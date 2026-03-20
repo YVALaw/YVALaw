@@ -132,7 +132,6 @@ All landing pages share the same structure: Hero → Problem → Solution + cost
 - Add real photos of the team / founders (currently using letter avatars)
 - Social media links in footer (currently `href="#"` placeholders)
 - Add a pricing toggle (part-time vs full-time hours)
-- SEO: add structured data / schema markup
 - Consider adding a Spanish-language version or language toggle
 - Connect landing pages to specific Google/YouTube ad campaigns
 - A/B test landing page headlines once ad campaigns are live
@@ -148,7 +147,17 @@ Already documented above.
 - Created `admin/index.html` + `admin/config.yml` — Decap CMS admin panel at /admin
 - Created `build.js` — runs on every Netlify deploy, generates posts/index.json from markdown files
 - Created `netlify.toml` — sets build command to `node build.js`, publish dir `.`
-- Added sample post: `posts/2026-03-20-why-law-firms-need-virtual-staff.md`
 - Added Blog link to main nav (desktop + mobile) and footer in index.html
 - Blog uses Netlify Identity + Git Gateway for CMS authentication
 - Writing workflow: /admin → write post → publish → Netlify auto-deploys in ~1 min
+
+### Session 5 (SEO + blog content)
+- Added JSON-LD structured data to `index.html`: Organization, ProfessionalService (all 4 services with prices), WebSite
+- Verify schema at search.google.com/test/rich-results
+- Wrote 6 SEO-targeted blog posts with Unsplash featured images:
+  - `why-law-firms-need-virtual-staff` — general virtual staffing trend
+  - `how-to-hire-a-legal-intake-specialist` — targets "hire legal intake specialist"
+  - `real-cost-inhouse-vs-virtual-legal-staff` — cost comparison with table
+  - `what-is-demand-writing` — targets "demand writing law firm"
+  - `signs-your-firm-needs-a-virtual-case-manager` — targets "virtual case manager"
+  - `bilingual-staff-law-firms` — targets "bilingual legal staff" with U.S. market data
