@@ -38,3 +38,35 @@ fs.writeFileSync(
 );
 
 console.log(`Built posts/index.json — ${posts.length} post(s)`);
+
+// Generate sitemap.xml
+const BASE_URL = 'https://yvastaffing.agency';
+const today = new Date().toISOString().split('T')[0];
+
+const staticPages = [
+  { url: '/',             changefreq: 'weekly',  priority: '1.0', lastmod: today },
+  { url: '/blog.html',    changefreq: 'weekly',  priority: '0.9', lastmod: today },
+  { url: '/careers.html', changefreq: 'monthly', priority: '0.8', lastmod: today },
+];
+
+const postPages = posts.map(post => ({
+  url: `/blog-post.html?slug=${post.slug}`,
+  changefreq: 'monthly',
+  priority: '0.7',
+  lastmod: post.date ? post.date.split('T')[0] : today
+}));
+
+const allPages = [...staticPages, ...postPages];
+
+const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${allPages.map(p => `  <url>
+    <loc>${BASE_URL}${p.url}</loc>
+    <lastmod>${p.lastmod}</lastmod>
+    <changefreq>${p.changefreq}</changefreq>
+    <priority>${p.priority}</priority>
+  </url>`).join('\n')}
+</urlset>`;
+
+fs.writeFileSync(path.join(__dirname, 'sitemap.xml'), sitemap);
+console.log(`Built sitemap.xml — ${allPages.length} URL(s)`);

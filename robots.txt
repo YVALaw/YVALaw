@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /posts/index.json
+
+Sitemap: https://yvastaffing.agency/sitemap.xml
