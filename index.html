@@ -1085,6 +1085,131 @@
         </div>
     </section>
 
+    <!-- ROI Calculator Section -->
+    <section id="roi-calculator" class="py-20 lg:py-32 bg-slate-50">
+        <div class="max-w-7xl mx-auto px-6">
+
+            <div class="text-center mb-14">
+                <div class="inline-flex items-center gap-2 bg-yellow-400 text-[#1b1e2b] px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider mb-4">
+                    <i data-lucide="calculator" class="w-4 h-4"></i> Savings Calculator
+                </div>
+                <h2 class="text-4xl lg:text-5xl font-black text-[#1b1e2b] leading-tight">How Much Will Your Firm Save?</h2>
+                <p class="text-slate-500 text-lg font-medium mt-4 max-w-2xl mx-auto">Select the roles you need and see your exact savings — instantly.</p>
+            </div>
+
+            <div class="grid lg:grid-cols-2 gap-8 items-start">
+
+                <!-- Left: Inputs -->
+                <div class="bg-white rounded-3xl p-8 shadow-sm border border-slate-100">
+
+                    <!-- Hours Toggle -->
+                    <div class="mb-8">
+                        <p class="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Hours Per Week</p>
+                        <div class="grid grid-cols-3 gap-3">
+                            <button class="hours-btn py-3 rounded-2xl font-black text-sm border-2 border-slate-200 text-slate-500 hover:border-[#1b1e2b] hover:text-[#1b1e2b] transition-all" data-hours="20">Part-Time<span class="block text-xs font-bold text-slate-400">20 hrs/wk</span></button>
+                            <button class="hours-btn py-3 rounded-2xl font-black text-sm border-2 border-[#1b1e2b] bg-[#1b1e2b] text-white transition-all" data-hours="40">Full-Time<span class="block text-xs font-bold text-yellow-400">40 hrs/wk</span></button>
+                            <button class="hours-btn py-3 rounded-2xl font-black text-sm border-2 border-slate-200 text-slate-500 hover:border-[#1b1e2b] hover:text-[#1b1e2b] transition-all" data-hours="60">Overtime<span class="block text-xs font-bold text-slate-400">60 hrs/wk</span></button>
+                        </div>
+                    </div>
+
+                    <!-- Role Checkboxes -->
+                    <div>
+                        <p class="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Roles You Need</p>
+                        <div class="space-y-3">
+                            <label class="role-check flex items-center justify-between p-4 rounded-2xl border-2 border-slate-200 cursor-pointer hover:border-yellow-400 transition-all has-[:checked]:border-yellow-400 has-[:checked]:bg-yellow-50">
+                                <div class="flex items-center gap-3">
+                                    <input type="checkbox" value="intake" checked class="w-4 h-4 accent-yellow-400">
+                                    <div>
+                                        <p class="font-black text-[#1b1e2b] text-sm">Legal Intake Specialist</p>
+                                        <p class="text-xs text-slate-400 font-bold">$7.50/hr · YVA rate</p>
+                                    </div>
+                                </div>
+                                <span class="text-xs font-black text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">$4,200/mo in-house</span>
+                            </label>
+                            <label class="role-check flex items-center justify-between p-4 rounded-2xl border-2 border-slate-200 cursor-pointer hover:border-yellow-400 transition-all has-[:checked]:border-yellow-400 has-[:checked]:bg-yellow-50">
+                                <div class="flex items-center gap-3">
+                                    <input type="checkbox" value="assistant" class="w-4 h-4 accent-yellow-400">
+                                    <div>
+                                        <p class="font-black text-[#1b1e2b] text-sm">Legal Assistant</p>
+                                        <p class="text-xs text-slate-400 font-bold">$8.50/hr · YVA rate</p>
+                                    </div>
+                                </div>
+                                <span class="text-xs font-black text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">$5,000/mo in-house</span>
+                            </label>
+                            <label class="role-check flex items-center justify-between p-4 rounded-2xl border-2 border-slate-200 cursor-pointer hover:border-yellow-400 transition-all has-[:checked]:border-yellow-400 has-[:checked]:bg-yellow-50">
+                                <div class="flex items-center gap-3">
+                                    <input type="checkbox" value="demand" class="w-4 h-4 accent-yellow-400">
+                                    <div>
+                                        <p class="font-black text-[#1b1e2b] text-sm">Demand Writer</p>
+                                        <p class="text-xs text-slate-400 font-bold">$10/hr · YVA rate</p>
+                                    </div>
+                                </div>
+                                <span class="text-xs font-black text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">$5,500/mo in-house</span>
+                            </label>
+                            <label class="role-check flex items-center justify-between p-4 rounded-2xl border-2 border-slate-200 cursor-pointer hover:border-yellow-400 transition-all has-[:checked]:border-yellow-400 has-[:checked]:bg-yellow-50">
+                                <div class="flex items-center gap-3">
+                                    <input type="checkbox" value="casemanager" class="w-4 h-4 accent-yellow-400">
+                                    <div>
+                                        <p class="font-black text-[#1b1e2b] text-sm">Case Manager</p>
+                                        <p class="text-xs text-slate-400 font-bold">$12/hr · YVA rate</p>
+                                    </div>
+                                </div>
+                                <span class="text-xs font-black text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">$5,500/mo in-house</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Results -->
+                <div class="space-y-4 lg:sticky lg:top-28">
+
+                    <!-- No roles selected -->
+                    <div id="calc-empty" class="hidden bg-white rounded-3xl p-8 border-2 border-dashed border-slate-200 text-center">
+                        <i data-lucide="mouse-pointer-click" class="w-10 h-10 text-slate-300 mx-auto mb-3"></i>
+                        <p class="text-slate-400 font-bold">Select at least one role to see your savings.</p>
+                    </div>
+
+                    <!-- Results card -->
+                    <div id="calc-results" class="bg-[#1b1e2b] rounded-3xl p-8 text-white">
+                        <p class="text-xs font-black text-yellow-400 uppercase tracking-widest mb-6">Your Estimated Savings</p>
+
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <div class="bg-white/5 rounded-2xl p-4">
+                                <p class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">In-House Cost</p>
+                                <p id="calc-inhouse" class="text-2xl font-black text-slate-300 line-through decoration-red-400">$0</p>
+                                <p class="text-slate-500 text-xs font-bold">per month</p>
+                            </div>
+                            <div class="bg-yellow-400/10 border border-yellow-400/20 rounded-2xl p-4">
+                                <p class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">With YVA</p>
+                                <p id="calc-yva" class="text-2xl font-black text-yellow-400">$0</p>
+                                <p class="text-slate-500 text-xs font-bold">per month</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-5 mb-6">
+                            <div class="flex items-center justify-between mb-1">
+                                <p class="text-emerald-400 text-xs font-black uppercase tracking-widest">Monthly Savings</p>
+                                <i data-lucide="trending-up" class="w-4 h-4 text-emerald-400"></i>
+                            </div>
+                            <p id="calc-monthly-savings" class="text-4xl font-black text-emerald-400">$0</p>
+                            <p class="text-slate-400 text-xs font-bold mt-1">Annual savings: <span id="calc-annual-savings" class="text-white font-black">$0</span></p>
+                        </div>
+
+                        <!-- Breakdown -->
+                        <div id="calc-breakdown" class="space-y-2 mb-6 text-sm"></div>
+
+                        <button onclick="openCalendly()" class="w-full bg-yellow-400 text-[#1b1e2b] py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-300 transition-all">
+                            Lock In These Savings <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+
+                    <p class="text-center text-xs text-slate-400 font-medium px-4">In-house estimates include salary, taxes, benefits & overhead. No contracts required with YVA.</p>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
     <!-- How It Works Section -->
     <section id="how-it-works" class="bg-[#1b1e2b] py-20 lg:py-32 overflow-hidden">
         <div class="max-w-7xl mx-auto px-6">
@@ -2250,6 +2375,93 @@
         });
 
         startAutoSlide();
+
+        // ROI Calculator
+        const roiRoles = {
+            intake:      { name: 'Legal Intake Specialist', rate: 7.50,  inhouse: 4200 },
+            assistant:   { name: 'Legal Assistant',         rate: 8.50,  inhouse: 5000 },
+            demand:      { name: 'Demand Writer',           rate: 10.00, inhouse: 5500 },
+            casemanager: { name: 'Case Manager',            rate: 12.00, inhouse: 5500 }
+        };
+
+        let roiHours = 40;
+
+        function formatCurrency(n) {
+            return '$' + Math.round(n).toLocaleString('en-US');
+        }
+
+        function calculateROI() {
+            const checked = [...document.querySelectorAll('.role-check input[type="checkbox"]:checked')]
+                .map(cb => cb.value);
+
+            const calcEmpty   = document.getElementById('calc-empty');
+            const calcResults = document.getElementById('calc-results');
+
+            if (checked.length === 0) {
+                calcEmpty.classList.remove('hidden');
+                calcResults.classList.add('hidden');
+                return;
+            }
+
+            calcEmpty.classList.add('hidden');
+            calcResults.classList.remove('hidden');
+
+            const weeksPerMonth = 4.33;
+            let totalInhouse = 0;
+            let totalYVA = 0;
+            let breakdownHTML = '';
+
+            checked.forEach(key => {
+                const role = roiRoles[key];
+                const yvaMonthly = role.rate * roiHours * weeksPerMonth;
+                totalInhouse += role.inhouse;
+                totalYVA += yvaMonthly;
+
+                breakdownHTML += `
+                    <div class="flex items-center justify-between text-xs py-2 border-b border-white/10 last:border-0">
+                        <span class="text-slate-400 font-bold">${role.name}</span>
+                        <div class="flex items-center gap-2">
+                            <span class="text-slate-500 line-through">${formatCurrency(role.inhouse)}</span>
+                            <span class="text-yellow-400 font-black">${formatCurrency(yvaMonthly)}</span>
+                        </div>
+                    </div>`;
+            });
+
+            const monthlySavings = totalInhouse - totalYVA;
+            const annualSavings  = monthlySavings * 12;
+
+            document.getElementById('calc-inhouse').textContent         = formatCurrency(totalInhouse);
+            document.getElementById('calc-yva').textContent             = formatCurrency(totalYVA);
+            document.getElementById('calc-monthly-savings').textContent = formatCurrency(monthlySavings);
+            document.getElementById('calc-annual-savings').textContent  = formatCurrency(annualSavings);
+            document.getElementById('calc-breakdown').innerHTML         = breakdownHTML;
+        }
+
+        // Hours buttons
+        document.querySelectorAll('.hours-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                roiHours = parseInt(btn.dataset.hours);
+                document.querySelectorAll('.hours-btn').forEach(b => {
+                    b.classList.remove('border-[#1b1e2b]', 'bg-[#1b1e2b]', 'text-white');
+                    b.classList.add('border-slate-200', 'text-slate-500');
+                    b.querySelector('span').classList.remove('text-yellow-400');
+                    b.querySelector('span').classList.add('text-slate-400');
+                });
+                btn.classList.add('border-[#1b1e2b]', 'bg-[#1b1e2b]', 'text-white');
+                btn.classList.remove('border-slate-200', 'text-slate-500');
+                btn.querySelector('span').classList.add('text-yellow-400');
+                btn.querySelector('span').classList.remove('text-slate-400');
+                calculateROI();
+            });
+        });
+
+        // Role checkboxes
+        document.querySelectorAll('.role-check input[type="checkbox"]').forEach(cb => {
+            cb.addEventListener('change', calculateROI);
+        });
+
+        // Run on load (intake is pre-checked)
+        calculateROI();
 
         // Active nav highlight on scroll
         const navLinks = document.querySelectorAll('.hidden.md\\:flex a[href^="#"]');

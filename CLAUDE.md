@@ -128,13 +128,33 @@ All landing pages share the same structure: Hero → Problem → Solution + cost
 
 ---
 
-## Potential Future Work
-- Add real photos of the team / founders (currently using letter avatars)
-- Social media links in footer (currently `href="#"` placeholders)
-- Add a pricing toggle (part-time vs full-time hours)
-- Consider adding a Spanish-language version or language toggle
-- Connect landing pages to specific Google/YouTube ad campaigns
-- A/B test landing page headlines once ad campaigns are live
+## Growth Roadmap (from session 6 audit)
+
+### High Priority
+- [x] ROI Calculator — interactive savings calculator on index.html (session 6)
+- [ ] WhatsApp floating button — 30 min, high conversion for bilingual market
+- [ ] Client logos bar — show FoodNet PR, Top Law Assist, Halavi Law on homepage
+- [ ] Live chat — Tidio free tier, catches visitors before they leave
+
+### Medium Priority
+- [ ] Growth Services section on main site — Social Media, Web Design, Marketing for law firms (roles exist on careers but not marketed to clients yet)
+- [ ] Practice area landing pages — dedicated pages for PI firms, Employment firms, Workers Comp (each ranks for own keywords)
+- [ ] Exit intent email capture popup
+- [ ] FAQ schema markup — structured data for FAQ section (can trigger rich results in Google)
+- [ ] Lead magnet — free PDF "Legal Staffing Checklist" in exchange for email
+
+### Low Priority / Future
+- [ ] Video — 60-sec founder or explainer video (highest trust signal)
+- [ ] Case studies — detailed client stories with results
+- [ ] Free trial / pilot offer — "Try 1 week" lowers barrier to yes
+- [ ] Spanish-language version or language toggle
+- [ ] Pricing toggle (part-time vs full-time hours)
+- [ ] Real photos of team / founders (currently pravatar.cc placeholders)
+- [ ] Social media links (footer currently href="#" placeholders)
+- [ ] Connect landing pages to Google/Meta ad campaigns
+- [ ] A/B test landing page headlines once campaigns are live
+
+## Potential Future Work (original)
 - Add Blog and Careers links to landing pages footer (currently minimal by design)
 
 ### Session 3 (careers page)
