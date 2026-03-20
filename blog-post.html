@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Blog | YVA Law Staffing</title>
+  <meta name="robots" content="index, follow">
+
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-V2Q6V4HE4F"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-V2Q6V4HE4F');
+  </script>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Inter', sans-serif; }
+    .nav-scrolled {
+      background-color: white;
+      box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1);
+      padding-top: 0.75rem;
+      padding-bottom: 0.75rem;
+    }
+    #mobile-menu {
+      transform: translateX(100%);
+      transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    #mobile-menu.open { transform: translateX(0); }
+
+    /* Prose styles for rendered markdown */
+    .prose h2 { font-size: 1.5rem; font-weight: 900; color: #1b1e2b; margin-top: 2.5rem; margin-bottom: 1rem; line-height: 1.2; }
+    .prose h3 { font-size: 1.2rem; font-weight: 900; color: #1b1e2b; margin-top: 2rem; margin-bottom: 0.75rem; }
+    .prose p { color: #475569; font-size: 1.05rem; line-height: 1.8; margin-bottom: 1.25rem; font-weight: 500; }
+    .prose ul { list-style: none; padding: 0; margin-bottom: 1.25rem; }
+    .prose ul li { color: #475569; font-size: 1.05rem; line-height: 1.8; font-weight: 500; padding-left: 1.5rem; position: relative; margin-bottom: 0.4rem; }
+    .prose ul li::before { content: ''; position: absolute; left: 0; top: 0.65rem; width: 8px; height: 8px; background: #facc15; border-radius: 50%; }
+    .prose ol { list-style: decimal; padding-left: 1.5rem; margin-bottom: 1.25rem; }
+    .prose ol li { color: #475569; font-size: 1.05rem; line-height: 1.8; font-weight: 500; margin-bottom: 0.4rem; }
+    .prose strong { color: #1b1e2b; font-weight: 900; }
+    .prose a { color: #1b1e2b; font-weight: 700; text-decoration: underline; text-decoration-color: #facc15; text-underline-offset: 3px; }
+    .prose a:hover { color: #facc15; }
+    .prose blockquote { border-left: 4px solid #facc15; padding-left: 1.25rem; margin: 1.5rem 0; }
+    .prose blockquote p { color: #64748b; font-style: italic; }
+    .prose hr { border: none; border-top: 1px solid #e2e8f0; margin: 2rem 0; }
+  </style>
+</head>
+<body class="bg-white text-slate-900 overflow-x-hidden">
+
+  <!-- Top Utility Bar -->
+  <div class="bg-[#1b1e2b] text-white py-2 px-6 hidden md:block border-b border-white/10">
+    <div class="max-w-7xl mx-auto flex justify-between items-center text-[11px] font-bold tracking-widest uppercase">
+      <div class="flex gap-8">
+        <span class="flex items-center gap-2">
+          <i data-lucide="globe" class="w-3.5 h-3.5 text-yellow-400"></i> English & Spanish Support
+        </span>
+        <span class="flex items-center gap-2 text-slate-400">
+          <i data-lucide="users" class="w-3.5 h-3.5"></i> High-Retention Specialists
+        </span>
+      </div>
+      <div class="flex gap-6">
+        <a href="mailto:contact@yvastaffing.agency" class="hover:text-yellow-400 transition-colors">contact@yvastaffing.agency</a>
+        <span class="text-yellow-400 font-black">Mon - Fri: 9am - 6pm</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <nav id="navbar" class="fixed md:sticky w-full z-50 transition-all duration-300 top-0 bg-white py-6">
+    <div class="max-w-7xl mx-auto px-6 flex justify-between items-center">
+      <a href="index.html" class="flex items-center gap-3 cursor-pointer group">
+        <div class="bg-[#1b1e2b] w-12 h-12 rounded-xl flex items-center justify-center transition-transform group-hover:rotate-6 shadow-lg text-yellow-400">
+          <i data-lucide="users" class="w-7 h-7"></i>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-2xl font-black tracking-tighter leading-none text-[#1b1e2b]">YVA <span class="text-base">Law</span></span>
+          <span class="text-[10px] uppercase tracking-[0.3em] font-bold text-slate-400">Staffing</span>
+        </div>
+      </a>
+
+      <div class="hidden md:flex items-center gap-10 font-black text-[12px] uppercase tracking-widest text-[#1b1e2b]">
+        <a href="index.html#home" class="hover:text-yellow-500 transition-colors">Home</a>
+        <a href="index.html#service-pillars" class="hover:text-yellow-500 transition-colors">Services</a>
+        <a href="index.html#how-it-works" class="hover:text-yellow-500 transition-colors">How It Works</a>
+        <a href="index.html#about" class="hover:text-yellow-500 transition-colors">About</a>
+        <a href="careers.html" class="hover:text-yellow-500 transition-colors">Careers</a>
+        <a href="blog.html" class="text-yellow-500 border-b-2 border-yellow-400 pb-0.5">Blog</a>
+        <a href="index.html" class="bg-[#1b1e2b] text-white px-8 py-3.5 rounded-full hover:bg-yellow-500 hover:text-[#1b1e2b] transition-all flex items-center gap-2 shadow-lg">
+          Book a Call <i data-lucide="calendar" class="w-4 h-4"></i>
+        </a>
+      </div>
+
+      <button id="mobile-menu-toggle" aria-label="Open menu" class="md:hidden text-[#1b1e2b] p-2 rounded-xl hover:bg-slate-100 transition-colors">
+        <i id="menu-icon-open" data-lucide="menu" class="w-6 h-6"></i>
+        <i id="menu-icon-close" data-lucide="x" class="w-6 h-6 hidden"></i>
+      </button>
+    </div>
+  </nav>
+
+  <!-- Mobile Menu -->
+  <div id="mobile-menu" class="fixed top-0 right-0 h-full w-full max-w-sm bg-[#1b1e2b] z-[60] flex flex-col shadow-2xl md:hidden">
+    <div class="flex items-center justify-between px-6 py-5 border-b border-white/10">
+      <div class="flex items-center gap-3">
+        <div class="bg-yellow-400 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg">
+          <i data-lucide="users" class="w-5 h-5 text-[#1b1e2b]"></i>
+        </div>
+        <div class="flex flex-col">
+          <span class="text-xl font-black tracking-tighter leading-none text-white">YVA <span class="text-sm">Law</span></span>
+          <span class="text-[10px] uppercase tracking-[0.3em] font-bold text-slate-400">Staffing</span>
+        </div>
+      </div>
+      <button id="mobile-menu-close" class="text-slate-400 hover:text-yellow-400 transition-colors p-2 rounded-xl hover:bg-white/10">
+        <i data-lucide="x" class="w-6 h-6"></i>
+      </button>
+    </div>
+    <nav class="flex flex-col px-6 py-8 gap-2 flex-1">
+      <a href="index.html#home" class="mobile-nav-link flex items-center gap-3 px-4 py-4 rounded-2xl text-white font-black text-sm uppercase tracking-widest hover:bg-white/10 hover:text-yellow-400 transition-all">
+        <i data-lucide="home" class="w-4 h-4 text-yellow-400"></i> Home
+      </a>
+      <a href="index.html#service-pillars" class="mobile-nav-link flex items-center gap-3 px-4 py-4 rounded-2xl text-white font-black text-sm uppercase tracking-widest hover:bg-white/10 hover:text-yellow-400 transition-all">
+        <i data-lucide="briefcase" class="w-4 h-4 text-yellow-400"></i> Services
+      </a>
+      <a href="careers.html" class="mobile-nav-link flex items-center gap-3 px-4 py-4 rounded-2xl text-white font-black text-sm uppercase tracking-widest hover:bg-white/10 hover:text-yellow-400 transition-all">
+        <i data-lucide="user-plus" class="w-4 h-4 text-yellow-400"></i> Careers
+      </a>
+      <a href="blog.html" class="flex items-center gap-3 px-4 py-4 rounded-2xl bg-white/10 text-yellow-400 font-black text-sm uppercase tracking-widest">
+        <i data-lucide="book-open" class="w-4 h-4 text-yellow-400"></i> Blog
+      </a>
+    </nav>
+  </div>
+  <div id="mobile-backdrop" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[55] hidden md:hidden"></div>
+
+  <!-- Post content -->
+  <article class="max-w-3xl mx-auto px-6 py-16 lg:py-24">
+
+    <!-- Back link -->
+    <a href="blog.html" class="inline-flex items-center gap-2 text-sm font-black text-slate-500 hover:text-yellow-500 uppercase tracking-widest transition-colors mb-12">
+      <i data-lucide="arrow-left" class="w-4 h-4"></i> Back to Blog
+    </a>
+
+    <!-- Loading -->
+    <div id="post-loading" class="text-center py-20">
+      <div class="w-12 h-12 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+      <p class="text-slate-500 font-medium">Loading post...</p>
+    </div>
+
+    <!-- Error -->
+    <div id="post-error" class="hidden text-center py-20">
+      <div class="w-20 h-20 bg-slate-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
+        <i data-lucide="alert-circle" class="w-10 h-10 text-slate-300"></i>
+      </div>
+      <h3 class="text-xl font-black text-slate-400">Post not found</h3>
+      <a href="blog.html" class="mt-4 inline-block text-yellow-500 font-bold hover:underline">Back to Blog</a>
+    </div>
+
+    <!-- Post -->
+    <div id="post-content" class="hidden">
+      <div id="post-image-wrap" class="hidden mb-10 rounded-3xl overflow-hidden shadow-xl">
+        <img id="post-image" src="" alt="" class="w-full max-h-96 object-cover">
+      </div>
+      <p id="post-date" class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4"></p>
+      <h1 id="post-title" class="text-4xl lg:text-5xl font-black text-[#1b1e2b] leading-tight tracking-tight mb-6"></h1>
+      <p id="post-description" class="text-xl text-slate-500 font-medium leading-relaxed mb-10 pb-10 border-b border-slate-100"></p>
+      <div id="post-body" class="prose"></div>
+    </div>
+
+  </article>
+
+  <!-- CTA Banner -->
+  <section class="bg-[#1b1e2b] py-16">
+    <div class="max-w-4xl mx-auto px-6 text-center">
+      <h2 class="text-3xl lg:text-4xl font-black text-white mb-4">Ready to build your virtual team?</h2>
+      <p class="text-slate-400 font-medium mb-8">Starting at $7.50/hr — no contracts, no overhead.</p>
+      <a href="index.html" class="bg-yellow-400 text-[#1b1e2b] px-10 py-5 rounded-2xl font-black text-lg inline-flex items-center gap-3 hover:bg-yellow-300 hover:translate-y-[-4px] transition-all shadow-2xl shadow-yellow-400/20">
+        Book a Free Call <i data-lucide="arrow-right" class="w-5 h-5"></i>
+      </a>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="bg-[#1b1e2b] border-t border-white/10">
+    <div class="max-w-7xl mx-auto px-6">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-12 py-16">
+        <div>
+          <a href="index.html" class="flex items-center gap-3 mb-6 group w-fit">
+            <div class="bg-yellow-400 w-11 h-11 rounded-xl flex items-center justify-center transition-transform group-hover:rotate-6 shadow-lg">
+              <i data-lucide="users" class="w-6 h-6 text-[#1b1e2b]"></i>
+            </div>
+            <div class="flex flex-col">
+              <span class="text-xl font-black tracking-tighter leading-none text-white">YVA <span class="text-sm">Law</span></span>
+              <span class="text-[10px] uppercase tracking-[0.3em] font-bold text-slate-400">Staffing</span>
+            </div>
+          </a>
+          <p class="text-slate-400 text-sm font-medium leading-relaxed">Elite bilingual virtual staffing for law firms. Starting at <span class="text-yellow-400 font-bold">$7.50/hr</span>.</p>
+        </div>
+        <div>
+          <p class="text-white font-black text-xs uppercase tracking-widest mb-6">Quick Links</p>
+          <ul class="space-y-3">
+            <li><a href="index.html#home" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Home</a></li>
+            <li><a href="index.html#service-pillars" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Services</a></li>
+            <li><a href="careers.html" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Careers</a></li>
+            <li><a href="blog.html" class="text-yellow-400 text-sm font-medium flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Blog</a></li>
+          </ul>
+        </div>
+        <div>
+          <p class="text-white font-black text-xs uppercase tracking-widest mb-6">Get In Touch</p>
+          <ul class="space-y-4">
+            <li><a href="mailto:contact@yvastaffing.agency" class="flex items-start gap-3 text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors"><i data-lucide="mail" class="w-4 h-4 mt-0.5 flex-shrink-0"></i> contact@yvastaffing.agency</a></li>
+            <li><div class="flex items-start gap-3 text-slate-400 text-sm font-medium"><i data-lucide="clock" class="w-4 h-4 mt-0.5 flex-shrink-0"></i> Mon - Fri · 9am - 6pm EST</div></li>
+          </ul>
+        </div>
+      </div>
+      <div class="border-t border-white/10 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <p class="text-slate-500 text-xs font-medium">© 2025 YVA Law Staffing. All rights reserved.</p>
+        <p class="text-slate-600 text-xs font-medium">Proudly serving U.S. law firms from the Dominican Republic</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    lucide.createIcons();
+
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      navbar.classList.toggle('nav-scrolled', window.scrollY > 50);
+    });
+
+    function openMobileMenu() {
+      document.getElementById('mobile-menu').classList.add('open');
+      document.getElementById('mobile-backdrop').classList.remove('hidden');
+      document.getElementById('menu-icon-open').classList.add('hidden');
+      document.getElementById('menu-icon-close').classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeMobileMenu() {
+      document.getElementById('mobile-menu').classList.remove('open');
+      document.getElementById('mobile-backdrop').classList.add('hidden');
+      document.getElementById('menu-icon-open').classList.remove('hidden');
+      document.getElementById('menu-icon-close').classList.add('hidden');
+      document.body.style.overflow = '';
+    }
+    document.getElementById('mobile-menu-toggle').addEventListener('click', openMobileMenu);
+    document.getElementById('mobile-menu-close').addEventListener('click', closeMobileMenu);
+    document.getElementById('mobile-backdrop').addEventListener('click', closeMobileMenu);
+    document.querySelectorAll('.mobile-nav-link').forEach(l => l.addEventListener('click', closeMobileMenu));
+
+    // Load post
+    async function loadPost() {
+      const params = new URLSearchParams(window.location.search);
+      const slug = params.get('slug');
+      if (!slug) { showError(); return; }
+
+      try {
+        const res = await fetch(`/posts/${slug}.md`);
+        if (!res.ok) throw new Error();
+        const text = await res.text();
+
+        // Parse frontmatter
+        const match = text.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+        if (!match) throw new Error();
+
+        const frontmatter = {};
+        match[1].split('\n').forEach(line => {
+          const colonIndex = line.indexOf(': ');
+          if (colonIndex === -1) return;
+          const key = line.slice(0, colonIndex).trim();
+          const val = line.slice(colonIndex + 2).trim().replace(/^["']|["']$/g, '');
+          frontmatter[key] = val;
+        });
+
+        const body = match[2];
+
+        // Update page meta
+        if (frontmatter.title) {
+          document.title = `${frontmatter.title} | YVA Law Staffing`;
+        }
+
+        // Populate
+        if (frontmatter.date) {
+          document.getElementById('post-date').textContent = new Date(frontmatter.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+        }
+        document.getElementById('post-title').textContent = frontmatter.title || '';
+        if (frontmatter.description) {
+          document.getElementById('post-description').textContent = frontmatter.description;
+        } else {
+          document.getElementById('post-description').remove();
+        }
+        if (frontmatter.image) {
+          document.getElementById('post-image').src = frontmatter.image;
+          document.getElementById('post-image').alt = frontmatter.title || '';
+          document.getElementById('post-image-wrap').classList.remove('hidden');
+        }
+        document.getElementById('post-body').innerHTML = marked.parse(body);
+
+        document.getElementById('post-loading').classList.add('hidden');
+        document.getElementById('post-content').classList.remove('hidden');
+        lucide.createIcons();
+      } catch (e) {
+        showError();
+      }
+    }
+
+    function showError() {
+      document.getElementById('post-loading').classList.add('hidden');
+      document.getElementById('post-error').classList.remove('hidden');
+    }
+
+    loadPost();
+  </script>
+
+</body>
+</html>
