@@ -1086,124 +1086,143 @@
     </section>
 
     <!-- ROI Calculator Section -->
-    <section id="roi-calculator" class="py-20 lg:py-32 bg-slate-50">
-        <div class="max-w-7xl mx-auto px-6">
+    <section id="roi-calculator" class="bg-[#1b1e2b] py-20 lg:py-32 overflow-hidden relative">
 
+        <!-- Decorative glows -->
+        <div class="absolute top-10 left-1/4 w-[500px] h-[500px] bg-yellow-400/5 rounded-full blur-[120px] pointer-events-none"></div>
+        <div class="absolute bottom-10 right-1/4 w-[400px] h-[400px] bg-yellow-400/5 rounded-full blur-[100px] pointer-events-none"></div>
+
+        <div class="max-w-7xl mx-auto px-6 relative">
+
+            <!-- Header -->
             <div class="text-center mb-14">
-                <div class="inline-flex items-center gap-2 bg-yellow-400 text-[#1b1e2b] px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider mb-4">
-                    <i data-lucide="calculator" class="w-4 h-4"></i> Savings Calculator
-                </div>
-                <h2 class="text-4xl lg:text-5xl font-black text-[#1b1e2b] leading-tight">How Much Will Your Firm Save?</h2>
-                <p class="text-slate-500 text-lg font-medium mt-4 max-w-2xl mx-auto">Select the roles you need and see your exact savings — instantly.</p>
+                <p class="text-yellow-400 font-black uppercase text-xs tracking-[0.3em] mb-3">Savings Calculator</p>
+                <h2 class="text-4xl lg:text-5xl font-black text-white leading-tight">How Much Will Your Firm Save?</h2>
+                <p class="text-slate-400 font-medium mt-4 max-w-2xl mx-auto">Pick the roles you need and see your exact savings — updated in real time.</p>
             </div>
 
             <div class="grid lg:grid-cols-2 gap-8 items-start">
 
                 <!-- Left: Inputs -->
-                <div class="bg-white rounded-3xl p-8 shadow-sm border border-slate-100">
+                <div class="bg-white rounded-[2rem] p-8 lg:p-10">
 
                     <!-- Hours Toggle -->
                     <div class="mb-8">
-                        <p class="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Hours Per Week</p>
-                        <div class="grid grid-cols-3 gap-3">
-                            <button class="hours-btn py-3 rounded-2xl font-black text-sm border-2 border-slate-200 text-slate-500 hover:border-[#1b1e2b] hover:text-[#1b1e2b] transition-all" data-hours="20">Part-Time<span class="block text-xs font-bold text-slate-400">20 hrs/wk</span></button>
-                            <button class="hours-btn py-3 rounded-2xl font-black text-sm border-2 border-[#1b1e2b] bg-[#1b1e2b] text-white transition-all" data-hours="40">Full-Time<span class="block text-xs font-bold text-yellow-400">40 hrs/wk</span></button>
-                            <button class="hours-btn py-3 rounded-2xl font-black text-sm border-2 border-slate-200 text-slate-500 hover:border-[#1b1e2b] hover:text-[#1b1e2b] transition-all" data-hours="60">Overtime<span class="block text-xs font-bold text-slate-400">60 hrs/wk</span></button>
+                        <p class="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-3">Hours Per Week</p>
+                        <div class="grid grid-cols-3 gap-1.5 bg-slate-100 p-1.5 rounded-2xl">
+                            <button class="hours-btn py-3 px-2 rounded-xl font-black text-sm text-slate-400 transition-all" data-hours="20">Part-Time<span class="block text-xs font-bold text-slate-400">20 hrs/wk</span></button>
+                            <button class="hours-btn py-3 px-2 rounded-xl font-black text-sm bg-[#1b1e2b] text-white shadow-lg transition-all" data-hours="40">Full-Time<span class="block text-xs font-bold text-yellow-400">40 hrs/wk</span></button>
+                            <button class="hours-btn py-3 px-2 rounded-xl font-black text-sm text-slate-400 transition-all" data-hours="60">Overtime<span class="block text-xs font-bold text-slate-400">60 hrs/wk</span></button>
                         </div>
                     </div>
 
                     <!-- Role Checkboxes -->
                     <div>
-                        <p class="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">Roles You Need</p>
-                        <div class="space-y-3">
-                            <label class="role-check flex items-center justify-between p-4 rounded-2xl border-2 border-slate-200 cursor-pointer hover:border-yellow-400 transition-all has-[:checked]:border-yellow-400 has-[:checked]:bg-yellow-50">
-                                <div class="flex items-center gap-3">
-                                    <input type="checkbox" value="intake" checked class="w-4 h-4 accent-yellow-400">
-                                    <div>
-                                        <p class="font-black text-[#1b1e2b] text-sm">Legal Intake Specialist</p>
-                                        <p class="text-xs text-slate-400 font-bold">$7.50/hr · YVA rate</p>
-                                    </div>
+                        <p class="text-xs font-black text-slate-400 uppercase tracking-[0.2em] mb-3">Roles You Need</p>
+                        <div class="space-y-2.5">
+
+                            <label class="role-check flex items-center gap-4 p-4 rounded-2xl border-2 border-slate-100 cursor-pointer hover:border-yellow-400/60 transition-all has-[:checked]:border-yellow-400 has-[:checked]:bg-yellow-50">
+                                <input type="checkbox" value="intake" checked class="w-5 h-5 accent-yellow-400 cursor-pointer flex-shrink-0 rounded">
+                                <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                    <i data-lucide="phone-incoming" class="w-5 h-5 text-[#1b1e2b]"></i>
                                 </div>
-                                <span class="text-xs font-black text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">$4,200/mo in-house</span>
-                            </label>
-                            <label class="role-check flex items-center justify-between p-4 rounded-2xl border-2 border-slate-200 cursor-pointer hover:border-yellow-400 transition-all has-[:checked]:border-yellow-400 has-[:checked]:bg-yellow-50">
-                                <div class="flex items-center gap-3">
-                                    <input type="checkbox" value="assistant" class="w-4 h-4 accent-yellow-400">
-                                    <div>
-                                        <p class="font-black text-[#1b1e2b] text-sm">Legal Assistant</p>
-                                        <p class="text-xs text-slate-400 font-bold">$8.50/hr · YVA rate</p>
-                                    </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-black text-[#1b1e2b] text-sm">Legal Intake Specialist</p>
+                                    <p class="text-xs text-slate-400 font-semibold">$7.50/hr with YVA &nbsp;·&nbsp; ~$4,200/mo in-house</p>
                                 </div>
-                                <span class="text-xs font-black text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">$5,000/mo in-house</span>
                             </label>
-                            <label class="role-check flex items-center justify-between p-4 rounded-2xl border-2 border-slate-200 cursor-pointer hover:border-yellow-400 transition-all has-[:checked]:border-yellow-400 has-[:checked]:bg-yellow-50">
-                                <div class="flex items-center gap-3">
-                                    <input type="checkbox" value="demand" class="w-4 h-4 accent-yellow-400">
-                                    <div>
-                                        <p class="font-black text-[#1b1e2b] text-sm">Demand Writer</p>
-                                        <p class="text-xs text-slate-400 font-bold">$10/hr · YVA rate</p>
-                                    </div>
+
+                            <label class="role-check flex items-center gap-4 p-4 rounded-2xl border-2 border-slate-100 cursor-pointer hover:border-yellow-400/60 transition-all has-[:checked]:border-yellow-400 has-[:checked]:bg-yellow-50">
+                                <input type="checkbox" value="assistant" class="w-5 h-5 accent-yellow-400 cursor-pointer flex-shrink-0 rounded">
+                                <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                    <i data-lucide="briefcase" class="w-5 h-5 text-[#1b1e2b]"></i>
                                 </div>
-                                <span class="text-xs font-black text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">$5,500/mo in-house</span>
-                            </label>
-                            <label class="role-check flex items-center justify-between p-4 rounded-2xl border-2 border-slate-200 cursor-pointer hover:border-yellow-400 transition-all has-[:checked]:border-yellow-400 has-[:checked]:bg-yellow-50">
-                                <div class="flex items-center gap-3">
-                                    <input type="checkbox" value="casemanager" class="w-4 h-4 accent-yellow-400">
-                                    <div>
-                                        <p class="font-black text-[#1b1e2b] text-sm">Case Manager</p>
-                                        <p class="text-xs text-slate-400 font-bold">$12/hr · YVA rate</p>
-                                    </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-black text-[#1b1e2b] text-sm">Legal Assistant</p>
+                                    <p class="text-xs text-slate-400 font-semibold">$8.50/hr with YVA &nbsp;·&nbsp; ~$5,000/mo in-house</p>
                                 </div>
-                                <span class="text-xs font-black text-slate-400 bg-slate-100 px-2 py-1 rounded-lg">$5,500/mo in-house</span>
                             </label>
+
+                            <label class="role-check flex items-center gap-4 p-4 rounded-2xl border-2 border-slate-100 cursor-pointer hover:border-yellow-400/60 transition-all has-[:checked]:border-yellow-400 has-[:checked]:bg-yellow-50">
+                                <input type="checkbox" value="demand" class="w-5 h-5 accent-yellow-400 cursor-pointer flex-shrink-0 rounded">
+                                <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                    <i data-lucide="file-text" class="w-5 h-5 text-[#1b1e2b]"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-black text-[#1b1e2b] text-sm">Demand Writer</p>
+                                    <p class="text-xs text-slate-400 font-semibold">$10/hr with YVA &nbsp;·&nbsp; ~$5,500/mo in-house</p>
+                                </div>
+                            </label>
+
+                            <label class="role-check flex items-center gap-4 p-4 rounded-2xl border-2 border-slate-100 cursor-pointer hover:border-yellow-400/60 transition-all has-[:checked]:border-yellow-400 has-[:checked]:bg-yellow-50">
+                                <input type="checkbox" value="casemanager" class="w-5 h-5 accent-yellow-400 cursor-pointer flex-shrink-0 rounded">
+                                <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center flex-shrink-0">
+                                    <i data-lucide="layout-dashboard" class="w-5 h-5 text-[#1b1e2b]"></i>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-black text-[#1b1e2b] text-sm">Case Manager</p>
+                                    <p class="text-xs text-slate-400 font-semibold">$12/hr with YVA &nbsp;·&nbsp; ~$5,500/mo in-house</p>
+                                </div>
+                            </label>
+
                         </div>
                     </div>
+
+                    <p class="text-xs text-slate-400 font-medium mt-6 pt-6 border-t border-slate-100">In-house estimates include salary, taxes, benefits &amp; overhead. Actual savings may vary.</p>
                 </div>
 
                 <!-- Right: Results -->
                 <div class="space-y-4 lg:sticky lg:top-28">
 
                     <!-- No roles selected -->
-                    <div id="calc-empty" class="hidden bg-white rounded-3xl p-8 border-2 border-dashed border-slate-200 text-center">
-                        <i data-lucide="mouse-pointer-click" class="w-10 h-10 text-slate-300 mx-auto mb-3"></i>
+                    <div id="calc-empty" class="hidden bg-white/5 border border-white/10 rounded-[2rem] p-12 text-center">
+                        <div class="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                            <i data-lucide="mouse-pointer-click" class="w-8 h-8 text-slate-500"></i>
+                        </div>
                         <p class="text-slate-400 font-bold">Select at least one role to see your savings.</p>
                     </div>
 
                     <!-- Results card -->
-                    <div id="calc-results" class="bg-[#1b1e2b] rounded-3xl p-8 text-white">
-                        <p class="text-xs font-black text-yellow-400 uppercase tracking-widest mb-6">Your Estimated Savings</p>
+                    <div id="calc-results" class="relative bg-white/5 border border-white/10 rounded-[2rem] p-8 lg:p-10 overflow-hidden">
 
-                        <div class="grid grid-cols-2 gap-4 mb-6">
+                        <!-- Card glow -->
+                        <div class="absolute -top-12 -right-12 w-56 h-56 bg-yellow-400/15 rounded-full blur-[70px] pointer-events-none"></div>
+
+                        <p class="text-xs font-black text-yellow-400 uppercase tracking-[0.3em] mb-6 relative">Your Estimated Savings</p>
+
+                        <!-- Hero savings number -->
+                        <div class="relative mb-6">
+                            <p class="text-slate-400 text-xs font-black uppercase tracking-[0.2em] mb-1">You Save Every Month</p>
+                            <p id="calc-monthly-savings" class="text-6xl lg:text-7xl font-black text-white leading-none">$0</p>
+                            <div class="flex items-center gap-2 mt-3">
+                                <i data-lucide="trending-up" class="w-4 h-4 text-emerald-400 flex-shrink-0"></i>
+                                <p class="text-slate-400 text-sm font-bold">Annual savings: <span id="calc-annual-savings" class="text-emerald-400 font-black">$0</span></p>
+                            </div>
+                        </div>
+
+                        <!-- In-house vs YVA -->
+                        <div class="grid grid-cols-2 gap-3 mb-6 relative">
                             <div class="bg-white/5 rounded-2xl p-4">
-                                <p class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">In-House Cost</p>
-                                <p id="calc-inhouse" class="text-2xl font-black text-slate-300 line-through decoration-red-400">$0</p>
-                                <p class="text-slate-500 text-xs font-bold">per month</p>
+                                <p class="text-slate-500 text-xs font-black uppercase tracking-widest mb-2">In-House Cost</p>
+                                <p id="calc-inhouse" class="text-2xl font-black text-slate-400 line-through decoration-red-500/60">$0</p>
+                                <p class="text-slate-600 text-xs font-bold mt-1">per month</p>
                             </div>
                             <div class="bg-yellow-400/10 border border-yellow-400/20 rounded-2xl p-4">
-                                <p class="text-slate-400 text-xs font-bold uppercase tracking-widest mb-1">With YVA</p>
+                                <p class="text-yellow-400/70 text-xs font-black uppercase tracking-widest mb-2">With YVA</p>
                                 <p id="calc-yva" class="text-2xl font-black text-yellow-400">$0</p>
-                                <p class="text-slate-500 text-xs font-bold">per month</p>
+                                <p class="text-slate-500 text-xs font-bold mt-1">per month</p>
                             </div>
                         </div>
 
-                        <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-5 mb-6">
-                            <div class="flex items-center justify-between mb-1">
-                                <p class="text-emerald-400 text-xs font-black uppercase tracking-widest">Monthly Savings</p>
-                                <i data-lucide="trending-up" class="w-4 h-4 text-emerald-400"></i>
-                            </div>
-                            <p id="calc-monthly-savings" class="text-4xl font-black text-emerald-400">$0</p>
-                            <p class="text-slate-400 text-xs font-bold mt-1">Annual savings: <span id="calc-annual-savings" class="text-white font-black">$0</span></p>
-                        </div>
+                        <!-- Per-role breakdown -->
+                        <div id="calc-breakdown" class="space-y-1.5 mb-6 relative"></div>
 
-                        <!-- Breakdown -->
-                        <div id="calc-breakdown" class="space-y-2 mb-6 text-sm"></div>
-
-                        <button onclick="openCalendly()" class="w-full bg-yellow-400 text-[#1b1e2b] py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-300 transition-all">
+                        <button onclick="openCalendly()" class="relative w-full bg-yellow-400 text-[#1b1e2b] py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-300 transition-all shadow-lg">
                             Lock In These Savings <i data-lucide="arrow-right" class="w-4 h-4"></i>
                         </button>
+                        <p class="text-center text-xs text-slate-500 font-medium mt-4 relative">No contracts. No minimums. Cancel anytime.</p>
                     </div>
 
-                    <p class="text-center text-xs text-slate-400 font-medium px-4">In-house estimates include salary, taxes, benefits & overhead. No contracts required with YVA.</p>
                 </div>
 
             </div>
@@ -2418,9 +2437,9 @@
                 totalYVA += yvaMonthly;
 
                 breakdownHTML += `
-                    <div class="flex items-center justify-between text-xs py-2 border-b border-white/10 last:border-0">
-                        <span class="text-slate-400 font-bold">${role.name}</span>
-                        <div class="flex items-center gap-2">
+                    <div class="flex items-center justify-between bg-white/5 rounded-xl px-4 py-3">
+                        <span class="text-slate-300 font-bold text-xs">${role.name}</span>
+                        <div class="flex items-center gap-3 text-xs">
                             <span class="text-slate-500 line-through">${formatCurrency(role.inhouse)}</span>
                             <span class="text-yellow-400 font-black">${formatCurrency(yvaMonthly)}</span>
                         </div>
@@ -2442,13 +2461,13 @@
             btn.addEventListener('click', () => {
                 roiHours = parseInt(btn.dataset.hours);
                 document.querySelectorAll('.hours-btn').forEach(b => {
-                    b.classList.remove('border-[#1b1e2b]', 'bg-[#1b1e2b]', 'text-white');
-                    b.classList.add('border-slate-200', 'text-slate-500');
+                    b.classList.remove('bg-[#1b1e2b]', 'text-white', 'shadow-lg');
+                    b.classList.add('text-slate-400');
                     b.querySelector('span').classList.remove('text-yellow-400');
                     b.querySelector('span').classList.add('text-slate-400');
                 });
-                btn.classList.add('border-[#1b1e2b]', 'bg-[#1b1e2b]', 'text-white');
-                btn.classList.remove('border-slate-200', 'text-slate-500');
+                btn.classList.add('bg-[#1b1e2b]', 'text-white', 'shadow-lg');
+                btn.classList.remove('text-slate-400');
                 btn.querySelector('span').classList.add('text-yellow-400');
                 btn.querySelector('span').classList.remove('text-slate-400');
                 calculateROI();
