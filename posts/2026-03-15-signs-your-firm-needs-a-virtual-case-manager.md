@@ -2,7 +2,7 @@
 title: "5 Signs Your Law Firm Needs a Virtual Case Manager"
 date: "2026-03-15T09:00:00.000Z"
 description: "Cases stalling, clients calling for updates, deadlines slipping — these aren't attorney problems. They're case management problems. Here's how to recognize them."
-image: ""
+image: "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=1200"
 ---
 
 In a growing law firm, there's a point where the attorneys can no longer be the ones tracking every deadline, following up with every medical provider, and updating every client. That point usually arrives before the firm is ready for it.

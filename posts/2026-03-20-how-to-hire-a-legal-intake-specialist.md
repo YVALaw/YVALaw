@@ -2,7 +2,7 @@
 title: "How to Hire a Legal Intake Specialist for Your Law Firm"
 date: "2026-03-18T09:00:00.000Z"
 description: "A legal intake specialist can be the difference between winning and losing a case before it even starts. Here's what to look for and how to hire right."
-image: ""
+image: "https://images.unsplash.com/photo-1423666639041-f56000c27a9a?auto=format&fit=crop&q=80&w=1200"
 ---
 
 Every missed call is a missed case. For law firms — especially personal injury and employment practices — the intake process is where potential clients are won or lost. Yet most firms either understaff this function or leave it to whoever happens to be available.

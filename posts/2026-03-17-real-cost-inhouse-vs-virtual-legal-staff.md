@@ -2,7 +2,7 @@
 title: "The Real Cost of In-House vs. Virtual Legal Staff"
 date: "2026-03-17T09:00:00.000Z"
 description: "When you add up salary, benefits, taxes, and overhead, in-house legal staff costs 3–4x more than the hourly rate. Here's the full breakdown."
-image: ""
+image: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&q=80&w=1200"
 ---
 
 When law firms evaluate staffing options, they usually compare hourly rates. A virtual assistant at $8/hr sounds cheap. An in-house hire at $22/hr sounds reasonable. But hourly rates are only one part of the equation — and often the smallest part.

@@ -2,7 +2,7 @@
 title: "How Bilingual Staff Helps U.S. Law Firms Win More Clients"
 date: "2026-03-14T09:00:00.000Z"
 description: "Over 42 million people in the U.S. speak Spanish at home. Law firms that can't serve them in their language are leaving significant revenue on the table."
-image: ""
+image: "https://images.unsplash.com/photo-1573497620053-ea5300f94f21?auto=format&fit=crop&q=80&w=1200"
 ---
 
 The United States has the second-largest Spanish-speaking population in the world — over 42 million native speakers, with tens of millions more who speak Spanish as a second language. In major metro markets like Los Angeles, Miami, New York, Houston, and Chicago, Spanish-speaking clients represent a significant and often underserved segment of the personal injury and employment law market.

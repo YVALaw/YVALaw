@@ -2,7 +2,7 @@
 title: "What Is Demand Writing and Why Your PI Firm Needs a Specialist"
 date: "2026-03-16T09:00:00.000Z"
 description: "Demand writing is one of the most time-consuming tasks in a personal injury firm. Here's what it involves and why a specialist handles it better than a generalist."
-image: ""
+image: "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&q=80&w=1200"
 ---
 
 In a personal injury law firm, the demand package is one of the most important documents in a case. It's the formal communication to an insurance adjuster laying out the facts, injuries, damages, and the settlement amount your client deserves. Done well, it accelerates settlement. Done poorly, it invites lowball offers and unnecessary delays.
