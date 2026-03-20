@@ -136,3 +136,19 @@ All landing pages share the same structure: Hero → Problem → Solution + cost
 - Consider adding a Spanish-language version or language toggle
 - Connect landing pages to specific Google/YouTube ad campaigns
 - A/B test landing page headlines once ad campaigns are live
+- Add Blog and Careers links to landing pages footer (currently minimal by design)
+
+### Session 3 (careers page)
+Already documented above.
+
+### Session 4 (blog system)
+- Set up GitHub repo at https://github.com/YVALaw/YVALaw and connected to Netlify
+- Created `blog.html` — public blog listing page, fetches posts/index.json dynamically
+- Created `blog-post.html` — individual post renderer using marked.js for markdown
+- Created `admin/index.html` + `admin/config.yml` — Decap CMS admin panel at /admin
+- Created `build.js` — runs on every Netlify deploy, generates posts/index.json from markdown files
+- Created `netlify.toml` — sets build command to `node build.js`, publish dir `.`
+- Added sample post: `posts/2026-03-20-why-law-firms-need-virtual-staff.md`
+- Added Blog link to main nav (desktop + mobile) and footer in index.html
+- Blog uses Netlify Identity + Git Gateway for CMS authentication
+- Writing workflow: /admin → write post → publish → Netlify auto-deploys in ~1 min
