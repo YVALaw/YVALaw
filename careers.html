@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Careers | Join the YVA Law Staffing Team</title>
+
+    <!-- SEO Meta -->
+    <meta name="description" content="Join YVA Law Staffing — a remote-first team of bilingual professionals supporting U.S. law firms. Open roles in legal intake, demand writing, case management, social media, web design, and marketing.">
+    <meta name="keywords" content="YVA Law Staffing careers, remote legal jobs, bilingual virtual assistant jobs, work from home legal, remote staffing jobs">
+    <meta name="author" content="YVA Law Staffing">
+    <meta name="robots" content="index, follow">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://yvastaffing.agency/careers">
+    <meta property="og:title" content="Careers | Join the YVA Law Staffing Team">
+    <meta property="og:description" content="Work remotely with a bilingual team supporting U.S. law firms. Open roles in legal support, marketing, web design, and more.">
+    <meta property="og:image" content="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=1200">
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-V2Q6V4HE4F"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-V2Q6V4HE4F');
+    </script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- EmailJS -->
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
+
+        html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+        body { font-family: 'Inter', sans-serif; }
+
+        .nav-scrolled {
+            background-color: white;
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            padding-top: 0.75rem;
+            padding-bottom: 0.75rem;
+        }
+
+        #mobile-menu {
+            transform: translateX(100%);
+            transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #mobile-menu.open {
+            transform: translateX(0);
+        }
+
+        /* Application Modal */
+        #apply-modal {
+            display: flex;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        #apply-modal.open {
+            visibility: visible;
+            opacity: 1;
+        }
+        #apply-modal .modal-panel {
+            transform: translateY(40px) scale(0.97);
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        #apply-modal.open .modal-panel {
+            transform: translateY(0) scale(1);
+        }
+
+        .role-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        .role-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px -10px rgb(0 0 0 / 0.12);
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+        .animate-float { animation: float 5s ease-in-out infinite; }
+    </style>
+</head>
+<body class="bg-white text-slate-900 overflow-x-hidden">
+
+    <!-- Top Utility Bar -->
+    <div class="bg-[#1b1e2b] text-white py-2 px-6 hidden md:block border-b border-white/10">
+        <div class="max-w-7xl mx-auto flex justify-between items-center text-[11px] font-bold tracking-widest uppercase">
+            <div class="flex gap-8">
+                <span class="flex items-center gap-2">
+                    <i data-lucide="globe" class="w-3.5 h-3.5 text-yellow-400"></i> English & Spanish Support
+                </span>
+                <span class="flex items-center gap-2 text-slate-400">
+                    <i data-lucide="users" class="w-3.5 h-3.5"></i> High-Retention Specialists
+                </span>
+            </div>
+            <div class="flex gap-6">
+                <a href="mailto:careers@yvastaffing.agency" class="hover:text-yellow-400 transition-colors">careers@yvastaffing.agency</a>
+                <span class="text-yellow-400 font-black">Now Hiring</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav id="navbar" class="fixed md:sticky w-full z-50 transition-all duration-300 top-0 bg-white py-6">
+        <div class="max-w-7xl mx-auto px-6 flex justify-between items-center">
+            <a href="index.html" class="flex items-center gap-3 cursor-pointer group">
+                <div class="bg-[#1b1e2b] w-12 h-12 rounded-xl flex items-center justify-center transition-transform group-hover:rotate-6 shadow-lg text-yellow-400">
+                    <i data-lucide="users" class="w-7 h-7"></i>
+                </div>
+                <div class="flex flex-col">
+                    <span class="text-2xl font-black tracking-tighter leading-none text-[#1b1e2b]">YVA <span class="text-base">Law</span></span>
+                    <span class="text-[10px] uppercase tracking-[0.3em] font-bold text-slate-400">Staffing</span>
+                </div>
+            </a>
+
+            <!-- Desktop Nav -->
+            <div class="hidden md:flex items-center gap-10 font-black text-[12px] uppercase tracking-widest text-[#1b1e2b]">
+                <a href="index.html#home" class="hover:text-yellow-500 transition-colors">Home</a>
+                <a href="index.html#service-pillars" class="hover:text-yellow-500 transition-colors">Services</a>
+                <a href="index.html#how-it-works" class="hover:text-yellow-500 transition-colors">How It Works</a>
+                <a href="index.html#about" class="hover:text-yellow-500 transition-colors">About</a>
+                <a href="careers.html" class="text-yellow-500 border-b-2 border-yellow-400 pb-0.5">Careers</a>
+                <button onclick="openApplyModal()" class="bg-[#1b1e2b] text-white px-8 py-3.5 rounded-full hover:bg-yellow-500 hover:text-[#1b1e2b] transition-all flex items-center gap-2 shadow-lg hover:shadow-yellow-100">
+                    Apply Now <i data-lucide="send" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <!-- Mobile Menu Toggle -->
+            <button id="mobile-menu-toggle" aria-label="Open menu" class="md:hidden text-[#1b1e2b] p-2 rounded-xl hover:bg-slate-100 transition-colors">
+                <i id="menu-icon-open" data-lucide="menu" class="w-6 h-6"></i>
+                <i id="menu-icon-close" data-lucide="x" class="w-6 h-6 hidden"></i>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu Drawer -->
+    <div id="mobile-menu" class="fixed top-0 right-0 h-full w-full max-w-sm bg-[#1b1e2b] z-[60] flex flex-col shadow-2xl md:hidden">
+        <div class="flex items-center justify-between px-6 py-5 border-b border-white/10">
+            <div class="flex items-center gap-3">
+                <div class="bg-yellow-400 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg">
+                    <i data-lucide="users" class="w-5 h-5 text-[#1b1e2b]"></i>
+                </div>
+                <div class="flex flex-col">
+                    <span class="text-xl font-black tracking-tighter leading-none text-white">YVA <span class="text-sm">Law</span></span>
+                    <span class="text-[10px] uppercase tracking-[0.3em] font-bold text-slate-400">Staffing</span>
+                </div>
+            </div>
+            <button id="mobile-menu-close" aria-label="Close menu" class="text-slate-400 hover:text-yellow-400 transition-colors p-2 rounded-xl hover:bg-white/10">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+        </div>
+        <nav class="flex flex-col px-6 py-8 gap-2 flex-1">
+            <a href="index.html#home" class="mobile-nav-link flex items-center gap-3 px-4 py-4 rounded-2xl text-white font-black text-sm uppercase tracking-widest hover:bg-white/10 hover:text-yellow-400 transition-all">
+                <i data-lucide="home" class="w-4 h-4 text-yellow-400"></i> Home
+            </a>
+            <a href="index.html#service-pillars" class="mobile-nav-link flex items-center gap-3 px-4 py-4 rounded-2xl text-white font-black text-sm uppercase tracking-widest hover:bg-white/10 hover:text-yellow-400 transition-all">
+                <i data-lucide="briefcase" class="w-4 h-4 text-yellow-400"></i> Services
+            </a>
+            <a href="index.html#how-it-works" class="mobile-nav-link flex items-center gap-3 px-4 py-4 rounded-2xl text-white font-black text-sm uppercase tracking-widest hover:bg-white/10 hover:text-yellow-400 transition-all">
+                <i data-lucide="zap" class="w-4 h-4 text-yellow-400"></i> How It Works
+            </a>
+            <a href="index.html#about" class="mobile-nav-link flex items-center gap-3 px-4 py-4 rounded-2xl text-white font-black text-sm uppercase tracking-widest hover:bg-white/10 hover:text-yellow-400 transition-all">
+                <i data-lucide="info" class="w-4 h-4 text-yellow-400"></i> About
+            </a>
+            <a href="careers.html" class="flex items-center gap-3 px-4 py-4 rounded-2xl bg-white/10 text-yellow-400 font-black text-sm uppercase tracking-widest">
+                <i data-lucide="user-plus" class="w-4 h-4 text-yellow-400"></i> Careers
+            </a>
+            <div class="border-t border-white/10 my-4"></div>
+            <button onclick="closeMobileMenu(); openApplyModal();" class="flex items-center justify-center gap-3 bg-yellow-400 text-[#1b1e2b] px-6 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-yellow-300 transition-all shadow-lg">
+                <i data-lucide="send" class="w-4 h-4"></i> Apply Now
+            </button>
+        </nav>
+        <div class="px-6 py-6 border-t border-white/10">
+            <a href="mailto:careers@yvastaffing.agency" class="flex items-center gap-2 text-slate-400 text-xs font-bold hover:text-yellow-400 transition-colors mb-2">
+                <i data-lucide="mail" class="w-4 h-4"></i> careers@yvastaffing.agency
+            </a>
+            <p class="text-slate-500 text-[11px] font-bold uppercase tracking-widest">Mon - Fri: 9am - 6pm EST</p>
+        </div>
+    </div>
+
+    <!-- Mobile Backdrop -->
+    <div id="mobile-backdrop" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[55] hidden md:hidden"></div>
+
+    <!-- Hero Section -->
+    <section class="relative bg-[#1b1e2b] pt-16 pb-24 lg:pt-24 lg:pb-32 overflow-hidden">
+        <div class="absolute top-0 right-0 w-96 h-96 bg-yellow-400/5 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute bottom-0 left-0 w-64 h-64 bg-yellow-400/5 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="grid lg:grid-cols-2 gap-16 items-center">
+
+                <!-- Left Column -->
+                <div class="space-y-8">
+                    <div class="inline-flex items-center gap-2 bg-yellow-400/10 border border-yellow-400/30 text-yellow-400 px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider">
+                        <i data-lucide="user-plus" class="w-4 h-4"></i> Now Hiring Worldwide
+                    </div>
+                    <h1 class="text-5xl lg:text-[4.5rem] font-black text-white leading-[0.95] tracking-tight">
+                        Build Your Career <span class="text-yellow-400">Remotely.</span>
+                    </h1>
+                    <p class="text-xl text-slate-300 font-medium leading-relaxed max-w-xl">
+                        Join a growing team of bilingual professionals making a real impact for U.S. law firms — from anywhere in the world. Remote-first, growth-focused, and people-first.
+                    </p>
+                    <div class="flex flex-col sm:flex-row gap-4 pt-2">
+                        <button onclick="openApplyModal()" class="bg-yellow-400 text-[#1b1e2b] px-10 py-5 rounded-2xl font-black text-lg flex items-center justify-center gap-3 hover:bg-yellow-300 hover:translate-y-[-4px] transition-all shadow-2xl shadow-yellow-400/20">
+                            Apply Now <i data-lucide="arrow-right" class="w-5 h-5"></i>
+                        </button>
+                        <a href="#open-roles" class="border-2 border-white/20 text-white px-10 py-5 rounded-2xl font-black text-lg flex items-center justify-center gap-3 hover:border-yellow-400 hover:text-yellow-400 transition-all">
+                            View Open Roles
+                        </a>
+                    </div>
+                    <!-- Stats -->
+                    <div class="grid grid-cols-3 gap-6 pt-4 border-t border-white/10">
+                        <div>
+                            <p class="text-3xl font-black text-yellow-400">50+</p>
+                            <p class="text-slate-400 text-sm font-medium">Active Team Members</p>
+                        </div>
+                        <div>
+                            <p class="text-3xl font-black text-yellow-400">7</p>
+                            <p class="text-slate-400 text-sm font-medium">Open Roles</p>
+                        </div>
+                        <div>
+                            <p class="text-3xl font-black text-yellow-400">100%</p>
+                            <p class="text-slate-400 text-sm font-medium">Remote Work</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Floating Card -->
+                <div class="relative hidden lg:flex items-center justify-center">
+                    <div class="animate-float">
+                        <div class="relative w-80">
+                            <div class="bg-white rounded-3xl shadow-2xl p-8 mb-6">
+                                <div class="flex items-center gap-4 mb-6">
+                                    <div class="bg-yellow-400 w-14 h-14 rounded-2xl flex items-center justify-center">
+                                        <i data-lucide="globe" class="w-7 h-7 text-[#1b1e2b]"></i>
+                                    </div>
+                                    <div>
+                                        <p class="font-black text-[#1b1e2b] text-lg leading-tight">Work From Anywhere</p>
+                                        <p class="text-slate-500 text-sm">Global team, remote-first</p>
+                                    </div>
+                                </div>
+                                <div class="space-y-3">
+                                    <div class="flex items-center gap-3 bg-slate-50 rounded-xl p-3">
+                                        <div class="w-2 h-2 bg-emerald-400 rounded-full flex-shrink-0"></div>
+                                        <span class="text-sm font-bold text-slate-700">Legal Intake Specialist</span>
+                                        <span class="ml-auto text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">Open</span>
+                                    </div>
+                                    <div class="flex items-center gap-3 bg-slate-50 rounded-xl p-3">
+                                        <div class="w-2 h-2 bg-emerald-400 rounded-full flex-shrink-0"></div>
+                                        <span class="text-sm font-bold text-slate-700">Demand Writer</span>
+                                        <span class="ml-auto text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">Open</span>
+                                    </div>
+                                    <div class="flex items-center gap-3 bg-slate-50 rounded-xl p-3">
+                                        <div class="w-2 h-2 bg-emerald-400 rounded-full flex-shrink-0"></div>
+                                        <span class="text-sm font-bold text-slate-700">Social Media Manager</span>
+                                        <span class="ml-auto text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">Open</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="absolute -top-4 -right-4 bg-yellow-400 text-[#1b1e2b] px-4 py-2 rounded-2xl font-black text-sm shadow-lg">
+                                Now Hiring
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Why Work With Us -->
+    <section class="py-20 bg-slate-50">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="text-center mb-14">
+                <div class="inline-flex items-center gap-2 bg-yellow-400 text-[#1b1e2b] px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider mb-4">
+                    <i data-lucide="star" class="w-4 h-4"></i> Why Join YVA
+                </div>
+                <h2 class="text-4xl lg:text-5xl font-black text-[#1b1e2b] leading-tight">Why Professionals Choose Us</h2>
+                <p class="text-slate-500 text-lg font-medium mt-4 max-w-2xl mx-auto">We're building something different — a team that grows together, works flexibly, and supports real careers.</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                    <div class="bg-[#1b1e2b] w-14 h-14 rounded-2xl flex items-center justify-center mb-6">
+                        <i data-lucide="home" class="w-7 h-7 text-yellow-400"></i>
+                    </div>
+                    <h3 class="font-black text-[#1b1e2b] text-lg mb-2">100% Remote</h3>
+                    <p class="text-slate-500 text-sm font-medium leading-relaxed">Work from home, a cafe, or anywhere with a good internet connection. No commute, ever.</p>
+                </div>
+                <div class="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                    <div class="bg-[#1b1e2b] w-14 h-14 rounded-2xl flex items-center justify-center mb-6">
+                        <i data-lucide="trending-up" class="w-7 h-7 text-yellow-400"></i>
+                    </div>
+                    <h3 class="font-black text-[#1b1e2b] text-lg mb-2">Real Growth</h3>
+                    <p class="text-slate-500 text-sm font-medium leading-relaxed">We invest in our team's skills. Many of our specialists have moved into senior roles within months.</p>
+                </div>
+                <div class="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                    <div class="bg-[#1b1e2b] w-14 h-14 rounded-2xl flex items-center justify-center mb-6">
+                        <i data-lucide="globe" class="w-7 h-7 text-yellow-400"></i>
+                    </div>
+                    <h3 class="font-black text-[#1b1e2b] text-lg mb-2">Global Team</h3>
+                    <p class="text-slate-500 text-sm font-medium leading-relaxed">Work alongside talented professionals from across Latin America and beyond. Diversity is our strength.</p>
+                </div>
+                <div class="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+                    <div class="bg-[#1b1e2b] w-14 h-14 rounded-2xl flex items-center justify-center mb-6">
+                        <i data-lucide="shield-check" class="w-7 h-7 text-yellow-400"></i>
+                    </div>
+                    <h3 class="font-black text-[#1b1e2b] text-lg mb-2">Stable & Reliable</h3>
+                    <p class="text-slate-500 text-sm font-medium leading-relaxed">Consistent work with U.S.-based clients. Predictable hours and reliable pay — not freelance gigs.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Open Roles -->
+    <section id="open-roles" class="py-20 bg-white">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="text-center mb-14">
+                <div class="inline-flex items-center gap-2 bg-yellow-400 text-[#1b1e2b] px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider mb-4">
+                    <i data-lucide="briefcase" class="w-4 h-4"></i> Open Positions
+                </div>
+                <h2 class="text-4xl lg:text-5xl font-black text-[#1b1e2b] leading-tight">Find Your Role</h2>
+                <p class="text-slate-500 text-lg font-medium mt-4 max-w-2xl mx-auto">We're growing fast and looking for dedicated professionals across multiple disciplines.</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                <!-- Legal Intake Specialist -->
+                <div class="role-card bg-white border-2 border-slate-100 rounded-3xl p-8 flex flex-col">
+                    <div class="flex items-start justify-between mb-6">
+                        <div class="bg-[#1b1e2b] w-14 h-14 rounded-2xl flex items-center justify-center">
+                            <i data-lucide="phone" class="w-7 h-7 text-yellow-400"></i>
+                        </div>
+                        <span class="bg-emerald-50 text-emerald-700 text-xs font-black uppercase tracking-wider px-3 py-1.5 rounded-full border border-emerald-200">Open</span>
+                    </div>
+                    <h3 class="font-black text-[#1b1e2b] text-xl mb-2">Legal Intake Specialist</h3>
+                    <div class="flex items-center gap-4 mb-4">
+                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i> Remote</span>
+                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> Full / Part-time</span>
+                    </div>
+                    <p class="text-slate-500 text-sm font-medium leading-relaxed mb-6 flex-1">Handle first contact with potential clients. Screen inquiries, capture intake forms, schedule consultations, and follow up on leads for U.S. law firms.</p>
+                    <div class="space-y-2 mb-6">
+                        <p class="text-xs font-black text-slate-400 uppercase tracking-widest">Key Skills</p>
+                        <div class="flex flex-wrap gap-2">
+                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">English/Spanish</span>
+                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">CRM</span>
+                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Communication</span>
+                        </div>
+                    </div>
+                    <button onclick="openApplyModal('Legal Intake Specialist')" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all flex items-center justify-center gap-2">
+                        Apply Now <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <!-- Legal Assistant -->
+                <div class="role-card bg-white border-2 border-slate-100 rounded-3xl p-8 flex flex-col">
+                    <div class="flex items-start justify-between mb-6">
+                        <div class="bg-[#1b1e2b] w-14 h-14 rounded-2xl flex items-center justify-center">
+                            <i data-lucide="scale" class="w-7 h-7 text-yellow-400"></i>
+                        </div>
+                        <span class="bg-emerald-50 text-emerald-700 text-xs font-black uppercase tracking-wider px-3 py-1.5 rounded-full border border-emerald-200">Open</span>
+                    </div>
+                    <h3 class="font-black text-[#1b1e2b] text-xl mb-2">Legal Assistant</h3>
+                    <div class="flex items-center gap-4 mb-4">
+                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i> Remote</span>
+                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> Full / Part-time</span>
+                    </div>
+                    <p class="text-slate-500 text-sm font-medium leading-relaxed mb-6 flex-1">Support attorneys with calendar management, client correspondence, case file organization, deadline tracking, and document drafting.</p>
+                    <div class="space-y-2 mb-6">
+                        <p class="text-xs font-black text-slate-400 uppercase tracking-widest">Key Skills</p>
+                        <div class="flex flex-wrap gap-2">
+                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Legal Knowledge</span>
+                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Organization</span>
+                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Drafting</span>
+                        </div>
+                    </div>
+                    <button onclick="openApplyModal('Legal Assistant')" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all flex items-center justify-center gap-2">
+                        Apply Now <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <!-- Demand Writer -->
+                <div class="role-card bg-white border-2 border-slate-100 rounded-3xl p-8 flex flex-col">
+                    <div class="flex items-start justify-between mb-6">
+                        <div class="bg-[#1b1e2b] w-14 h-14 rounded-2xl flex items-center justify-center">
+                            <i data-lucide="file-text" class="w-7 h-7 text-yellow-400"></i>
+                        </div>
+                        <span class="bg-emerald-50 text-emerald-700 text-xs font-black uppercase tracking-wider px-3 py-1.5 rounded-full border border-emerald-200">Open</span>
+                    </div>
+                    <h3 class="font-black text-[#1b1e2b] text-xl mb-2">Demand Writer</h3>
+                    <div class="flex items-center gap-4 mb-4">
+                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i> Remote</span>
+                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> Full / Part-time</span>
+                    </div>
+                    <p class="text-slate-500 text-sm font-medium leading-relaxed mb-6 flex-1">Review medical records, calculate damages, and draft professional demand letters and settlement packages for personal injury and employment law firms.</p>
+                    <div class="space-y-2 mb-6">
+                        <p class="text-xs font-black text-slate-400 uppercase tracking-widest">Key Skills</p>
+                        <div class="flex flex-wrap gap-2">
+                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Legal Writing</span>
+                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Medical Records</span>
+                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Detail-Oriented</span>
+                        </div>
+                    </div>
+                    <button onclick="openApplyModal('Demand Writer')" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all flex items-center justify-center gap-2">
+                        Apply Now <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <!-- Case Manager -->
+                <div class="role-card bg-white border-2 border-slate-100 rounded-3xl p-8 flex flex-col">
+                    <div class="flex items-start justify-between mb-6">
+                        <div class="bg-[#1b1e2b] w-14 h-14 rounded-2xl flex items-center justify-center">
+                            <i data-lucide="users" class="w-7 h-7 text-yellow-400"></i>
+                        </div>
+                        <span class="bg-emerald-50 text-emerald-700 text-xs font-black uppercase tracking-wider px-3 py-1.5 rounded-full border border-emerald-200">Open</span>
+                    </div>
+                    <h3 class="font-black text-[#1b1e2b] text-xl mb-2">Case Manager</h3>
+                    <div class="flex items-center gap-4 mb-4">
+                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i> Remote</span>
+                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> Full / Part-time</span>
+                    </div>
+                    <p class="text-slate-500 text-sm font-medium leading-relaxed mb-6 flex-1">Own the full case lifecycle. Coordinate between clients, attorneys, medical providers, and insurance adjusters from case open through settlement.</p>
+                    <div class="space-y-2 mb-6">
+                        <p class="text-xs font-black text-slate-400 uppercase tracking-widest">Key Skills</p>
+                        <div class="flex flex-wrap gap-2">
+                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Coordination</span>
+                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Bilingual</span>
+                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Case Management</span>
+                        </div>
+                    </div>
+                    <button onclick="openApplyModal('Case Manager')" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all flex items-center justify-center gap-2">
+                        Apply Now <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <!-- Social Media Manager -->
+                <div class="role-card bg-white border-2 border-slate-100 rounded-3xl p-8 flex flex-col">
+                    <div class="flex items-start justify-between mb-6">
+                        <div class="bg-[#1b1e2b] w-14 h-14 rounded-2xl flex items-center justify-center">
+                            <i data-lucide="share-2" class="w-7 h-7 text-yellow-400"></i>
+                        </div>
+                        <span class="bg-emerald-50 text-emerald-700 text-xs font-black uppercase tracking-wider px-3 py-1.5 rounded-full border border-emerald-200">Open</span>
+                    </div>
+                    <h3 class="font-black text-[#1b1e2b] text-xl mb-2">Social Media Manager</h3>
+                    <div class="flex items-center gap-4 mb-4">
+                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i> Remote</span>
+                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> Full / Part-time</span>
+                    </div>
+                    <p class="text-slate-500 text-sm font-medium leading-relaxed mb-6 flex-1">Manage social media presence for U.S. law firms and professional clients. Create content, schedule posts, engage audiences, and report on performance.</p>
+                    <div class="space-y-2 mb-6">
+                        <p class="text-xs font-black text-slate-400 uppercase tracking-widest">Key Skills</p>
+                        <div class="flex flex-wrap gap-2">
+                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Content Creation</span>
+                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Instagram/LinkedIn</span>
+                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Analytics</span>
+                        </div>
+                    </div>
+                    <button onclick="openApplyModal('Social Media Manager')" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all flex items-center justify-center gap-2">
+                        Apply Now <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <!-- Web Designer -->
+                <div class="role-card bg-white border-2 border-slate-100 rounded-3xl p-8 flex flex-col">
+                    <div class="flex items-start justify-between mb-6">
+                        <div class="bg-[#1b1e2b] w-14 h-14 rounded-2xl flex items-center justify-center">
+                            <i data-lucide="layout" class="w-7 h-7 text-yellow-400"></i>
+                        </div>
+                        <span class="bg-emerald-50 text-emerald-700 text-xs font-black uppercase tracking-wider px-3 py-1.5 rounded-full border border-emerald-200">Open</span>
+                    </div>
+                    <h3 class="font-black text-[#1b1e2b] text-xl mb-2">Web Designer</h3>
+                    <div class="flex items-center gap-4 mb-4">
+                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i> Remote</span>
+                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> Full / Part-time</span>
+                    </div>
+                    <p class="text-slate-500 text-sm font-medium leading-relaxed mb-6 flex-1">Design and build modern, high-converting websites for law firms and professional clients. From landing pages to full firm websites — clean, fast, and effective.</p>
+                    <div class="space-y-2 mb-6">
+                        <p class="text-xs font-black text-slate-400 uppercase tracking-widest">Key Skills</p>
+                        <div class="flex flex-wrap gap-2">
+                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">HTML/CSS</span>
+                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Figma</span>
+                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Responsive Design</span>
+                        </div>
+                    </div>
+                    <button onclick="openApplyModal('Web Designer')" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all flex items-center justify-center gap-2">
+                        Apply Now <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+                <!-- Marketing Specialist — centered on last row -->
+                <div class="role-card bg-white border-2 border-slate-100 rounded-3xl p-8 flex flex-col md:col-start-1 lg:col-start-2">
+                    <div class="flex items-start justify-between mb-6">
+                        <div class="bg-[#1b1e2b] w-14 h-14 rounded-2xl flex items-center justify-center">
+                            <i data-lucide="megaphone" class="w-7 h-7 text-yellow-400"></i>
+                        </div>
+                        <span class="bg-emerald-50 text-emerald-700 text-xs font-black uppercase tracking-wider px-3 py-1.5 rounded-full border border-emerald-200">Open</span>
+                    </div>
+                    <h3 class="font-black text-[#1b1e2b] text-xl mb-2">Marketing Specialist</h3>
+                    <div class="flex items-center gap-4 mb-4">
+                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i> Remote</span>
+                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> Full / Part-time</span>
+                    </div>
+                    <p class="text-slate-500 text-sm font-medium leading-relaxed mb-6 flex-1">Execute digital marketing strategies for law firm clients. Manage ad campaigns (Google/Meta), email marketing, SEO content, and lead generation funnels.</p>
+                    <div class="space-y-2 mb-6">
+                        <p class="text-xs font-black text-slate-400 uppercase tracking-widest">Key Skills</p>
+                        <div class="flex flex-wrap gap-2">
+                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Google Ads</span>
+                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Meta Ads</span>
+                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">SEO</span>
+                        </div>
+                    </div>
+                    <button onclick="openApplyModal('Marketing Specialist')" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all flex items-center justify-center gap-2">
+                        Apply Now <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- Application Process -->
+    <section class="py-20 bg-[#1b1e2b]">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="text-center mb-14">
+                <div class="inline-flex items-center gap-2 bg-yellow-400/10 border border-yellow-400/30 text-yellow-400 px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider mb-4">
+                    <i data-lucide="zap" class="w-4 h-4"></i> Application Process
+                </div>
+                <h2 class="text-4xl lg:text-5xl font-black text-white leading-tight">How It Works</h2>
+                <p class="text-slate-400 text-lg font-medium mt-4 max-w-2xl mx-auto">From application to your first day — we keep it simple and fast.</p>
+            </div>
+
+            <div class="grid md:grid-cols-3 gap-8">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-yellow-400 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                        <span class="text-[#1b1e2b] font-black text-2xl">1</span>
+                    </div>
+                    <h3 class="font-black text-white text-xl mb-3">Apply Online</h3>
+                    <p class="text-slate-400 text-sm font-medium leading-relaxed">Fill out the application form on this page. Tell us about your experience, languages, and the role you're interested in.</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-yellow-400 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                        <span class="text-[#1b1e2b] font-black text-2xl">2</span>
+                    </div>
+                    <h3 class="font-black text-white text-xl mb-3">Interview & Assessment</h3>
+                    <p class="text-slate-400 text-sm font-medium leading-relaxed">Our team will review your application and reach out within 3-5 business days for a short video interview and skills assessment.</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-yellow-400 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                        <span class="text-[#1b1e2b] font-black text-2xl">3</span>
+                    </div>
+                    <h3 class="font-black text-white text-xl mb-3">Start Working</h3>
+                    <p class="text-slate-400 text-sm font-medium leading-relaxed">Once accepted, you'll be matched with a client, onboarded to their workflow, and supported by our team every step of the way.</p>
+                </div>
+            </div>
+
+            <div class="text-center mt-14">
+                <button onclick="openApplyModal()" class="bg-yellow-400 text-[#1b1e2b] px-12 py-5 rounded-2xl font-black text-lg inline-flex items-center gap-3 hover:bg-yellow-300 hover:translate-y-[-4px] transition-all shadow-2xl shadow-yellow-400/20">
+                    Apply Today <i data-lucide="arrow-right" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-[#1b1e2b] border-t border-white/10">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12 py-16">
+
+                <!-- Col 1: Brand -->
+                <div class="lg:col-span-1">
+                    <a href="index.html" class="flex items-center gap-3 mb-6 group w-fit">
+                        <div class="bg-yellow-400 w-11 h-11 rounded-xl flex items-center justify-center transition-transform group-hover:rotate-6 shadow-lg">
+                            <i data-lucide="users" class="w-6 h-6 text-[#1b1e2b]"></i>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-xl font-black tracking-tighter leading-none text-white">YVA <span class="text-sm">Law</span></span>
+                            <span class="text-[10px] uppercase tracking-[0.3em] font-bold text-slate-400">Staffing</span>
+                        </div>
+                    </a>
+                    <p class="text-slate-400 text-sm font-medium leading-relaxed mb-6">Elite bilingual virtual staffing for law firms and professional services. Starting at <span class="text-yellow-400 font-bold">$7.50/hr</span>.</p>
+                    <div class="flex gap-3">
+                        <a href="#" target="_blank" aria-label="Instagram" class="w-9 h-9 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-yellow-400 hover:text-[#1b1e2b] hover:border-yellow-400 transition-all">
+                            <i data-lucide="instagram" class="w-4 h-4"></i>
+                        </a>
+                        <a href="#" target="_blank" aria-label="LinkedIn" class="w-9 h-9 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-yellow-400 hover:text-[#1b1e2b] hover:border-yellow-400 transition-all">
+                            <i data-lucide="linkedin" class="w-4 h-4"></i>
+                        </a>
+                        <a href="#" target="_blank" aria-label="X / Twitter" class="w-9 h-9 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-yellow-400 hover:text-[#1b1e2b] hover:border-yellow-400 transition-all">
+                            <i data-lucide="twitter" class="w-4 h-4"></i>
+                        </a>
+                        <a href="mailto:careers@yvastaffing.agency" aria-label="Email" class="w-9 h-9 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-yellow-400 hover:text-[#1b1e2b] hover:border-yellow-400 transition-all">
+                            <i data-lucide="mail" class="w-4 h-4"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Col 2: Quick Links -->
+                <div>
+                    <p class="text-white font-black text-xs uppercase tracking-widest mb-6">Quick Links</p>
+                    <ul class="space-y-3">
+                        <li><a href="index.html#home" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Home</a></li>
+                        <li><a href="index.html#service-pillars" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Services</a></li>
+                        <li><a href="index.html#how-it-works" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> How It Works</a></li>
+                        <li><a href="index.html#about" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> About</a></li>
+                        <li><a href="careers.html" class="text-yellow-400 text-sm font-medium flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Careers</a></li>
+                    </ul>
+                </div>
+
+                <!-- Col 3: Open Roles -->
+                <div>
+                    <p class="text-white font-black text-xs uppercase tracking-widest mb-6">Open Roles</p>
+                    <ul class="space-y-3">
+                        <li><button onclick="openApplyModal('Legal Intake Specialist')" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Legal Intake</button></li>
+                        <li><button onclick="openApplyModal('Legal Assistant')" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Legal Assistant</button></li>
+                        <li><button onclick="openApplyModal('Demand Writer')" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Demand Writing</button></li>
+                        <li><button onclick="openApplyModal('Case Manager')" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Case Manager</button></li>
+                        <li><button onclick="openApplyModal('Social Media Manager')" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Social Media</button></li>
+                        <li><button onclick="openApplyModal('Web Designer')" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Web Design</button></li>
+                        <li><button onclick="openApplyModal('Marketing Specialist')" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Marketing</button></li>
+                    </ul>
+                </div>
+
+                <!-- Col 4: Contact -->
+                <div>
+                    <p class="text-white font-black text-xs uppercase tracking-widest mb-6">Get In Touch</p>
+                    <ul class="space-y-4 mb-8">
+                        <li>
+                            <a href="mailto:careers@yvastaffing.agency" class="flex items-start gap-3 text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors">
+                                <i data-lucide="mail" class="w-4 h-4 mt-0.5 flex-shrink-0"></i>
+                                careers@yvastaffing.agency
+                            </a>
+                        </li>
+                        <li>
+                            <div class="flex items-start gap-3 text-slate-400 text-sm font-medium">
+                                <i data-lucide="clock" class="w-4 h-4 mt-0.5 flex-shrink-0"></i>
+                                Mon - Fri · 9am - 6pm EST
+                            </div>
+                        </li>
+                        <li>
+                            <div class="flex items-start gap-3 text-slate-400 text-sm font-medium">
+                                <i data-lucide="globe" class="w-4 h-4 mt-0.5 flex-shrink-0"></i>
+                                Hiring Worldwide
+                            </div>
+                        </li>
+                    </ul>
+                    <button onclick="openApplyModal()" class="w-full bg-yellow-400 text-[#1b1e2b] px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-300 transition-all shadow-lg">
+                        Apply Now <i data-lucide="send" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+            </div>
+            <div class="border-t border-white/10 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <p class="text-slate-500 text-xs font-medium">© 2025 YVA Law Staffing. All rights reserved.</p>
+                <p class="text-slate-600 text-xs font-medium">Proudly serving U.S. law firms from the Dominican Republic</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Application Modal -->
+    <div id="apply-modal" class="fixed inset-0 z-[100] items-center justify-center p-4">
+        <div id="apply-backdrop" class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+        <div class="modal-panel relative bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto z-10">
+
+            <!-- Modal Header -->
+            <div class="sticky top-0 bg-white rounded-t-3xl border-b border-slate-100 px-8 py-6 flex items-center justify-between">
+                <div>
+                    <p class="text-xs font-black text-yellow-500 uppercase tracking-widest mb-1">Join Our Team</p>
+                    <h3 class="text-xl font-black text-[#1b1e2b]">Submit Your Application</h3>
+                </div>
+                <button id="apply-close" class="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200 transition-colors">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Form Step -->
+            <div id="apply-form-step" class="px-8 py-6 space-y-5">
+
+                <!-- Role -->
+                <div>
+                    <label class="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Position *</label>
+                    <div id="role-prefilled" class="hidden items-center gap-3 bg-yellow-50 border-2 border-yellow-200 rounded-2xl px-4 py-3.5">
+                        <i data-lucide="briefcase" class="w-4 h-4 text-yellow-600"></i>
+                        <span id="role-prefilled-label" class="font-black text-[#1b1e2b] text-sm"></span>
+                    </div>
+                    <select id="role-dropdown" class="w-full border-2 border-slate-200 rounded-2xl px-4 py-3.5 text-sm font-bold text-slate-700 focus:outline-none focus:border-yellow-400 transition-colors appearance-none bg-white">
+                        <option value="">Select a position...</option>
+                        <option value="Legal Intake Specialist">Legal Intake Specialist</option>
+                        <option value="Legal Assistant">Legal Assistant</option>
+                        <option value="Demand Writer">Demand Writer</option>
+                        <option value="Case Manager">Case Manager</option>
+                        <option value="Social Media Manager">Social Media Manager</option>
+                        <option value="Web Designer">Web Designer</option>
+                        <option value="Marketing Specialist">Marketing Specialist</option>
+                    </select>
+                </div>
+
+                <!-- Name + Email -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Full Name *</label>
+                        <input id="apply-name" type="text" placeholder="Your name" class="w-full border-2 border-slate-200 rounded-2xl px-4 py-3.5 text-sm font-bold text-slate-700 focus:outline-none focus:border-yellow-400 transition-colors placeholder:font-medium placeholder:text-slate-400">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Email *</label>
+                        <input id="apply-email" type="email" placeholder="you@email.com" class="w-full border-2 border-slate-200 rounded-2xl px-4 py-3.5 text-sm font-bold text-slate-700 focus:outline-none focus:border-yellow-400 transition-colors placeholder:font-medium placeholder:text-slate-400">
+                    </div>
+                </div>
+
+                <!-- Phone + Country -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Phone</label>
+                        <input id="apply-phone" type="tel" placeholder="+1 555 000 0000" class="w-full border-2 border-slate-200 rounded-2xl px-4 py-3.5 text-sm font-bold text-slate-700 focus:outline-none focus:border-yellow-400 transition-colors placeholder:font-medium placeholder:text-slate-400">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Country *</label>
+                        <input id="apply-country" type="text" placeholder="e.g. Dominican Republic" class="w-full border-2 border-slate-200 rounded-2xl px-4 py-3.5 text-sm font-bold text-slate-700 focus:outline-none focus:border-yellow-400 transition-colors placeholder:font-medium placeholder:text-slate-400">
+                    </div>
+                </div>
+
+                <!-- Languages + Experience -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Languages *</label>
+                        <input id="apply-languages" type="text" placeholder="e.g. English, Spanish" class="w-full border-2 border-slate-200 rounded-2xl px-4 py-3.5 text-sm font-bold text-slate-700 focus:outline-none focus:border-yellow-400 transition-colors placeholder:font-medium placeholder:text-slate-400">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Experience *</label>
+                        <select id="apply-experience" class="w-full border-2 border-slate-200 rounded-2xl px-4 py-3.5 text-sm font-bold text-slate-700 focus:outline-none focus:border-yellow-400 transition-colors appearance-none bg-white">
+                            <option value="">Select...</option>
+                            <option value="Less than 1 year">Less than 1 year</option>
+                            <option value="1-2 years">1-2 years</option>
+                            <option value="3-5 years">3-5 years</option>
+                            <option value="5+ years">5+ years</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- LinkedIn / Portfolio -->
+                <div>
+                    <label class="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">LinkedIn or Portfolio URL</label>
+                    <input id="apply-linkedin" type="url" placeholder="https://linkedin.com/in/yourprofile" class="w-full border-2 border-slate-200 rounded-2xl px-4 py-3.5 text-sm font-bold text-slate-700 focus:outline-none focus:border-yellow-400 transition-colors placeholder:font-medium placeholder:text-slate-400">
+                </div>
+
+                <!-- Message -->
+                <div>
+                    <label class="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Why do you want to join YVA? *</label>
+                    <textarea id="apply-message" rows="4" placeholder="Tell us about yourself and why you'd be a great fit..." class="w-full border-2 border-slate-200 rounded-2xl px-4 py-3.5 text-sm font-bold text-slate-700 focus:outline-none focus:border-yellow-400 transition-colors resize-none placeholder:font-medium placeholder:text-slate-400"></textarea>
+                </div>
+
+                <!-- Error -->
+                <div id="apply-error" class="hidden bg-red-50 border border-red-200 rounded-2xl px-4 py-3 text-red-600 text-sm font-bold flex items-center gap-2">
+                    <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                    <span id="apply-error-text">Please fill in all required fields.</span>
+                </div>
+
+                <button id="apply-submit" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all">
+                    Submit Application <i data-lucide="send" class="w-4 h-4"></i>
+                </button>
+                <p class="text-center text-xs text-slate-400 font-medium">We review every application and respond within 3-5 business days.</p>
+            </div>
+
+            <!-- Success Step -->
+            <div id="apply-success-step" class="hidden px-8 py-12 text-center">
+                <div class="w-20 h-20 bg-emerald-100 rounded-3xl flex items-center justify-center mx-auto mb-6">
+                    <i data-lucide="check-circle-2" class="w-10 h-10 text-emerald-500"></i>
+                </div>
+                <h3 class="text-2xl font-black text-[#1b1e2b] mb-3">Application Received!</h3>
+                <p class="text-slate-500 font-medium leading-relaxed mb-8">Thank you for applying to YVA Law Staffing. Our team will review your application and reach out within <strong>3-5 business days</strong>.</p>
+                <button onclick="closeApplyModal()" class="bg-[#1b1e2b] text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all">
+                    Done
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        emailjs.init('3eYVQFnWUlAnJ1Ah0');
+
+        // Navbar scroll
+        const navbar = document.getElementById('navbar');
+        window.addEventListener('scroll', () => {
+            navbar.classList.toggle('nav-scrolled', window.scrollY > 50);
+        });
+
+        // Mobile Menu
+        function openMobileMenu() {
+            document.getElementById('mobile-menu').classList.add('open');
+            document.getElementById('mobile-backdrop').classList.remove('hidden');
+            document.getElementById('menu-icon-open').classList.add('hidden');
+            document.getElementById('menu-icon-close').classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeMobileMenu() {
+            document.getElementById('mobile-menu').classList.remove('open');
+            document.getElementById('mobile-backdrop').classList.add('hidden');
+            document.getElementById('menu-icon-open').classList.remove('hidden');
+            document.getElementById('menu-icon-close').classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+        document.getElementById('mobile-menu-toggle').addEventListener('click', openMobileMenu);
+        document.getElementById('mobile-menu-close').addEventListener('click', closeMobileMenu);
+        document.getElementById('mobile-backdrop').addEventListener('click', closeMobileMenu);
+        document.querySelectorAll('.mobile-nav-link').forEach(l => l.addEventListener('click', closeMobileMenu));
+
+        // Application Modal
+        const applyModal = document.getElementById('apply-modal');
+
+        function openApplyModal(role = '') {
+            const prefilled = document.getElementById('role-prefilled');
+            const dropdown = document.getElementById('role-dropdown');
+            if (role) {
+                document.getElementById('role-prefilled-label').textContent = role;
+                prefilled.classList.remove('hidden');
+                prefilled.classList.add('flex');
+                dropdown.classList.add('hidden');
+                dropdown.value = role;
+            } else {
+                prefilled.classList.add('hidden');
+                prefilled.classList.remove('flex');
+                dropdown.classList.remove('hidden');
+                dropdown.value = '';
+            }
+            document.getElementById('apply-form-step').classList.remove('hidden');
+            document.getElementById('apply-success-step').classList.add('hidden');
+            document.getElementById('apply-error').classList.add('hidden');
+            applyModal.classList.add('open');
+            document.body.style.overflow = 'hidden';
+            gtag('event', 'open_application', { event_category: 'careers', event_label: role || 'general' });
+        }
+
+        function closeApplyModal() {
+            applyModal.classList.remove('open');
+            document.body.style.overflow = '';
+            ['apply-name','apply-email','apply-phone','apply-country','apply-languages','apply-linkedin','apply-message'].forEach(id => {
+                document.getElementById(id).value = '';
+            });
+            document.getElementById('apply-experience').value = '';
+            document.getElementById('role-dropdown').value = '';
+        }
+
+        document.getElementById('apply-close').addEventListener('click', closeApplyModal);
+        document.getElementById('apply-backdrop').addEventListener('click', closeApplyModal);
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeApplyModal(); });
+
+        document.getElementById('apply-submit').addEventListener('click', async () => {
+            const name     = document.getElementById('apply-name').value.trim();
+            const email    = document.getElementById('apply-email').value.trim();
+            const country  = document.getElementById('apply-country').value.trim();
+            const languages = document.getElementById('apply-languages').value.trim();
+            const experience = document.getElementById('apply-experience').value;
+            const message  = document.getElementById('apply-message').value.trim();
+            const role     = document.getElementById('role-dropdown').value || document.getElementById('role-prefilled-label').textContent;
+            const phone    = document.getElementById('apply-phone').value.trim();
+            const linkedin = document.getElementById('apply-linkedin').value.trim();
+            const errorEl  = document.getElementById('apply-error');
+            const errorText = document.getElementById('apply-error-text');
+            const submitBtn = document.getElementById('apply-submit');
+
+            if (!name || !email || !country || !languages || !experience || !message || !role) {
+                errorText.textContent = 'Please fill in all required fields.';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+            errorEl.classList.add('hidden');
+            submitBtn.textContent = 'Sending...';
+            submitBtn.disabled = true;
+
+            try {
+                await emailjs.send('service_e0rf9ot', 'template_5q01i8v', {
+                    name, email,
+                    phone: phone || 'Not provided',
+                    country, role, languages, experience,
+                    linkedin: linkedin || 'Not provided',
+                    message,
+                    time: new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })
+                });
+                await emailjs.send('service_e0rf9ot', 'template_2mbtvvn', { name, email, role });
+                document.getElementById('apply-form-step').classList.add('hidden');
+                document.getElementById('apply-success-step').classList.remove('hidden');
+                gtag('event', 'application_submitted', { event_category: 'careers', event_label: role });
+            } catch (err) {
+                errorText.textContent = 'Something went wrong. Please email us directly at careers@yvastaffing.agency';
+                errorEl.classList.remove('hidden');
+            } finally {
+                submitBtn.textContent = 'Submit Application';
+                submitBtn.disabled = false;
+            }
+        });
+    </script>
+
+</body>
+</html>

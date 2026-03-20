@@ -1,0 +1,2383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YVA Law Staffing | Elite Bilingual Virtual Staffing for Law Firms</title>
+
+    <!-- SEO Meta -->
+    <meta name="description" content="YVA Law Staffing provides elite bilingual virtual assistants for U.S. law firms. Legal intake, demand writing, legal assistants, and case managers — starting at $7.50/hr. No contracts. Start in 72 hours.">
+    <meta name="keywords" content="bilingual virtual assistant, legal intake specialist, virtual staffing law firm, demand writing VA, case manager virtual, remote legal staff, YVA Law Staffing, YVA Law">
+    <meta name="author" content="YVA Law Staffing">
+    <meta name="robots" content="index, follow">
+
+    <!-- Open Graph (Social Sharing) -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://yvastaffing.agency">
+    <meta property="og:title" content="YVA Law Staffing | Elite Bilingual Virtual Staffing for Law Firms">
+    <meta property="og:description" content="Bilingual virtual professionals for law firms. Legal intake, demand writing, legal assistants & case managers starting at $7.50/hr. Start in 72 hours, no contracts.">
+    <meta property="og:image" content="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=1200">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="YVA Law Staffing | Elite Bilingual Virtual Staffing for Law Firms">
+    <meta name="twitter:description" content="Bilingual virtual professionals for law firms. Starting at $7.50/hr. No contracts. Start in 72 hours.">
+    <meta name="twitter:image" content="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=1200">
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-V2Q6V4HE4F"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-V2Q6V4HE4F');
+    </script>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
+
+        html {
+            scroll-behavior: smooth;
+            scroll-padding-top: 80px;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(2deg); }
+        }
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+
+        .nav-scrolled {
+            background-color: white;
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            padding-top: 0.75rem;
+            padding-bottom: 0.75rem;
+        }
+
+        /* Services Section */
+        .services-track {
+            display: flex;
+            transition: transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .service-panel {
+            min-width: 100%;
+        }
+        .service-tab.active {
+            background-color: #1b1e2b;
+            color: #fff;
+        }
+        .service-tab.active .tab-dot {
+            background-color: #facc15;
+        }
+
+        /* Cookie Banner */
+        #cookie-banner {
+            transform: translateY(100%);
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #cookie-banner.visible {
+            transform: translateY(0);
+        }
+
+        /* FAQ Modal */
+        #faq-modal {
+            display: flex;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        #faq-modal.open {
+            visibility: visible;
+            opacity: 1;
+        }
+        #faq-modal .faq-panel {
+            transform: translateY(40px) scale(0.97);
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        #faq-modal.open .faq-panel {
+            transform: translateY(0) scale(1);
+        }
+        #privacy-modal {
+            display: flex;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        #privacy-modal.open {
+            visibility: visible;
+            opacity: 1;
+        }
+        #privacy-modal .privacy-panel {
+            transform: translateY(40px) scale(0.97);
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        #privacy-modal.open .privacy-panel {
+            transform: translateY(0) scale(1);
+        }
+        .faq-answer {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.35s ease, opacity 0.3s ease;
+            opacity: 0;
+        }
+        .faq-item.open .faq-answer {
+            opacity: 1;
+        }
+        .faq-item.open .faq-chevron {
+            transform: rotate(180deg);
+        }
+        .faq-chevron {
+            transition: transform 0.3s ease;
+        }
+
+        /* Services expand/collapse */
+        #services {
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+            transition: max-height 0.7s cubic-bezier(0.4, 0, 0.2, 1),
+                        opacity 0.5s ease,
+                        padding 0.5s ease;
+        }
+        #services.expanded {
+            opacity: 1;
+            padding-top: 5rem;
+            padding-bottom: 5rem;
+        }
+
+        /* Active pillar card */
+        .pillar-card.active {
+            background-color: #fff;
+        }
+        .pillar-card.active h4 {
+            color: #1b1e2b;
+        }
+        .pillar-card.active .pillar-icon {
+            color: #1b1e2b;
+        }
+
+        /* Testimonials Carousel */
+        .testimonial-track {
+            display: flex;
+            transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .testimonial-slide {
+            min-width: 100%;
+        }
+
+        /* Calendly Modal */
+        #mobile-menu {
+            transform: translateX(100%);
+            transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #mobile-menu.open {
+            transform: translateX(0);
+        }
+
+        /* Calendly Modal */
+        #calendly-modal {
+            display: flex;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        #calendly-modal.open {
+            visibility: visible;
+            opacity: 1;
+        }
+        #calendly-modal .modal-panel {
+            transform: translateY(40px) scale(0.97);
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        #calendly-modal.open .modal-panel {
+            transform: translateY(0) scale(1);
+        }
+
+        /* Mobile Service Modal */
+        #mobile-service-modal {
+            display: flex;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        #mobile-service-modal.open {
+            visibility: visible;
+            opacity: 1;
+        }
+        #mobile-service-modal .mobile-service-panel {
+            transform: translateY(40px) scale(0.97);
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        #mobile-service-modal.open .mobile-service-panel {
+            transform: translateY(0) scale(1);
+        }
+
+        /* Founders reveal */
+        #founders-cards {
+            max-height: 0;
+            overflow: hidden;
+            opacity: 0;
+            transition: max-height 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease;
+        }
+        #founders-cards.revealed {
+            opacity: 1;
+        }
+        .founders-arrow {
+            transition: transform 0.3s ease;
+        }
+        .founders-arrow.rotated {
+            transform: rotate(180deg);
+        }
+
+        /* Comparison mobile cards */
+        .comparison-mobile-card {
+            background: white;
+            border-radius: 1.5rem;
+            border: 1px solid #e2e8f0;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body class="bg-white text-slate-900 overflow-x-hidden">
+
+    <!-- Top Utility Bar -->
+    <div class="bg-[#1b1e2b] text-white py-2 px-6 hidden md:block border-b border-white/10">
+        <div class="max-w-7xl mx-auto flex justify-between items-center text-[11px] font-bold tracking-widest uppercase">
+            <div class="flex gap-8">
+                <span class="flex items-center gap-2">
+                    <i data-lucide="globe" class="w-3.5 h-3.5 text-yellow-400"></i> English & Spanish Support
+                </span>
+                <span class="flex items-center gap-2 text-slate-400">
+                    <i data-lucide="users" class="w-3.5 h-3.5"></i> High-Retention Specialists
+                </span>
+            </div>
+            <div class="flex gap-6">
+                <a href="#" onclick="openEmailPicker(event)" class="hover:text-yellow-400 transition-colors">contact@yvastaffing.agency</a>
+                <span class="text-yellow-400 font-black">Mon - Fri: 9am - 6pm</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav id="navbar" class="fixed md:sticky w-full z-50 transition-all duration-300 top-0 bg-white py-6">
+        <div class="max-w-7xl mx-auto px-6 flex justify-between items-center">
+            <!-- Logo Brand Mark -->
+            <a href="#home" class="flex items-center gap-3 cursor-pointer group">
+                <div class="bg-[#1b1e2b] w-12 h-12 rounded-xl flex items-center justify-center transition-transform group-hover:rotate-6 shadow-lg text-yellow-400">
+                    <i data-lucide="users" class="w-7 h-7"></i>
+                </div>
+                <div class="flex flex-col">
+                    <span class="text-2xl font-black tracking-tighter leading-none text-[#1b1e2b]">YVA <span class="text-base">Law</span></span>
+                    <span class="text-[10px] uppercase tracking-[0.3em] font-bold text-slate-400">Staffing</span>
+                </div>
+            </a>
+
+            <!-- Desktop Nav -->
+            <div class="hidden md:flex items-center gap-10 font-black text-[12px] uppercase tracking-widest text-[#1b1e2b]">
+                <a href="#home" class="hover:text-yellow-500 transition-colors">Home</a>
+                <a href="#service-pillars" class="hover:text-yellow-500 transition-colors">Services</a>
+                <a href="#how-it-works" class="hover:text-yellow-500 transition-colors">How It Works</a>
+                <a href="#about" class="hover:text-yellow-500 transition-colors">About</a>
+                <a href="careers.html" class="hover:text-yellow-500 transition-colors">Careers</a>
+                <button onclick="openCalendly()" class="bg-[#1b1e2b] text-white px-8 py-3.5 rounded-full hover:bg-yellow-500 hover:text-[#1b1e2b] transition-all flex items-center gap-2 shadow-lg hover:shadow-yellow-100">
+                    Book a Call <i data-lucide="calendar" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <!-- Mobile Menu Toggle -->
+            <button id="mobile-menu-toggle" aria-label="Open menu" class="md:hidden text-[#1b1e2b] p-2 rounded-xl hover:bg-slate-100 transition-colors">
+                <i id="menu-icon-open" data-lucide="menu" class="w-6 h-6"></i>
+                <i id="menu-icon-close" data-lucide="x" class="w-6 h-6 hidden"></i>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu Drawer -->
+    <div id="mobile-menu" class="fixed top-0 right-0 h-full w-full max-w-sm bg-[#1b1e2b] z-[60] flex flex-col shadow-2xl md:hidden">
+        <!-- Drawer Header -->
+        <div class="flex items-center justify-between px-6 py-5 border-b border-white/10">
+            <div class="flex items-center gap-3">
+                <div class="bg-yellow-400 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg">
+                    <i data-lucide="users" class="w-5 h-5 text-[#1b1e2b]"></i>
+                </div>
+                <div class="flex flex-col">
+                    <span class="text-xl font-black tracking-tighter leading-none text-white">YVA <span class="text-sm">Law</span></span>
+                    <span class="text-[10px] uppercase tracking-[0.3em] font-bold text-slate-400">Staffing</span>
+                </div>
+            </div>
+            <button id="mobile-menu-close" aria-label="Close menu" class="text-slate-400 hover:text-yellow-400 transition-colors p-2 rounded-xl hover:bg-white/10">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+        </div>
+
+        <!-- Nav Links -->
+        <nav class="flex flex-col px-6 py-8 gap-2 flex-1">
+            <a href="#home" class="mobile-nav-link flex items-center gap-3 px-4 py-4 rounded-2xl text-white font-black text-sm uppercase tracking-widest hover:bg-white/10 hover:text-yellow-400 transition-all">
+                <i data-lucide="home" class="w-4 h-4 text-yellow-400"></i> Home
+            </a>
+            <a href="#service-pillars" class="mobile-nav-link flex items-center gap-3 px-4 py-4 rounded-2xl text-white font-black text-sm uppercase tracking-widest hover:bg-white/10 hover:text-yellow-400 transition-all">
+                <i data-lucide="briefcase" class="w-4 h-4 text-yellow-400"></i> Services
+            </a>
+            <a href="#how-it-works" class="mobile-nav-link flex items-center gap-3 px-4 py-4 rounded-2xl text-white font-black text-sm uppercase tracking-widest hover:bg-white/10 hover:text-yellow-400 transition-all">
+                <i data-lucide="zap" class="w-4 h-4 text-yellow-400"></i> How It Works
+            </a>
+            <a href="#about" class="mobile-nav-link flex items-center gap-3 px-4 py-4 rounded-2xl text-white font-black text-sm uppercase tracking-widest hover:bg-white/10 hover:text-yellow-400 transition-all">
+                <i data-lucide="info" class="w-4 h-4 text-yellow-400"></i> About
+            </a>
+            <a href="careers.html" class="mobile-nav-link flex items-center gap-3 px-4 py-4 rounded-2xl text-white font-black text-sm uppercase tracking-widest hover:bg-white/10 hover:text-yellow-400 transition-all">
+                <i data-lucide="user-plus" class="w-4 h-4 text-yellow-400"></i> Careers
+            </a>
+
+            <div class="border-t border-white/10 my-4"></div>
+
+            <!-- Mobile CTA -->
+            <button onclick="closeMobileMenu(); openCalendly();" class="flex items-center justify-center gap-3 bg-yellow-400 text-[#1b1e2b] px-6 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-yellow-300 transition-all shadow-lg">
+                <i data-lucide="calendar" class="w-4 h-4"></i> Book a Free Call
+            </button>
+        </nav>
+
+        <!-- Footer Info -->
+        <div class="px-6 py-6 border-t border-white/10">
+            <a href="#" onclick="openEmailPicker(event)" class="flex items-center gap-2 text-slate-400 text-xs font-bold hover:text-yellow-400 transition-colors mb-2">
+                <i data-lucide="mail" class="w-4 h-4"></i> contact@yvastaffing.agency
+            </a>
+            <p class="text-slate-500 text-[11px] font-bold uppercase tracking-widest">Mon – Fri · 9am – 6pm EST</p>
+        </div>
+    </div>
+
+    <!-- Mobile Menu Backdrop -->
+    <div id="mobile-backdrop" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[55] hidden md:hidden"></div>
+
+    <!-- Hero Section -->
+    <section id="home" class="relative pt-12 pb-20 lg:pt-20 lg:pb-32 bg-slate-50">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="grid lg:grid-cols-2 gap-16 items-center">
+                
+                <!-- Left Column -->
+                <div class="space-y-8">
+                    <div class="inline-flex items-center gap-2 bg-yellow-400 text-[#1b1e2b] px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider">
+                        <i data-lucide="trending-up" class="w-4 h-4"></i> Professional Staffing Solutions
+                    </div>
+
+                    <h1 class="text-5xl lg:text-[4.8rem] font-black text-[#1b1e2b] leading-[0.95] tracking-tight">
+                        Elite <span class="text-yellow-500">Bilingual</span> Virtual Support.
+                    </h1>
+
+                    <h2 class="text-xl text-slate-600 font-medium leading-relaxed max-w-xl">
+                        Elevate your productivity with dedicated virtual assistants specializing in legal intake, demand writing, legal assistance, and case management. Starting at <span class="text-[#1b1e2b] font-black underline decoration-yellow-400 decoration-8 underline-offset-4">$7.50/hour</span>.
+                    </h2>
+
+                    <div class="flex flex-col sm:flex-row gap-4 pt-4">
+                        <button onclick="openCalendly()" class="bg-[#1b1e2b] text-white px-10 py-5 rounded-2xl font-black text-lg flex items-center justify-center gap-3 hover:translate-y-[-4px] transition-all shadow-2xl shadow-slate-300">
+                            Hire Your Assistant <i data-lucide="arrow-right" class="w-5 h-5 text-yellow-400"></i>
+                        </button>
+                        <div class="flex items-center gap-4 px-2">
+                            <div class="flex -space-x-3">
+                                <img src="https://i.pravatar.cc/100?u=yva1" class="w-12 h-12 rounded-full border-4 border-white shadow-md" alt="VA">
+                                <img src="https://i.pravatar.cc/100?u=yva2" class="w-12 h-12 rounded-full border-4 border-white shadow-md" alt="VA">
+                                <img src="https://i.pravatar.cc/100?u=yva3" class="w-12 h-12 rounded-full border-4 border-white shadow-md" alt="VA">
+                            </div>
+                            <div class="text-sm leading-tight">
+                                <p class="font-black text-[#1b1e2b]">50+ Active VA's</p>
+                                <p class="text-slate-500 font-bold">Ready to Start</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Trust Signals -->
+                    <div class="pt-12 grid grid-cols-2 gap-8 border-t border-slate-200">
+                        <div class="flex items-start gap-3">
+                            <div class="bg-white p-2.5 rounded-xl shadow-md text-emerald-600">
+                                <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <p class="font-black text-[#1b1e2b] text-sm uppercase">No Hidden Fees</p>
+                                <p class="text-xs font-bold text-slate-400">Zero Onboarding Cost</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <div class="bg-white p-2.5 rounded-xl shadow-md text-indigo-600">
+                                <i data-lucide="shield-check" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <p class="font-black text-[#1b1e2b] text-sm uppercase">Vetted Talent</p>
+                                <p class="text-xs font-bold text-slate-400">Rigorous Testing Process</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column -->
+                <div class="relative mt-8 lg:mt-0 px-4 lg:px-0">
+                    <div class="relative z-10 rounded-[2rem] lg:rounded-[3rem] overflow-hidden shadow-[0_50px_100px_-20px_rgba(27,30,43,0.3)] border-[10px] lg:border-[16px] border-white">
+                        <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=1000" alt="Specialized Virtual Staffing" class="w-full h-[320px] sm:h-[450px] lg:h-[650px] object-cover">
+                        <div class="absolute inset-0 bg-gradient-to-t from-[#1b1e2b]/60 via-transparent to-transparent"></div>
+                    </div>
+
+                    <!-- Floating Price — hidden on small screens, shown lg+ -->
+                    <div class="hidden lg:block absolute -left-12 top-1/4 z-20 bg-[#1b1e2b] p-8 rounded-[2rem] shadow-2xl border-4 border-white animate-float text-white">
+                        <p class="text-yellow-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Starting From</p>
+                        <div class="flex items-baseline gap-1">
+                            <span class="text-4xl font-black">$7.50</span>
+                            <span class="text-slate-400 font-bold text-sm">/hr</span>
+                        </div>
+                    </div>
+
+                    <!-- Testimonial — repositioned for mobile -->
+                    <div class="absolute right-2 lg:-right-6 bottom-8 lg:bottom-16 z-20 bg-white/95 backdrop-blur-md p-4 lg:p-6 rounded-2xl lg:rounded-3xl shadow-2xl border border-slate-100 max-w-[220px] lg:max-w-[280px]">
+                        <div class="flex gap-0.5 mb-2 lg:mb-3 text-yellow-400">
+                            <i data-lucide="star" class="w-3 h-3 lg:w-4 lg:h-4 fill-yellow-400"></i>
+                            <i data-lucide="star" class="w-3 h-3 lg:w-4 lg:h-4 fill-yellow-400"></i>
+                            <i data-lucide="star" class="w-3 h-3 lg:w-4 lg:h-4 fill-yellow-400"></i>
+                            <i data-lucide="star" class="w-3 h-3 lg:w-4 lg:h-4 fill-yellow-400"></i>
+                            <i data-lucide="star" class="w-3 h-3 lg:w-4 lg:h-4 fill-yellow-400"></i>
+                        </div>
+                        <p class="text-xs lg:text-sm font-bold text-[#1b1e2b] leading-snug italic">
+                            "Hiring through YVA was the best decision for my Law Firm. Professional and seamless."
+                        </p>
+                        <div class="mt-3 lg:mt-4 flex items-center gap-2 lg:gap-3">
+                            <img src="https://i.pravatar.cc/100?u=testi" class="w-7 h-7 lg:w-8 lg:h-8 rounded-full bg-slate-100" alt="Client">
+                            <div>
+                                <p class="text-xs font-black text-[#1b1e2b]">Joshua K.</p>
+                                <p class="text-[10px] text-slate-400 font-bold uppercase">Business Owner</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="absolute -top-10 -right-10 w-80 h-80 bg-yellow-400/20 rounded-full blur-[100px] -z-10"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- SEO Service Pillars -->
+    <div id="service-pillars" class="bg-[#1b1e2b] py-16">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="flex flex-col md:flex-row items-end justify-between gap-8 mb-12">
+                <div>
+                    <p class="text-yellow-400 font-black uppercase text-xs tracking-[0.3em] mb-3">Service Expertise</p>
+                    <h3 class="text-3xl font-bold text-white max-w-md">Tailored Support for Your Industry</h3>
+                </div>
+                <p class="text-slate-400 font-medium max-w-sm">
+                    High-impact virtual staffing across specialized sectors.
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <button class="pillar-card group p-8 rounded-3xl border border-white/10 hover:bg-white transition-all cursor-pointer text-left" data-service="0">
+                    <div class="pillar-icon text-yellow-400 group-hover:text-[#1b1e2b] mb-4"><i data-lucide="scale" class="w-6 h-6"></i></div>
+                    <h4 class="text-white group-hover:text-[#1b1e2b] font-black uppercase text-sm mb-2 tracking-widest">Legal Intake</h4>
+                    <p class="text-slate-500 text-xs font-bold leading-relaxed">Lead capture, screening & scheduling.</p>
+                    <div class="mt-4 flex items-center gap-1 text-yellow-400 text-[10px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
+                        Learn More <i data-lucide="chevron-down" class="w-3 h-3"></i>
+                    </div>
+                </button>
+                <button class="pillar-card group p-8 rounded-3xl border border-white/10 hover:bg-white transition-all cursor-pointer text-left" data-service="1">
+                    <div class="pillar-icon text-yellow-400 group-hover:text-[#1b1e2b] mb-4"><i data-lucide="gavel" class="w-6 h-6"></i></div>
+                    <h4 class="text-white group-hover:text-[#1b1e2b] font-black uppercase text-sm mb-2 tracking-widest">Legal Assistants</h4>
+                    <p class="text-slate-500 text-xs font-bold leading-relaxed">Attorney support & case admin.</p>
+                    <div class="mt-4 flex items-center gap-1 text-yellow-400 text-[10px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
+                        Learn More <i data-lucide="chevron-down" class="w-3 h-3"></i>
+                    </div>
+                </button>
+                <button class="pillar-card group p-8 rounded-3xl border border-white/10 hover:bg-white transition-all cursor-pointer text-left" data-service="2">
+                    <div class="pillar-icon text-yellow-400 group-hover:text-[#1b1e2b] mb-4"><i data-lucide="file-text" class="w-6 h-6"></i></div>
+                    <h4 class="text-white group-hover:text-[#1b1e2b] font-black uppercase text-sm mb-2 tracking-widest">Demand Writing</h4>
+                    <p class="text-slate-500 text-xs font-bold leading-relaxed">Medical records & demand letters.</p>
+                    <div class="mt-4 flex items-center gap-1 text-yellow-400 text-[10px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
+                        Learn More <i data-lucide="chevron-down" class="w-3 h-3"></i>
+                    </div>
+                </button>
+                <button class="pillar-card group p-8 rounded-3xl border border-white/10 hover:bg-white transition-all cursor-pointer text-left" data-service="3">
+                    <div class="pillar-icon text-yellow-400 group-hover:text-[#1b1e2b] mb-4"><i data-lucide="users" class="w-6 h-6"></i></div>
+                    <h4 class="text-white group-hover:text-[#1b1e2b] font-black uppercase text-sm mb-2 tracking-widest">Case Managers</h4>
+                    <p class="text-slate-500 text-xs font-bold leading-relaxed">Full case oversight, intake to resolution.</p>
+                    <div class="mt-4 flex items-center gap-1 text-yellow-400 text-[10px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
+                        Learn More <i data-lucide="chevron-down" class="w-3 h-3"></i>
+                    </div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Services Section -->
+    <section id="services" class="bg-white py-20 lg:py-32">
+        <div class="max-w-7xl mx-auto px-6">
+
+            <!-- Tab Navigation -->
+            <div class="flex flex-wrap justify-center gap-3 mb-10">
+                <button class="service-tab active flex items-center gap-2 px-5 py-3 rounded-full border-2 border-[#1b1e2b] font-black text-xs uppercase tracking-widest transition-all" data-service="0">
+                    <span class="tab-dot w-2 h-2 rounded-full bg-yellow-400 inline-block"></span> Legal Intake
+                </button>
+                <button class="service-tab flex items-center gap-2 px-5 py-3 rounded-full border-2 border-slate-200 text-slate-500 font-black text-xs uppercase tracking-widest hover:border-[#1b1e2b] hover:text-[#1b1e2b] transition-all" data-service="1">
+                    <span class="tab-dot w-2 h-2 rounded-full bg-slate-300 inline-block"></span> Legal Assistants
+                </button>
+                <button class="service-tab flex items-center gap-2 px-5 py-3 rounded-full border-2 border-slate-200 text-slate-500 font-black text-xs uppercase tracking-widest hover:border-[#1b1e2b] hover:text-[#1b1e2b] transition-all" data-service="2">
+                    <span class="tab-dot w-2 h-2 rounded-full bg-slate-300 inline-block"></span> Demand Writing
+                </button>
+                <button class="service-tab flex items-center gap-2 px-5 py-3 rounded-full border-2 border-slate-200 text-slate-500 font-black text-xs uppercase tracking-widest hover:border-[#1b1e2b] hover:text-[#1b1e2b] transition-all" data-service="3">
+                    <span class="tab-dot w-2 h-2 rounded-full bg-slate-300 inline-block"></span> Case Managers
+                </button>
+            </div>
+
+            <!-- Sliding Panels -->
+            <div class="overflow-hidden rounded-[2rem] border border-slate-100 shadow-xl">
+                <div class="services-track" id="services-track">
+
+                    <!-- Panel 1: Legal Intake -->
+                    <div class="service-panel">
+                        <div class="grid lg:grid-cols-2">
+                            <div class="relative h-64 lg:h-auto overflow-hidden">
+                                <img src="https://images.unsplash.com/photo-1601933973783-43cf8a7d4c5f?auto=format&fit=crop&q=80&w=900" alt="Legal Intake" class="w-full h-full object-cover">
+                                <div class="absolute inset-0 bg-gradient-to-r from-[#1b1e2b]/60 to-transparent lg:bg-gradient-to-t"></div>
+                                <div class="absolute bottom-6 left-6 bg-yellow-400 text-[#1b1e2b] px-5 py-3 rounded-2xl shadow-lg">
+                                    <p class="text-[10px] font-black uppercase tracking-widest mb-0.5">Starting From</p>
+                                    <p class="text-2xl font-black leading-none">$7.50<span class="text-sm font-bold">/hr</span></p>
+                                </div>
+                            </div>
+                            <div class="bg-white p-10 lg:p-14 flex flex-col justify-center">
+                                <div class="inline-flex items-center gap-2 bg-yellow-400/20 text-[#1b1e2b] px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest mb-6 w-fit">
+                                    <i data-lucide="scale" class="w-3.5 h-3.5"></i> Legal Intake
+                                </div>
+                                <h3 class="text-2xl lg:text-3xl font-black text-[#1b1e2b] leading-tight mb-4">Stop losing potential clients to <span class="text-yellow-500">missed calls or delayed responses.</span></h3>
+                                <p class="text-slate-600 leading-relaxed mb-8">Your intake specialist is the first voice a potential client hears. They answer calls in English and Spanish, gather case details, screen for eligibility, complete intake forms, update your CRM, and book consultations — so every lead is captured and your attorneys only speak with qualified prospects.</p>
+                                <ul class="space-y-3 mb-10">
+                                    <li class="flex items-start gap-3 text-sm font-bold text-slate-700">
+                                        <div class="w-5 h-5 rounded-full bg-yellow-400 flex items-center justify-center flex-shrink-0 mt-0.5"><i data-lucide="check" class="w-3 h-3 text-[#1b1e2b]"></i></div>
+                                        Bilingual inbound call & email handling
+                                    </li>
+                                    <li class="flex items-start gap-3 text-sm font-bold text-slate-700">
+                                        <div class="w-5 h-5 rounded-full bg-yellow-400 flex items-center justify-center flex-shrink-0 mt-0.5"><i data-lucide="check" class="w-3 h-3 text-[#1b1e2b]"></i></div>
+                                        Client screening & eligibility check
+                                    </li>
+                                    <li class="flex items-start gap-3 text-sm font-bold text-slate-700">
+                                        <div class="w-5 h-5 rounded-full bg-yellow-400 flex items-center justify-center flex-shrink-0 mt-0.5"><i data-lucide="check" class="w-3 h-3 text-[#1b1e2b]"></i></div>
+                                        Intake form completion & CRM entry
+                                    </li>
+                                    <li class="flex items-start gap-3 text-sm font-bold text-slate-700">
+                                        <div class="w-5 h-5 rounded-full bg-yellow-400 flex items-center justify-center flex-shrink-0 mt-0.5"><i data-lucide="check" class="w-3 h-3 text-[#1b1e2b]"></i></div>
+                                        Consultation scheduling & confirmations
+                                    </li>
+                                    <li class="flex items-start gap-3 text-sm font-bold text-slate-700">
+                                        <div class="w-5 h-5 rounded-full bg-yellow-400 flex items-center justify-center flex-shrink-0 mt-0.5"><i data-lucide="check" class="w-3 h-3 text-[#1b1e2b]"></i></div>
+                                        Lead follow-up & status updates
+                                    </li>
+                                </ul>
+                                <button onclick="openCalendly('Legal Intake')" class="bg-[#1b1e2b] text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center gap-2 hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all w-fit shadow-lg">
+                                    Hire an Intake Specialist <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Panel 2: Legal Assistants -->
+                    <div class="service-panel">
+                        <div class="grid lg:grid-cols-2">
+                            <div class="relative h-64 lg:h-auto overflow-hidden">
+                                <img src="https://images.unsplash.com/photo-1586281380349-632531db7ed4?auto=format&fit=crop&q=80&w=900" alt="Legal Assistants" class="w-full h-full object-cover">
+                                <div class="absolute inset-0 bg-gradient-to-r from-[#1b1e2b]/60 to-transparent lg:bg-gradient-to-t"></div>
+                                <div class="absolute bottom-6 left-6 bg-yellow-400 text-[#1b1e2b] px-5 py-3 rounded-2xl shadow-lg">
+                                    <p class="text-[10px] font-black uppercase tracking-widest mb-0.5">Starting From</p>
+                                    <p class="text-2xl font-black leading-none">$8.50<span class="text-sm font-bold">/hr</span></p>
+                                </div>
+                            </div>
+                            <div class="bg-white p-10 lg:p-14 flex flex-col justify-center">
+                                <div class="inline-flex items-center gap-2 bg-yellow-400/20 text-[#1b1e2b] px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest mb-6 w-fit">
+                                    <i data-lucide="gavel" class="w-3.5 h-3.5"></i> Legal Assistants
+                                </div>
+                                <h3 class="text-2xl lg:text-3xl font-black text-[#1b1e2b] leading-tight mb-4">Give your attorneys the support they need to <span class="text-yellow-500">stay focused on cases — not paperwork.</span></h3>
+                                <p class="text-slate-600 leading-relaxed mb-8">Our bilingual legal assistants handle the day-to-day administrative workload that consumes attorney hours. They manage calendars, draft correspondence, organize case files, follow up with clients, and keep track of upcoming deadlines — functioning as a true extension of your legal team without the overhead of an in-house hire.</p>
+                                <ul class="space-y-3 mb-10">
+                                    <li class="flex items-start gap-3 text-sm font-bold text-slate-700">
+                                        <div class="w-5 h-5 rounded-full bg-yellow-400 flex items-center justify-center flex-shrink-0 mt-0.5"><i data-lucide="check" class="w-3 h-3 text-[#1b1e2b]"></i></div>
+                                        Attorney calendar & scheduling management
+                                    </li>
+                                    <li class="flex items-start gap-3 text-sm font-bold text-slate-700">
+                                        <div class="w-5 h-5 rounded-full bg-yellow-400 flex items-center justify-center flex-shrink-0 mt-0.5"><i data-lucide="check" class="w-3 h-3 text-[#1b1e2b]"></i></div>
+                                        Client correspondence & follow-ups
+                                    </li>
+                                    <li class="flex items-start gap-3 text-sm font-bold text-slate-700">
+                                        <div class="w-5 h-5 rounded-full bg-yellow-400 flex items-center justify-center flex-shrink-0 mt-0.5"><i data-lucide="check" class="w-3 h-3 text-[#1b1e2b]"></i></div>
+                                        Case file organization & maintenance
+                                    </li>
+                                    <li class="flex items-start gap-3 text-sm font-bold text-slate-700">
+                                        <div class="w-5 h-5 rounded-full bg-yellow-400 flex items-center justify-center flex-shrink-0 mt-0.5"><i data-lucide="check" class="w-3 h-3 text-[#1b1e2b]"></i></div>
+                                        Court deadline tracking & reminders
+                                    </li>
+                                    <li class="flex items-start gap-3 text-sm font-bold text-slate-700">
+                                        <div class="w-5 h-5 rounded-full bg-yellow-400 flex items-center justify-center flex-shrink-0 mt-0.5"><i data-lucide="check" class="w-3 h-3 text-[#1b1e2b]"></i></div>
+                                        Document drafting & proofreading
+                                    </li>
+                                </ul>
+                                <button onclick="openCalendly('Legal Assistants')" class="bg-[#1b1e2b] text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center gap-2 hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all w-fit shadow-lg">
+                                    Hire a Legal Assistant <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Panel 3: Demand Writing -->
+                    <div class="service-panel">
+                        <div class="grid lg:grid-cols-2">
+                            <div class="relative h-64 lg:h-auto overflow-hidden">
+                                <img src="https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=900" alt="Demand Writing" class="w-full h-full object-cover">
+                                <div class="absolute inset-0 bg-gradient-to-r from-[#1b1e2b]/60 to-transparent lg:bg-gradient-to-t"></div>
+                                <div class="absolute bottom-6 left-6 bg-yellow-400 text-[#1b1e2b] px-5 py-3 rounded-2xl shadow-lg">
+                                    <p class="text-[10px] font-black uppercase tracking-widest mb-0.5">Starting From</p>
+                                    <p class="text-2xl font-black leading-none">$10<span class="text-sm font-bold">/hr</span></p>
+                                </div>
+                            </div>
+                            <div class="bg-white p-10 lg:p-14 flex flex-col justify-center">
+                                <div class="inline-flex items-center gap-2 bg-yellow-400/20 text-[#1b1e2b] px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest mb-6 w-fit">
+                                    <i data-lucide="file-text" class="w-3.5 h-3.5"></i> Demand Writing
+                                </div>
+                                <h3 class="text-2xl lg:text-3xl font-black text-[#1b1e2b] leading-tight mb-4">Turn case records into <span class="text-yellow-500">complete demand packages</span> without slowing down your attorneys.</h3>
+                                <p class="text-slate-600 leading-relaxed mb-8">Our demand writing specialists are trained to review medical records and bills, organize evidence, calculate damages, and draft professional demand letters that match your firm's tone and standards. They build the full package so your attorney can review, approve, and send — cutting turnaround time and backlog significantly.</p>
+                                <ul class="space-y-3 mb-10">
+                                    <li class="flex items-start gap-3 text-sm font-bold text-slate-700">
+                                        <div class="w-5 h-5 rounded-full bg-yellow-400 flex items-center justify-center flex-shrink-0 mt-0.5"><i data-lucide="check" class="w-3 h-3 text-[#1b1e2b]"></i></div>
+                                        Medical record review & bill summarization
+                                    </li>
+                                    <li class="flex items-start gap-3 text-sm font-bold text-slate-700">
+                                        <div class="w-5 h-5 rounded-full bg-yellow-400 flex items-center justify-center flex-shrink-0 mt-0.5"><i data-lucide="check" class="w-3 h-3 text-[#1b1e2b]"></i></div>
+                                        Damages calculation & case chronology
+                                    </li>
+                                    <li class="flex items-start gap-3 text-sm font-bold text-slate-700">
+                                        <div class="w-5 h-5 rounded-full bg-yellow-400 flex items-center justify-center flex-shrink-0 mt-0.5"><i data-lucide="check" class="w-3 h-3 text-[#1b1e2b]"></i></div>
+                                        Demand letter drafting to firm standards
+                                    </li>
+                                    <li class="flex items-start gap-3 text-sm font-bold text-slate-700">
+                                        <div class="w-5 h-5 rounded-full bg-yellow-400 flex items-center justify-center flex-shrink-0 mt-0.5"><i data-lucide="check" class="w-3 h-3 text-[#1b1e2b]"></i></div>
+                                        Settlement package preparation
+                                    </li>
+                                    <li class="flex items-start gap-3 text-sm font-bold text-slate-700">
+                                        <div class="w-5 h-5 rounded-full bg-yellow-400 flex items-center justify-center flex-shrink-0 mt-0.5"><i data-lucide="check" class="w-3 h-3 text-[#1b1e2b]"></i></div>
+                                        Insurance adjuster follow-up support
+                                    </li>
+                                </ul>
+                                <button onclick="openCalendly('Demand Writing')" class="bg-[#1b1e2b] text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center gap-2 hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all w-fit shadow-lg">
+                                    Hire a Demand Writer <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Panel 4: Case Managers -->
+                    <div class="service-panel">
+                        <div class="grid lg:grid-cols-2">
+                            <div class="relative h-64 lg:h-auto overflow-hidden">
+                                <img src="https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=900" alt="Case Managers" class="w-full h-full object-cover">
+                                <div class="absolute inset-0 bg-gradient-to-r from-[#1b1e2b]/60 to-transparent lg:bg-gradient-to-t"></div>
+                                <div class="absolute bottom-6 left-6 bg-yellow-400 text-[#1b1e2b] px-5 py-3 rounded-2xl shadow-lg">
+                                    <p class="text-[10px] font-black uppercase tracking-widest mb-0.5">Starting From</p>
+                                    <p class="text-2xl font-black leading-none">$12<span class="text-sm font-bold">/hr</span></p>
+                                </div>
+                            </div>
+                            <div class="bg-white p-10 lg:p-14 flex flex-col justify-center">
+                                <div class="inline-flex items-center gap-2 bg-yellow-400/20 text-[#1b1e2b] px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest mb-6 w-fit">
+                                    <i data-lucide="users" class="w-3.5 h-3.5"></i> Case Managers
+                                </div>
+                                <h3 class="text-2xl lg:text-3xl font-black text-[#1b1e2b] leading-tight mb-4">Keep every case on track <span class="text-yellow-500">from the moment it opens to the day it settles.</span></h3>
+                                <p class="text-slate-600 leading-relaxed mb-8">Our bilingual case managers take full ownership of the case lifecycle. They coordinate between clients, attorneys, medical providers, and insurance adjusters — tracking every deadline, collecting documentation, managing treatment follow-ups, and reporting status to attorneys. Nothing stalls, nothing falls through the cracks.</p>
+                                <ul class="space-y-3 mb-10">
+                                    <li class="flex items-start gap-3 text-sm font-bold text-slate-700">
+                                        <div class="w-5 h-5 rounded-full bg-yellow-400 flex items-center justify-center flex-shrink-0 mt-0.5"><i data-lucide="check" class="w-3 h-3 text-[#1b1e2b]"></i></div>
+                                        Full case lifecycle coordination
+                                    </li>
+                                    <li class="flex items-start gap-3 text-sm font-bold text-slate-700">
+                                        <div class="w-5 h-5 rounded-full bg-yellow-400 flex items-center justify-center flex-shrink-0 mt-0.5"><i data-lucide="check" class="w-3 h-3 text-[#1b1e2b]"></i></div>
+                                        Medical treatment & provider follow-up
+                                    </li>
+                                    <li class="flex items-start gap-3 text-sm font-bold text-slate-700">
+                                        <div class="w-5 h-5 rounded-full bg-yellow-400 flex items-center justify-center flex-shrink-0 mt-0.5"><i data-lucide="check" class="w-3 h-3 text-[#1b1e2b]"></i></div>
+                                        Deadline tracking & attorney status reports
+                                    </li>
+                                    <li class="flex items-start gap-3 text-sm font-bold text-slate-700">
+                                        <div class="w-5 h-5 rounded-full bg-yellow-400 flex items-center justify-center flex-shrink-0 mt-0.5"><i data-lucide="check" class="w-3 h-3 text-[#1b1e2b]"></i></div>
+                                        Client relationship management throughout the case
+                                    </li>
+                                    <li class="flex items-start gap-3 text-sm font-bold text-slate-700">
+                                        <div class="w-5 h-5 rounded-full bg-yellow-400 flex items-center justify-center flex-shrink-0 mt-0.5"><i data-lucide="check" class="w-3 h-3 text-[#1b1e2b]"></i></div>
+                                        Multi-party communication & documentation
+                                    </li>
+                                </ul>
+                                <button onclick="openCalendly('Case Managers')" class="bg-[#1b1e2b] text-white px-8 py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center gap-2 hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all w-fit shadow-lg">
+                                    Hire a Case Manager <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing Section -->
+    <section id="pricing" class="bg-slate-50 py-20 lg:py-32">
+        <div class="max-w-7xl mx-auto px-6">
+
+            <!-- Header -->
+            <div class="text-center mb-16">
+                <p class="text-yellow-500 font-black uppercase text-xs tracking-[0.3em] mb-3">Transparent Pricing</p>
+                <h2 class="text-4xl lg:text-5xl font-black text-[#1b1e2b] tracking-tight">Simple, Affordable Rates</h2>
+                <p class="text-slate-500 font-medium mt-4 max-w-xl mx-auto">No surprises. No hidden fees. Just elite bilingual talent at a fraction of what you'd pay in-house.</p>
+            </div>
+
+            <!-- Pricing Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-20">
+
+                <!-- Legal Intake -->
+                <div class="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-sm hover:shadow-xl hover:border-yellow-400/40 hover:-translate-y-1 transition-all group">
+                    <div class="w-12 h-12 bg-[#1b1e2b] rounded-2xl flex items-center justify-center mb-6">
+                        <i data-lucide="scale" class="w-5 h-5 text-yellow-400"></i>
+                    </div>
+                    <p class="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">Legal Intake</p>
+                    <div class="flex items-baseline gap-1 mb-1">
+                        <span class="text-4xl font-black text-[#1b1e2b]">$7.50</span>
+                        <span class="text-slate-400 font-bold text-sm">/hr</span>
+                    </div>
+                    <p class="text-yellow-500 text-xs font-black mb-6">~$1,200/mo full-time</p>
+                    <ul class="space-y-2 mb-8">
+                        <li class="flex items-center gap-2 text-xs font-bold text-slate-600"><div class="w-4 h-4 rounded-full bg-yellow-400/20 flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-2.5 h-2.5 text-yellow-600"></i></div> Bilingual call & email handling</li>
+                        <li class="flex items-center gap-2 text-xs font-bold text-slate-600"><div class="w-4 h-4 rounded-full bg-yellow-400/20 flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-2.5 h-2.5 text-yellow-600"></i></div> Client screening & eligibility</li>
+                        <li class="flex items-center gap-2 text-xs font-bold text-slate-600"><div class="w-4 h-4 rounded-full bg-yellow-400/20 flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-2.5 h-2.5 text-yellow-600"></i></div> Intake form completion & CRM</li>
+                        <li class="flex items-center gap-2 text-xs font-bold text-slate-600"><div class="w-4 h-4 rounded-full bg-yellow-400/20 flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-2.5 h-2.5 text-yellow-600"></i></div> Consultation scheduling</li>
+                    </ul>
+                    <button onclick="openCalendly('Legal Intake')" class="w-full bg-slate-50 group-hover:bg-[#1b1e2b] text-[#1b1e2b] group-hover:text-white border-2 border-slate-200 group-hover:border-[#1b1e2b] py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all">
+                        Get Started
+                    </button>
+                </div>
+
+                <!-- Legal Assistants — Featured -->
+                <div class="bg-[#1b1e2b] rounded-[2rem] p-8 border border-[#1b1e2b] shadow-xl hover:-translate-y-1 transition-all group relative">
+                    <div class="absolute -top-4 left-1/2 -translate-x-1/2 bg-yellow-400 text-[#1b1e2b] text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full whitespace-nowrap">Most Popular</div>
+                    <div class="w-12 h-12 bg-yellow-400/20 rounded-2xl flex items-center justify-center mb-6 mt-2">
+                        <i data-lucide="gavel" class="w-5 h-5 text-yellow-400"></i>
+                    </div>
+                    <p class="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">Legal Assistants</p>
+                    <div class="flex items-baseline gap-1 mb-1">
+                        <span class="text-4xl font-black text-white">$8.50</span>
+                        <span class="text-slate-400 font-bold text-sm">/hr</span>
+                    </div>
+                    <p class="text-yellow-400 text-xs font-black mb-6">~$1,360/mo full-time</p>
+                    <ul class="space-y-2 mb-8">
+                        <li class="flex items-center gap-2 text-xs font-bold text-slate-300"><div class="w-4 h-4 rounded-full bg-yellow-400/20 flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-2.5 h-2.5 text-yellow-400"></i></div> Calendar & scheduling management</li>
+                        <li class="flex items-center gap-2 text-xs font-bold text-slate-300"><div class="w-4 h-4 rounded-full bg-yellow-400/20 flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-2.5 h-2.5 text-yellow-400"></i></div> Client correspondence & follow-ups</li>
+                        <li class="flex items-center gap-2 text-xs font-bold text-slate-300"><div class="w-4 h-4 rounded-full bg-yellow-400/20 flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-2.5 h-2.5 text-yellow-400"></i></div> Case file organization</li>
+                        <li class="flex items-center gap-2 text-xs font-bold text-slate-300"><div class="w-4 h-4 rounded-full bg-yellow-400/20 flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-2.5 h-2.5 text-yellow-400"></i></div> Deadline tracking & reminders</li>
+                    </ul>
+                    <button onclick="openCalendly('Legal Assistants')" class="w-full bg-yellow-400 hover:bg-yellow-300 text-[#1b1e2b] py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all">
+                        Get Started
+                    </button>
+                </div>
+
+                <!-- Demand Writing -->
+                <div class="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-sm hover:shadow-xl hover:border-yellow-400/40 hover:-translate-y-1 transition-all group">
+                    <div class="w-12 h-12 bg-[#1b1e2b] rounded-2xl flex items-center justify-center mb-6">
+                        <i data-lucide="file-text" class="w-5 h-5 text-yellow-400"></i>
+                    </div>
+                    <p class="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">Demand Writing</p>
+                    <div class="flex items-baseline gap-1 mb-1">
+                        <span class="text-4xl font-black text-[#1b1e2b]">$10</span>
+                        <span class="text-slate-400 font-bold text-sm">/hr</span>
+                    </div>
+                    <p class="text-yellow-500 text-xs font-black mb-6">~$1,600/mo full-time</p>
+                    <ul class="space-y-2 mb-8">
+                        <li class="flex items-center gap-2 text-xs font-bold text-slate-600"><div class="w-4 h-4 rounded-full bg-yellow-400/20 flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-2.5 h-2.5 text-yellow-600"></i></div> Medical record review</li>
+                        <li class="flex items-center gap-2 text-xs font-bold text-slate-600"><div class="w-4 h-4 rounded-full bg-yellow-400/20 flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-2.5 h-2.5 text-yellow-600"></i></div> Damages calculation</li>
+                        <li class="flex items-center gap-2 text-xs font-bold text-slate-600"><div class="w-4 h-4 rounded-full bg-yellow-400/20 flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-2.5 h-2.5 text-yellow-600"></i></div> Demand letter drafting</li>
+                        <li class="flex items-center gap-2 text-xs font-bold text-slate-600"><div class="w-4 h-4 rounded-full bg-yellow-400/20 flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-2.5 h-2.5 text-yellow-600"></i></div> Settlement package prep</li>
+                    </ul>
+                    <button onclick="openCalendly('Demand Writing')" class="w-full bg-slate-50 group-hover:bg-[#1b1e2b] text-[#1b1e2b] group-hover:text-white border-2 border-slate-200 group-hover:border-[#1b1e2b] py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all">
+                        Get Started
+                    </button>
+                </div>
+
+                <!-- Case Managers -->
+                <div class="bg-white rounded-[2rem] p-8 border border-slate-100 shadow-sm hover:shadow-xl hover:border-yellow-400/40 hover:-translate-y-1 transition-all group">
+                    <div class="w-12 h-12 bg-[#1b1e2b] rounded-2xl flex items-center justify-center mb-6">
+                        <i data-lucide="users" class="w-5 h-5 text-yellow-400"></i>
+                    </div>
+                    <p class="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">Case Managers</p>
+                    <div class="flex items-baseline gap-1 mb-1">
+                        <span class="text-4xl font-black text-[#1b1e2b]">$12</span>
+                        <span class="text-slate-400 font-bold text-sm">/hr</span>
+                    </div>
+                    <p class="text-yellow-500 text-xs font-black mb-6">~$1,920/mo full-time</p>
+                    <ul class="space-y-2 mb-8">
+                        <li class="flex items-center gap-2 text-xs font-bold text-slate-600"><div class="w-4 h-4 rounded-full bg-yellow-400/20 flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-2.5 h-2.5 text-yellow-600"></i></div> Full case lifecycle management</li>
+                        <li class="flex items-center gap-2 text-xs font-bold text-slate-600"><div class="w-4 h-4 rounded-full bg-yellow-400/20 flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-2.5 h-2.5 text-yellow-600"></i></div> Medical treatment follow-up</li>
+                        <li class="flex items-center gap-2 text-xs font-bold text-slate-600"><div class="w-4 h-4 rounded-full bg-yellow-400/20 flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-2.5 h-2.5 text-yellow-600"></i></div> Client & provider coordination</li>
+                        <li class="flex items-center gap-2 text-xs font-bold text-slate-600"><div class="w-4 h-4 rounded-full bg-yellow-400/20 flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-2.5 h-2.5 text-yellow-600"></i></div> Deadline tracking & reporting</li>
+                    </ul>
+                    <button onclick="openCalendly('Case Managers')" class="w-full bg-slate-50 group-hover:bg-[#1b1e2b] text-[#1b1e2b] group-hover:text-white border-2 border-slate-200 group-hover:border-[#1b1e2b] py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all">
+                        Get Started
+                    </button>
+                </div>
+
+            </div>
+
+            <!-- Comparison Table -->
+            <div>
+                <div class="text-center mb-10">
+                    <p class="text-yellow-500 font-black uppercase text-xs tracking-[0.3em] mb-3">The Real Cost</p>
+                    <h3 class="text-3xl lg:text-4xl font-black text-[#1b1e2b] tracking-tight">In-House vs YVA Law Staffing</h3>
+                    <p class="text-slate-500 font-medium mt-3 max-w-lg mx-auto">See exactly how much your firm saves by switching to a bilingual YVA professional.</p>
+                </div>
+
+                <!-- Desktop Table (hidden on mobile) -->
+                <div class="hidden md:block overflow-x-auto rounded-[2rem] border border-slate-200 shadow-lg">
+                    <table class="w-full min-w-[600px]">
+                        <thead>
+                            <tr>
+                                <th class="bg-slate-50 px-8 py-5 text-left text-xs font-black uppercase tracking-widest text-slate-400 w-[220px]">Role</th>
+                                <th class="bg-slate-50 px-8 py-5 text-center text-xs font-black uppercase tracking-widest text-slate-400">In-House / Month</th>
+                                <th class="bg-[#1b1e2b] px-8 py-5 text-center text-xs font-black uppercase tracking-widest text-yellow-400">YVA / Month</th>
+                                <th class="bg-yellow-400 px-8 py-5 text-center text-xs font-black uppercase tracking-widest text-[#1b1e2b]">You Save</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-t border-slate-100 hover:bg-slate-50 transition-colors">
+                                <td class="px-8 py-5 font-black text-[#1b1e2b] text-sm">Legal Intake</td>
+                                <td class="px-8 py-5 text-center text-slate-500 font-bold text-sm line-through decoration-red-400">$4,200</td>
+                                <td class="px-8 py-5 text-center bg-[#1b1e2b]/5 font-black text-[#1b1e2b] text-sm">$1,200</td>
+                                <td class="px-8 py-5 text-center bg-yellow-400/10 font-black text-emerald-600 text-sm">$3,000 <span class="text-xs text-emerald-500">(71%)</span></td>
+                            </tr>
+                            <tr class="border-t border-slate-100 hover:bg-slate-50 transition-colors">
+                                <td class="px-8 py-5 font-black text-[#1b1e2b] text-sm">Legal Assistants</td>
+                                <td class="px-8 py-5 text-center text-slate-500 font-bold text-sm line-through decoration-red-400">$5,000</td>
+                                <td class="px-8 py-5 text-center bg-[#1b1e2b]/5 font-black text-[#1b1e2b] text-sm">$1,360</td>
+                                <td class="px-8 py-5 text-center bg-yellow-400/10 font-black text-emerald-600 text-sm">$3,640 <span class="text-xs text-emerald-500">(73%)</span></td>
+                            </tr>
+                            <tr class="border-t border-slate-100 hover:bg-slate-50 transition-colors">
+                                <td class="px-8 py-5 font-black text-[#1b1e2b] text-sm">Demand Writing</td>
+                                <td class="px-8 py-5 text-center text-slate-500 font-bold text-sm line-through decoration-red-400">$5,500</td>
+                                <td class="px-8 py-5 text-center bg-[#1b1e2b]/5 font-black text-[#1b1e2b] text-sm">$1,600</td>
+                                <td class="px-8 py-5 text-center bg-yellow-400/10 font-black text-emerald-600 text-sm">$3,900 <span class="text-xs text-emerald-500">(71%)</span></td>
+                            </tr>
+                            <tr class="border-t border-slate-100 hover:bg-slate-50 transition-colors">
+                                <td class="px-8 py-5 font-black text-[#1b1e2b] text-sm">Case Managers</td>
+                                <td class="px-8 py-5 text-center text-slate-500 font-bold text-sm line-through decoration-red-400">$5,500</td>
+                                <td class="px-8 py-5 text-center bg-[#1b1e2b]/5 font-black text-[#1b1e2b] text-sm">$1,920</td>
+                                <td class="px-8 py-5 text-center bg-yellow-400/10 font-black text-emerald-600 text-sm">$3,580 <span class="text-xs text-emerald-500">(65%)</span></td>
+                            </tr>
+                            <tr class="border-t-2 border-[#1b1e2b] bg-[#1b1e2b]">
+                                <td class="px-8 py-5 font-black text-white text-sm">Full Team (4 roles)</td>
+                                <td class="px-8 py-5 text-center font-black text-slate-400 text-sm line-through decoration-red-400">$20,200</td>
+                                <td class="px-8 py-5 text-center font-black text-yellow-400 text-sm">$6,080</td>
+                                <td class="px-8 py-5 text-center font-black text-yellow-400 text-sm">$14,120 <span class="text-xs">(70%)</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Mobile Cards (shown on mobile only) -->
+                <div class="md:hidden space-y-4">
+                    <!-- Legal Intake -->
+                    <div class="comparison-mobile-card shadow-sm">
+                        <div class="bg-slate-50 px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+                            <span class="font-black text-[#1b1e2b] text-sm">Legal Intake</span>
+                            <span class="bg-yellow-400/20 text-yellow-700 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">Save 71%</span>
+                        </div>
+                        <div class="grid grid-cols-2 divide-x divide-slate-100">
+                            <div class="px-5 py-4 text-center">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">In-House</p>
+                                <p class="text-lg font-black text-slate-400 line-through decoration-red-400">$4,200<span class="text-xs font-bold">/mo</span></p>
+                            </div>
+                            <div class="px-5 py-4 text-center bg-[#1b1e2b]/3">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">YVA</p>
+                                <p class="text-lg font-black text-[#1b1e2b]">$1,200<span class="text-xs font-bold">/mo</span></p>
+                            </div>
+                        </div>
+                        <div class="px-5 py-3 bg-emerald-50 border-t border-emerald-100 text-center">
+                            <p class="text-sm font-black text-emerald-600">You save <span class="text-base">$3,000</span> every month</p>
+                        </div>
+                    </div>
+                    <!-- Legal Assistants -->
+                    <div class="comparison-mobile-card shadow-sm">
+                        <div class="bg-slate-50 px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+                            <span class="font-black text-[#1b1e2b] text-sm">Legal Assistants</span>
+                            <span class="bg-yellow-400/20 text-yellow-700 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">Save 73%</span>
+                        </div>
+                        <div class="grid grid-cols-2 divide-x divide-slate-100">
+                            <div class="px-5 py-4 text-center">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">In-House</p>
+                                <p class="text-lg font-black text-slate-400 line-through decoration-red-400">$5,000<span class="text-xs font-bold">/mo</span></p>
+                            </div>
+                            <div class="px-5 py-4 text-center bg-[#1b1e2b]/3">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">YVA</p>
+                                <p class="text-lg font-black text-[#1b1e2b]">$1,360<span class="text-xs font-bold">/mo</span></p>
+                            </div>
+                        </div>
+                        <div class="px-5 py-3 bg-emerald-50 border-t border-emerald-100 text-center">
+                            <p class="text-sm font-black text-emerald-600">You save <span class="text-base">$3,640</span> every month</p>
+                        </div>
+                    </div>
+                    <!-- Demand Writing -->
+                    <div class="comparison-mobile-card shadow-sm">
+                        <div class="bg-slate-50 px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+                            <span class="font-black text-[#1b1e2b] text-sm">Demand Writing</span>
+                            <span class="bg-yellow-400/20 text-yellow-700 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">Save 71%</span>
+                        </div>
+                        <div class="grid grid-cols-2 divide-x divide-slate-100">
+                            <div class="px-5 py-4 text-center">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">In-House</p>
+                                <p class="text-lg font-black text-slate-400 line-through decoration-red-400">$5,500<span class="text-xs font-bold">/mo</span></p>
+                            </div>
+                            <div class="px-5 py-4 text-center bg-[#1b1e2b]/3">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">YVA</p>
+                                <p class="text-lg font-black text-[#1b1e2b]">$1,600<span class="text-xs font-bold">/mo</span></p>
+                            </div>
+                        </div>
+                        <div class="px-5 py-3 bg-emerald-50 border-t border-emerald-100 text-center">
+                            <p class="text-sm font-black text-emerald-600">You save <span class="text-base">$3,900</span> every month</p>
+                        </div>
+                    </div>
+                    <!-- Case Managers -->
+                    <div class="comparison-mobile-card shadow-sm">
+                        <div class="bg-slate-50 px-5 py-3 border-b border-slate-100 flex items-center justify-between">
+                            <span class="font-black text-[#1b1e2b] text-sm">Case Managers</span>
+                            <span class="bg-yellow-400/20 text-yellow-700 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">Save 65%</span>
+                        </div>
+                        <div class="grid grid-cols-2 divide-x divide-slate-100">
+                            <div class="px-5 py-4 text-center">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">In-House</p>
+                                <p class="text-lg font-black text-slate-400 line-through decoration-red-400">$5,500<span class="text-xs font-bold">/mo</span></p>
+                            </div>
+                            <div class="px-5 py-4 text-center bg-[#1b1e2b]/3">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">YVA</p>
+                                <p class="text-lg font-black text-[#1b1e2b]">$1,920<span class="text-xs font-bold">/mo</span></p>
+                            </div>
+                        </div>
+                        <div class="px-5 py-3 bg-emerald-50 border-t border-emerald-100 text-center">
+                            <p class="text-sm font-black text-emerald-600">You save <span class="text-base">$3,580</span> every month</p>
+                        </div>
+                    </div>
+                    <!-- Full Team Total -->
+                    <div class="bg-[#1b1e2b] rounded-[1.5rem] overflow-hidden">
+                        <div class="px-5 py-4 border-b border-white/10 flex items-center justify-between">
+                            <span class="font-black text-white text-sm">Full Team (4 roles)</span>
+                            <span class="bg-yellow-400 text-[#1b1e2b] text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">Save 70%</span>
+                        </div>
+                        <div class="grid grid-cols-2 divide-x divide-white/10">
+                            <div class="px-5 py-4 text-center">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">In-House</p>
+                                <p class="text-lg font-black text-slate-400 line-through decoration-red-400">$20,200<span class="text-xs font-bold">/mo</span></p>
+                            </div>
+                            <div class="px-5 py-4 text-center">
+                                <p class="text-[10px] font-black uppercase tracking-widest text-yellow-400 mb-1">YVA</p>
+                                <p class="text-lg font-black text-yellow-400">$6,080<span class="text-xs font-bold">/mo</span></p>
+                            </div>
+                        </div>
+                        <div class="px-5 py-3 bg-yellow-400/10 border-t border-white/10 text-center">
+                            <p class="text-sm font-black text-yellow-400">You save <span class="text-base">$14,120</span> every month</p>
+                        </div>
+                    </div>
+                </div>
+
+                <p class="text-center text-slate-400 text-xs font-medium mt-4">* Monthly estimates based on full-time (160 hrs). In-house figures reflect average U.S. salaries + overhead.</p>
+
+                <!-- Bottom CTA -->
+                <div class="mt-12 text-center">
+                    <button onclick="openCalendly()" class="bg-[#1b1e2b] text-white px-12 py-5 rounded-2xl font-black text-sm uppercase tracking-widest inline-flex items-center gap-3 hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all shadow-xl">
+                        Start Saving Today <i data-lucide="arrow-right" class="w-5 h-5"></i>
+                    </button>
+                    <p class="text-slate-400 text-xs font-medium mt-3">No contracts · No minimums · Start in 72 hours</p>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- How It Works Section -->
+    <section id="how-it-works" class="bg-[#1b1e2b] py-20 lg:py-32 overflow-hidden">
+        <div class="max-w-7xl mx-auto px-6">
+
+            <!-- Header -->
+            <div class="text-center mb-16">
+                <p class="text-yellow-400 font-black uppercase text-xs tracking-[0.3em] mb-3">The Process</p>
+                <h2 class="text-4xl lg:text-5xl font-black text-white tracking-tight">Up and Running in 48 Hours</h2>
+                <p class="text-slate-400 font-medium mt-4 max-w-xl mx-auto">No lengthy contracts, no complicated onboarding. Just the right person, ready to work.</p>
+            </div>
+
+            <!-- Steps -->
+            <div class="relative">
+                <!-- Connecting Line (desktop only) -->
+                <div class="hidden lg:block absolute top-16 left-[calc(16.66%+2rem)] right-[calc(16.66%+2rem)] h-0.5 border-t-2 border-dashed border-yellow-400/30 z-0"></div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8 relative z-10">
+
+                    <!-- Step 1 -->
+                    <div class="group relative bg-white/5 border border-white/10 rounded-[2rem] p-10 hover:bg-white/10 transition-all">
+                        <div class="absolute -top-4 left-10 bg-yellow-400 text-[#1b1e2b] text-xs font-black uppercase tracking-widest px-4 py-1.5 rounded-full">Step 01</div>
+                        <div class="w-14 h-14 bg-yellow-400/10 rounded-2xl flex items-center justify-center mb-6 mt-4 group-hover:bg-yellow-400/20 transition-all">
+                            <i data-lucide="calendar" class="w-7 h-7 text-yellow-400"></i>
+                        </div>
+                        <h3 class="text-white font-black text-xl mb-3">Book a Free Call</h3>
+                        <p class="text-slate-400 font-medium leading-relaxed">Schedule a 20-minute consultation. We listen, ask the right questions, and get a clear picture of what your firm needs.</p>
+                        <div class="mt-8 pt-6 border-t border-white/10">
+                            <p class="text-yellow-400 text-xs font-black uppercase tracking-widest">What to expect</p>
+                            <p class="text-slate-500 text-sm font-medium mt-1">A focused, no-pressure conversation about your workflow and goals.</p>
+                        </div>
+                    </div>
+
+                    <!-- Step 2 -->
+                    <div class="group relative bg-yellow-400 rounded-[2rem] p-10 hover:bg-yellow-300 transition-all">
+                        <div class="absolute -top-4 left-10 bg-[#1b1e2b] text-yellow-400 text-xs font-black uppercase tracking-widest px-4 py-1.5 rounded-full">Step 02</div>
+                        <div class="w-14 h-14 bg-[#1b1e2b]/10 rounded-2xl flex items-center justify-center mb-6 mt-4 group-hover:bg-[#1b1e2b]/20 transition-all">
+                            <i data-lucide="users" class="w-7 h-7 text-[#1b1e2b]"></i>
+                        </div>
+                        <h3 class="text-[#1b1e2b] font-black text-xl mb-3">We Match Your VA</h3>
+                        <p class="text-[#1b1e2b]/70 font-medium leading-relaxed">We hand-select a vetted bilingual specialist from our team that fits your industry, tools, and work style — no guesswork.</p>
+                        <div class="mt-8 pt-6 border-t border-[#1b1e2b]/20">
+                            <p class="text-[#1b1e2b] text-xs font-black uppercase tracking-widest">What to expect</p>
+                            <p class="text-[#1b1e2b]/60 text-sm font-medium mt-1">A curated match based on your practice area, language needs, and workflow.</p>
+                        </div>
+                    </div>
+
+                    <!-- Step 3 -->
+                    <div class="group relative bg-white/5 border border-white/10 rounded-[2rem] p-10 hover:bg-white/10 transition-all">
+                        <div class="absolute -top-4 left-10 bg-yellow-400 text-[#1b1e2b] text-xs font-black uppercase tracking-widest px-4 py-1.5 rounded-full">Step 03</div>
+                        <div class="w-14 h-14 bg-yellow-400/10 rounded-2xl flex items-center justify-center mb-6 mt-4 group-hover:bg-yellow-400/20 transition-all">
+                            <i data-lucide="zap" class="w-7 h-7 text-yellow-400"></i>
+                        </div>
+                        <h3 class="text-white font-black text-xl mb-3">Start in 48 Hours</h3>
+                        <p class="text-slate-400 font-medium leading-relaxed">Your VA joins your tools, gets briefed on your processes, and hits the ground running — fully integrated from day one.</p>
+                        <div class="mt-8 pt-6 border-t border-white/10">
+                            <p class="text-yellow-400 text-xs font-black uppercase tracking-widest">What to expect</p>
+                            <p class="text-slate-500 text-sm font-medium mt-1">A fully onboarded specialist ready to work within two business days.</p>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Bottom CTA -->
+            <div class="mt-16 bg-white/5 border border-white/10 rounded-[2rem] p-10 lg:p-14 flex flex-col lg:flex-row items-center justify-between gap-8">
+                <div>
+                    <p class="text-yellow-400 font-black uppercase text-xs tracking-[0.3em] mb-2">No Contracts. No Minimums.</p>
+                    <h3 class="text-white font-black text-2xl lg:text-3xl">Ready to get started?</h3>
+                    <p class="text-slate-400 font-medium mt-2">Join the firms already growing with YVA Law Staffing. Bilingual support starting at <span class="text-yellow-400 font-black">$7.50/hr</span>.</p>
+                </div>
+                <button onclick="openCalendly()" class="flex-shrink-0 bg-yellow-400 text-[#1b1e2b] px-10 py-5 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center gap-3 hover:bg-yellow-300 transition-all shadow-xl whitespace-nowrap">
+                    Book Your Free Call <i data-lucide="arrow-right" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- Testimonials Section -->
+    <section id="testimonials" class="bg-slate-50 py-20 lg:py-32 overflow-hidden">
+        <div class="max-w-7xl mx-auto px-6">
+
+            <!-- Header -->
+            <div class="text-center mb-14">
+                <p class="text-yellow-500 font-black uppercase text-xs tracking-[0.3em] mb-3">Client Stories</p>
+                <h2 class="text-4xl lg:text-5xl font-black text-[#1b1e2b] tracking-tight">What Our Clients Say</h2>
+                <p class="text-slate-500 font-medium mt-4 max-w-xl mx-auto">Real results from real businesses that trust YVA Law Staffing every day.</p>
+            </div>
+
+            <!-- Carousel Wrapper -->
+            <div class="relative">
+                <div class="overflow-hidden rounded-[2rem]">
+                    <div class="testimonial-track" id="testimonial-track">
+
+                        <!-- Slide 1 -->
+                        <div class="testimonial-slide px-2">
+                            <div class="bg-[#1b1e2b] rounded-[2rem] p-10 lg:p-14 relative overflow-hidden">
+                                <div class="absolute top-0 right-0 w-64 h-64 bg-yellow-400/10 rounded-full blur-[80px] -z-0"></div>
+                                <div class="relative z-10">
+                                    <div class="flex gap-1 mb-6">
+                                        <i data-lucide="star" class="w-5 h-5 text-yellow-400 fill-yellow-400"></i>
+                                        <i data-lucide="star" class="w-5 h-5 text-yellow-400 fill-yellow-400"></i>
+                                        <i data-lucide="star" class="w-5 h-5 text-yellow-400 fill-yellow-400"></i>
+                                        <i data-lucide="star" class="w-5 h-5 text-yellow-400 fill-yellow-400"></i>
+                                        <i data-lucide="star" class="w-5 h-5 text-yellow-400 fill-yellow-400"></i>
+                                    </div>
+                                    <p class="text-white text-xl lg:text-2xl font-bold leading-relaxed italic mb-8 max-w-3xl">
+                                        "YVA team has been exceptional with our bookkeeping needs. They are accurate, organized, and dependable, ensuring our records are always up to date and handled with the utmost professionalism."
+                                    </p>
+                                    <div class="flex items-center gap-4">
+                                        <div class="w-12 h-12 rounded-2xl bg-yellow-400 flex items-center justify-center font-black text-[#1b1e2b] text-lg">J</div>
+                                        <div>
+                                            <p class="text-white font-black">Junior Corrido</p>
+                                            <p class="text-yellow-400 text-sm font-bold uppercase tracking-widest">SkyTalk</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Slide 2 -->
+                        <div class="testimonial-slide px-2">
+                            <div class="bg-[#1b1e2b] rounded-[2rem] p-10 lg:p-14 relative overflow-hidden">
+                                <div class="absolute top-0 right-0 w-64 h-64 bg-yellow-400/10 rounded-full blur-[80px] -z-0"></div>
+                                <div class="relative z-10">
+                                    <div class="flex gap-1 mb-6">
+                                        <i data-lucide="star" class="w-5 h-5 text-yellow-400 fill-yellow-400"></i>
+                                        <i data-lucide="star" class="w-5 h-5 text-yellow-400 fill-yellow-400"></i>
+                                        <i data-lucide="star" class="w-5 h-5 text-yellow-400 fill-yellow-400"></i>
+                                        <i data-lucide="star" class="w-5 h-5 text-yellow-400 fill-yellow-400"></i>
+                                        <i data-lucide="star" class="w-5 h-5 text-yellow-400 fill-yellow-400"></i>
+                                    </div>
+                                    <p class="text-white text-xl lg:text-2xl font-bold leading-relaxed italic mb-8 max-w-3xl">
+                                        "YVA's Team has been outstanding—organized, reliable, and proactive. They handle intake with professionalism, communicate promptly, and bring integrity and dedication to every task."
+                                    </p>
+                                    <div class="flex items-center gap-4">
+                                        <div class="w-12 h-12 rounded-2xl bg-yellow-400 flex items-center justify-center font-black text-[#1b1e2b] text-lg">N</div>
+                                        <div>
+                                            <p class="text-white font-black">Naveed Halavi</p>
+                                            <p class="text-yellow-400 text-sm font-bold uppercase tracking-widest">Halavi Law</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Slide 3 -->
+                        <div class="testimonial-slide px-2">
+                            <div class="bg-[#1b1e2b] rounded-[2rem] p-10 lg:p-14 relative overflow-hidden">
+                                <div class="absolute top-0 right-0 w-64 h-64 bg-yellow-400/10 rounded-full blur-[80px] -z-0"></div>
+                                <div class="relative z-10">
+                                    <div class="flex gap-1 mb-6">
+                                        <i data-lucide="star" class="w-5 h-5 text-yellow-400 fill-yellow-400"></i>
+                                        <i data-lucide="star" class="w-5 h-5 text-yellow-400 fill-yellow-400"></i>
+                                        <i data-lucide="star" class="w-5 h-5 text-yellow-400 fill-yellow-400"></i>
+                                        <i data-lucide="star" class="w-5 h-5 text-yellow-400 fill-yellow-400"></i>
+                                        <i data-lucide="star" class="w-5 h-5 text-yellow-400 fill-yellow-400"></i>
+                                    </div>
+                                    <p class="text-white text-xl lg:text-2xl font-bold leading-relaxed italic mb-8 max-w-3xl">
+                                        "Hiring YVA was the best decision for my business. My bilingual assistant handles everything efficiently and frees up my time to focus on growth."
+                                    </p>
+                                    <div class="flex items-center gap-4">
+                                        <div class="w-12 h-12 rounded-2xl bg-yellow-400 flex items-center justify-center font-black text-[#1b1e2b] text-lg">J</div>
+                                        <div>
+                                            <p class="text-white font-black">Joshua Klugman</p>
+                                            <p class="text-yellow-400 text-sm font-bold uppercase tracking-widest">Employees Work Right</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Slide 4 -->
+                        <div class="testimonial-slide px-2">
+                            <div class="bg-[#1b1e2b] rounded-[2rem] p-10 lg:p-14 relative overflow-hidden">
+                                <div class="absolute top-0 right-0 w-64 h-64 bg-yellow-400/10 rounded-full blur-[80px] -z-0"></div>
+                                <div class="relative z-10">
+                                    <div class="flex gap-1 mb-6">
+                                        <i data-lucide="star" class="w-5 h-5 text-yellow-400 fill-yellow-400"></i>
+                                        <i data-lucide="star" class="w-5 h-5 text-yellow-400 fill-yellow-400"></i>
+                                        <i data-lucide="star" class="w-5 h-5 text-yellow-400 fill-yellow-400"></i>
+                                        <i data-lucide="star" class="w-5 h-5 text-yellow-400 fill-yellow-400"></i>
+                                        <i data-lucide="star" class="w-5 h-5 text-yellow-400 fill-yellow-400"></i>
+                                    </div>
+                                    <p class="text-white text-xl lg:text-2xl font-bold leading-relaxed italic mb-8 max-w-3xl">
+                                        "Working with YVA team has been a game changer. They are efficient, detail oriented, and always take initiative, delivering quality work with professionalism and a positive attitude."
+                                    </p>
+                                    <div class="flex items-center gap-4">
+                                        <div class="w-12 h-12 rounded-2xl bg-yellow-400 flex items-center justify-center font-black text-[#1b1e2b] text-lg">T</div>
+                                        <div>
+                                            <p class="text-white font-black">Thomas Holmes</p>
+                                            <p class="text-yellow-400 text-sm font-bold uppercase tracking-widest">Holmes Law</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- Prev / Next Arrows -->
+                <button id="testimonial-prev" aria-label="Previous" class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 lg:-translate-x-6 bg-white border border-slate-200 shadow-lg w-12 h-12 rounded-2xl flex items-center justify-center text-[#1b1e2b] hover:bg-yellow-400 hover:border-yellow-400 transition-all z-10">
+                    <i data-lucide="chevron-left" class="w-5 h-5"></i>
+                </button>
+                <button id="testimonial-next" aria-label="Next" class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 lg:translate-x-6 bg-white border border-slate-200 shadow-lg w-12 h-12 rounded-2xl flex items-center justify-center text-[#1b1e2b] hover:bg-yellow-400 hover:border-yellow-400 transition-all z-10">
+                    <i data-lucide="chevron-right" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <!-- Dot Navigation -->
+            <div class="flex justify-center gap-3 mt-8" id="testimonial-dots">
+                <button class="testimonial-dot w-8 h-2 rounded-full bg-[#1b1e2b] transition-all" data-index="0"></button>
+                <button class="testimonial-dot w-2 h-2 rounded-full bg-slate-300 transition-all" data-index="1"></button>
+                <button class="testimonial-dot w-2 h-2 rounded-full bg-slate-300 transition-all" data-index="2"></button>
+                <button class="testimonial-dot w-2 h-2 rounded-full bg-slate-300 transition-all" data-index="3"></button>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section id="about" class="bg-white py-20 lg:py-32">
+        <div class="max-w-7xl mx-auto px-6">
+
+            <!-- Top Grid: Story + Stats -->
+            <div class="grid lg:grid-cols-2 gap-16 items-center mb-20">
+
+                <!-- Left: Story -->
+                <div>
+                    <p class="text-yellow-500 font-black uppercase text-xs tracking-[0.3em] mb-3">Our Story</p>
+                    <h2 class="text-4xl lg:text-5xl font-black text-[#1b1e2b] tracking-tight leading-tight mb-6">Built by People Who <span class="text-yellow-500">Lived the Problem.</span></h2>
+                    <div class="space-y-5 text-slate-600 font-medium leading-relaxed">
+                        <p>YVA Law Staffing didn't start in a boardroom — it started on the floor of a California law firm. Founders <span class="font-black text-[#1b1e2b]">Hans Esmel</span> and <span class="font-black text-[#1b1e2b]">Paola Delgado</span> were working remotely when the firm began asking them to refer talent. What started as a favor quickly revealed something bigger: they had a rare ability to identify, vet, and train high-performing professionals who integrated seamlessly into demanding legal environments.</p>
+                        <p>As they looked at the market, one thing stood out — competitors were charging a premium for the same quality of service that Hans and Paola knew could be delivered at a fraction of the cost. Small and mid-size law firms were being priced out of the support they needed to grow.</p>
+                        <p>In 2023, they founded YVA Law Staffing with a clear mission: <span class="font-black text-[#1b1e2b]">help law firms scale their teams without burning their budget.</span> Operating from a physical office in the Dominican Republic, YVA now provides fully bilingual, rigorously vetted virtual professionals who work in U.S. time zones and integrate directly into your firm's workflow — not as freelancers, but as real team members.</p>
+                    </div>
+                </div>
+
+                <!-- Right: Stats -->
+                <div class="grid grid-cols-2 gap-6">
+
+                    <div class="group bg-[#1b1e2b] rounded-[2rem] p-8 flex flex-col justify-between cursor-default hover:-translate-y-2 hover:shadow-2xl hover:shadow-[#1b1e2b]/30 hover:z-10 transition-all duration-300">
+                        <div class="w-10 h-10 bg-yellow-400/20 rounded-xl flex items-center justify-center mb-6">
+                            <i data-lucide="calendar" class="w-5 h-5 text-yellow-400"></i>
+                        </div>
+                        <div>
+                            <p class="text-5xl font-black text-white leading-none mb-2">2023</p>
+                            <p class="text-slate-400 font-bold text-sm uppercase tracking-widest">Founded</p>
+                            <p class="text-slate-500 text-xs font-medium leading-relaxed mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">From a single placement to a full agency in just 2 years — built on results, not promises.</p>
+                        </div>
+                    </div>
+
+                    <div class="group bg-yellow-400 rounded-[2rem] p-8 flex flex-col justify-between cursor-default hover:-translate-y-2 hover:shadow-2xl hover:shadow-yellow-400/40 hover:z-10 transition-all duration-300">
+                        <div class="w-10 h-10 bg-[#1b1e2b]/10 rounded-xl flex items-center justify-center mb-6">
+                            <i data-lucide="trending-down" class="w-5 h-5 text-[#1b1e2b]"></i>
+                        </div>
+                        <div>
+                            <p class="text-5xl font-black text-[#1b1e2b] leading-none mb-2">60%</p>
+                            <p class="text-[#1b1e2b]/70 font-bold text-sm uppercase tracking-widest">Avg. Cost Reduction</p>
+                            <p class="text-[#1b1e2b]/60 text-xs font-medium leading-relaxed mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">Our clients consistently cut staffing costs in half while getting more done — no quality trade-off.</p>
+                        </div>
+                    </div>
+
+                    <div class="group bg-slate-50 border border-slate-100 rounded-[2rem] p-8 flex flex-col justify-between cursor-default hover:-translate-y-2 hover:border-yellow-400 hover:shadow-2xl hover:z-10 transition-all duration-300">
+                        <div class="w-10 h-10 bg-yellow-400/20 rounded-xl flex items-center justify-center mb-6">
+                            <i data-lucide="building-2" class="w-5 h-5 text-yellow-500"></i>
+                        </div>
+                        <div>
+                            <p class="text-5xl font-black text-[#1b1e2b] leading-none mb-2">10+</p>
+                            <p class="text-slate-500 font-bold text-sm uppercase tracking-widest">Law Firms Served</p>
+                            <p class="text-slate-400 text-xs font-medium leading-relaxed mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">From solo practitioners to growing multi-attorney firms across the U.S. — all scaling smarter.</p>
+                        </div>
+                    </div>
+
+                    <div class="group bg-slate-50 border border-slate-100 rounded-[2rem] p-8 flex flex-col justify-between cursor-default hover:-translate-y-2 hover:border-yellow-400 hover:shadow-2xl hover:z-10 transition-all duration-300">
+                        <div class="w-10 h-10 bg-yellow-400/20 rounded-xl flex items-center justify-center mb-6">
+                            <i data-lucide="users" class="w-5 h-5 text-yellow-500"></i>
+                        </div>
+                        <div>
+                            <p class="text-5xl font-black text-[#1b1e2b] leading-none mb-2">27x</p>
+                            <p class="text-slate-500 font-bold text-sm uppercase tracking-widest">Client Team Growth</p>
+                            <p class="text-slate-400 text-xs font-medium leading-relaxed mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">One client started with 2 VAs and now runs a 27-member team — all placed and trained by YVA.</p>
+                        </div>
+                    </div>
+
+                    <div class="group bg-[#1b1e2b] rounded-[2rem] p-8 flex flex-col justify-between cursor-default hover:-translate-y-2 hover:shadow-2xl hover:shadow-[#1b1e2b]/30 hover:z-10 transition-all duration-300">
+                        <div class="w-10 h-10 bg-yellow-400/20 rounded-xl flex items-center justify-center mb-6">
+                            <i data-lucide="zap" class="w-5 h-5 text-yellow-400"></i>
+                        </div>
+                        <div>
+                            <p class="text-5xl font-black text-white leading-none mb-2">35%</p>
+                            <p class="text-slate-400 font-bold text-sm uppercase tracking-widest">Avg. Productivity Increase</p>
+                            <p class="text-slate-500 text-xs font-medium leading-relaxed mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">Attorneys and managers reclaim hours every week when admin, intake, and follow-ups are fully delegated.</p>
+                        </div>
+                    </div>
+
+                    <div class="group bg-yellow-400 rounded-[2rem] p-8 flex flex-col justify-between cursor-default hover:-translate-y-2 hover:shadow-2xl hover:shadow-yellow-400/40 hover:z-10 transition-all duration-300">
+                        <div class="w-10 h-10 bg-[#1b1e2b]/10 rounded-xl flex items-center justify-center mb-6">
+                            <i data-lucide="bar-chart-2" class="w-5 h-5 text-[#1b1e2b]"></i>
+                        </div>
+                        <div>
+                            <p class="text-5xl font-black text-[#1b1e2b] leading-none mb-2">40%</p>
+                            <p class="text-[#1b1e2b]/70 font-bold text-sm uppercase tracking-widest">Avg. Profit Growth</p>
+                            <p class="text-[#1b1e2b]/60 text-xs font-medium leading-relaxed mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">Lower overhead, more capacity, faster turnaround — our clients close more cases and keep more revenue.</p>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Founders -->
+            <div class="border-t border-slate-100 pt-16">
+                <div class="text-center mb-6">
+                    <p class="text-yellow-500 font-black uppercase text-sm tracking-[0.3em] mb-2">The Founders</p>
+                    <h3 class="text-2xl lg:text-3xl font-black text-[#1b1e2b] tracking-tight">The People Behind YVA</h3>
+                </div>
+
+                <!-- Hidden founder cards, revealed on click -->
+                <div id="founders-cards" class="grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
+
+                    <!-- Hans -->
+                    <div class="bg-[#1b1e2b] rounded-[2rem] p-8 relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 w-40 h-40 bg-yellow-400/10 rounded-full blur-[60px]"></div>
+                        <div class="w-16 h-16 bg-yellow-400 rounded-2xl flex items-center justify-center font-black text-[#1b1e2b] text-2xl mb-6 shadow-lg">H</div>
+                        <h4 class="text-white font-black text-xl mb-1">Hans Esmel</h4>
+                        <p class="text-yellow-400 text-xs font-black uppercase tracking-widest mb-4">Co-Founder & CEO</p>
+                        <p class="text-slate-400 text-base font-medium leading-relaxed">Drives operations, talent vetting, and client success. Hans built YVA's training systems from the ground up, ensuring every VA meets the firm's high standards.</p>
+                    </div>
+
+                    <!-- Paola -->
+                    <div class="bg-[#1b1e2b] rounded-[2rem] p-8 relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 w-40 h-40 bg-yellow-400/10 rounded-full blur-[60px]"></div>
+                        <div class="w-16 h-16 bg-yellow-400 rounded-2xl flex items-center justify-center font-black text-[#1b1e2b] text-2xl mb-6 shadow-lg">P</div>
+                        <h4 class="text-white font-black text-xl mb-1">Paola Delgado</h4>
+                        <p class="text-yellow-400 text-xs font-black uppercase tracking-widest mb-4">Co-Founder & COO</p>
+                        <p class="text-slate-400 text-base font-medium leading-relaxed">Leads client relations and team coordination. Paola ensures every placement is the right fit and that clients get the support they need from day one.</p>
+                    </div>
+
+                </div>
+
+                <!-- Reveal Arrow -->
+                <div class="flex justify-center mt-8">
+                    <button id="founders-toggle" aria-label="Meet the founders" class="flex flex-col items-center gap-2 group">
+                        <span class="text-xs font-black uppercase tracking-widest text-slate-400 group-hover:text-yellow-500 transition-colors">Meet the Founders</span>
+                        <div class="w-10 h-10 bg-[#1b1e2b] rounded-full flex items-center justify-center group-hover:bg-yellow-400 transition-all shadow-lg">
+                            <i data-lucide="chevron-down" class="founders-arrow w-5 h-5 text-yellow-400 group-hover:text-[#1b1e2b]"></i>
+                        </div>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-[#1b1e2b] border-t border-white/10">
+        <div class="max-w-7xl mx-auto px-6">
+
+            <!-- Main Footer Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12 py-16">
+
+                <!-- Col 1: Brand -->
+                <div class="lg:col-span-1">
+                    <a href="#home" class="flex items-center gap-3 mb-6 group w-fit">
+                        <div class="bg-yellow-400 w-11 h-11 rounded-xl flex items-center justify-center transition-transform group-hover:rotate-6 shadow-lg">
+                            <i data-lucide="users" class="w-6 h-6 text-[#1b1e2b]"></i>
+                        </div>
+                        <div class="flex flex-col">
+                            <span class="text-xl font-black tracking-tighter leading-none text-white">YVA <span class="text-sm">Law</span></span>
+                            <span class="text-[10px] uppercase tracking-[0.3em] font-bold text-slate-400">Staffing</span>
+                        </div>
+                    </a>
+                    <p class="text-slate-400 text-sm font-medium leading-relaxed mb-6">Elite bilingual virtual staffing for law firms and professional services. Starting at <span class="text-yellow-400 font-bold">$7.50/hr</span>.</p>
+                    <!-- Social Links -->
+                    <div class="flex gap-3">
+                        <a href="#" target="_blank" aria-label="Instagram" class="w-9 h-9 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-yellow-400 hover:text-[#1b1e2b] hover:border-yellow-400 transition-all">
+                            <i data-lucide="instagram" class="w-4 h-4"></i>
+                        </a>
+                        <a href="#" target="_blank" aria-label="LinkedIn" class="w-9 h-9 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-yellow-400 hover:text-[#1b1e2b] hover:border-yellow-400 transition-all">
+                            <i data-lucide="linkedin" class="w-4 h-4"></i>
+                        </a>
+                        <a href="#" target="_blank" aria-label="X / Twitter" class="w-9 h-9 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-yellow-400 hover:text-[#1b1e2b] hover:border-yellow-400 transition-all">
+                            <i data-lucide="twitter" class="w-4 h-4"></i>
+                        </a>
+                        <a href="#" onclick="openEmailPicker(event)" aria-label="Email" class="w-9 h-9 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-yellow-400 hover:text-[#1b1e2b] hover:border-yellow-400 transition-all">
+                            <i data-lucide="mail" class="w-4 h-4"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Col 2: Quick Links -->
+                <div>
+                    <p class="text-white font-black text-xs uppercase tracking-widest mb-6">Quick Links</p>
+                    <ul class="space-y-3">
+                        <li><a href="#home" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Home</a></li>
+                        <li><a href="#service-pillars" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Services</a></li>
+                        <li><a href="#how-it-works" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> How It Works</a></li>
+                        <li><a href="#testimonials" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Testimonials</a></li>
+                        <li><a href="#about" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> About</a></li>
+                        <li><button onclick="openFaq()" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> FAQ</button></li>
+                        <li><a href="careers.html" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Careers</a></li>
+                    </ul>
+                </div>
+
+                <!-- Col 3: Services -->
+                <div>
+                    <p class="text-white font-black text-xs uppercase tracking-widest mb-6">Our Services</p>
+                    <ul class="space-y-3">
+                        <li><a href="#service-pillars" onclick="setTimeout(()=>goToService(0),100)" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Legal Intake</a></li>
+                        <li><a href="#service-pillars" onclick="setTimeout(()=>goToService(1),100)" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Legal Assistants</a></li>
+                        <li><a href="#service-pillars" onclick="setTimeout(()=>goToService(2),100)" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Demand Writing</a></li>
+                        <li><a href="#service-pillars" onclick="setTimeout(()=>goToService(3),100)" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Case Managers</a></li>
+                    </ul>
+                </div>
+
+                <!-- Col 4: Contact + CTA -->
+                <div>
+                    <p class="text-white font-black text-xs uppercase tracking-widest mb-6">Get In Touch</p>
+                    <ul class="space-y-4 mb-8">
+                        <li>
+                            <a href="#" onclick="openEmailPicker(event)" class="flex items-start gap-3 text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors">
+                                <i data-lucide="mail" class="w-4 h-4 mt-0.5 flex-shrink-0"></i>
+                                contact@yvastaffing.agency
+                            </a>
+                        </li>
+                        <li>
+                            <div class="flex items-start gap-3 text-slate-400 text-sm font-medium">
+                                <i data-lucide="clock" class="w-4 h-4 mt-0.5 flex-shrink-0"></i>
+                                Mon – Fri · 9am – 6pm EST
+                            </div>
+                        </li>
+                        <li>
+                            <div class="flex items-start gap-3 text-slate-400 text-sm font-medium">
+                                <i data-lucide="map-pin" class="w-4 h-4 mt-0.5 flex-shrink-0"></i>
+                                Dominican Republic / Latin America
+                            </div>
+                        </li>
+                    </ul>
+                    <button onclick="openCalendly()" class="w-full bg-yellow-400 text-[#1b1e2b] px-6 py-3.5 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-300 transition-all shadow-lg">
+                        Book a Free Call <i data-lucide="calendar" class="w-4 h-4"></i>
+                    </button>
+                </div>
+
+            </div>
+
+            <!-- Bottom Bar -->
+            <div class="border-t border-white/10 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <p class="text-slate-500 text-xs font-medium">© 2025 YVA Law Staffing. All rights reserved. · <button onclick="openPrivacy()" class="hover:text-yellow-400 transition-colors">Privacy Policy</button></p>
+                <p class="text-slate-600 text-xs font-medium">Proudly serving U.S. law firms from the Dominican Republic 🇩🇴</p>
+            </div>
+
+        </div>
+    </footer>
+
+    <!-- Cookie Banner -->
+    <div id="cookie-banner" class="fixed bottom-0 left-0 right-0 z-[90] p-4 md:p-6">
+        <div class="max-w-7xl mx-auto bg-[#1b1e2b] border border-white/10 rounded-2xl px-6 py-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-2xl">
+            <div class="flex items-start gap-4">
+                <div class="w-9 h-9 bg-yellow-400/20 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <i data-lucide="cookie" class="w-4 h-4 text-yellow-400"></i>
+                </div>
+                <p class="text-slate-300 text-sm font-medium leading-relaxed">
+                    We use cookies to improve your experience on our site and analyze traffic. By continuing to browse, you agree to our use of cookies.
+                    <button onclick="openPrivacy()" class="text-yellow-400 font-bold hover:underline ml-1">Privacy Policy</button>
+                </p>
+            </div>
+            <div class="flex items-center gap-3 flex-shrink-0">
+                <button id="cookie-decline" class="text-slate-400 text-xs font-black uppercase tracking-widest hover:text-white transition-colors px-4 py-2">
+                    Decline
+                </button>
+                <button id="cookie-accept" class="bg-yellow-400 text-[#1b1e2b] px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest hover:bg-yellow-300 transition-all whitespace-nowrap">
+                    Accept All
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Service Modal (shown on mobile only when pillar card is clicked) -->
+    <div id="mobile-service-modal" class="fixed inset-0 z-[100] items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Service Details">
+        <div id="mobile-service-backdrop" class="absolute inset-0 bg-[#1b1e2b]/80 backdrop-blur-sm"></div>
+        <div class="mobile-service-panel relative w-full max-w-lg bg-white rounded-[2rem] overflow-hidden shadow-[0_40px_80px_-20px_rgba(27,30,43,0.5)] border-4 border-white max-h-[90vh] flex flex-col">
+            <!-- Service Image Header -->
+            <div id="msm-image-wrap" class="relative h-44 overflow-hidden flex-shrink-0">
+                <img id="msm-image" src="" alt="" class="w-full h-full object-cover">
+                <div class="absolute inset-0 bg-gradient-to-t from-[#1b1e2b]/80 to-transparent"></div>
+                <button id="mobile-service-close" aria-label="Close" class="absolute top-4 right-4 bg-white/20 backdrop-blur-sm text-white hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all p-2 rounded-xl">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+                <div id="msm-price-badge" class="absolute bottom-4 left-4 bg-yellow-400 text-[#1b1e2b] px-4 py-2 rounded-2xl shadow-lg">
+                    <p class="text-[9px] font-black uppercase tracking-widest mb-0.5">Starting From</p>
+                    <p id="msm-rate" class="text-xl font-black leading-none"></p>
+                </div>
+            </div>
+            <!-- Content -->
+            <div class="overflow-y-auto px-6 py-6 flex flex-col gap-4">
+                <div id="msm-badge" class="inline-flex items-center gap-2 bg-yellow-400/20 text-[#1b1e2b] px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest w-fit"></div>
+                <h3 id="msm-headline" class="text-xl font-black text-[#1b1e2b] leading-tight"></h3>
+                <p id="msm-description" class="text-slate-600 text-sm leading-relaxed"></p>
+                <ul id="msm-checklist" class="space-y-2.5"></ul>
+                <button id="msm-cta" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all shadow-lg mt-2">
+                    <span id="msm-cta-text"></span> <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FAQ Modal -->
+    <div id="faq-modal" class="fixed inset-0 z-[100] items-center justify-center p-4 md:p-8" role="dialog" aria-modal="true" aria-label="FAQ">
+        <div id="faq-backdrop" class="absolute inset-0 bg-[#1b1e2b]/80 backdrop-blur-sm"></div>
+        <div class="faq-panel relative w-full max-w-2xl bg-white rounded-[2rem] overflow-hidden shadow-[0_40px_80px_-20px_rgba(27,30,43,0.5)] border-4 border-white max-h-[90vh] flex flex-col">
+
+            <!-- Header -->
+            <div class="bg-[#1b1e2b] px-8 py-5 flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="bg-yellow-400 w-9 h-9 rounded-xl flex items-center justify-center">
+                        <i data-lucide="help-circle" class="w-5 h-5 text-[#1b1e2b]"></i>
+                    </div>
+                    <div>
+                        <p class="text-white font-black text-sm tracking-widest uppercase">Frequently Asked Questions</p>
+                        <p class="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Everything you need to know</p>
+                    </div>
+                </div>
+                <button id="faq-close" aria-label="Close" class="text-slate-400 hover:text-yellow-400 transition-colors p-2 rounded-xl hover:bg-white/10">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <!-- Accordion -->
+            <div class="overflow-y-auto px-8 py-6 space-y-3">
+
+                <div class="faq-item border border-slate-200 rounded-2xl overflow-hidden">
+                    <button class="faq-trigger w-full flex items-center justify-between px-6 py-4 text-left hover:bg-slate-50 transition-colors">
+                        <span class="font-black text-[#1b1e2b] text-sm pr-4">How quickly can we get started?</span>
+                        <i data-lucide="chevron-down" class="faq-chevron w-4 h-4 text-yellow-500 flex-shrink-0"></i>
+                    </button>
+                    <div class="faq-answer">
+                        <p class="px-6 pb-5 text-slate-600 text-sm font-medium leading-relaxed">Once we've had our consultation call and confirmed the match, your VA will be fully onboarded and ready to work within <span class="font-black text-[#1b1e2b]">72 business hours</span>. We handle all the briefing and setup so you don't have to.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item border border-slate-200 rounded-2xl overflow-hidden">
+                    <button class="faq-trigger w-full flex items-center justify-between px-6 py-4 text-left hover:bg-slate-50 transition-colors">
+                        <span class="font-black text-[#1b1e2b] text-sm pr-4">Are your VAs bilingual?</span>
+                        <i data-lucide="chevron-down" class="faq-chevron w-4 h-4 text-yellow-500 flex-shrink-0"></i>
+                    </button>
+                    <div class="faq-answer">
+                        <p class="px-6 pb-5 text-slate-600 text-sm font-medium leading-relaxed">Yes — all YVA professionals are fully bilingual in <span class="font-black text-[#1b1e2b]">English and Spanish</span>. This is a core part of who we are, allowing your firm to serve a broader client base without any language barriers.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item border border-slate-200 rounded-2xl overflow-hidden">
+                    <button class="faq-trigger w-full flex items-center justify-between px-6 py-4 text-left hover:bg-slate-50 transition-colors">
+                        <span class="font-black text-[#1b1e2b] text-sm pr-4">Is there a minimum hours commitment or contract?</span>
+                        <i data-lucide="chevron-down" class="faq-chevron w-4 h-4 text-yellow-500 flex-shrink-0"></i>
+                    </button>
+                    <div class="faq-answer">
+                        <p class="px-6 pb-5 text-slate-600 text-sm font-medium leading-relaxed">We do have a service agreement, but there are <span class="font-black text-[#1b1e2b]">no long-term lock-ins</span>. You can exit at any time with no penalties or attachments. We believe our results should be the reason you stay — not a contract.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item border border-slate-200 rounded-2xl overflow-hidden">
+                    <button class="faq-trigger w-full flex items-center justify-between px-6 py-4 text-left hover:bg-slate-50 transition-colors">
+                        <span class="font-black text-[#1b1e2b] text-sm pr-4">What hours do your VAs work?</span>
+                        <i data-lucide="chevron-down" class="faq-chevron w-4 h-4 text-yellow-500 flex-shrink-0"></i>
+                    </button>
+                    <div class="faq-answer">
+                        <p class="px-6 pb-5 text-slate-600 text-sm font-medium leading-relaxed">Our VAs are available <span class="font-black text-[#1b1e2b]">24/7 across U.S. time zones</span>, giving your firm around-the-clock coverage. YVA Law Staffing's administrative team operates <span class="font-black text-[#1b1e2b]">Monday–Friday, 8:00am–5:00pm Eastern Time</span>.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item border border-slate-200 rounded-2xl overflow-hidden">
+                    <button class="faq-trigger w-full flex items-center justify-between px-6 py-4 text-left hover:bg-slate-50 transition-colors">
+                        <span class="font-black text-[#1b1e2b] text-sm pr-4">What tools and software do your VAs use?</span>
+                        <i data-lucide="chevron-down" class="faq-chevron w-4 h-4 text-yellow-500 flex-shrink-0"></i>
+                    </button>
+                    <div class="faq-answer">
+                        <p class="px-6 pb-5 text-slate-600 text-sm font-medium leading-relaxed">Our VAs adapt to <span class="font-black text-[#1b1e2b]">whatever tools your firm already uses</span> — including Clio, MyCase, HubSpot, Salesforce, Slack, Google Workspace, and more. No switching, no disruption to your existing workflow.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item border border-slate-200 rounded-2xl overflow-hidden">
+                    <button class="faq-trigger w-full flex items-center justify-between px-6 py-4 text-left hover:bg-slate-50 transition-colors">
+                        <span class="font-black text-[#1b1e2b] text-sm pr-4">How is billing handled?</span>
+                        <i data-lucide="chevron-down" class="faq-chevron w-4 h-4 text-yellow-500 flex-shrink-0"></i>
+                    </button>
+                    <div class="faq-answer">
+                        <p class="px-6 pb-5 text-slate-600 text-sm font-medium leading-relaxed">Services are billed hourly, starting at <span class="font-black text-[#1b1e2b]">$7.50/hr</span>. Payments are processed through <span class="font-black text-[#1b1e2b]">Zelle, Remitly, PayPal, or Payoneer</span> — whichever works best for you.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item border border-slate-200 rounded-2xl overflow-hidden">
+                    <button class="faq-trigger w-full flex items-center justify-between px-6 py-4 text-left hover:bg-slate-50 transition-colors">
+                        <span class="font-black text-[#1b1e2b] text-sm pr-4">What if the VA isn't a good fit?</span>
+                        <i data-lucide="chevron-down" class="faq-chevron w-4 h-4 text-yellow-500 flex-shrink-0"></i>
+                    </button>
+                    <div class="faq-answer">
+                        <p class="px-6 pb-5 text-slate-600 text-sm font-medium leading-relaxed">No problem at all. Just let us know and we'll <span class="font-black text-[#1b1e2b]">match you with someone else</span> at no extra cost. We're committed to finding the right fit for your firm, not just filling a seat.</p>
+                    </div>
+                </div>
+
+                <div class="faq-item border border-slate-200 rounded-2xl overflow-hidden">
+                    <button class="faq-trigger w-full flex items-center justify-between px-6 py-4 text-left hover:bg-slate-50 transition-colors">
+                        <span class="font-black text-[#1b1e2b] text-sm pr-4">Do you only work with law firms?</span>
+                        <i data-lucide="chevron-down" class="faq-chevron w-4 h-4 text-yellow-500 flex-shrink-0"></i>
+                    </button>
+                    <div class="faq-answer">
+                        <p class="px-6 pb-5 text-slate-600 text-sm font-medium leading-relaxed">Law firms are our primary focus, but we also work with <span class="font-black text-[#1b1e2b]">professional services businesses and startups</span> that need bilingual virtual support. If you're unsure whether we're the right fit, just book a free call and we'll let you know honestly.</p>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Footer CTA -->
+            <div class="flex-shrink-0 px-8 py-5 border-t border-slate-100 bg-slate-50 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <p class="text-slate-500 text-xs font-medium">Still have questions? We're happy to help.</p>
+                <button onclick="closeFaq(); openCalendly();" class="bg-[#1b1e2b] text-white px-6 py-3 rounded-xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all">
+                    Book a Free Call <i data-lucide="calendar" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Booking Modal (Form → Calendly) -->
+    <div id="calendly-modal" class="fixed inset-0 z-[100] items-center justify-center p-4 md:p-8" role="dialog" aria-modal="true" aria-label="Book a Call">
+        <div id="calendly-backdrop" class="absolute inset-0 bg-[#1b1e2b]/80 backdrop-blur-sm"></div>
+
+        <div class="modal-panel relative w-full max-w-2xl bg-white rounded-[2rem] overflow-hidden shadow-[0_40px_80px_-20px_rgba(27,30,43,0.5)] border-4 border-white max-h-[95vh] flex flex-col">
+
+            <!-- Header -->
+            <div class="bg-[#1b1e2b] px-8 py-5 flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="bg-yellow-400 w-9 h-9 rounded-xl flex items-center justify-center">
+                        <i data-lucide="calendar" class="w-5 h-5 text-[#1b1e2b]"></i>
+                    </div>
+                    <div>
+                        <p id="modal-title" class="text-white font-black text-sm tracking-widest uppercase">Book a Free Call</p>
+                        <p id="modal-subtitle" class="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Step 1 of 2 — Tell us about your needs</p>
+                    </div>
+                </div>
+                <button id="calendly-close" aria-label="Close" class="text-slate-400 hover:text-yellow-400 transition-colors p-2 rounded-xl hover:bg-white/10">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <!-- Step 1: Form -->
+            <div id="booking-form-step" class="overflow-y-auto px-8 py-8 flex flex-col gap-5">
+                <div class="grid sm:grid-cols-2 gap-5">
+                    <div>
+                        <label class="block text-xs font-black text-[#1b1e2b] uppercase tracking-widest mb-2">Full Name <span class="text-yellow-500">*</span></label>
+                        <input id="field-name" type="text" placeholder="Jane Smith" required class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20 transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-[#1b1e2b] uppercase tracking-widest mb-2">Email Address <span class="text-yellow-500">*</span></label>
+                        <input id="field-email" type="email" placeholder="jane@lawfirm.com" required class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20 transition">
+                    </div>
+                </div>
+                <div class="grid sm:grid-cols-2 gap-5">
+                    <div>
+                        <label class="block text-xs font-black text-[#1b1e2b] uppercase tracking-widest mb-2">Company / Firm Name <span class="text-yellow-500">*</span></label>
+                        <input id="field-company" type="text" placeholder="Smith & Associates" required class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20 transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-black text-[#1b1e2b] uppercase tracking-widest mb-2">Website <span class="text-slate-400 font-medium normal-case tracking-normal">(optional)</span></label>
+                        <input id="field-website" type="url" placeholder="https://yourfirm.com" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20 transition">
+                    </div>
+                </div>
+
+                <!-- Service: prefilled badge or dropdown -->
+                <div>
+                    <label class="block text-xs font-black text-[#1b1e2b] uppercase tracking-widest mb-2">Service You're Interested In <span class="text-yellow-500">*</span></label>
+                    <div id="service-prefilled" class="hidden items-center gap-3">
+                        <div class="flex items-center gap-2 bg-yellow-400/20 text-[#1b1e2b] px-4 py-2.5 rounded-xl text-sm font-black border border-yellow-400/40">
+                            <i data-lucide="check-circle-2" class="w-4 h-4 text-yellow-500"></i>
+                            <span id="service-prefilled-label"></span>
+                        </div>
+                        <button onclick="document.getElementById('service-prefilled').classList.add('hidden'); document.getElementById('service-dropdown').classList.remove('hidden');" class="text-slate-400 text-xs font-bold hover:text-yellow-500 transition-colors">Change</button>
+                    </div>
+                    <select id="service-dropdown" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20 transition bg-white">
+                        <option value="">Select a service...</option>
+                        <option value="Legal Intake">Legal Intake</option>
+                        <option value="Legal Assistants">Legal Assistants</option>
+                        <option value="Demand Writing">Demand Writing</option>
+                        <option value="Case Managers">Case Managers</option>
+                        <option value="Not sure yet">Not sure yet — I'd like to learn more</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-black text-[#1b1e2b] uppercase tracking-widest mb-2">Tell Us What You're Looking For <span class="text-yellow-500">*</span></label>
+                    <textarea id="field-message" rows="3" placeholder="Briefly describe your needs, current challenges, or any questions you have..." class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20 transition resize-none"></textarea>
+                </div>
+
+                <p id="form-error" class="hidden text-red-500 text-xs font-bold">Please fill in all required fields.</p>
+
+                <button id="form-submit" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all shadow-lg">
+                    Continue to Schedule <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                </button>
+                <p class="text-center text-slate-400 text-xs font-medium">No commitment required — just a conversation.</p>
+            </div>
+
+            <!-- Step 2: Calendly -->
+            <div id="booking-calendly-step" class="hidden flex-col flex-1">
+                <div class="bg-slate-50 px-8 py-3 border-b border-slate-100 flex-shrink-0">
+                    <p class="text-xs font-black text-[#1b1e2b] uppercase tracking-widest">Step 2 of 2 — Pick a time that works for you</p>
+                </div>
+                <div class="calendly-inline-widget" data-url="https://calendly.com/contact-yvastaffing-vuu8/new-meeting?hide_gdpr_banner=1&primary_color=f59e0b" style="min-width:100%;height:620px;"></div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Calendly Widget Script -->
+    <script src="https://assets.calendly.com/assets/external/widget.js" async></script>
+    <!-- EmailJS -->
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    <script>emailjs.init('Vsnmntfk0c8ChKXVL');</script>
+
+    <script>
+        // Initialize Icons
+        lucide.createIcons();
+
+        // Mobile Menu
+        const mobileMenu = document.getElementById('mobile-menu');
+        const mobileBackdrop = document.getElementById('mobile-backdrop');
+        const menuIconOpen = document.getElementById('menu-icon-open');
+        const menuIconClose = document.getElementById('menu-icon-close');
+
+        function openMobileMenu() {
+            mobileMenu.classList.add('open');
+            mobileBackdrop.classList.remove('hidden');
+            document.body.style.overflow = 'hidden';
+            menuIconOpen.classList.add('hidden');
+            menuIconClose.classList.remove('hidden');
+        }
+
+        function closeMobileMenu() {
+            mobileMenu.classList.remove('open');
+            mobileBackdrop.classList.add('hidden');
+            document.body.style.overflow = '';
+            menuIconOpen.classList.remove('hidden');
+            menuIconClose.classList.add('hidden');
+        }
+
+        document.getElementById('mobile-menu-toggle').addEventListener('click', openMobileMenu);
+        document.getElementById('mobile-menu-close').addEventListener('click', closeMobileMenu);
+        mobileBackdrop.addEventListener('click', closeMobileMenu);
+        document.querySelectorAll('.mobile-nav-link').forEach(link => {
+            link.addEventListener('click', closeMobileMenu);
+        });
+
+        // Cookie Banner
+        const cookieBanner = document.getElementById('cookie-banner');
+
+        function dismissCookie() {
+            cookieBanner.classList.remove('visible');
+            setTimeout(() => cookieBanner.style.display = 'none', 400);
+        }
+
+        if (!localStorage.getItem('yva_cookie_consent')) {
+            setTimeout(() => cookieBanner.classList.add('visible'), 1500);
+        } else {
+            cookieBanner.style.display = 'none';
+        }
+
+        document.getElementById('cookie-accept').addEventListener('click', () => {
+            localStorage.setItem('yva_cookie_consent', 'accepted');
+            dismissCookie();
+        });
+
+        document.getElementById('cookie-decline').addEventListener('click', () => {
+            localStorage.setItem('yva_cookie_consent', 'declined');
+            dismissCookie();
+        });
+
+        // FAQ Modal
+        const faqModal = document.getElementById('faq-modal');
+
+        function openFaq() {
+            faqModal.classList.add('open');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeFaq() {
+            faqModal.classList.remove('open');
+            document.body.style.overflow = '';
+        }
+
+        document.getElementById('faq-close').addEventListener('click', closeFaq);
+        document.getElementById('faq-backdrop').addEventListener('click', closeFaq);
+
+        // Privacy Modal
+        function openPrivacy() {
+            document.getElementById('privacy-modal').classList.add('open');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closePrivacy() {
+            document.getElementById('privacy-modal').classList.remove('open');
+            document.body.style.overflow = '';
+        }
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeFaq(); closeCalendly(); closePrivacy(); closeMobileServiceModal(); } });
+
+
+        // FAQ Accordion
+        document.querySelectorAll('.faq-trigger').forEach(trigger => {
+            trigger.addEventListener('click', () => {
+                const item = trigger.closest('.faq-item');
+                const answer = item.querySelector('.faq-answer');
+                const isOpen = item.classList.contains('open');
+
+                // Close all
+                document.querySelectorAll('.faq-item').forEach(i => {
+                    i.classList.remove('open');
+                    i.querySelector('.faq-answer').style.maxHeight = '0px';
+                });
+
+                // Open clicked if it was closed
+                if (!isOpen) {
+                    item.classList.add('open');
+                    answer.style.maxHeight = answer.scrollHeight + 'px';
+                }
+            });
+        });
+
+        // Booking Modal (Form → Calendly)
+        const calendlyModal = document.getElementById('calendly-modal');
+        const formStep = document.getElementById('booking-form-step');
+        const calendlyStep = document.getElementById('booking-calendly-step');
+
+        function openCalendly(service = '') {
+            // Reset to step 1
+            formStep.classList.remove('hidden');
+            calendlyStep.classList.add('hidden');
+            document.getElementById('modal-subtitle').textContent = 'Step 1 of 2 — Tell us about your needs';
+
+            // Pre-fill or show dropdown
+            const prefilled = document.getElementById('service-prefilled');
+            const dropdown = document.getElementById('service-dropdown');
+            if (service) {
+                document.getElementById('service-prefilled-label').textContent = service;
+                prefilled.classList.remove('hidden');
+                prefilled.classList.add('flex');
+                dropdown.classList.add('hidden');
+                dropdown.value = service;
+            } else {
+                prefilled.classList.add('hidden');
+                prefilled.classList.remove('flex');
+                dropdown.classList.remove('hidden');
+                dropdown.value = '';
+            }
+
+            calendlyModal.classList.add('open');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeCalendly() {
+            calendlyModal.classList.remove('open');
+            document.body.style.overflow = '';
+            // Reset form fields
+            ['field-name','field-email','field-company','field-website','field-message'].forEach(id => {
+                document.getElementById(id).value = '';
+            });
+            document.getElementById('form-error').classList.add('hidden');
+        }
+
+        // Form submit → send emails → go to Calendly step
+        document.getElementById('form-submit').addEventListener('click', async () => {
+            const name = document.getElementById('field-name').value.trim();
+            const email = document.getElementById('field-email').value.trim();
+            const company = document.getElementById('field-company').value.trim();
+            const website = document.getElementById('field-website').value.trim();
+            const message = document.getElementById('field-message').value.trim();
+            const service = document.getElementById('service-dropdown').value;
+            const error = document.getElementById('form-error');
+            const submitBtn = document.getElementById('form-submit');
+
+            if (!name || !email || !company || !message || !service) {
+                error.classList.remove('hidden');
+                return;
+            }
+            error.classList.add('hidden');
+
+            // Show loading state
+            submitBtn.textContent = 'Sending...';
+            submitBtn.disabled = true;
+
+            const templateParams = {
+                name,
+                email,
+                company,
+                website: website || 'Not provided',
+                service,
+                message,
+                time: new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })
+            };
+
+            try {
+                // Send contact us email to YVA
+                await emailjs.send('service_d485bxr', 'template_8gftonr', templateParams);
+                // Send auto-reply to client
+                await emailjs.send('service_d485bxr', 'template_9r6xtuw', templateParams);
+            } catch (err) {
+                console.error('EmailJS error:', err);
+            }
+
+            // Reset button and go to step 2 regardless
+            submitBtn.innerHTML = 'Continue to Schedule <i data-lucide="arrow-right" class="w-4 h-4 inline"></i>';
+            submitBtn.disabled = false;
+
+            formStep.classList.add('hidden');
+            calendlyStep.classList.remove('hidden');
+            calendlyStep.classList.add('flex');
+            document.getElementById('modal-subtitle').textContent = 'Step 2 of 2 — Pick a time that works for you';
+        });
+
+        document.getElementById('calendly-close').addEventListener('click', closeCalendly);
+        document.getElementById('calendly-backdrop').addEventListener('click', closeCalendly);
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { closeCalendly(); closeFaq(); }
+        });
+
+        // Mobile Service Modal Data
+        const mobileServiceData = [
+            {
+                name: 'Legal Intake',
+                icon: 'scale',
+                rate: '$7.50/hr',
+                image: 'https://images.unsplash.com/photo-1601933973783-43cf8a7d4c5f?auto=format&fit=crop&q=80&w=900',
+                headline: 'Stop losing potential clients to missed calls or delayed responses.',
+                description: 'Your intake specialist is the first voice a potential client hears. They answer calls in English and Spanish, gather case details, screen for eligibility, complete intake forms, update your CRM, and book consultations — so every lead is captured and your attorneys only speak with qualified prospects.',
+                checklist: [
+                    'Bilingual inbound call & email handling',
+                    'Client screening & eligibility check',
+                    'Intake form completion & CRM entry',
+                    'Consultation scheduling & confirmations',
+                    'Lead follow-up & status updates'
+                ],
+                cta: 'Hire an Intake Specialist',
+                ctaService: 'Legal Intake'
+            },
+            {
+                name: 'Legal Assistants',
+                icon: 'gavel',
+                rate: '$8.50/hr',
+                image: 'https://images.unsplash.com/photo-1586281380349-632531db7ed4?auto=format&fit=crop&q=80&w=900',
+                headline: 'Give your attorneys the support they need to stay focused on cases — not paperwork.',
+                description: 'Our bilingual legal assistants handle the day-to-day administrative workload that consumes attorney hours. They manage calendars, draft correspondence, organize case files, follow up with clients, and keep track of upcoming deadlines — functioning as a true extension of your legal team.',
+                checklist: [
+                    'Attorney calendar & scheduling management',
+                    'Client correspondence & follow-ups',
+                    'Case file organization & maintenance',
+                    'Court deadline tracking & reminders',
+                    'Document drafting & proofreading'
+                ],
+                cta: 'Hire a Legal Assistant',
+                ctaService: 'Legal Assistants'
+            },
+            {
+                name: 'Demand Writing',
+                icon: 'file-text',
+                rate: '$10/hr',
+                image: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=900',
+                headline: 'Turn case records into complete demand packages without slowing down your attorneys.',
+                description: 'Our demand writing specialists review medical records and bills, organize evidence, calculate damages, and draft professional demand letters that match your firm\'s standards. They build the full package so your attorney can review, approve, and send — cutting turnaround time significantly.',
+                checklist: [
+                    'Medical record review & bill summarization',
+                    'Damages calculation & case chronology',
+                    'Demand letter drafting to firm standards',
+                    'Settlement package preparation',
+                    'Insurance adjuster follow-up support'
+                ],
+                cta: 'Hire a Demand Writer',
+                ctaService: 'Demand Writing'
+            },
+            {
+                name: 'Case Managers',
+                icon: 'users',
+                rate: '$12/hr',
+                image: 'https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=900',
+                headline: 'Keep every case on track from the moment it opens to the day it settles.',
+                description: 'Our bilingual case managers take full ownership of the case lifecycle. They coordinate between clients, attorneys, medical providers, and insurance adjusters — tracking every deadline, collecting documentation, managing treatment follow-ups, and reporting status. Nothing stalls, nothing falls through the cracks.',
+                checklist: [
+                    'Full case lifecycle coordination',
+                    'Medical treatment & provider follow-up',
+                    'Deadline tracking & attorney status reports',
+                    'Client relationship management throughout the case',
+                    'Multi-party communication & documentation'
+                ],
+                cta: 'Hire a Case Manager',
+                ctaService: 'Case Managers'
+            }
+        ];
+
+        // Mobile Service Modal
+        const mobileServiceModal = document.getElementById('mobile-service-modal');
+
+        function openMobileServiceModal(index) {
+            const s = mobileServiceData[index];
+            document.getElementById('msm-image').src = s.image;
+            document.getElementById('msm-image').alt = s.name;
+            document.getElementById('msm-rate').textContent = s.rate;
+            document.getElementById('msm-badge').innerHTML = `<i data-lucide="${s.icon}" class="w-3.5 h-3.5"></i> ${s.name}`;
+            document.getElementById('msm-headline').textContent = s.headline;
+            document.getElementById('msm-description').textContent = s.description;
+            const ul = document.getElementById('msm-checklist');
+            ul.innerHTML = s.checklist.map(item => `
+                <li class="flex items-start gap-3 text-sm font-bold text-slate-700">
+                    <div class="w-5 h-5 rounded-full bg-yellow-400 flex items-center justify-center flex-shrink-0 mt-0.5"><i data-lucide="check" class="w-3 h-3 text-[#1b1e2b]"></i></div>
+                    ${item}
+                </li>`).join('');
+            document.getElementById('msm-cta-text').textContent = s.cta;
+            document.getElementById('msm-cta').onclick = () => { closeMobileServiceModal(); openCalendly(s.ctaService); };
+            lucide.createIcons();
+            mobileServiceModal.classList.add('open');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeMobileServiceModal() {
+            mobileServiceModal.classList.remove('open');
+            document.body.style.overflow = '';
+        }
+
+        document.getElementById('mobile-service-close').addEventListener('click', closeMobileServiceModal);
+        document.getElementById('mobile-service-backdrop').addEventListener('click', closeMobileServiceModal);
+
+        // Services Tabs
+        const servicesSection = document.getElementById('services');
+        const servicesTrack = document.getElementById('services-track');
+        const serviceTabs = document.querySelectorAll('.service-tab');
+        const pillarCards = document.querySelectorAll('.pillar-card');
+        let activeServiceIndex = null;
+
+        function goToService(index) {
+            servicesTrack.style.transform = `translateX(-${index * 100}%)`;
+            serviceTabs.forEach((tab, i) => {
+                const dot = tab.querySelector('.tab-dot');
+                if (i === index) {
+                    tab.classList.add('active');
+                    tab.classList.remove('border-slate-200', 'text-slate-500');
+                    tab.classList.add('border-[#1b1e2b]');
+                    dot.classList.remove('bg-slate-300');
+                    dot.classList.add('bg-yellow-400');
+                } else {
+                    tab.classList.remove('active');
+                    tab.classList.add('border-slate-200', 'text-slate-500');
+                    tab.classList.remove('border-[#1b1e2b]');
+                    dot.classList.add('bg-slate-300');
+                    dot.classList.remove('bg-yellow-400');
+                }
+            });
+        }
+
+        function expandServices(index) {
+            // On mobile: show inline modal instead
+            if (window.innerWidth < 768) {
+                openMobileServiceModal(index);
+                return;
+            }
+
+            const isExpanded = servicesSection.classList.contains('expanded');
+            const isSame = activeServiceIndex === index && isExpanded;
+
+            // Collapse if same card clicked again
+            if (isSame) {
+                servicesSection.style.maxHeight = servicesSection.scrollHeight + 'px';
+                requestAnimationFrame(() => {
+                    servicesSection.style.maxHeight = '0px';
+                    servicesSection.classList.remove('expanded');
+                });
+                pillarCards.forEach(c => c.classList.remove('active'));
+                activeServiceIndex = null;
+                return;
+            }
+
+            // Switch tab first
+            activeServiceIndex = index;
+            goToService(index);
+            pillarCards.forEach((c, i) => c.classList.toggle('active', i === index));
+
+            if (!isExpanded) {
+                // Expanding from closed: set to 0, add class, then animate to real height
+                servicesSection.style.maxHeight = '0px';
+                servicesSection.classList.add('expanded');
+                requestAnimationFrame(() => {
+                    const targetHeight = servicesSection.scrollHeight;
+                    servicesSection.style.maxHeight = targetHeight + 'px';
+                    // Scroll into view only after animation finishes
+                    setTimeout(() => {
+                        servicesSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        servicesSection.style.maxHeight = 'none';
+                    }, 720);
+                });
+            }
+        }
+
+        pillarCards.forEach(card => {
+            card.addEventListener('click', () => expandServices(parseInt(card.dataset.service)));
+        });
+
+        serviceTabs.forEach(tab => {
+            tab.addEventListener('click', () => goToService(parseInt(tab.dataset.service)));
+        });
+
+        // Founders Toggle
+        const foundersCards = document.getElementById('founders-cards');
+        const foundersToggle = document.getElementById('founders-toggle');
+        const foundersArrow = foundersToggle.querySelector('.founders-arrow');
+        const foundersToggleLabel = foundersToggle.querySelector('span');
+        let foundersRevealed = false;
+
+        foundersToggle.addEventListener('click', () => {
+            foundersRevealed = !foundersRevealed;
+            if (foundersRevealed) {
+                foundersCards.style.maxHeight = foundersCards.scrollHeight + 'px';
+                foundersCards.classList.add('revealed');
+                foundersArrow.classList.add('rotated');
+                foundersToggleLabel.textContent = 'Hide Founders';
+                setTimeout(() => { foundersCards.style.maxHeight = 'none'; }, 620);
+            } else {
+                foundersCards.style.maxHeight = foundersCards.scrollHeight + 'px';
+                requestAnimationFrame(() => {
+                    foundersCards.style.maxHeight = '0px';
+                    foundersCards.classList.remove('revealed');
+                    foundersArrow.classList.remove('rotated');
+                    foundersToggleLabel.textContent = 'Meet the Founders';
+                });
+            }
+        });
+
+        // Testimonials Carousel
+        const track = document.getElementById('testimonial-track');
+        const dots = document.querySelectorAll('.testimonial-dot');
+        const totalSlides = 4;
+        let current = 0;
+        let autoSlide;
+
+        function goToSlide(index) {
+            current = (index + totalSlides) % totalSlides;
+            track.style.transform = `translateX(-${current * 100}%)`;
+            dots.forEach((dot, i) => {
+                dot.classList.toggle('bg-[#1b1e2b]', i === current);
+                dot.classList.toggle('w-8', i === current);
+                dot.classList.toggle('bg-slate-300', i !== current);
+                dot.classList.toggle('w-2', i !== current);
+            });
+        }
+
+        function startAutoSlide() {
+            autoSlide = setInterval(() => goToSlide(current + 1), 5000);
+        }
+
+        function resetAutoSlide() {
+            clearInterval(autoSlide);
+            startAutoSlide();
+        }
+
+        document.getElementById('testimonial-prev').addEventListener('click', () => { goToSlide(current - 1); resetAutoSlide(); });
+        document.getElementById('testimonial-next').addEventListener('click', () => { goToSlide(current + 1); resetAutoSlide(); });
+        dots.forEach(dot => {
+            dot.addEventListener('click', () => { goToSlide(parseInt(dot.dataset.index)); resetAutoSlide(); });
+        });
+
+        startAutoSlide();
+
+        // Active nav highlight on scroll
+        const navLinks = document.querySelectorAll('.hidden.md\\:flex a[href^="#"]');
+        const sections = ['home', 'service-pillars', 'how-it-works', 'testimonials', 'about'];
+
+        const navObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const id = entry.target.id;
+                    navLinks.forEach(link => {
+                        const isActive = link.getAttribute('href') === `#${id}`;
+                        link.classList.toggle('text-yellow-500', isActive);
+                        link.classList.toggle('text-[#1b1e2b]', !isActive);
+                    });
+                }
+            });
+        }, { threshold: 0.3, rootMargin: '-80px 0px -40% 0px' });
+
+        sections.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) navObserver.observe(el);
+        });
+
+        // Navbar scroll effect
+        window.addEventListener('scroll', () => {
+            const nav = document.getElementById('navbar');
+            if (window.scrollY > 20) {
+                nav.classList.add('nav-scrolled');
+            } else {
+                nav.classList.remove('nav-scrolled');
+            }
+        });
+    </script>
+
+    <!-- Privacy Policy Modal -->
+    <div id="privacy-modal" class="fixed inset-0 z-[110] items-center justify-center p-4 md:p-8" role="dialog" aria-modal="true" aria-label="Privacy Policy">
+        <div id="privacy-backdrop" class="absolute inset-0 bg-[#1b1e2b]/80 backdrop-blur-sm"></div>
+        <div class="privacy-panel relative w-full max-w-2xl bg-white rounded-[2rem] overflow-hidden shadow-[0_40px_80px_-20px_rgba(27,30,43,0.5)] border-4 border-white max-h-[90vh] flex flex-col">
+
+            <!-- Header -->
+            <div class="bg-[#1b1e2b] px-8 py-5 flex items-center justify-between flex-shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="bg-yellow-400 w-9 h-9 rounded-xl flex items-center justify-center">
+                        <i data-lucide="shield" class="w-5 h-5 text-[#1b1e2b]"></i>
+                    </div>
+                    <div>
+                        <p class="text-white font-black text-sm tracking-widest uppercase">Privacy Policy</p>
+                        <p class="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Last updated: March 2025</p>
+                    </div>
+                </div>
+                <button id="privacy-close" aria-label="Close" class="text-slate-400 hover:text-yellow-400 transition-colors p-2 rounded-xl hover:bg-white/10">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <!-- Content -->
+            <div class="overflow-y-auto px-8 py-7 space-y-6 text-slate-600 text-sm font-medium leading-relaxed">
+
+                <div>
+                    <h3 class="font-black text-[#1b1e2b] text-base mb-2">1. Who We Are</h3>
+                    <p>YVA Law Staffing ("we", "us", "our") operates at <span class="font-bold text-[#1b1e2b]">yvastaffing.agency</span>. We provide bilingual virtual staffing solutions for U.S. law firms and professional services. For any privacy-related questions, contact us at <span class="font-bold text-[#1b1e2b]">contact@yvastaffing.agency</span>.</p>
+                </div>
+
+                <div>
+                    <h3 class="font-black text-[#1b1e2b] text-base mb-2">2. Information We Collect</h3>
+                    <p>We collect information you voluntarily provide through our contact and booking forms, including:</p>
+                    <ul class="list-disc list-inside mt-2 space-y-1">
+                        <li>Name and email address</li>
+                        <li>Company name and website</li>
+                        <li>Service inquiries and messages</li>
+                        <li>Scheduling information via Calendly</li>
+                    </ul>
+                    <p class="mt-2">We also collect anonymized analytics data (page views, traffic sources) via Google Analytics to improve our website.</p>
+                </div>
+
+                <div>
+                    <h3 class="font-black text-[#1b1e2b] text-base mb-2">3. How We Use Your Information</h3>
+                    <p>We use your information exclusively to:</p>
+                    <ul class="list-disc list-inside mt-2 space-y-1">
+                        <li>Respond to your inquiries and schedule consultations</li>
+                        <li>Send relevant information about our services</li>
+                        <li>Improve our website and user experience</li>
+                        <li>Comply with legal obligations</li>
+                    </ul>
+                    <p class="mt-2">We do <span class="font-black text-[#1b1e2b]">not</span> sell, rent, or share your personal data with third parties for marketing purposes.</p>
+                </div>
+
+                <div>
+                    <h3 class="font-black text-[#1b1e2b] text-base mb-2">4. Cookies</h3>
+                    <p>Our website uses cookies to enhance your experience and gather analytics. By accepting our cookie banner, you consent to the use of:</p>
+                    <ul class="list-disc list-inside mt-2 space-y-1">
+                        <li><span class="font-bold text-[#1b1e2b]">Essential cookies</span> — required for the site to function</li>
+                        <li><span class="font-bold text-[#1b1e2b]">Analytics cookies</span> — Google Analytics (anonymized) to understand traffic patterns</li>
+                    </ul>
+                    <p class="mt-2">You may disable cookies in your browser settings at any time without affecting your ability to use the site.</p>
+                </div>
+
+                <div>
+                    <h3 class="font-black text-[#1b1e2b] text-base mb-2">5. Third-Party Services</h3>
+                    <p>We use the following trusted third-party services that may process your data under their own privacy policies:</p>
+                    <ul class="list-disc list-inside mt-2 space-y-1">
+                        <li><span class="font-bold text-[#1b1e2b]">Calendly</span> — for appointment scheduling</li>
+                        <li><span class="font-bold text-[#1b1e2b]">EmailJS</span> — for secure form submission delivery</li>
+                        <li><span class="font-bold text-[#1b1e2b]">Google Analytics</span> — for anonymized website analytics</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 class="font-black text-[#1b1e2b] text-base mb-2">6. Data Retention</h3>
+                    <p>We retain your contact information only as long as necessary to fulfill the purpose for which it was collected or as required by law. You may request deletion of your data at any time by emailing us at <span class="font-bold text-[#1b1e2b]">contact@yvastaffing.agency</span>.</p>
+                </div>
+
+                <div>
+                    <h3 class="font-black text-[#1b1e2b] text-base mb-2">7. Your Rights</h3>
+                    <p>Depending on your location, you may have the right to access, correct, or delete the personal information we hold about you. To exercise any of these rights, contact us at <span class="font-bold text-[#1b1e2b]">contact@yvastaffing.agency</span> and we will respond within 30 days.</p>
+                </div>
+
+                <div>
+                    <h3 class="font-black text-[#1b1e2b] text-base mb-2">8. Changes to This Policy</h3>
+                    <p>We may update this Privacy Policy from time to time. Any changes will be reflected on this page with an updated date. Continued use of our website after changes constitutes acceptance of the updated policy.</p>
+                </div>
+
+                <div class="border-t border-slate-200 pt-4">
+                    <p class="text-xs text-slate-400">For questions about this policy, contact <span class="font-bold text-[#1b1e2b]">contact@yvastaffing.agency</span> · yvastaffing.agency</p>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    <script>
+        document.getElementById('privacy-close').addEventListener('click', closePrivacy);
+        document.getElementById('privacy-backdrop').addEventListener('click', closePrivacy);
+    </script>
+
+    <!-- Email Picker Modal -->
+    <div id="email-picker" class="fixed inset-0 z-[120] flex items-center justify-center p-4" style="visibility:hidden;opacity:0;transition:opacity 0.25s ease,visibility 0.25s ease;">
+        <div id="email-picker-backdrop" class="absolute inset-0 bg-[#1b1e2b]/70 backdrop-blur-sm"></div>
+        <div id="email-picker-panel" class="relative bg-white rounded-[2rem] shadow-[0_40px_80px_-20px_rgba(27,30,43,0.5)] border-4 border-white w-full max-w-sm p-8" style="transform:translateY(30px) scale(0.97);transition:transform 0.3s cubic-bezier(0.34,1.56,0.64,1);">
+            <button id="email-picker-close" class="absolute top-4 right-4 text-slate-400 hover:text-yellow-500 transition-colors p-1">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            <div class="flex items-center gap-3 mb-5">
+                <div class="flex items-center gap-2">
+                    <div class="bg-[#1b1e2b] w-10 h-10 rounded-xl flex items-center justify-center shadow-lg text-yellow-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    </div>
+                    <div class="flex flex-col">
+                        <span class="text-xl font-black tracking-tighter leading-none text-[#1b1e2b]">YVA <span class="text-base">Law</span></span>
+                        <span class="text-[10px] uppercase tracking-[0.3em] font-bold text-slate-400">Staffing</span>
+                    </div>
+                </div>
+                <div class="ml-2 pl-3 border-l border-slate-200">
+                    <p class="font-black text-[#1b1e2b] text-sm">Send us an email</p>
+                    <p class="text-slate-400 text-xs font-bold">contact@yvastaffing.agency</p>
+                </div>
+            </div>
+            <div class="space-y-3">
+                <a href="https://mail.google.com/mail/?view=cm&to=contact@yvastaffing.agency" target="_blank" class="flex items-center gap-3 w-full bg-slate-50 hover:bg-yellow-50 border border-slate-200 hover:border-yellow-300 rounded-2xl px-5 py-3.5 transition-all group">
+                    <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24"><path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L5.455 4.64 12 9.548l6.545-4.91 1.528-1.145C21.69 2.28 24 3.434 24 5.457z" fill="#EA4335"/></svg>
+                    <span class="font-black text-[#1b1e2b] text-sm group-hover:text-yellow-600 transition-colors">Open in Gmail</span>
+                    <i data-lucide="arrow-right" class="w-4 h-4 text-slate-300 group-hover:text-yellow-400 ml-auto transition-colors"></i>
+                </a>
+                <a href="https://outlook.live.com/mail/0/deeplink/compose?to=contact@yvastaffing.agency" target="_blank" class="flex items-center gap-3 w-full bg-slate-50 hover:bg-yellow-50 border border-slate-200 hover:border-yellow-300 rounded-2xl px-5 py-3.5 transition-all group">
+                    <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24"><path d="M7.88 12.04q0 .45-.11.87-.1.41-.33.74-.22.33-.58.52-.37.2-.87.2t-.85-.2q-.35-.21-.57-.55-.22-.33-.33-.75-.1-.42-.1-.86t.1-.87q.1-.43.34-.76.22-.34.59-.54.36-.2.87-.2t.86.2q.35.21.57.55.22.34.31.77.1.43.1.88zM24 12v9.38q0 .46-.33.8-.33.32-.8.32H7.13q-.46 0-.8-.33-.32-.34-.32-.8V18H1q-.41 0-.7-.3-.3-.29-.3-.7V7q0-.41.3-.7Q.58 6 1 6h6.5V2.55q0-.44.3-.75.3-.3.75-.3h12.9q.44 0 .75.3.3.3.3.75V10.85l1.24.72h.01q.germination.43.25.43zM7.13 7.5H6.5v9h.63q.35 0 .61-.25.25-.25.25-.6V8.35q0-.35-.25-.6-.26-.25-.61-.25zM10.5 8h-2v8h2q1.2 0 2.01-.74.82-.73.82-2.03v-1.46q0-1.3-.82-2.04Q11.7 8 10.5 8zm1.33 5.23q0 .9-.45 1.37-.46.48-1.33.48H9.5V9h.55q.87 0 1.33.48.45.48.45 1.37v2.38zm3.17-5.23v8h1v-3.5h2.5v-1h-2.5V9.5H17V8.5h-2zm5 0v8h3v-1h-2V8zm3 0v8h1v-8z" fill="#0078D4"/></svg>
+                    <span class="font-black text-[#1b1e2b] text-sm group-hover:text-yellow-600 transition-colors">Open in Outlook</span>
+                    <i data-lucide="arrow-right" class="w-4 h-4 text-slate-300 group-hover:text-yellow-400 ml-auto transition-colors"></i>
+                </a>
+                <a href="https://compose.mail.yahoo.com/?to=contact@yvastaffing.agency" target="_blank" class="flex items-center gap-3 w-full bg-slate-50 hover:bg-yellow-50 border border-slate-200 hover:border-yellow-300 rounded-2xl px-5 py-3.5 transition-all group">
+                    <svg class="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24"><path d="M24 4h-5l-4.5 8.5L10 4H5l7 12.5V24h5v-7.5z" fill="#6001D2"/></svg>
+                    <span class="font-black text-[#1b1e2b] text-sm group-hover:text-yellow-600 transition-colors">Open in Yahoo Mail</span>
+                    <i data-lucide="arrow-right" class="w-4 h-4 text-slate-300 group-hover:text-yellow-400 ml-auto transition-colors"></i>
+                </a>
+                <button id="copy-email-btn" onclick="copyEmail()" class="flex items-center gap-3 w-full bg-slate-50 hover:bg-yellow-50 border border-slate-200 hover:border-yellow-300 rounded-2xl px-5 py-3.5 transition-all group">
+                    <i data-lucide="copy" class="w-5 h-5 text-slate-400 group-hover:text-yellow-500 flex-shrink-0 transition-colors"></i>
+                    <span id="copy-email-label" class="font-black text-[#1b1e2b] text-sm group-hover:text-yellow-600 transition-colors">Copy email address</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    <script>
+        document.getElementById('email-picker-close').addEventListener('click', closeEmailPicker);
+        document.getElementById('email-picker-backdrop').addEventListener('click', closeEmailPicker);
+
+        function openEmailPicker(e) {
+            e.preventDefault();
+            window.location.href = 'mailto:contact@yvastaffing.agency';
+            setTimeout(() => {
+                const picker = document.getElementById('email-picker');
+                const panel = document.getElementById('email-picker-panel');
+                picker.style.visibility = 'visible';
+                picker.style.opacity = '1';
+                panel.style.transform = 'translateY(0) scale(1)';
+                document.body.style.overflow = 'hidden';
+            }, 500);
+        }
+
+        function closeEmailPicker() {
+            const picker = document.getElementById('email-picker');
+            const panel = document.getElementById('email-picker-panel');
+            picker.style.opacity = '0';
+            picker.style.visibility = 'hidden';
+            panel.style.transform = 'translateY(30px) scale(0.97)';
+            document.body.style.overflow = '';
+        }
+
+        function copyEmail() {
+            navigator.clipboard.writeText('contact@yvastaffing.agency').then(() => {
+                const label = document.getElementById('copy-email-label');
+                label.textContent = 'Copied!';
+                setTimeout(() => { label.textContent = 'Copy email address'; }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>
