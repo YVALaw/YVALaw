@@ -33,6 +33,85 @@
       gtag('config', 'G-V2Q6V4HE4F');
     </script>
 
+    <!-- Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "Organization",
+          "@id": "https://yvastaffing.agency/#organization",
+          "name": "YVA Law Staffing",
+          "url": "https://yvastaffing.agency",
+          "description": "Elite bilingual virtual staffing for U.S. law firms. Legal intake, legal assistants, demand writing, and case managers starting at $7.50/hr.",
+          "email": "contact@yvastaffing.agency",
+          "areaServed": { "@type": "Country", "name": "United States" },
+          "knowsLanguage": ["en", "es"]
+        },
+        {
+          "@type": "ProfessionalService",
+          "@id": "https://yvastaffing.agency/#service",
+          "name": "YVA Law Staffing",
+          "url": "https://yvastaffing.agency",
+          "description": "Bilingual virtual staffing solutions for U.S. law firms — legal intake specialists, legal assistants, demand writers, and case managers.",
+          "priceRange": "$7.50 - $12/hr",
+          "email": "contact@yvastaffing.agency",
+          "openingHours": "Mo-Fr 09:00-18:00",
+          "areaServed": { "@type": "Country", "name": "United States" },
+          "hasOfferCatalog": {
+            "@type": "OfferCatalog",
+            "name": "Virtual Legal Staffing Services",
+            "itemListElement": [
+              {
+                "@type": "Offer",
+                "itemOffered": {
+                  "@type": "Service",
+                  "name": "Legal Intake Specialist",
+                  "description": "Bilingual legal intake specialists handle first contact, screen leads, capture intake forms, schedule consultations, and follow up."
+                },
+                "price": "7.50", "priceCurrency": "USD", "unitText": "per hour"
+              },
+              {
+                "@type": "Offer",
+                "itemOffered": {
+                  "@type": "Service",
+                  "name": "Legal Assistant",
+                  "description": "Virtual legal assistants support attorneys with calendar management, client correspondence, case file organization, and document drafting."
+                },
+                "price": "8.50", "priceCurrency": "USD", "unitText": "per hour"
+              },
+              {
+                "@type": "Offer",
+                "itemOffered": {
+                  "@type": "Service",
+                  "name": "Demand Writing Specialist",
+                  "description": "Demand writers review medical records, calculate damages, and draft complete demand packages for personal injury and employment law firms."
+                },
+                "price": "10.00", "priceCurrency": "USD", "unitText": "per hour"
+              },
+              {
+                "@type": "Offer",
+                "itemOffered": {
+                  "@type": "Service",
+                  "name": "Virtual Case Manager",
+                  "description": "Bilingual case managers own the full case lifecycle — coordinating clients, attorneys, medical providers, and adjusters from open to settlement."
+                },
+                "price": "12.00", "priceCurrency": "USD", "unitText": "per hour"
+              }
+            ]
+          }
+        },
+        {
+          "@type": "WebSite",
+          "@id": "https://yvastaffing.agency/#website",
+          "url": "https://yvastaffing.agency",
+          "name": "YVA Law Staffing",
+          "publisher": { "@id": "https://yvastaffing.agency/#organization" }
+        }
+      ]
+    }
+    </script>
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
