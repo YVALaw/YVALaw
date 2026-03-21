@@ -346,16 +346,6 @@
             overflow: hidden;
         }
 
-        /* Announcement Bar */
-        #announcement-bar {
-            transition: max-height 0.4s ease, opacity 0.4s ease;
-            max-height: 80px;
-            overflow: hidden;
-        }
-        #announcement-bar.dismissed {
-            max-height: 0;
-            opacity: 0;
-        }
 
         /* Sticky CTA Bar */
         #sticky-cta {
@@ -397,18 +387,6 @@
 </head>
 <body class="bg-white text-slate-900 overflow-x-hidden">
 
-    <!-- Announcement Bar -->
-    <div id="announcement-bar" class="bg-yellow-400 text-[#1b1e2b] py-2.5 px-4">
-        <div class="max-w-7xl mx-auto flex items-center justify-center gap-3 relative">
-            <i data-lucide="zap" class="w-3.5 h-3.5 flex-shrink-0"></i>
-            <p class="text-[11px] font-black uppercase tracking-widest text-center" data-i18n="announcement">
-                Limited spots available — <strong>Book this week</strong> and your VA starts in 48 hours.
-            </p>
-            <button id="announcement-close" aria-label="Dismiss" class="absolute right-0 p-1 hover:opacity-70 transition-opacity flex-shrink-0">
-                <i data-lucide="x" class="w-3.5 h-3.5"></i>
-            </button>
-        </div>
-    </div>
 
     <!-- Top Utility Bar -->
     <div class="bg-[#1b1e2b] text-white py-2 px-6 hidden md:block border-b border-white/10">
@@ -2925,15 +2903,6 @@
     </div>
 
     <script>
-        // ── Announcement Bar ──────────────────────────────────────────────
-        const announcementBar = document.getElementById('announcement-bar');
-        if (localStorage.getItem('yva_announcement_dismissed')) {
-            announcementBar.classList.add('dismissed');
-        }
-        document.getElementById('announcement-close').addEventListener('click', () => {
-            announcementBar.classList.add('dismissed');
-            localStorage.setItem('yva_announcement_dismissed', '1');
-        });
 
         // ── Sticky CTA Bar ────────────────────────────────────────────────
         const stickyCta = document.getElementById('sticky-cta');
