@@ -688,25 +688,6 @@
         </div>
     </div>
 
-    <!-- Lead Magnet Strip -->
-    <div class="bg-[#1b1e2b] py-8">
-        <div class="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-6">
-            <div class="flex items-center gap-4">
-                <div class="w-12 h-12 bg-yellow-400 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg">
-                    <i data-lucide="file-down" class="w-6 h-6 text-[#1b1e2b]"></i>
-                </div>
-                <div>
-                    <p class="text-yellow-400 text-[10px] font-black uppercase tracking-[0.3em] mb-0.5" data-i18n="lmLabel">Free Download</p>
-                    <p class="text-white font-black text-base" data-i18n="lmTitle">Legal Staffing Checklist</p>
-                    <p class="text-slate-400 text-xs font-medium" data-i18n="lmSub">10 questions to ask before hiring virtual legal staff</p>
-                </div>
-            </div>
-            <button onclick="openLeadMagnet()" class="flex-shrink-0 bg-yellow-400 text-[#1b1e2b] px-8 py-3.5 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center gap-2 hover:bg-yellow-300 transition-all shadow-lg whitespace-nowrap">
-                <span data-i18n="lmCta">Get Free Checklist</span> <i data-lucide="arrow-right" class="w-4 h-4"></i>
-            </button>
-        </div>
-    </div>
-
     <!-- SEO Service Pillars -->
     <div id="service-pillars" class="bg-[#1b1e2b] py-16">
         <div class="max-w-7xl mx-auto px-6">
@@ -1390,6 +1371,25 @@
             </div>
         </div>
     </section>
+
+    <!-- Lead Magnet Strip -->
+    <div class="bg-white border-t border-b border-gray-100 py-10">
+        <div class="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-yellow-400 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg">
+                    <i data-lucide="file-down" class="w-6 h-6 text-[#1b1e2b]"></i>
+                </div>
+                <div>
+                    <p class="text-yellow-500 text-[10px] font-black uppercase tracking-[0.3em] mb-0.5" data-i18n="lmLabel">Free Download</p>
+                    <p class="text-[#1b1e2b] font-black text-base" data-i18n="lmTitle">Legal Staffing Checklist</p>
+                    <p class="text-gray-500 text-xs font-medium" data-i18n="lmSub">10 questions to ask before hiring virtual legal staff</p>
+                </div>
+            </div>
+            <button onclick="openLeadMagnet()" class="flex-shrink-0 bg-[#1b1e2b] text-white px-8 py-3.5 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center gap-2 hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all shadow-lg whitespace-nowrap">
+                <span data-i18n="lmCta">Get Free Checklist</span> <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </div>
 
     <!-- How It Works Section -->
     <section id="how-it-works" class="bg-[#1b1e2b] py-20 lg:py-32 overflow-hidden">
@@ -2985,6 +2985,11 @@
                     service: 'Free Checklist Download', website: '',
                     message: 'Downloaded the Legal Staffing Checklist.',
                     time: new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })
+                });
+                await emailjs.send('service_d485bxr', 'template_9r6xtuw', {
+                    first_name: name, name, email,
+                    service: 'Legal Staffing Checklist',
+                    message: 'Your free Legal Staffing Checklist is attached below. Access it here: https://yvastaffing.agency/checklist.html'
                 });
             } catch(e) { console.error('EmailJS lead magnet error:', e); }
             document.getElementById('lm-form-step').classList.add('hidden');
