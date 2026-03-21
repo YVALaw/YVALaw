@@ -2,15 +2,23 @@
 
 ## Project Overview
 Single-page website for **YVA Law Staffing** (yvastaffing.agency).
-Single file: `index.html` (~2100 lines). No build system — pure HTML, Tailwind CDN, Lucide icons, EmailJS, Calendly.
+Single file: `index.html` (~3100 lines). No build system — pure HTML, Tailwind CDN, Lucide icons, EmailJS, Calendly.
 
-**Also includes 4 standalone landing pages** (for ad campaigns — `noindex, nofollow`, no nav):
-- `landing-intake.html` — Legal Intake ($7.50/hr)
-- `landing-assistants.html` — Legal Assistants ($8.50/hr)
-- `landing-demand.html` — Demand Writing ($10/hr)
-- `landing-case-managers.html` — Case Managers ($12/hr)
+**Standalone pages:**
+- `landing-intake.html` — Legal Intake ad landing page ($7.50/hr)
+- `landing-assistants.html` — Legal Assistants ad landing page ($8.50/hr)
+- `landing-demand.html` — Demand Writing ad landing page ($10/hr)
+- `landing-case-managers.html` — Case Managers ad landing page ($12/hr)
+- `landing-pi.html` — Personal Injury practice area landing page (GA: `landing_pi`)
+- `landing-employment.html` — Employment Law practice area landing page (GA: `landing_employment`)
+- `landing-workers-comp.html` — Workers' Comp practice area landing page (GA: `landing_workers_comp`)
+- `checklist.html` — Lead magnet: printable Legal Staffing Checklist (10 Q&A sections, print button)
+- `careers.html` — Careers page (7 open roles, application modal, separate EmailJS account)
+- `blog.html` — Blog listing page (fetches posts/index.json dynamically)
+- `blog-post.html` — Individual post renderer (marked.js markdown)
 
-All landing pages share the same structure: Hero → Problem → Solution + cost comparison → Testimonials → How It Works → FAQ → Final CTA → Booking modal (EmailJS → Calendly). GA events use `landing_intake`, `landing_assistants`, `landing_demand`, `landing_case_managers` as `event_category`.
+All service landing pages: Hero → Problem → Solution + cost comparison → Testimonials → How It Works → FAQ → Final CTA → Booking modal (EmailJS → Calendly). GA events use page-specific `event_category`.
+Practice area landing pages: Hero → Problem → Services (role cards) → Cost comparison → Testimonials → How It Works → FAQ → Final CTA → Booking modal.
 
 **Brand colors:** Dark navy `#1b1e2b`, Yellow `#facc15` / `yellow-400`, White backgrounds.
 **Font:** Inter (Google Fonts).
@@ -79,6 +87,30 @@ All landing pages share the same structure: Hero → Problem → Solution + cost
 - EmailJS: service `service_d485bxr`, templates `template_8gftonr` (to YVA) and `template_9r6xtuw` (auto-reply to client).
 - Calendly URL: `https://calendly.com/contact-yvastaffing-vuu8/new-meeting`
 
+### Language Toggle (EN/ES)
+- Pill buttons in desktop nav and mobile drawer (`#lang-en`, `#lang-es`, `#lang-en-mobile`, `#lang-es-mobile`).
+- `data-i18n="key"` attributes on all translatable elements (nav, hero, trust badges, service pillars + full panels + bullets, pricing, comparison table, ROI calculator, testimonials header, about section + stats, founder section, footer, cookie banner).
+- Central `translations` object with `en` and `es` keys (~80 keys each).
+- `setLang(lang)` iterates all `[data-i18n]` elements and sets `innerHTML`.
+- Language persisted to `localStorage('yva_lang')`.
+- **To add a new translatable string:** add `data-i18n="myKey"` to the element, then add `myKey` to both `en` and `es` objects in the translations block.
+
+### Lead Magnet Modal (`#lead-magnet-modal`)
+- Triggered by `openLeadMagnet()` — strip button between ROI calculator and How It Works.
+- Two-step: email + name capture form → success screen with link to `checklist.html`.
+- On submit: sends EmailJS notification to YVA (`template_8gftonr`) AND auto-reply to submitter (`template_9r6xtuw`) with checklist link.
+- GA event: `download_checklist` / `event_category: lead_magnet`.
+- **Note:** verify `template_9r6xtuw` uses `{{email}}` as To address and `{{name}}` for personalization in EmailJS dashboard.
+
+### Sticky CTA Bar (`#sticky-cta`)
+- Fixed bottom bar, appears after scrolling 600px.
+- Dismissed per session via `sessionStorage('yva_sticky_closed')`.
+- z-index: 80 (cookie banner at 90 takes priority when both visible).
+
+### Trust Badges Section
+- 6 badges between hero and service pillars: 100% Bilingual, U.S. Time Zones, 72-hr Onboarding, No Contracts, Vetted Talent, Free Replacement.
+- All badge text has `data-i18n` keys (`badge1`–`badge6`, `badge1sub`–`badge6sub`).
+
 ### Other Modals
 - `#faq-modal` — FAQ accordion
 - `#privacy-modal` — Privacy Policy
@@ -96,6 +128,22 @@ All landing pages share the same structure: Hero → Problem → Solution + cost
 ---
 
 ## Things Completed
+
+### Session 7 (marketing enhancements + translation)
+- Removed Hans co-founder — Paola Delgado is now sole founder; updated all copy, grid layout, section labels, JS toggle labels
+- Added `FAQPage` JSON-LD schema in `<head>` (8 Q&A pairs — triggers Google FAQ rich results)
+- Added Trust Badges section (6 badges, between hero and service pillars)
+- Added Lead Magnet strip + modal: email capture → success → link to `checklist.html`; EmailJS sends notification to YVA + auto-reply to submitter; GA event `download_checklist`
+- Strip relocated to between ROI Calculator and How It Works (better conversion context)
+- Added Sticky CTA bar (scroll-triggered at 600px, session-dismissible)
+- Added EN/ES language toggle to desktop nav and mobile drawer
+- `data-i18n` attributes added site-wide (~80 keys); full Spanish translations with natural phrasing
+- Created `checklist.html` — printable/PDF legal staffing checklist (10 Q&A sections, print button)
+- Created `landing-pi.html` — Personal Injury practice area landing page
+- Created `landing-employment.html` — Employment Law practice area landing page
+- Created `landing-workers-comp.html` — Workers' Comp practice area landing page
+- Removed yellow announcement bar (user preference)
+- Fixed lead magnet email: now sends auto-reply to submitter (was only notifying YVA)
 
 ### Session 1 (index.html)
 - Removed Admin Support as a service entirely
@@ -128,37 +176,31 @@ All landing pages share the same structure: Hero → Problem → Solution + cost
 
 ---
 
-## Growth Roadmap (from session 6 audit)
+## Growth Roadmap
 
 ### High Priority
 - [x] ROI Calculator — interactive savings calculator on index.html (session 6)
-- [ ] WhatsApp floating button — 30 min, high conversion for bilingual market
-- [ ] Client logos bar — show FoodNet PR, Top Law Assist, Halavi Law on homepage
-- [ ] Live chat — Tidio free tier, catches visitors before they leave
+- [x] FAQ schema markup — FAQPage JSON-LD added (session 7)
+- [x] Lead magnet — Legal Staffing Checklist with email capture (session 7)
+- [x] Practice area landing pages — PI, Employment Law, Workers Comp (session 7)
+- [x] Spanish/English language toggle — full site translated (session 7)
+- [ ] **WhatsApp floating button** — 30 min of work, high conversion for bilingual market
+- [ ] **Client logos bar** — FoodNet PR, Top Law Assist, Halavi Law above the fold
+- [ ] **Live chat** — Tidio free tier, catches visitors before they leave
 
 ### Medium Priority
-- [ ] Growth Services section on main site — Social Media, Web Design, Marketing for law firms (roles exist on careers but not marketed to clients yet)
-- [ ] Practice area landing pages — dedicated pages for PI firms, Employment firms, Workers Comp (each ranks for own keywords)
+- [ ] **Growth Services section** — Social Media, Web Design, Marketing for law firms (roles on careers page but not marketed to clients on main site)
+- [ ] **"Try 1 week" pilot offer** — lowers barrier to yes for cold traffic
 - [ ] Exit intent email capture popup
-- [ ] FAQ schema markup — structured data for FAQ section (can trigger rich results in Google)
-- [ ] Lead magnet — free PDF "Legal Staffing Checklist" in exchange for email
 
 ### Low Priority / Future
 - [ ] Video — 60-sec founder or explainer video (highest trust signal)
 - [ ] Case studies — detailed client stories with results
-- [ ] Free trial / pilot offer — "Try 1 week" lowers barrier to yes
-- [ ] Spanish-language version or language toggle
 - [ ] Pricing toggle (part-time vs full-time hours)
 - [ ] Real photos of team / founders (currently pravatar.cc placeholders)
 - [ ] Social media links (footer currently href="#" placeholders)
 - [ ] Connect landing pages to Google/Meta ad campaigns
 - [ ] A/B test landing page headlines once campaigns are live
-
-## Potential Future Work (original)
-- Add Blog and Careers links to landing pages footer (currently minimal by design)
-
-### Session 3 (careers page)
-Already documented above.
 
 ### Session 4 (blog system)
 - Set up GitHub repo at https://github.com/YVALaw/YVALaw and connected to Netlify
