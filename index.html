@@ -112,6 +112,24 @@
     }
     </script>
 
+    <!-- FAQ Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        { "@type": "Question", "name": "How quickly can we get started?", "acceptedAnswer": { "@type": "Answer", "text": "Once we've had our consultation call and confirmed the match, your VA will be fully onboarded and ready to work within 72 business hours." } },
+        { "@type": "Question", "name": "Are your VAs bilingual?", "acceptedAnswer": { "@type": "Answer", "text": "Yes — all YVA professionals are fully bilingual in English and Spanish, allowing your firm to serve a broader client base without any language barriers." } },
+        { "@type": "Question", "name": "Is there a minimum hours commitment or contract?", "acceptedAnswer": { "@type": "Answer", "text": "We do have a service agreement, but there are no long-term lock-ins. You can exit at any time with no penalties or attachments." } },
+        { "@type": "Question", "name": "What hours do your VAs work?", "acceptedAnswer": { "@type": "Answer", "text": "Our VAs are available 24/7 across U.S. time zones. YVA Law Staffing's administrative team operates Monday–Friday, 8:00am–5:00pm Eastern Time." } },
+        { "@type": "Question", "name": "What tools and software do your VAs use?", "acceptedAnswer": { "@type": "Answer", "text": "Our VAs adapt to whatever tools your firm already uses — including Clio, MyCase, HubSpot, Salesforce, Slack, Google Workspace, and more." } },
+        { "@type": "Question", "name": "How is billing handled?", "acceptedAnswer": { "@type": "Answer", "text": "Services are billed hourly, starting at $7.50/hr. Payments are processed through Zelle, Remitly, PayPal, or Payoneer." } },
+        { "@type": "Question", "name": "What if the VA isn't a good fit?", "acceptedAnswer": { "@type": "Answer", "text": "Just let us know and we'll match you with someone else at no extra cost. We're committed to finding the right fit for your firm, not just filling a seat." } },
+        { "@type": "Question", "name": "Do you only work with law firms?", "acceptedAnswer": { "@type": "Answer", "text": "Law firms are our primary focus, but we also work with professional services businesses and startups that need bilingual virtual support." } }
+      ]
+    }
+    </script>
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
@@ -327,9 +345,70 @@
             border: 1px solid #e2e8f0;
             overflow: hidden;
         }
+
+        /* Announcement Bar */
+        #announcement-bar {
+            transition: max-height 0.4s ease, opacity 0.4s ease;
+            max-height: 80px;
+            overflow: hidden;
+        }
+        #announcement-bar.dismissed {
+            max-height: 0;
+            opacity: 0;
+        }
+
+        /* Sticky CTA Bar */
+        #sticky-cta {
+            transform: translateY(100%);
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #sticky-cta.visible {
+            transform: translateY(0);
+        }
+
+        /* Lead Magnet Modal */
+        #lead-magnet-modal {
+            display: flex;
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        #lead-magnet-modal.open {
+            visibility: visible;
+            opacity: 1;
+        }
+        #lead-magnet-modal .lm-panel {
+            transform: translateY(40px) scale(0.97);
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        #lead-magnet-modal.open .lm-panel {
+            transform: translateY(0) scale(1);
+        }
+
+        /* Language Toggle */
+        .lang-btn {
+            transition: all 0.2s ease;
+        }
+        .lang-btn.active {
+            background-color: #1b1e2b;
+            color: #facc15;
+        }
     </style>
 </head>
 <body class="bg-white text-slate-900 overflow-x-hidden">
+
+    <!-- Announcement Bar -->
+    <div id="announcement-bar" class="bg-yellow-400 text-[#1b1e2b] py-2.5 px-4">
+        <div class="max-w-7xl mx-auto flex items-center justify-center gap-3 relative">
+            <i data-lucide="zap" class="w-3.5 h-3.5 flex-shrink-0"></i>
+            <p class="text-[11px] font-black uppercase tracking-widest text-center" data-i18n="announcement">
+                Limited spots available — <strong>Book this week</strong> and your VA starts in 48 hours.
+            </p>
+            <button id="announcement-close" aria-label="Dismiss" class="absolute right-0 p-1 hover:opacity-70 transition-opacity flex-shrink-0">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+            </button>
+        </div>
+    </div>
 
     <!-- Top Utility Bar -->
     <div class="bg-[#1b1e2b] text-white py-2 px-6 hidden md:block border-b border-white/10">
@@ -365,14 +444,19 @@
 
             <!-- Desktop Nav -->
             <div class="hidden md:flex items-center gap-10 font-black text-[12px] uppercase tracking-widest text-[#1b1e2b]">
-                <a href="#home" class="hover:text-yellow-500 transition-colors">Home</a>
-                <a href="#service-pillars" class="hover:text-yellow-500 transition-colors">Services</a>
-                <a href="#how-it-works" class="hover:text-yellow-500 transition-colors">How It Works</a>
-                <a href="#about" class="hover:text-yellow-500 transition-colors">About</a>
-                <a href="careers.html" class="hover:text-yellow-500 transition-colors">Careers</a>
+                <a href="#home" id="nav-home" class="hover:text-yellow-500 transition-colors" data-i18n="navHome">Home</a>
+                <a href="#service-pillars" id="nav-services" class="hover:text-yellow-500 transition-colors" data-i18n="navServices">Services</a>
+                <a href="#how-it-works" id="nav-how" class="hover:text-yellow-500 transition-colors" data-i18n="navHow">How It Works</a>
+                <a href="#about" id="nav-about" class="hover:text-yellow-500 transition-colors" data-i18n="navAbout">About</a>
+                <a href="careers.html" id="nav-careers" class="hover:text-yellow-500 transition-colors" data-i18n="navCareers">Careers</a>
                 <a href="blog.html" class="hover:text-yellow-500 transition-colors">Blog</a>
+                <!-- Language Toggle -->
+                <div class="flex items-center gap-0.5 bg-slate-100 rounded-full p-0.5">
+                    <button id="lang-en" class="lang-btn active text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full" onclick="setLang('en')">EN</button>
+                    <button id="lang-es" class="lang-btn text-slate-400 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full" onclick="setLang('es')">ES</button>
+                </div>
                 <button onclick="openCalendly()" class="bg-[#1b1e2b] text-white px-8 py-3.5 rounded-full hover:bg-yellow-500 hover:text-[#1b1e2b] transition-all flex items-center gap-2 shadow-lg hover:shadow-yellow-100">
-                    Book a Call <i data-lucide="calendar" class="w-4 h-4"></i>
+                    <span data-i18n="navCta">Book a Call</span> <i data-lucide="calendar" class="w-4 h-4"></i>
                 </button>
             </div>
 
@@ -404,20 +488,28 @@
 
         <!-- Nav Links -->
         <nav class="flex flex-col px-6 py-8 gap-2 flex-1">
+            <!-- Mobile Language Toggle -->
+            <div class="flex items-center gap-2 mb-2">
+                <span class="text-slate-500 text-[10px] font-black uppercase tracking-widest">Language:</span>
+                <div class="flex items-center gap-0.5 bg-white/10 rounded-full p-0.5">
+                    <button id="lang-en-mobile" class="lang-btn active text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full" onclick="setLang('en')">EN</button>
+                    <button id="lang-es-mobile" class="lang-btn text-slate-400 text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full" onclick="setLang('es')">ES</button>
+                </div>
+            </div>
             <a href="#home" class="mobile-nav-link flex items-center gap-3 px-4 py-4 rounded-2xl text-white font-black text-sm uppercase tracking-widest hover:bg-white/10 hover:text-yellow-400 transition-all">
-                <i data-lucide="home" class="w-4 h-4 text-yellow-400"></i> Home
+                <i data-lucide="home" class="w-4 h-4 text-yellow-400"></i> <span data-i18n="navHome">Home</span>
             </a>
             <a href="#service-pillars" class="mobile-nav-link flex items-center gap-3 px-4 py-4 rounded-2xl text-white font-black text-sm uppercase tracking-widest hover:bg-white/10 hover:text-yellow-400 transition-all">
-                <i data-lucide="briefcase" class="w-4 h-4 text-yellow-400"></i> Services
+                <i data-lucide="briefcase" class="w-4 h-4 text-yellow-400"></i> <span data-i18n="navServices">Services</span>
             </a>
             <a href="#how-it-works" class="mobile-nav-link flex items-center gap-3 px-4 py-4 rounded-2xl text-white font-black text-sm uppercase tracking-widest hover:bg-white/10 hover:text-yellow-400 transition-all">
-                <i data-lucide="zap" class="w-4 h-4 text-yellow-400"></i> How It Works
+                <i data-lucide="zap" class="w-4 h-4 text-yellow-400"></i> <span data-i18n="navHow">How It Works</span>
             </a>
             <a href="#about" class="mobile-nav-link flex items-center gap-3 px-4 py-4 rounded-2xl text-white font-black text-sm uppercase tracking-widest hover:bg-white/10 hover:text-yellow-400 transition-all">
-                <i data-lucide="info" class="w-4 h-4 text-yellow-400"></i> About
+                <i data-lucide="info" class="w-4 h-4 text-yellow-400"></i> <span data-i18n="navAbout">About</span>
             </a>
             <a href="careers.html" class="mobile-nav-link flex items-center gap-3 px-4 py-4 rounded-2xl text-white font-black text-sm uppercase tracking-widest hover:bg-white/10 hover:text-yellow-400 transition-all">
-                <i data-lucide="user-plus" class="w-4 h-4 text-yellow-400"></i> Careers
+                <i data-lucide="user-plus" class="w-4 h-4 text-yellow-400"></i> <span data-i18n="navCareers">Careers</span>
             </a>
             <a href="blog.html" class="mobile-nav-link flex items-center gap-3 px-4 py-4 rounded-2xl text-white font-black text-sm uppercase tracking-widest hover:bg-white/10 hover:text-yellow-400 transition-all">
                 <i data-lucide="book-open" class="w-4 h-4 text-yellow-400"></i> Blog
@@ -427,7 +519,7 @@
 
             <!-- Mobile CTA -->
             <button onclick="closeMobileMenu(); openCalendly();" class="flex items-center justify-center gap-3 bg-yellow-400 text-[#1b1e2b] px-6 py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-yellow-300 transition-all shadow-lg">
-                <i data-lucide="calendar" class="w-4 h-4"></i> Book a Free Call
+                <i data-lucide="calendar" class="w-4 h-4"></i> <span data-i18n="navCta">Book a Free Call</span>
             </button>
         </nav>
 
@@ -451,20 +543,20 @@
                 <!-- Left Column -->
                 <div class="space-y-8">
                     <div class="inline-flex items-center gap-2 bg-yellow-400 text-[#1b1e2b] px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider">
-                        <i data-lucide="trending-up" class="w-4 h-4"></i> Professional Staffing Solutions
+                        <i data-lucide="trending-up" class="w-4 h-4"></i> <span data-i18n="heroBadge">Professional Staffing Solutions</span>
                     </div>
 
-                    <h1 class="text-5xl lg:text-[4.8rem] font-black text-[#1b1e2b] leading-[0.95] tracking-tight">
+                    <h1 id="hero-h1" class="text-5xl lg:text-[4.8rem] font-black text-[#1b1e2b] leading-[0.95] tracking-tight" data-i18n="heroH1">
                         Elite <span class="text-yellow-500">Bilingual</span> Virtual Support.
                     </h1>
 
-                    <h2 class="text-xl text-slate-600 font-medium leading-relaxed max-w-xl">
+                    <h2 id="hero-h2" class="text-xl text-slate-600 font-medium leading-relaxed max-w-xl" data-i18n="heroH2">
                         Elevate your productivity with dedicated virtual assistants specializing in legal intake, demand writing, legal assistance, and case management. Starting at <span class="text-[#1b1e2b] font-black underline decoration-yellow-400 decoration-8 underline-offset-4">$7.50/hour</span>.
                     </h2>
 
                     <div class="flex flex-col sm:flex-row gap-4 pt-4">
                         <button onclick="openCalendly()" class="bg-[#1b1e2b] text-white px-10 py-5 rounded-2xl font-black text-lg flex items-center justify-center gap-3 hover:translate-y-[-4px] transition-all shadow-2xl shadow-slate-300">
-                            Hire Your Assistant <i data-lucide="arrow-right" class="w-5 h-5 text-yellow-400"></i>
+                            <span data-i18n="heroCta">Hire Your Assistant</span> <i data-lucide="arrow-right" class="w-5 h-5 text-yellow-400"></i>
                         </button>
                         <div class="flex items-center gap-4 px-2">
                             <div class="flex -space-x-3">
@@ -473,8 +565,8 @@
                                 <img src="https://i.pravatar.cc/100?u=yva3" class="w-12 h-12 rounded-full border-4 border-white shadow-md" alt="VA">
                             </div>
                             <div class="text-sm leading-tight">
-                                <p class="font-black text-[#1b1e2b]">50+ Active VA's</p>
-                                <p class="text-slate-500 font-bold">Ready to Start</p>
+                                <p class="font-black text-[#1b1e2b]" data-i18n="heroVas">50+ Active VA's</p>
+                                <p class="text-slate-500 font-bold" data-i18n="heroVasSub">Ready to Start</p>
                             </div>
                         </div>
                     </div>
@@ -486,8 +578,8 @@
                                 <i data-lucide="check-circle-2" class="w-5 h-5"></i>
                             </div>
                             <div>
-                                <p class="font-black text-[#1b1e2b] text-sm uppercase">No Hidden Fees</p>
-                                <p class="text-xs font-bold text-slate-400">Zero Onboarding Cost</p>
+                                <p class="font-black text-[#1b1e2b] text-sm uppercase" data-i18n="trustFees">No Hidden Fees</p>
+                                <p class="text-xs font-bold text-slate-400" data-i18n="trustFeesSub">Zero Onboarding Cost</p>
                             </div>
                         </div>
                         <div class="flex items-start gap-3">
@@ -495,8 +587,8 @@
                                 <i data-lucide="shield-check" class="w-5 h-5"></i>
                             </div>
                             <div>
-                                <p class="font-black text-[#1b1e2b] text-sm uppercase">Vetted Talent</p>
-                                <p class="text-xs font-bold text-slate-400">Rigorous Testing Process</p>
+                                <p class="font-black text-[#1b1e2b] text-sm uppercase" data-i18n="trustVetted">Vetted Talent</p>
+                                <p class="text-xs font-bold text-slate-400" data-i18n="trustVettedSub">Rigorous Testing Process</p>
                             </div>
                         </div>
                     </div>
@@ -545,15 +637,85 @@
         </div>
     </section>
 
+    <!-- Trust Badges -->
+    <div class="bg-white border-b border-slate-100 py-10">
+        <div class="max-w-7xl mx-auto px-6">
+            <p class="text-center text-[10px] font-black uppercase tracking-[0.3em] text-slate-400 mb-8" data-i18n="trustBadgesHeader">Why Law Firms Choose YVA</p>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <div class="flex flex-col items-center gap-2 text-center p-4 rounded-2xl bg-slate-50 hover:bg-yellow-50 transition-colors">
+                    <div class="w-10 h-10 bg-[#1b1e2b] rounded-xl flex items-center justify-center">
+                        <i data-lucide="globe" class="w-5 h-5 text-yellow-400"></i>
+                    </div>
+                    <p class="font-black text-[#1b1e2b] text-[11px] uppercase tracking-wider leading-tight" data-i18n="badge1">100% Bilingual</p>
+                    <p class="text-[10px] text-slate-400 font-medium" data-i18n="badge1sub">English & Spanish</p>
+                </div>
+                <div class="flex flex-col items-center gap-2 text-center p-4 rounded-2xl bg-slate-50 hover:bg-yellow-50 transition-colors">
+                    <div class="w-10 h-10 bg-[#1b1e2b] rounded-xl flex items-center justify-center">
+                        <i data-lucide="clock" class="w-5 h-5 text-yellow-400"></i>
+                    </div>
+                    <p class="font-black text-[#1b1e2b] text-[11px] uppercase tracking-wider leading-tight" data-i18n="badge2">U.S. Time Zones</p>
+                    <p class="text-[10px] text-slate-400 font-medium" data-i18n="badge2sub">Works your hours</p>
+                </div>
+                <div class="flex flex-col items-center gap-2 text-center p-4 rounded-2xl bg-slate-50 hover:bg-yellow-50 transition-colors">
+                    <div class="w-10 h-10 bg-[#1b1e2b] rounded-xl flex items-center justify-center">
+                        <i data-lucide="zap" class="w-5 h-5 text-yellow-400"></i>
+                    </div>
+                    <p class="font-black text-[#1b1e2b] text-[11px] uppercase tracking-wider leading-tight" data-i18n="badge3">72-hr Onboarding</p>
+                    <p class="text-[10px] text-slate-400 font-medium" data-i18n="badge3sub">Start in days, not weeks</p>
+                </div>
+                <div class="flex flex-col items-center gap-2 text-center p-4 rounded-2xl bg-slate-50 hover:bg-yellow-50 transition-colors">
+                    <div class="w-10 h-10 bg-[#1b1e2b] rounded-xl flex items-center justify-center">
+                        <i data-lucide="shield-check" class="w-5 h-5 text-yellow-400"></i>
+                    </div>
+                    <p class="font-black text-[#1b1e2b] text-[11px] uppercase tracking-wider leading-tight" data-i18n="badge4">No Contracts</p>
+                    <p class="text-[10px] text-slate-400 font-medium" data-i18n="badge4sub">Cancel any time</p>
+                </div>
+                <div class="flex flex-col items-center gap-2 text-center p-4 rounded-2xl bg-slate-50 hover:bg-yellow-50 transition-colors">
+                    <div class="w-10 h-10 bg-[#1b1e2b] rounded-xl flex items-center justify-center">
+                        <i data-lucide="award" class="w-5 h-5 text-yellow-400"></i>
+                    </div>
+                    <p class="font-black text-[#1b1e2b] text-[11px] uppercase tracking-wider leading-tight" data-i18n="badge5">Vetted Talent</p>
+                    <p class="text-[10px] text-slate-400 font-medium" data-i18n="badge5sub">Rigorously screened</p>
+                </div>
+                <div class="flex flex-col items-center gap-2 text-center p-4 rounded-2xl bg-slate-50 hover:bg-yellow-50 transition-colors">
+                    <div class="w-10 h-10 bg-[#1b1e2b] rounded-xl flex items-center justify-center">
+                        <i data-lucide="refresh-cw" class="w-5 h-5 text-yellow-400"></i>
+                    </div>
+                    <p class="font-black text-[#1b1e2b] text-[11px] uppercase tracking-wider leading-tight" data-i18n="badge6">Free Replacement</p>
+                    <p class="text-[10px] text-slate-400 font-medium" data-i18n="badge6sub">Not a fit? We fix it</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lead Magnet Strip -->
+    <div class="bg-[#1b1e2b] py-8">
+        <div class="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-6">
+            <div class="flex items-center gap-4">
+                <div class="w-12 h-12 bg-yellow-400 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg">
+                    <i data-lucide="file-down" class="w-6 h-6 text-[#1b1e2b]"></i>
+                </div>
+                <div>
+                    <p class="text-yellow-400 text-[10px] font-black uppercase tracking-[0.3em] mb-0.5" data-i18n="lmLabel">Free Download</p>
+                    <p class="text-white font-black text-base" data-i18n="lmTitle">Legal Staffing Checklist</p>
+                    <p class="text-slate-400 text-xs font-medium" data-i18n="lmSub">10 questions to ask before hiring virtual legal staff</p>
+                </div>
+            </div>
+            <button onclick="openLeadMagnet()" class="flex-shrink-0 bg-yellow-400 text-[#1b1e2b] px-8 py-3.5 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center gap-2 hover:bg-yellow-300 transition-all shadow-lg whitespace-nowrap">
+                <span data-i18n="lmCta">Get Free Checklist</span> <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </button>
+        </div>
+    </div>
+
     <!-- SEO Service Pillars -->
     <div id="service-pillars" class="bg-[#1b1e2b] py-16">
         <div class="max-w-7xl mx-auto px-6">
             <div class="flex flex-col md:flex-row items-end justify-between gap-8 mb-12">
                 <div>
-                    <p class="text-yellow-400 font-black uppercase text-xs tracking-[0.3em] mb-3">Service Expertise</p>
-                    <h3 class="text-3xl font-bold text-white max-w-md">Tailored Support for Your Industry</h3>
+                    <p class="text-yellow-400 font-black uppercase text-xs tracking-[0.3em] mb-3" data-i18n="pillarsLabel">Service Expertise</p>
+                    <h3 class="text-3xl font-bold text-white max-w-md" data-i18n="pillarsTitle">Tailored Support for Your Industry</h3>
                 </div>
-                <p class="text-slate-400 font-medium max-w-sm">
+                <p class="text-slate-400 font-medium max-w-sm" data-i18n="pillarsSub">
                     High-impact virtual staffing across specialized sectors.
                 </p>
             </div>
@@ -561,34 +723,34 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <button class="pillar-card group p-8 rounded-3xl border border-white/10 hover:bg-white transition-all cursor-pointer text-left" data-service="0">
                     <div class="pillar-icon text-yellow-400 group-hover:text-[#1b1e2b] mb-4"><i data-lucide="scale" class="w-6 h-6"></i></div>
-                    <h4 class="text-white group-hover:text-[#1b1e2b] font-black uppercase text-sm mb-2 tracking-widest">Legal Intake</h4>
-                    <p class="text-slate-500 text-xs font-bold leading-relaxed">Lead capture, screening & scheduling.</p>
+                    <h4 class="text-white group-hover:text-[#1b1e2b] font-black uppercase text-sm mb-2 tracking-widest" data-i18n="pillar0Title">Legal Intake</h4>
+                    <p class="text-slate-500 text-xs font-bold leading-relaxed" data-i18n="pillar0Sub">Lead capture, screening & scheduling.</p>
                     <div class="mt-4 flex items-center gap-1 text-yellow-400 text-[10px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
-                        Learn More <i data-lucide="chevron-down" class="w-3 h-3"></i>
+                        <span data-i18n="learnMore">Learn More</span> <i data-lucide="chevron-down" class="w-3 h-3"></i>
                     </div>
                 </button>
                 <button class="pillar-card group p-8 rounded-3xl border border-white/10 hover:bg-white transition-all cursor-pointer text-left" data-service="1">
                     <div class="pillar-icon text-yellow-400 group-hover:text-[#1b1e2b] mb-4"><i data-lucide="gavel" class="w-6 h-6"></i></div>
-                    <h4 class="text-white group-hover:text-[#1b1e2b] font-black uppercase text-sm mb-2 tracking-widest">Legal Assistants</h4>
-                    <p class="text-slate-500 text-xs font-bold leading-relaxed">Attorney support & case admin.</p>
+                    <h4 class="text-white group-hover:text-[#1b1e2b] font-black uppercase text-sm mb-2 tracking-widest" data-i18n="pillar1Title">Legal Assistants</h4>
+                    <p class="text-slate-500 text-xs font-bold leading-relaxed" data-i18n="pillar1Sub">Attorney support & case admin.</p>
                     <div class="mt-4 flex items-center gap-1 text-yellow-400 text-[10px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
-                        Learn More <i data-lucide="chevron-down" class="w-3 h-3"></i>
+                        <span data-i18n="learnMore">Learn More</span> <i data-lucide="chevron-down" class="w-3 h-3"></i>
                     </div>
                 </button>
                 <button class="pillar-card group p-8 rounded-3xl border border-white/10 hover:bg-white transition-all cursor-pointer text-left" data-service="2">
                     <div class="pillar-icon text-yellow-400 group-hover:text-[#1b1e2b] mb-4"><i data-lucide="file-text" class="w-6 h-6"></i></div>
-                    <h4 class="text-white group-hover:text-[#1b1e2b] font-black uppercase text-sm mb-2 tracking-widest">Demand Writing</h4>
-                    <p class="text-slate-500 text-xs font-bold leading-relaxed">Medical records & demand letters.</p>
+                    <h4 class="text-white group-hover:text-[#1b1e2b] font-black uppercase text-sm mb-2 tracking-widest" data-i18n="pillar2Title">Demand Writing</h4>
+                    <p class="text-slate-500 text-xs font-bold leading-relaxed" data-i18n="pillar2Sub">Medical records & demand letters.</p>
                     <div class="mt-4 flex items-center gap-1 text-yellow-400 text-[10px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
-                        Learn More <i data-lucide="chevron-down" class="w-3 h-3"></i>
+                        <span data-i18n="learnMore">Learn More</span> <i data-lucide="chevron-down" class="w-3 h-3"></i>
                     </div>
                 </button>
                 <button class="pillar-card group p-8 rounded-3xl border border-white/10 hover:bg-white transition-all cursor-pointer text-left" data-service="3">
                     <div class="pillar-icon text-yellow-400 group-hover:text-[#1b1e2b] mb-4"><i data-lucide="users" class="w-6 h-6"></i></div>
-                    <h4 class="text-white group-hover:text-[#1b1e2b] font-black uppercase text-sm mb-2 tracking-widest">Case Managers</h4>
-                    <p class="text-slate-500 text-xs font-bold leading-relaxed">Full case oversight, intake to resolution.</p>
+                    <h4 class="text-white group-hover:text-[#1b1e2b] font-black uppercase text-sm mb-2 tracking-widest" data-i18n="pillar3Title">Case Managers</h4>
+                    <p class="text-slate-500 text-xs font-bold leading-relaxed" data-i18n="pillar3Sub">Full case oversight, intake to resolution.</p>
                     <div class="mt-4 flex items-center gap-1 text-yellow-400 text-[10px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
-                        Learn More <i data-lucide="chevron-down" class="w-3 h-3"></i>
+                        <span data-i18n="learnMore">Learn More</span> <i data-lucide="chevron-down" class="w-3 h-3"></i>
                     </div>
                 </button>
             </div>
@@ -1235,9 +1397,9 @@
 
             <!-- Header -->
             <div class="text-center mb-16">
-                <p class="text-yellow-400 font-black uppercase text-xs tracking-[0.3em] mb-3">The Process</p>
-                <h2 class="text-4xl lg:text-5xl font-black text-white tracking-tight">Up and Running in 48 Hours</h2>
-                <p class="text-slate-400 font-medium mt-4 max-w-xl mx-auto">No lengthy contracts, no complicated onboarding. Just the right person, ready to work.</p>
+                <p class="text-yellow-400 font-black uppercase text-xs tracking-[0.3em] mb-3" data-i18n="howLabel">The Process</p>
+                <h2 class="text-4xl lg:text-5xl font-black text-white tracking-tight" data-i18n="howTitle">Up and Running in 48 Hours</h2>
+                <p class="text-slate-400 font-medium mt-4 max-w-xl mx-auto" data-i18n="howSub">No lengthy contracts, no complicated onboarding. Just the right person, ready to work.</p>
             </div>
 
             <!-- Steps -->
@@ -1253,8 +1415,8 @@
                         <div class="w-14 h-14 bg-yellow-400/10 rounded-2xl flex items-center justify-center mb-6 mt-4 group-hover:bg-yellow-400/20 transition-all">
                             <i data-lucide="calendar" class="w-7 h-7 text-yellow-400"></i>
                         </div>
-                        <h3 class="text-white font-black text-xl mb-3">Book a Free Call</h3>
-                        <p class="text-slate-400 font-medium leading-relaxed">Schedule a 20-minute consultation. We listen, ask the right questions, and get a clear picture of what your firm needs.</p>
+                        <h3 class="text-white font-black text-xl mb-3" data-i18n="step1Title">Book a Free Call</h3>
+                        <p class="text-slate-400 font-medium leading-relaxed" data-i18n="step1Sub">Schedule a 20-minute consultation. We listen, ask the right questions, and get a clear picture of what your firm needs.</p>
                         <div class="mt-8 pt-6 border-t border-white/10">
                             <p class="text-yellow-400 text-xs font-black uppercase tracking-widest">What to expect</p>
                             <p class="text-slate-500 text-sm font-medium mt-1">A focused, no-pressure conversation about your workflow and goals.</p>
@@ -1267,8 +1429,8 @@
                         <div class="w-14 h-14 bg-[#1b1e2b]/10 rounded-2xl flex items-center justify-center mb-6 mt-4 group-hover:bg-[#1b1e2b]/20 transition-all">
                             <i data-lucide="users" class="w-7 h-7 text-[#1b1e2b]"></i>
                         </div>
-                        <h3 class="text-[#1b1e2b] font-black text-xl mb-3">We Match Your VA</h3>
-                        <p class="text-[#1b1e2b]/70 font-medium leading-relaxed">We hand-select a vetted bilingual specialist from our team that fits your industry, tools, and work style — no guesswork.</p>
+                        <h3 class="text-[#1b1e2b] font-black text-xl mb-3" data-i18n="step2Title">We Match Your VA</h3>
+                        <p class="text-[#1b1e2b]/70 font-medium leading-relaxed" data-i18n="step2Sub">We hand-select a vetted bilingual specialist from our team that fits your industry, tools, and work style — no guesswork.</p>
                         <div class="mt-8 pt-6 border-t border-[#1b1e2b]/20">
                             <p class="text-[#1b1e2b] text-xs font-black uppercase tracking-widest">What to expect</p>
                             <p class="text-[#1b1e2b]/60 text-sm font-medium mt-1">A curated match based on your practice area, language needs, and workflow.</p>
@@ -1281,8 +1443,8 @@
                         <div class="w-14 h-14 bg-yellow-400/10 rounded-2xl flex items-center justify-center mb-6 mt-4 group-hover:bg-yellow-400/20 transition-all">
                             <i data-lucide="zap" class="w-7 h-7 text-yellow-400"></i>
                         </div>
-                        <h3 class="text-white font-black text-xl mb-3">Start in 48 Hours</h3>
-                        <p class="text-slate-400 font-medium leading-relaxed">Your VA joins your tools, gets briefed on your processes, and hits the ground running — fully integrated from day one.</p>
+                        <h3 class="text-white font-black text-xl mb-3" data-i18n="step3Title">Start in 48 Hours</h3>
+                        <p class="text-slate-400 font-medium leading-relaxed" data-i18n="step3Sub">Your VA joins your tools, gets briefed on your processes, and hits the ground running — fully integrated from day one.</p>
                         <div class="mt-8 pt-6 border-t border-white/10">
                             <p class="text-yellow-400 text-xs font-black uppercase tracking-widest">What to expect</p>
                             <p class="text-slate-500 text-sm font-medium mt-1">A fully onboarded specialist ready to work within two business days.</p>
@@ -1675,6 +1837,24 @@
 
         </div>
     </footer>
+
+    <!-- Sticky CTA Bar -->
+    <div id="sticky-cta" class="fixed bottom-0 left-0 right-0 z-[80] bg-[#1b1e2b] border-t border-white/10 px-6 py-4 shadow-2xl">
+        <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div>
+                <p class="text-white font-black text-sm" data-i18n="stickyTitle">Ready to cut staffing costs by up to 70%?</p>
+                <p class="text-slate-400 text-xs font-medium" data-i18n="stickySub">No contracts · Bilingual VAs · Start in 48 hours</p>
+            </div>
+            <div class="flex items-center gap-3 flex-shrink-0">
+                <button id="sticky-cta-close" class="text-slate-500 hover:text-slate-300 transition-colors p-1.5" aria-label="Dismiss">
+                    <i data-lucide="x" class="w-4 h-4"></i>
+                </button>
+                <button onclick="openCalendly()" class="bg-yellow-400 text-[#1b1e2b] px-8 py-3 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center gap-2 hover:bg-yellow-300 transition-all shadow-lg whitespace-nowrap">
+                    <span data-i18n="stickyBtn">Book a Free Call</span> <i data-lucide="calendar" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Cookie Banner -->
     <div id="cookie-banner" class="fixed bottom-0 left-0 right-0 z-[90] p-4 md:p-6">
@@ -2684,6 +2864,232 @@
                 setTimeout(() => { label.textContent = 'Copy email address'; }, 2000);
             });
         }
+    </script>
+
+    <!-- Lead Magnet Modal -->
+    <div id="lead-magnet-modal" class="fixed inset-0 z-[100] items-center justify-center p-4 md:p-8" role="dialog" aria-modal="true" aria-label="Free Checklist">
+        <div id="lm-backdrop" class="absolute inset-0 bg-[#1b1e2b]/80 backdrop-blur-sm"></div>
+        <div class="lm-panel relative w-full max-w-md bg-white rounded-[2rem] overflow-hidden shadow-[0_40px_80px_-20px_rgba(27,30,43,0.5)] border-4 border-white">
+
+            <!-- Header -->
+            <div class="bg-[#1b1e2b] px-8 py-5 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="bg-yellow-400 w-9 h-9 rounded-xl flex items-center justify-center">
+                        <i data-lucide="file-down" class="w-5 h-5 text-[#1b1e2b]"></i>
+                    </div>
+                    <div>
+                        <p class="text-white font-black text-sm tracking-widest uppercase">Free Download</p>
+                        <p class="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Legal Staffing Checklist</p>
+                    </div>
+                </div>
+                <button id="lm-close" aria-label="Close" class="text-slate-400 hover:text-yellow-400 transition-colors p-2 rounded-xl hover:bg-white/10">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+
+            <!-- Form -->
+            <div id="lm-form-step" class="px-8 py-7 space-y-4">
+                <p class="text-slate-600 text-sm font-medium leading-relaxed">Get our free <strong class="text-[#1b1e2b]">10-question checklist</strong> — everything you need to evaluate before hiring virtual legal staff.</p>
+                <div>
+                    <label class="block text-xs font-black text-[#1b1e2b] uppercase tracking-widest mb-2">Your Name <span class="text-yellow-500">*</span></label>
+                    <input id="lm-name" type="text" placeholder="Jane Smith" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20 transition">
+                </div>
+                <div>
+                    <label class="block text-xs font-black text-[#1b1e2b] uppercase tracking-widest mb-2">Work Email <span class="text-yellow-500">*</span></label>
+                    <input id="lm-email" type="email" placeholder="jane@lawfirm.com" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20 transition">
+                </div>
+                <p id="lm-error" class="hidden text-red-500 text-xs font-bold">Please fill in all required fields.</p>
+                <button id="lm-submit" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all shadow-lg">
+                    Send Me the Checklist <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                </button>
+                <p class="text-center text-slate-400 text-xs font-medium">No spam, ever. Unsubscribe anytime.</p>
+            </div>
+
+            <!-- Success Step -->
+            <div id="lm-success-step" class="hidden px-8 py-10 text-center space-y-5">
+                <div class="w-16 h-16 bg-yellow-400 rounded-2xl flex items-center justify-center mx-auto shadow-lg">
+                    <i data-lucide="check" class="w-8 h-8 text-[#1b1e2b]"></i>
+                </div>
+                <div>
+                    <p class="text-[#1b1e2b] font-black text-xl mb-2">Your checklist is ready!</p>
+                    <p class="text-slate-500 text-sm font-medium">We also sent a copy to your email.</p>
+                </div>
+                <a href="checklist.html" target="_blank" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all shadow-lg">
+                    Open Checklist <i data-lucide="external-link" class="w-4 h-4"></i>
+                </a>
+                <button onclick="closeLeadMagnet(); openCalendly();" class="w-full border-2 border-[#1b1e2b] text-[#1b1e2b] py-3.5 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-[#1b1e2b] hover:text-white transition-all">
+                    Book a Free Call Instead
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ── Announcement Bar ──────────────────────────────────────────────
+        const announcementBar = document.getElementById('announcement-bar');
+        if (localStorage.getItem('yva_announcement_dismissed')) {
+            announcementBar.classList.add('dismissed');
+        }
+        document.getElementById('announcement-close').addEventListener('click', () => {
+            announcementBar.classList.add('dismissed');
+            localStorage.setItem('yva_announcement_dismissed', '1');
+        });
+
+        // ── Sticky CTA Bar ────────────────────────────────────────────────
+        const stickyCta = document.getElementById('sticky-cta');
+        let stickyClosed = sessionStorage.getItem('yva_sticky_closed');
+        if (!stickyClosed) {
+            window.addEventListener('scroll', function stickyScroll() {
+                if (window.scrollY > 600) {
+                    stickyCta.classList.add('visible');
+                    window.removeEventListener('scroll', stickyScroll);
+                }
+            }, { passive: true });
+        }
+        document.getElementById('sticky-cta-close').addEventListener('click', () => {
+            stickyCta.classList.remove('visible');
+            sessionStorage.setItem('yva_sticky_closed', '1');
+        });
+
+        // ── Lead Magnet Modal ─────────────────────────────────────────────
+        const lmModal = document.getElementById('lead-magnet-modal');
+
+        function openLeadMagnet() {
+            document.getElementById('lm-form-step').classList.remove('hidden');
+            document.getElementById('lm-success-step').classList.add('hidden');
+            lmModal.classList.add('open');
+            document.body.style.overflow = 'hidden';
+            if (typeof gtag !== 'undefined') gtag('event', 'open_lead_magnet', { event_category: 'lead_magnet' });
+        }
+
+        function closeLeadMagnet() {
+            lmModal.classList.remove('open');
+            document.body.style.overflow = '';
+        }
+
+        document.getElementById('lm-close').addEventListener('click', closeLeadMagnet);
+        document.getElementById('lm-backdrop').addEventListener('click', closeLeadMagnet);
+
+        document.getElementById('lm-submit').addEventListener('click', async () => {
+            const name = document.getElementById('lm-name').value.trim();
+            const email = document.getElementById('lm-email').value.trim();
+            const errEl = document.getElementById('lm-error');
+            const btn = document.getElementById('lm-submit');
+            if (!name || !email) { errEl.classList.remove('hidden'); return; }
+            errEl.classList.add('hidden');
+            btn.textContent = 'Sending...';
+            btn.disabled = true;
+            try {
+                await emailjs.send('service_d485bxr', 'template_8gftonr', {
+                    name, email, company: 'Lead Magnet Download',
+                    service: 'Free Checklist Download', website: '',
+                    message: 'Downloaded the Legal Staffing Checklist.',
+                    time: new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })
+                });
+            } catch(e) { console.error('EmailJS lead magnet error:', e); }
+            document.getElementById('lm-form-step').classList.add('hidden');
+            document.getElementById('lm-success-step').classList.remove('hidden');
+            if (typeof gtag !== 'undefined') gtag('event', 'download_checklist', { event_category: 'lead_magnet' });
+            btn.textContent = 'Send Me the Checklist';
+            btn.disabled = false;
+        });
+
+        // ── Language Toggle ───────────────────────────────────────────────
+        const translations = {
+            en: {
+                announcement: 'Limited spots available — <strong>Book this week</strong> and your VA starts in 48 hours.',
+                navHome: 'Home', navServices: 'Services', navHow: 'How It Works',
+                navAbout: 'About', navCareers: 'Careers', navCta: 'Book a Call',
+                heroBadge: 'Professional Staffing Solutions',
+                heroH1: 'Elite <span class="text-yellow-500">Bilingual</span> Virtual Support.',
+                heroH2: 'Elevate your productivity with dedicated virtual assistants specializing in legal intake, demand writing, legal assistance, and case management. Starting at <span class="text-[#1b1e2b] font-black underline decoration-yellow-400 decoration-8 underline-offset-4">$7.50/hour</span>.',
+                heroCta: 'Hire Your Assistant', heroVas: '50+ Active VA\'s', heroVasSub: 'Ready to Start',
+                trustFees: 'No Hidden Fees', trustFeesSub: 'Zero Onboarding Cost',
+                trustVetted: 'Vetted Talent', trustVettedSub: 'Rigorous Testing Process',
+                trustBadgesHeader: 'Why Law Firms Choose YVA',
+                badge1: '100% Bilingual', badge1sub: 'English & Spanish',
+                badge2: 'U.S. Time Zones', badge2sub: 'Works your hours',
+                badge3: '72-hr Onboarding', badge3sub: 'Start in days, not weeks',
+                badge4: 'No Contracts', badge4sub: 'Cancel any time',
+                badge5: 'Vetted Talent', badge5sub: 'Rigorously screened',
+                badge6: 'Free Replacement', badge6sub: 'Not a fit? We fix it',
+                lmLabel: 'Free Download', lmTitle: 'Legal Staffing Checklist',
+                lmSub: '10 questions to ask before hiring virtual legal staff', lmCta: 'Get Free Checklist',
+                pillarsLabel: 'Service Expertise', pillarsTitle: 'Tailored Support for Your Industry',
+                pillarsSub: 'High-impact virtual staffing across specialized sectors.',
+                pillar0Title: 'Legal Intake', pillar0Sub: 'Lead capture, screening & scheduling.',
+                pillar1Title: 'Legal Assistants', pillar1Sub: 'Attorney support & case admin.',
+                pillar2Title: 'Demand Writing', pillar2Sub: 'Medical records & demand letters.',
+                pillar3Title: 'Case Managers', pillar3Sub: 'Full case oversight, intake to resolution.',
+                learnMore: 'Learn More',
+                howLabel: 'The Process', howTitle: 'Up and Running in 48 Hours',
+                howSub: 'No lengthy contracts, no complicated onboarding. Just the right person, ready to work.',
+                step1Title: 'Book a Free Call', step1Sub: 'Schedule a 20-minute consultation. We listen, ask the right questions, and get a clear picture of what your firm needs.',
+                step2Title: 'We Match Your VA', step2Sub: 'We hand-select a vetted bilingual specialist from our team that fits your industry, tools, and work style — no guesswork.',
+                step3Title: 'Start in 48 Hours', step3Sub: 'Your VA joins your tools, gets briefed on your processes, and hits the ground running — fully integrated from day one.',
+                stickyTitle: 'Ready to cut staffing costs by up to 70%?',
+                stickySub: 'No contracts · Bilingual VAs · Start in 48 hours',
+                stickyBtn: 'Book a Free Call'
+            },
+            es: {
+                announcement: 'Cupos limitados — <strong>Reserva esta semana</strong> y tu VA empieza en 48 horas.',
+                navHome: 'Inicio', navServices: 'Servicios', navHow: 'Cómo Funciona',
+                navAbout: 'Nosotros', navCareers: 'Empleos', navCta: 'Reservar Llamada',
+                heroBadge: 'Soluciones de Personal Profesional',
+                heroH1: 'Soporte Virtual <span class="text-yellow-500">Bilingüe</span> de Élite.',
+                heroH2: 'Eleva la productividad de tu firma con asistentes virtuales especializados en intake legal, redacción de demandas, asistencia legal y gestión de casos. Desde <span class="text-[#1b1e2b] font-black underline decoration-yellow-400 decoration-8 underline-offset-4">$7.50/hora</span>.',
+                heroCta: 'Contratar Mi Asistente', heroVas: '50+ VAs Activos', heroVasSub: 'Listos para Empezar',
+                trustFees: 'Sin Cargos Ocultos', trustFeesSub: 'Cero Costo de Incorporación',
+                trustVetted: 'Talento Verificado', trustVettedSub: 'Proceso de Evaluación Riguroso',
+                trustBadgesHeader: 'Por Qué las Firmas Eligen YVA',
+                badge1: '100% Bilingüe', badge1sub: 'Inglés y Español',
+                badge2: 'Zona Horaria EE.UU.', badge2sub: 'Trabaja en tus horarios',
+                badge3: 'Incorporación en 72h', badge3sub: 'Empieza en días, no semanas',
+                badge4: 'Sin Contratos', badge4sub: 'Cancela cuando quieras',
+                badge5: 'Talento Verificado', badge5sub: 'Evaluación rigurosa',
+                badge6: 'Reemplazo Gratis', badge6sub: '¿No es el indicado? Lo resolvemos',
+                lmLabel: 'Descarga Gratuita', lmTitle: 'Lista de Verificación Legal',
+                lmSub: '10 preguntas antes de contratar personal legal virtual', lmCta: 'Obtener Lista Gratis',
+                pillarsLabel: 'Especialidades', pillarsTitle: 'Soporte Especializado para tu Firma',
+                pillarsSub: 'Personal virtual de alto impacto en sectores especializados.',
+                pillar0Title: 'Intake Legal', pillar0Sub: 'Captura de leads, filtrado y agenda.',
+                pillar1Title: 'Asistentes Legales', pillar1Sub: 'Apoyo al abogado y administración.',
+                pillar2Title: 'Redacción de Demandas', pillar2Sub: 'Registros médicos y cartas de demanda.',
+                pillar3Title: 'Gestores de Casos', pillar3Sub: 'Supervisión completa, intake a resolución.',
+                learnMore: 'Ver Más',
+                howLabel: 'El Proceso', howTitle: 'Funcionando en 48 Horas',
+                howSub: 'Sin contratos largos, sin incorporación complicada. Solo la persona indicada, lista para trabajar.',
+                step1Title: 'Reserva una Llamada', step1Sub: 'Agenda una consulta de 20 minutos. Escuchamos, hacemos las preguntas correctas y entendemos qué necesita tu firma.',
+                step2Title: 'Encontramos tu VA', step2Sub: 'Seleccionamos a mano a un especialista bilingüe de nuestro equipo que se adapte a tu industria, herramientas y estilo de trabajo.',
+                step3Title: 'Empieza en 48 Horas', step3Sub: 'Tu VA se une a tus herramientas, aprende tus procesos y entra en acción — completamente integrado desde el primer día.',
+                stickyTitle: '¿Listo para reducir costos de personal hasta un 70%?',
+                stickySub: 'Sin contratos · VAs bilingües · Empieza en 48 horas',
+                stickyBtn: 'Reservar Llamada Gratis'
+            }
+        };
+
+        let currentLang = localStorage.getItem('yva_lang') || 'en';
+
+        function setLang(lang) {
+            currentLang = lang;
+            localStorage.setItem('yva_lang', lang);
+            const t = translations[lang];
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.dataset.i18n;
+                if (t[key] !== undefined) el.innerHTML = t[key];
+            });
+            // Update toggle button states
+            ['lang-en', 'lang-es', 'lang-en-mobile', 'lang-es-mobile'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (!btn) return;
+                const isActive = (id.includes('en') && lang === 'en') || (id.includes('es') && lang === 'es');
+                btn.classList.toggle('active', isActive);
+                btn.classList.toggle('text-slate-400', !isActive);
+            });
+        }
+
+        // Apply language on load if stored
+        if (currentLang === 'es') setLang('es');
     </script>
 </body>
 </html>

@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Staff for Personal Injury Firms | YVA Law Staffing</title>
+    <meta name="description" content="Bilingual virtual staff built for personal injury law firms. Intake specialists, demand writers, and case managers starting at $7.50/hr. No contracts. Start in 72 hours.">
+    <meta name="robots" content="index, follow">
+    <meta property="og:title" content="Virtual Staff for Personal Injury Firms | YVA Law Staffing">
+    <meta property="og:description" content="Intake, demand writing & case management for PI firms. Bilingual. Starting at $7.50/hr.">
+    <meta property="og:image" content="https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=1200">
+
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-V2Q6V4HE4F"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-V2Q6V4HE4F');
+        gtag('event', 'page_view', { event_category: 'landing_pi' });
+    </script>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+        #lp-nav { transition: box-shadow 0.3s ease; }
+        #lp-nav.scrolled { box-shadow: 0 4px 24px -4px rgba(27,30,43,0.12); }
+        #lp-modal { display: flex; visibility: hidden; opacity: 0; transition: opacity 0.3s ease, visibility 0.3s ease; }
+        #lp-modal.open { visibility: visible; opacity: 1; }
+        #lp-modal .modal-panel { transform: translateY(40px) scale(0.97); transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1); }
+        #lp-modal.open .modal-panel { transform: translateY(0) scale(1); }
+        .faq-answer { max-height: 0; overflow: hidden; transition: max-height 0.35s ease, opacity 0.3s ease; opacity: 0; }
+        .faq-item.open .faq-answer { opacity: 1; }
+        .faq-item.open .faq-chevron { transform: rotate(180deg); }
+        .faq-chevron { transition: transform 0.3s ease; }
+        @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-12px)} }
+        .float { animation: float 5s ease-in-out infinite; }
+        @keyframes ping-slow { 0%{transform:scale(1);opacity:0.6} 100%{transform:scale(1.5);opacity:0} }
+        .ping-slow { animation: ping-slow 2s cubic-bezier(0,0,0.2,1) infinite; }
+    </style>
+</head>
+<body class="bg-white text-slate-900 overflow-x-hidden">
+
+<!-- Nav -->
+<nav id="lp-nav" class="fixed top-0 w-full z-50 bg-white py-4">
+    <div class="max-w-5xl mx-auto px-6 flex items-center justify-between">
+        <a href="/" class="flex items-center gap-3">
+            <div class="bg-[#1b1e2b] w-10 h-10 rounded-xl flex items-center justify-center shadow-md">
+                <i data-lucide="users" class="w-5 h-5 text-yellow-400"></i>
+            </div>
+            <div class="flex flex-col">
+                <span class="text-lg font-black tracking-tighter leading-none text-[#1b1e2b]">YVA <span class="text-sm">Law</span></span>
+                <span class="text-[9px] uppercase tracking-[0.3em] font-bold text-slate-400">Staffing</span>
+            </div>
+        </a>
+        <button onclick="openModal()" class="bg-[#1b1e2b] text-white px-6 py-3 rounded-full font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all shadow-lg">
+            Book a Free Call <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+        </button>
+    </div>
+</nav>
+
+<!-- Hero -->
+<section class="pt-28 pb-20 lg:pt-36 lg:pb-28 bg-slate-50 relative overflow-hidden">
+    <div class="absolute -top-20 -right-20 w-[500px] h-[500px] bg-yellow-400/10 rounded-full blur-[120px] pointer-events-none"></div>
+    <div class="absolute bottom-0 -left-20 w-[400px] h-[400px] bg-[#1b1e2b]/5 rounded-full blur-[100px] pointer-events-none"></div>
+    <div class="max-w-5xl mx-auto px-6 relative z-10">
+        <div class="grid lg:grid-cols-2 gap-14 items-center">
+            <div class="space-y-7">
+                <div class="inline-flex items-center gap-2 bg-yellow-400 text-[#1b1e2b] px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider">
+                    <i data-lucide="scale" class="w-3.5 h-3.5"></i> Personal Injury Firms
+                </div>
+                <h1 class="text-4xl lg:text-5xl font-black text-[#1b1e2b] leading-[1.05] tracking-tight">
+                    Virtual Staff Built for <span class="text-yellow-500">PI Law Firms.</span>
+                </h1>
+                <p class="text-lg text-slate-600 font-medium leading-relaxed">
+                    From first call to settlement, YVA provides bilingual intake specialists, demand writers, and case managers who know personal injury workflows inside and out.
+                    <span class="font-black text-[#1b1e2b]">Starting at $7.50/hr. No contracts.</span>
+                </p>
+                <div class="flex flex-col sm:flex-row gap-4 pt-2">
+                    <div class="relative">
+                        <div class="absolute inset-0 bg-yellow-400 rounded-2xl ping-slow"></div>
+                        <button onclick="openModal()" class="relative bg-[#1b1e2b] text-white px-10 py-5 rounded-2xl font-black text-base flex items-center gap-3 hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all shadow-2xl shadow-slate-200">
+                            Book a Free Call <i data-lucide="arrow-right" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-3 px-2 text-sm text-slate-500 font-bold">
+                        <i data-lucide="shield-check" class="w-4 h-4 text-emerald-500 flex-shrink-0"></i>
+                        No commitment · 20-min call
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 bg-white rounded-xl shadow-md flex items-center justify-center flex-shrink-0"><i data-lucide="phone-incoming" class="w-4 h-4 text-yellow-500"></i></div>
+                        <div><p class="font-black text-[#1b1e2b] text-xs uppercase">Intake Covered</p><p class="text-[11px] text-slate-400 font-bold">Every lead captured</p></div>
+                    </div>
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 bg-white rounded-xl shadow-md flex items-center justify-center flex-shrink-0"><i data-lucide="file-text" class="w-4 h-4 text-indigo-500"></i></div>
+                        <div><p class="font-black text-[#1b1e2b] text-xs uppercase">Demand Writing</p><p class="text-[11px] text-slate-400 font-bold">Full packages, fast</p></div>
+                    </div>
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 bg-white rounded-xl shadow-md flex items-center justify-center flex-shrink-0"><i data-lucide="globe" class="w-4 h-4 text-emerald-500"></i></div>
+                        <div><p class="font-black text-[#1b1e2b] text-xs uppercase">English + Spanish</p><p class="text-[11px] text-slate-400 font-bold">Fully bilingual team</p></div>
+                    </div>
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 bg-white rounded-xl shadow-md flex items-center justify-center flex-shrink-0"><i data-lucide="check-circle-2" class="w-4 h-4 text-yellow-500"></i></div>
+                        <div><p class="font-black text-[#1b1e2b] text-xs uppercase">No Contracts</p><p class="text-[11px] text-slate-400 font-bold">Exit any time</p></div>
+                    </div>
+                </div>
+            </div>
+            <div class="relative mt-6 lg:mt-0">
+                <div class="rounded-[2rem] overflow-hidden shadow-[0_40px_80px_-20px_rgba(27,30,43,0.25)] border-[10px] border-white">
+                    <img src="https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=900" alt="Personal Injury Law Firm Virtual Staff" class="w-full h-[360px] lg:h-[480px] object-cover">
+                </div>
+                <div class="float absolute -left-6 top-8 bg-[#1b1e2b] text-white p-5 rounded-2xl shadow-2xl border-4 border-white z-10">
+                    <p class="text-yellow-400 text-[9px] font-black uppercase tracking-widest mb-1">Starting From</p>
+                    <p class="text-3xl font-black leading-none">$7.50<span class="text-sm font-bold text-slate-400">/hr</span></p>
+                    <p class="text-slate-400 text-[10px] font-bold mt-1">~$1,200/mo full-time</p>
+                </div>
+                <div class="absolute -bottom-4 right-4 bg-white px-4 py-3 rounded-2xl shadow-xl border border-slate-100 z-10">
+                    <div class="flex gap-0.5 mb-1">
+                        <i data-lucide="star" class="w-3.5 h-3.5 text-yellow-400 fill-yellow-400"></i>
+                        <i data-lucide="star" class="w-3.5 h-3.5 text-yellow-400 fill-yellow-400"></i>
+                        <i data-lucide="star" class="w-3.5 h-3.5 text-yellow-400 fill-yellow-400"></i>
+                        <i data-lucide="star" class="w-3.5 h-3.5 text-yellow-400 fill-yellow-400"></i>
+                        <i data-lucide="star" class="w-3.5 h-3.5 text-yellow-400 fill-yellow-400"></i>
+                    </div>
+                    <p class="text-[11px] font-black text-[#1b1e2b]">Trusted by PI firms</p>
+                    <p class="text-[10px] text-slate-400 font-bold">across the U.S.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Problem -->
+<section class="bg-[#1b1e2b] py-20">
+    <div class="max-w-5xl mx-auto px-6">
+        <div class="text-center mb-12">
+            <p class="text-yellow-400 font-black uppercase text-xs tracking-[0.3em] mb-3">Sound Familiar?</p>
+            <h2 class="text-3xl lg:text-4xl font-black text-white tracking-tight">PI firms bleed cases when staff can't keep up.</h2>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <div class="bg-white/5 border border-white/10 rounded-[2rem] p-8">
+                <div class="w-12 h-12 bg-red-500/20 rounded-2xl flex items-center justify-center mb-5"><i data-lucide="phone-missed" class="w-6 h-6 text-red-400"></i></div>
+                <h3 class="text-white font-black text-lg mb-2">Intake Bottlenecks</h3>
+                <p class="text-slate-400 font-medium text-sm leading-relaxed">Potential clients call multiple firms. The first one that picks up and screens them properly wins the case.</p>
+            </div>
+            <div class="bg-white/5 border border-white/10 rounded-[2rem] p-8">
+                <div class="w-12 h-12 bg-orange-500/20 rounded-2xl flex items-center justify-center mb-5"><i data-lucide="file-x" class="w-6 h-6 text-orange-400"></i></div>
+                <h3 class="text-white font-black text-lg mb-2">Demand Backlogs</h3>
+                <p class="text-slate-400 font-medium text-sm leading-relaxed">Attorneys spending hours on demand packages instead of strategy and settlements — wasting the firm's highest-value hours.</p>
+            </div>
+            <div class="bg-white/5 border border-white/10 rounded-[2rem] p-8">
+                <div class="w-12 h-12 bg-yellow-500/20 rounded-2xl flex items-center justify-center mb-5"><i data-lucide="clock" class="w-6 h-6 text-yellow-400"></i></div>
+                <h3 class="text-white font-black text-lg mb-2">Cases Falling Through</h3>
+                <p class="text-slate-400 font-medium text-sm leading-relaxed">Without a dedicated case manager, treatment follow-ups slip, deadlines get missed, and clients feel abandoned.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Services for PI -->
+<section class="bg-white py-20 lg:py-28">
+    <div class="max-w-5xl mx-auto px-6">
+        <div class="text-center mb-16">
+            <p class="text-yellow-500 font-black uppercase text-xs tracking-[0.3em] mb-3">Built for PI</p>
+            <h2 class="text-3xl lg:text-4xl font-black text-[#1b1e2b] tracking-tight">Every role your PI firm actually needs.</h2>
+            <p class="text-slate-500 font-medium mt-4 max-w-xl mx-auto">Mix and match — hire one role or all four. Each specialist is trained on PI-specific workflows from day one.</p>
+        </div>
+        <div class="grid md:grid-cols-2 gap-6">
+            <div class="bg-slate-50 rounded-[2rem] p-8 border border-slate-100">
+                <div class="flex items-center gap-4 mb-5">
+                    <div class="w-12 h-12 bg-[#1b1e2b] rounded-2xl flex items-center justify-center shadow-lg"><i data-lucide="phone-incoming" class="w-6 h-6 text-yellow-400"></i></div>
+                    <div><p class="font-black text-[#1b1e2b] text-base">Legal Intake Specialist</p><p class="text-yellow-500 text-xs font-black uppercase tracking-widest">$7.50/hr</p></div>
+                </div>
+                <p class="text-slate-600 text-sm font-medium leading-relaxed mb-4">Answers every call in English and Spanish, screens for case viability (liability, injuries, SOL), completes intake forms, enters into your CRM, and books consultations. No lead left behind.</p>
+                <button onclick="openModal('Legal Intake')" class="text-[#1b1e2b] font-black text-xs uppercase tracking-widest flex items-center gap-1 hover:text-yellow-500 transition-colors">Hire an Intake Specialist <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></button>
+            </div>
+            <div class="bg-slate-50 rounded-[2rem] p-8 border border-slate-100">
+                <div class="flex items-center gap-4 mb-5">
+                    <div class="w-12 h-12 bg-[#1b1e2b] rounded-2xl flex items-center justify-center shadow-lg"><i data-lucide="file-text" class="w-6 h-6 text-yellow-400"></i></div>
+                    <div><p class="font-black text-[#1b1e2b] text-base">Demand Writing Specialist</p><p class="text-yellow-500 text-xs font-black uppercase tracking-widest">$10/hr</p></div>
+                </div>
+                <p class="text-slate-600 text-sm font-medium leading-relaxed mb-4">Reviews medical records and bills, summarizes treatment, calculates damages, and builds complete demand packages to your firm's standards. Faster turnaround, consistent quality.</p>
+                <button onclick="openModal('Demand Writing')" class="text-[#1b1e2b] font-black text-xs uppercase tracking-widest flex items-center gap-1 hover:text-yellow-500 transition-colors">Hire a Demand Writer <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></button>
+            </div>
+            <div class="bg-slate-50 rounded-[2rem] p-8 border border-slate-100">
+                <div class="flex items-center gap-4 mb-5">
+                    <div class="w-12 h-12 bg-[#1b1e2b] rounded-2xl flex items-center justify-center shadow-lg"><i data-lucide="layout-dashboard" class="w-6 h-6 text-yellow-400"></i></div>
+                    <div><p class="font-black text-[#1b1e2b] text-base">Virtual Case Manager</p><p class="text-yellow-500 text-xs font-black uppercase tracking-widest">$12/hr</p></div>
+                </div>
+                <p class="text-slate-600 text-sm font-medium leading-relaxed mb-4">Owns the full case lifecycle — coordinates clients, medical providers, and adjusters, tracks treatment and deadlines, manages documentation, and keeps attorneys informed at every stage.</p>
+                <button onclick="openModal('Case Managers')" class="text-[#1b1e2b] font-black text-xs uppercase tracking-widest flex items-center gap-1 hover:text-yellow-500 transition-colors">Hire a Case Manager <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></button>
+            </div>
+            <div class="bg-slate-50 rounded-[2rem] p-8 border border-slate-100">
+                <div class="flex items-center gap-4 mb-5">
+                    <div class="w-12 h-12 bg-[#1b1e2b] rounded-2xl flex items-center justify-center shadow-lg"><i data-lucide="gavel" class="w-6 h-6 text-yellow-400"></i></div>
+                    <div><p class="font-black text-[#1b1e2b] text-base">Legal Assistant</p><p class="text-yellow-500 text-xs font-black uppercase tracking-widest">$8.50/hr</p></div>
+                </div>
+                <p class="text-slate-600 text-sm font-medium leading-relaxed mb-4">Supports attorneys with calendar management, client correspondence, document drafting, court deadline tracking, and file organization — so your attorneys stay focused on litigation, not admin.</p>
+                <button onclick="openModal('Legal Assistants')" class="text-[#1b1e2b] font-black text-xs uppercase tracking-widest flex items-center gap-1 hover:text-yellow-500 transition-colors">Hire a Legal Assistant <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i></button>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Cost Comparison -->
+<section class="bg-slate-50 py-20">
+    <div class="max-w-5xl mx-auto px-6">
+        <div class="text-center mb-12">
+            <p class="text-yellow-500 font-black uppercase text-xs tracking-[0.3em] mb-3">The Numbers</p>
+            <h2 class="text-3xl lg:text-4xl font-black text-[#1b1e2b] tracking-tight">What a full PI support team actually costs.</h2>
+        </div>
+        <div class="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto">
+            <div class="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm">
+                <div class="flex items-center justify-between mb-4">
+                    <p class="font-black text-[#1b1e2b] text-sm uppercase tracking-widest">In-House Team (4 roles)</p>
+                    <span class="bg-red-100 text-red-600 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">Expensive</span>
+                </div>
+                <p class="text-5xl font-black text-slate-400 line-through decoration-red-400 decoration-2">$20,200<span class="text-xl font-bold">/mo</span></p>
+                <p class="text-slate-400 text-xs font-medium mt-2">Average salary + benefits + overhead for all 4 roles</p>
+                <ul class="mt-5 space-y-2">
+                    <li class="flex items-center gap-2 text-xs text-slate-400 font-medium"><i data-lucide="x" class="w-3.5 h-3.5 text-red-400 flex-shrink-0"></i> Weeks to hire and onboard</li>
+                    <li class="flex items-center gap-2 text-xs text-slate-400 font-medium"><i data-lucide="x" class="w-3.5 h-3.5 text-red-400 flex-shrink-0"></i> Payroll taxes + benefits</li>
+                    <li class="flex items-center gap-2 text-xs text-slate-400 font-medium"><i data-lucide="x" class="w-3.5 h-3.5 text-red-400 flex-shrink-0"></i> Office space + equipment</li>
+                </ul>
+            </div>
+            <div class="bg-[#1b1e2b] rounded-2xl p-8 shadow-lg">
+                <div class="flex items-center justify-between mb-4">
+                    <p class="font-black text-white text-sm uppercase tracking-widest">YVA Law Staffing</p>
+                    <span class="bg-yellow-400 text-[#1b1e2b] text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">Save 70%+</span>
+                </div>
+                <p class="text-5xl font-black text-yellow-400">$5,990<span class="text-xl font-bold text-slate-400">/mo</span></p>
+                <p class="text-slate-400 text-xs font-medium mt-2">All 4 roles · 160 hrs each · full-time</p>
+                <ul class="mt-5 space-y-2">
+                    <li class="flex items-center gap-2 text-xs text-slate-300 font-medium"><i data-lucide="check" class="w-3.5 h-3.5 text-yellow-400 flex-shrink-0"></i> Ready in 72 hours</li>
+                    <li class="flex items-center gap-2 text-xs text-slate-300 font-medium"><i data-lucide="check" class="w-3.5 h-3.5 text-yellow-400 flex-shrink-0"></i> Fully bilingual, PI-trained</li>
+                    <li class="flex items-center gap-2 text-xs text-slate-300 font-medium"><i data-lucide="check" class="w-3.5 h-3.5 text-yellow-400 flex-shrink-0"></i> No contracts or minimums</li>
+                </ul>
+            </div>
+        </div>
+        <p class="text-center text-slate-400 text-xs font-medium mt-6">* Full-time rates (160 hrs/mo per role). In-house estimates include avg. U.S. salary + overhead.</p>
+    </div>
+</section>
+
+<!-- Testimonials -->
+<section class="bg-[#1b1e2b] py-20">
+    <div class="max-w-5xl mx-auto px-6">
+        <div class="text-center mb-12">
+            <p class="text-yellow-400 font-black uppercase text-xs tracking-[0.3em] mb-3">Real Results</p>
+            <h2 class="text-3xl lg:text-4xl font-black text-white tracking-tight">What PI firms say about YVA.</h2>
+        </div>
+        <div class="grid md:grid-cols-2 gap-6">
+            <div class="bg-white/5 border border-white/10 rounded-[2rem] p-8 relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-40 h-40 bg-yellow-400/10 rounded-full blur-[60px]"></div>
+                <div class="flex gap-1 mb-5">
+                    <i data-lucide="star" class="w-4 h-4 text-yellow-400 fill-yellow-400"></i><i data-lucide="star" class="w-4 h-4 text-yellow-400 fill-yellow-400"></i><i data-lucide="star" class="w-4 h-4 text-yellow-400 fill-yellow-400"></i><i data-lucide="star" class="w-4 h-4 text-yellow-400 fill-yellow-400"></i><i data-lucide="star" class="w-4 h-4 text-yellow-400 fill-yellow-400"></i>
+                </div>
+                <p class="text-white text-base font-bold leading-relaxed italic mb-6">"YVA's Team has been outstanding — organized, reliable, and proactive. They handle intake with professionalism, communicate promptly, and bring integrity and dedication to every task."</p>
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-yellow-400 flex items-center justify-center font-black text-[#1b1e2b]">N</div>
+                    <div><p class="text-white font-black text-sm">Naveed Halavi</p><p class="text-yellow-400 text-xs font-bold uppercase tracking-widest">Halavi Law</p></div>
+                </div>
+            </div>
+            <div class="bg-white/5 border border-white/10 rounded-[2rem] p-8 relative overflow-hidden">
+                <div class="absolute top-0 right-0 w-40 h-40 bg-yellow-400/10 rounded-full blur-[60px]"></div>
+                <div class="flex gap-1 mb-5">
+                    <i data-lucide="star" class="w-4 h-4 text-yellow-400 fill-yellow-400"></i><i data-lucide="star" class="w-4 h-4 text-yellow-400 fill-yellow-400"></i><i data-lucide="star" class="w-4 h-4 text-yellow-400 fill-yellow-400"></i><i data-lucide="star" class="w-4 h-4 text-yellow-400 fill-yellow-400"></i><i data-lucide="star" class="w-4 h-4 text-yellow-400 fill-yellow-400"></i>
+                </div>
+                <p class="text-white text-base font-bold leading-relaxed italic mb-6">"Our intake volume doubled in 3 months. We were losing leads before — now every call gets answered and screened the same day. The bilingual piece has been especially valuable for our PI practice."</p>
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-yellow-400 flex items-center justify-center font-black text-[#1b1e2b]">R</div>
+                    <div><p class="text-white font-black text-sm">Rafael M.</p><p class="text-yellow-400 text-xs font-bold uppercase tracking-widest">PI Firm · Texas</p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- How It Works -->
+<section class="bg-white py-20">
+    <div class="max-w-5xl mx-auto px-6">
+        <div class="text-center mb-14">
+            <p class="text-yellow-500 font-black uppercase text-xs tracking-[0.3em] mb-3">The Process</p>
+            <h2 class="text-3xl lg:text-4xl font-black text-[#1b1e2b] tracking-tight">Up and running in 48 hours.</h2>
+        </div>
+        <div class="grid md:grid-cols-3 gap-6">
+            <div class="text-center p-8 rounded-[2rem] bg-slate-50 border border-slate-100">
+                <div class="w-14 h-14 bg-[#1b1e2b] rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg"><i data-lucide="calendar" class="w-7 h-7 text-yellow-400"></i></div>
+                <div class="inline-block bg-yellow-400 text-[#1b1e2b] text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-3">Step 01</div>
+                <h3 class="font-black text-[#1b1e2b] text-lg mb-2">Book a Free Call</h3>
+                <p class="text-slate-500 text-sm font-medium leading-relaxed">20 minutes. We learn your firm's workflow, practice area focus, and what role you need first.</p>
+            </div>
+            <div class="text-center p-8 rounded-[2rem] bg-yellow-400 border border-yellow-400">
+                <div class="w-14 h-14 bg-[#1b1e2b] rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg"><i data-lucide="users" class="w-7 h-7 text-yellow-400"></i></div>
+                <div class="inline-block bg-[#1b1e2b] text-yellow-400 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-3">Step 02</div>
+                <h3 class="font-black text-[#1b1e2b] text-lg mb-2">We Match Your VA</h3>
+                <p class="text-[#1b1e2b]/70 text-sm font-medium leading-relaxed">We hand-select a bilingual specialist trained in PI law workflows, CRM tools, and your state's intake requirements.</p>
+            </div>
+            <div class="text-center p-8 rounded-[2rem] bg-slate-50 border border-slate-100">
+                <div class="w-14 h-14 bg-[#1b1e2b] rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg"><i data-lucide="zap" class="w-7 h-7 text-yellow-400"></i></div>
+                <div class="inline-block bg-yellow-400 text-[#1b1e2b] text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-3">Step 03</div>
+                <h3 class="font-black text-[#1b1e2b] text-lg mb-2">Start in 48 Hours</h3>
+                <p class="text-slate-500 text-sm font-medium leading-relaxed">Your VA is briefed on your processes and integrated into your tools — ready to handle real work from day one.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- FAQ -->
+<section class="bg-slate-50 py-20">
+    <div class="max-w-3xl mx-auto px-6">
+        <div class="text-center mb-12">
+            <p class="text-yellow-500 font-black uppercase text-xs tracking-[0.3em] mb-3">FAQ</p>
+            <h2 class="text-3xl font-black text-[#1b1e2b] tracking-tight">Common questions from PI firms.</h2>
+        </div>
+        <div class="space-y-3">
+            <div class="faq-item bg-white border border-slate-200 rounded-2xl overflow-hidden">
+                <button class="faq-trigger w-full flex items-center justify-between px-6 py-4 text-left hover:bg-slate-50 transition-colors">
+                    <span class="font-black text-[#1b1e2b] text-sm pr-4">Do your VAs understand personal injury case workflows?</span>
+                    <i data-lucide="chevron-down" class="faq-chevron w-4 h-4 text-yellow-500 flex-shrink-0"></i>
+                </button>
+                <div class="faq-answer"><p class="px-6 pb-5 text-slate-600 text-sm font-medium leading-relaxed">Yes. Our PI-focused VAs are trained on SOL tracking, medical record review, insurance adjuster communication, demand package preparation, and common PI CRMs like Filevine, Clio, and MyCase.</p></div>
+            </div>
+            <div class="faq-item bg-white border border-slate-200 rounded-2xl overflow-hidden">
+                <button class="faq-trigger w-full flex items-center justify-between px-6 py-4 text-left hover:bg-slate-50 transition-colors">
+                    <span class="font-black text-[#1b1e2b] text-sm pr-4">Can I hire just one role, or do I need a full team?</span>
+                    <i data-lucide="chevron-down" class="faq-chevron w-4 h-4 text-yellow-500 flex-shrink-0"></i>
+                </button>
+                <div class="faq-answer"><p class="px-6 pb-5 text-slate-600 text-sm font-medium leading-relaxed">You can start with one role and add more as your firm grows. Most PI firms start with intake or demand writing, then add case managers once they see the results.</p></div>
+            </div>
+            <div class="faq-item bg-white border border-slate-200 rounded-2xl overflow-hidden">
+                <button class="faq-trigger w-full flex items-center justify-between px-6 py-4 text-left hover:bg-slate-50 transition-colors">
+                    <span class="font-black text-[#1b1e2b] text-sm pr-4">How quickly can my VA start handling real calls and cases?</span>
+                    <i data-lucide="chevron-down" class="faq-chevron w-4 h-4 text-yellow-500 flex-shrink-0"></i>
+                </button>
+                <div class="faq-answer"><p class="px-6 pb-5 text-slate-600 text-sm font-medium leading-relaxed">Within 48-72 hours of confirming the match. We handle the briefing on your systems and processes so your VA hits the ground running — not weeks later.</p></div>
+            </div>
+            <div class="faq-item bg-white border border-slate-200 rounded-2xl overflow-hidden">
+                <button class="faq-trigger w-full flex items-center justify-between px-6 py-4 text-left hover:bg-slate-50 transition-colors">
+                    <span class="font-black text-[#1b1e2b] text-sm pr-4">Are there any contracts or minimum commitments?</span>
+                    <i data-lucide="chevron-down" class="faq-chevron w-4 h-4 text-yellow-500 flex-shrink-0"></i>
+                </button>
+                <div class="faq-answer"><p class="px-6 pb-5 text-slate-600 text-sm font-medium leading-relaxed">No lock-ins. We believe our results should keep you — not a contract. Exit anytime with no penalties.</p></div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Final CTA -->
+<section class="bg-[#1b1e2b] py-20">
+    <div class="max-w-3xl mx-auto px-6 text-center">
+        <p class="text-yellow-400 font-black uppercase text-xs tracking-[0.3em] mb-4">No Contracts. No Minimums.</p>
+        <h2 class="text-3xl lg:text-4xl font-black text-white tracking-tight mb-4">Ready to scale your PI firm<br>without scaling your overhead?</h2>
+        <p class="text-slate-400 font-medium mb-8 max-w-lg mx-auto">Book a free 20-minute call. We'll listen, recommend the right role, and match you with a vetted bilingual specialist — fast.</p>
+        <button onclick="openModal()" class="bg-yellow-400 text-[#1b1e2b] px-12 py-5 rounded-2xl font-black text-base uppercase tracking-widest flex items-center gap-3 hover:bg-yellow-300 transition-all shadow-2xl mx-auto">
+            Book a Free Call <i data-lucide="arrow-right" class="w-5 h-5"></i>
+        </button>
+        <p class="text-slate-500 text-xs font-medium mt-4">No commitment required · 20-min conversation</p>
+    </div>
+</section>
+
+<!-- Footer -->
+<footer class="bg-[#1b1e2b] border-t border-white/10 py-6">
+    <div class="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+        <p class="text-slate-500 text-xs font-medium">© 2025 YVA Law Staffing · yvastaffing.agency</p>
+        <a href="/" class="text-slate-400 text-xs font-bold hover:text-yellow-400 transition-colors">← Back to Main Site</a>
+    </div>
+</footer>
+
+<!-- Booking Modal -->
+<div id="lp-modal" class="fixed inset-0 z-[100] items-center justify-center p-4 md:p-8" role="dialog" aria-modal="true">
+    <div id="lp-backdrop" class="absolute inset-0 bg-[#1b1e2b]/80 backdrop-blur-sm"></div>
+    <div class="modal-panel relative w-full max-w-lg bg-white rounded-[2rem] overflow-hidden shadow-[0_40px_80px_-20px_rgba(27,30,43,0.5)] border-4 border-white max-h-[95vh] flex flex-col">
+        <div class="bg-[#1b1e2b] px-8 py-5 flex items-center justify-between flex-shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="bg-yellow-400 w-9 h-9 rounded-xl flex items-center justify-center"><i data-lucide="calendar" class="w-5 h-5 text-[#1b1e2b]"></i></div>
+                <div>
+                    <p class="text-white font-black text-sm tracking-widest uppercase">Book a Free Call</p>
+                    <p id="lp-modal-subtitle" class="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Step 1 of 2 — Tell us about your needs</p>
+                </div>
+            </div>
+            <button id="lp-modal-close" class="text-slate-400 hover:text-yellow-400 transition-colors p-2 rounded-xl hover:bg-white/10"><i data-lucide="x" class="w-6 h-6"></i></button>
+        </div>
+        <div id="lp-form-step" class="overflow-y-auto px-8 py-7 flex flex-col gap-4">
+            <div class="grid sm:grid-cols-2 gap-4">
+                <div><label class="block text-xs font-black text-[#1b1e2b] uppercase tracking-widest mb-2">Full Name <span class="text-yellow-500">*</span></label><input id="lp-name" type="text" placeholder="Jane Smith" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 transition"></div>
+                <div><label class="block text-xs font-black text-[#1b1e2b] uppercase tracking-widest mb-2">Email <span class="text-yellow-500">*</span></label><input id="lp-email" type="email" placeholder="jane@firm.com" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 transition"></div>
+            </div>
+            <div><label class="block text-xs font-black text-[#1b1e2b] uppercase tracking-widest mb-2">Firm Name <span class="text-yellow-500">*</span></label><input id="lp-company" type="text" placeholder="Smith PI Law" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 transition"></div>
+            <div><label class="block text-xs font-black text-[#1b1e2b] uppercase tracking-widest mb-2">Service Needed <span class="text-yellow-500">*</span></label>
+                <select id="lp-service" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 transition bg-white">
+                    <option value="">Select a role...</option>
+                    <option value="Legal Intake">Legal Intake Specialist</option>
+                    <option value="Demand Writing">Demand Writing Specialist</option>
+                    <option value="Case Managers">Virtual Case Manager</option>
+                    <option value="Legal Assistants">Legal Assistant</option>
+                    <option value="Not sure yet">Not sure yet — let's talk</option>
+                </select>
+            </div>
+            <div><label class="block text-xs font-black text-[#1b1e2b] uppercase tracking-widest mb-2">Tell Us More <span class="text-yellow-500">*</span></label><textarea id="lp-message" rows="3" placeholder="What's your biggest staffing challenge right now?" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 transition resize-none"></textarea></div>
+            <p id="lp-error" class="hidden text-red-500 text-xs font-bold">Please fill in all required fields.</p>
+            <button id="lp-submit" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all shadow-lg">
+                Continue to Schedule <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </button>
+        </div>
+        <div id="lp-calendly-step" class="hidden flex-col flex-1">
+            <div class="bg-slate-50 px-8 py-3 border-b border-slate-100 flex-shrink-0"><p class="text-xs font-black text-[#1b1e2b] uppercase tracking-widest">Step 2 of 2 — Pick a time that works</p></div>
+            <div class="calendly-inline-widget" data-url="https://calendly.com/contact-yvastaffing-vuu8/new-meeting?hide_gdpr_banner=1&primary_color=f59e0b" style="min-width:100%;height:580px;"></div>
+        </div>
+    </div>
+</div>
+
+<script src="https://assets.calendly.com/assets/external/widget.js" async></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script>
+    emailjs.init('Vsnmntfk0c8ChKXVL');
+    lucide.createIcons();
+
+    window.addEventListener('scroll', () => {
+        document.getElementById('lp-nav').classList.toggle('scrolled', window.scrollY > 20);
+    });
+
+    function openModal(service = '') {
+        const modal = document.getElementById('lp-modal');
+        document.getElementById('lp-form-step').classList.remove('hidden');
+        document.getElementById('lp-calendly-step').classList.add('hidden');
+        if (service) document.getElementById('lp-service').value = service;
+        modal.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        gtag('event', 'open_booking_modal', { event_category: 'landing_pi', event_label: service });
+    }
+
+    function closeModal() {
+        document.getElementById('lp-modal').classList.remove('open');
+        document.body.style.overflow = '';
+    }
+
+    document.getElementById('lp-modal-close').addEventListener('click', closeModal);
+    document.getElementById('lp-backdrop').addEventListener('click', closeModal);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+    document.getElementById('lp-submit').addEventListener('click', async () => {
+        const name = document.getElementById('lp-name').value.trim();
+        const email = document.getElementById('lp-email').value.trim();
+        const company = document.getElementById('lp-company').value.trim();
+        const service = document.getElementById('lp-service').value;
+        const message = document.getElementById('lp-message').value.trim();
+        const errEl = document.getElementById('lp-error');
+        const btn = document.getElementById('lp-submit');
+        if (!name || !email || !company || !service || !message) { errEl.classList.remove('hidden'); return; }
+        errEl.classList.add('hidden');
+        btn.textContent = 'Sending...'; btn.disabled = true;
+        try {
+            await emailjs.send('service_d485bxr', 'template_8gftonr', { name, email, company, service, message, website: 'PI Landing Page', time: new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' }) });
+            await emailjs.send('service_d485bxr', 'template_9r6xtuw', { name, email, company, service, message, website: '', time: new Date().toLocaleString() });
+        } catch(e) { console.error(e); }
+        btn.innerHTML = 'Continue to Schedule <i data-lucide="arrow-right" class="w-4 h-4 inline"></i>'; btn.disabled = false;
+        document.getElementById('lp-form-step').classList.add('hidden');
+        const cal = document.getElementById('lp-calendly-step');
+        cal.classList.remove('hidden'); cal.classList.add('flex');
+        document.getElementById('lp-modal-subtitle').textContent = 'Step 2 of 2 — Pick a time that works';
+        gtag('event', 'booking_form_submitted', { event_category: 'landing_pi', event_label: service });
+    });
+
+    document.querySelectorAll('.faq-trigger').forEach(trigger => {
+        trigger.addEventListener('click', () => {
+            const item = trigger.closest('.faq-item');
+            const answer = item.querySelector('.faq-answer');
+            const isOpen = item.classList.contains('open');
+            document.querySelectorAll('.faq-item').forEach(i => { i.classList.remove('open'); i.querySelector('.faq-answer').style.maxHeight = '0px'; });
+            if (!isOpen) { item.classList.add('open'); answer.style.maxHeight = answer.scrollHeight + 'px'; }
+        });
+    });
+</script>
+</body>
+</html>

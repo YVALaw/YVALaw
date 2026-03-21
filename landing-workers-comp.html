@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Virtual Staff for Workers' Comp Firms | YVA Law Staffing</title>
+  <meta name="description" content="Workers' comp firms: stop losing cases to missed deadlines and delayed medical records. YVA provides bilingual virtual staff from $7.50/hr — intake, case management, and more." />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+
+  <!-- EmailJS -->
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
+  <!-- Google Analytics -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-V2Q6V4HE4F"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-V2Q6V4HE4F');
+  </script>
+
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    html { scroll-behavior: smooth; }
+
+    /* Booking modal */
+    #booking-modal {
+      visibility: hidden;
+      opacity: 0;
+      transition: visibility 0s linear 0.2s, opacity 0.2s ease;
+    }
+    #booking-modal.open {
+      visibility: visible;
+      opacity: 1;
+      transition: visibility 0s linear 0s, opacity 0.2s ease;
+    }
+
+    /* Calendly step */
+    #calendly-step { display: none; }
+    #calendly-step.active { display: block; }
+
+    /* FAQ accordion */
+    .faq-answer { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+    .faq-answer.open { max-height: 400px; }
+    .faq-icon { transition: transform 0.3s ease; }
+    .faq-item.open .faq-icon { transform: rotate(45deg); }
+  </style>
+</head>
+<body class="bg-white text-gray-900">
+
+  <!-- ===== HERO ===== -->
+  <section class="bg-[#1b1e2b] text-white py-20 px-4">
+    <div class="max-w-4xl mx-auto text-center">
+      <div class="inline-block bg-yellow-400 text-[#1b1e2b] text-xs font-bold uppercase tracking-widest px-4 py-1.5 rounded-full mb-6">
+        Workers' Compensation Firms
+      </div>
+      <h1 class="text-4xl sm:text-5xl font-extrabold leading-tight mb-5">
+        Stop Losing Cases to<br />Missed Deadlines &amp; Delayed Records
+      </h1>
+      <p class="text-lg text-gray-300 max-w-2xl mx-auto mb-8">
+        Your clients are injured and waiting. Every day without a signed medical authorization or missed treatment follow-up costs your firm money — and costs your client their case. YVA places bilingual virtual staff directly into your workflow so nothing falls through the cracks.
+      </p>
+      <div class="flex flex-col sm:flex-row gap-3 justify-center mb-6">
+        <button onclick="openBooking('Workers Comp Firm')" class="bg-yellow-400 hover:bg-yellow-300 text-[#1b1e2b] font-bold px-8 py-4 rounded-lg text-lg transition">
+          Get Your Free Strategy Call
+        </button>
+        <a href="#services" class="border border-white text-white hover:bg-white hover:text-[#1b1e2b] font-semibold px-8 py-4 rounded-lg text-lg transition text-center">
+          See What We Handle
+        </a>
+      </div>
+      <p class="text-gray-400 text-sm">Starting at $7.50/hr &nbsp;·&nbsp; No contracts &nbsp;·&nbsp; Bilingual staff</p>
+    </div>
+  </section>
+
+  <!-- ===== PROBLEM ===== -->
+  <section class="py-16 px-4 bg-gray-50">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-2xl sm:text-3xl font-bold text-center text-[#1b1e2b] mb-10">
+        Workers' Comp Is a Paper Chase — And It Never Stops
+      </h2>
+      <div class="grid sm:grid-cols-3 gap-6">
+        <div class="bg-white rounded-xl p-6 shadow-sm border border-red-100">
+          <div class="text-3xl mb-3">📋</div>
+          <h3 class="font-bold text-[#1b1e2b] mb-2">Authorizations Stuck in Limbo</h3>
+          <p class="text-gray-600 text-sm">Medical providers won't release records without signed authorizations. Follow-up falls on your staff — or doesn't happen at all.</p>
+        </div>
+        <div class="bg-white rounded-xl p-6 shadow-sm border border-red-100">
+          <div class="text-3xl mb-3">⏰</div>
+          <h3 class="font-bold text-[#1b1e2b] mb-2">Statute Deadlines Don't Wait</h3>
+          <p class="text-gray-600 text-sm">Missing a filing deadline, IME, or hearing notice in workers' comp can end a case. With high caseloads, manual tracking fails.</p>
+        </div>
+        <div class="bg-white rounded-xl p-6 shadow-sm border border-red-100">
+          <div class="text-3xl mb-3">🗣️</div>
+          <h3 class="font-bold text-[#1b1e2b] mb-2">Injured Workers Can't Wait on Hold</h3>
+          <p class="text-gray-600 text-sm">Many of your clients are Spanish-speaking and injured. When they can't reach anyone, they call a different firm — or stop treating.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== SERVICES ===== -->
+  <section id="services" class="py-16 px-4 bg-white">
+    <div class="max-w-5xl mx-auto">
+      <h2 class="text-2xl sm:text-3xl font-bold text-center text-[#1b1e2b] mb-3">
+        What YVA Handles for Workers' Comp Firms
+      </h2>
+      <p class="text-center text-gray-500 mb-10">From first call to settlement — your virtual team handles the follow-up so your attorneys can focus on winning.</p>
+
+      <div class="grid sm:grid-cols-2 gap-6">
+
+        <!-- Legal Intake -->
+        <div class="rounded-xl border border-gray-200 p-6 hover:shadow-md transition">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center">
+              <i data-lucide="phone-incoming" class="w-5 h-5 text-[#1b1e2b]"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-[#1b1e2b]">Legal Intake Specialist</h3>
+              <span class="text-yellow-600 font-semibold text-sm">$7.50/hr</span>
+            </div>
+          </div>
+          <ul class="space-y-2 text-sm text-gray-600">
+            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0"></i> Bilingual call and text intake (EN/ES)</li>
+            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0"></i> Employer, injury date, and coverage screening</li>
+            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0"></i> CRM entry and consultation scheduling</li>
+            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0"></i> Lead follow-up within 5 minutes of form submit</li>
+          </ul>
+          <button onclick="openBooking('Legal Intake')" class="mt-5 w-full bg-[#1b1e2b] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-800 transition">
+            Add an Intake Specialist
+          </button>
+        </div>
+
+        <!-- Case Manager -->
+        <div class="rounded-xl border border-gray-200 p-6 hover:shadow-md transition">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center">
+              <i data-lucide="folder-open" class="w-5 h-5 text-[#1b1e2b]"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-[#1b1e2b]">Virtual Case Manager</h3>
+              <span class="text-yellow-600 font-semibold text-sm">$12/hr</span>
+            </div>
+          </div>
+          <ul class="space-y-2 text-sm text-gray-600">
+            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0"></i> Medical authorization follow-up with providers</li>
+            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0"></i> Treatment compliance tracking and client check-ins</li>
+            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0"></i> Deadline and hearing calendar management</li>
+            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0"></i> Weekly status reports to supervising attorney</li>
+          </ul>
+          <button onclick="openBooking('Case Manager')" class="mt-5 w-full bg-[#1b1e2b] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-800 transition">
+            Add a Case Manager
+          </button>
+        </div>
+
+        <!-- Legal Assistant -->
+        <div class="rounded-xl border border-gray-200 p-6 hover:shadow-md transition">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 bg-yellow-400 rounded-lg flex items-center justify-center">
+              <i data-lucide="briefcase" class="w-5 h-5 text-[#1b1e2b]"></i>
+            </div>
+            <div>
+              <h3 class="font-bold text-[#1b1e2b]">Legal Assistant</h3>
+              <span class="text-yellow-600 font-semibold text-sm">$8.50/hr</span>
+            </div>
+          </div>
+          <ul class="space-y-2 text-sm text-gray-600">
+            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0"></i> Case file organization and document management</li>
+            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0"></i> Drafting correspondence to insurers and adjusters</li>
+            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0"></i> Calendar and deadline tracking for attorneys</li>
+            <li class="flex items-start gap-2"><i data-lucide="check" class="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0"></i> Client correspondence and status updates</li>
+          </ul>
+          <button onclick="openBooking('Legal Assistant')" class="mt-5 w-full bg-[#1b1e2b] text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-800 transition">
+            Add a Legal Assistant
+          </button>
+        </div>
+
+        <!-- Cost Comparison Card -->
+        <div class="rounded-xl bg-[#1b1e2b] text-white p-6">
+          <h3 class="font-bold text-lg mb-2">What You're Currently Spending</h3>
+          <p class="text-gray-300 text-sm mb-5">3 in-house staff for a mid-size workers' comp firm:</p>
+          <div class="space-y-2 mb-5">
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-300">Intake Coordinator</span>
+              <span class="font-semibold">$3,800/mo</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-300">Legal Assistant</span>
+              <span class="font-semibold">$4,200/mo</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-300">Case Manager</span>
+              <span class="font-semibold">$5,000/mo</span>
+            </div>
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-300">Benefits + Overhead (~35%)</span>
+              <span class="font-semibold">$4,550/mo</span>
+            </div>
+            <div class="border-t border-gray-600 pt-2 flex justify-between font-bold">
+              <span>Total In-House</span>
+              <span class="text-red-400">~$17,550/mo</span>
+            </div>
+          </div>
+          <div class="bg-yellow-400 text-[#1b1e2b] rounded-lg p-3 text-center">
+            <div class="text-xs font-bold uppercase tracking-wide mb-1">With YVA</div>
+            <div class="text-2xl font-extrabold">~$4,480/mo</div>
+            <div class="text-xs font-semibold mt-1">Save $13,000+ every month</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== TESTIMONIALS ===== -->
+  <section class="py-16 px-4 bg-gray-50">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-2xl sm:text-3xl font-bold text-center text-[#1b1e2b] mb-10">
+        What Firms Say After Switching
+      </h2>
+      <div class="grid sm:grid-cols-2 gap-6">
+        <div class="bg-white rounded-xl p-6 shadow-sm">
+          <div class="flex gap-1 text-yellow-400 mb-3">★★★★★</div>
+          <p class="text-gray-700 italic mb-4">"Our medical record turnaround went from 3 weeks to under 5 days. The case manager YVA placed just doesn't stop following up — exactly what we needed."</p>
+          <div class="flex items-center gap-3">
+            <img src="https://i.pravatar.cc/40?img=11" alt="" class="w-10 h-10 rounded-full" />
+            <div>
+              <div class="font-semibold text-sm text-[#1b1e2b]">Marcus T.</div>
+              <div class="text-xs text-gray-500">Workers' Comp Attorney, Texas</div>
+            </div>
+          </div>
+        </div>
+        <div class="bg-white rounded-xl p-6 shadow-sm">
+          <div class="flex gap-1 text-yellow-400 mb-3">★★★★★</div>
+          <p class="text-gray-700 italic mb-4">"Half my clients are Spanish-speaking and their bilingual intake specialist handled everything. No dropped calls, no lost clients. I saw the difference in 2 weeks."</p>
+          <div class="flex items-center gap-3">
+            <img src="https://i.pravatar.cc/40?img=25" alt="" class="w-10 h-10 rounded-full" />
+            <div>
+              <div class="font-semibold text-sm text-[#1b1e2b]">Sofia R.</div>
+              <div class="text-xs text-gray-500">Managing Partner, Florida WC Firm</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== HOW IT WORKS ===== -->
+  <section class="py-16 px-4 bg-white">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-2xl sm:text-3xl font-bold text-center text-[#1b1e2b] mb-10">
+        Up and Running in 72 Hours
+      </h2>
+      <div class="grid sm:grid-cols-3 gap-8">
+        <div class="text-center">
+          <div class="w-14 h-14 bg-yellow-400 rounded-full flex items-center justify-center text-[#1b1e2b] font-extrabold text-xl mx-auto mb-4">1</div>
+          <h3 class="font-bold text-[#1b1e2b] mb-2">Free Strategy Call</h3>
+          <p class="text-gray-600 text-sm">We learn your workflow, caseload volume, and pain points. No pitch — just an honest conversation about fit.</p>
+        </div>
+        <div class="text-center">
+          <div class="w-14 h-14 bg-yellow-400 rounded-full flex items-center justify-center text-[#1b1e2b] font-extrabold text-xl mx-auto mb-4">2</div>
+          <h3 class="font-bold text-[#1b1e2b] mb-2">We Match &amp; Onboard</h3>
+          <p class="text-gray-600 text-sm">We select the right professional for your practice and handle all onboarding — tools, access, workflows, and your firm's processes.</p>
+        </div>
+        <div class="text-center">
+          <div class="w-14 h-14 bg-yellow-400 rounded-full flex items-center justify-center text-[#1b1e2b] font-extrabold text-xl mx-auto mb-4">3</div>
+          <h3 class="font-bold text-[#1b1e2b] mb-2">They Start Delivering</h3>
+          <p class="text-gray-600 text-sm">Within 72 hours your virtual staff member is active, following up on authorizations, handling intake, and managing deadlines.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== FAQ ===== -->
+  <section class="py-16 px-4 bg-gray-50">
+    <div class="max-w-3xl mx-auto">
+      <h2 class="text-2xl sm:text-3xl font-bold text-center text-[#1b1e2b] mb-10">
+        Common Questions from Workers' Comp Firms
+      </h2>
+      <div class="space-y-3" id="faq-list">
+
+        <div class="faq-item bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <button class="faq-trigger w-full flex justify-between items-center p-5 text-left font-semibold text-[#1b1e2b]">
+            Can your staff handle communication with insurance adjusters?
+            <span class="faq-icon text-xl leading-none flex-shrink-0 ml-4">+</span>
+          </button>
+          <div class="faq-answer px-5 pb-5 text-gray-600 text-sm">
+            Yes. Our legal assistants and case managers are trained to correspond with adjusters — sending demand letters, following up on pending approvals, and escalating when needed. They document everything in your CRM.
+          </div>
+        </div>
+
+        <div class="faq-item bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <button class="faq-trigger w-full flex justify-between items-center p-5 text-left font-semibold text-[#1b1e2b]">
+            Are your staff bilingual in workers' comp terminology?
+            <span class="faq-icon text-xl leading-none flex-shrink-0 ml-4">+</span>
+          </button>
+          <div class="faq-answer px-5 pb-5 text-gray-600 text-sm">
+            All of our staff are fluent in English and Spanish. For workers' comp specifically, we train on key terminology — IMEs, lien letters, compromise &amp; release vs. stipulation, and state-specific processes — before placing anyone on your cases.
+          </div>
+        </div>
+
+        <div class="faq-item bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <button class="faq-trigger w-full flex justify-between items-center p-5 text-left font-semibold text-[#1b1e2b]">
+            What software do your staff use?
+            <span class="faq-icon text-xl leading-none flex-shrink-0 ml-4">+</span>
+          </button>
+          <div class="faq-answer px-5 pb-5 text-gray-600 text-sm">
+            Our team works within your existing systems — Filevine, Clio, MyCase, Litify, or any other CMS. We also use Google Workspace, Microsoft 365, and common communication tools. No new software required on your end.
+          </div>
+        </div>
+
+        <div class="faq-item bg-white rounded-xl border border-gray-200 overflow-hidden">
+          <button class="faq-trigger w-full flex justify-between items-center p-5 text-left font-semibold text-[#1b1e2b]">
+            Is there a contract or minimum commitment?
+            <span class="faq-icon text-xl leading-none flex-shrink-0 ml-4">+</span>
+          </button>
+          <div class="faq-answer px-5 pb-5 text-gray-600 text-sm">
+            No long-term contracts. We work month-to-month and you can scale up or down based on your caseload. Most firms expand to additional staff within 60 days once they see the impact.
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== FINAL CTA ===== -->
+  <section class="py-20 px-4 bg-[#1b1e2b] text-white text-center">
+    <div class="max-w-2xl mx-auto">
+      <h2 class="text-3xl sm:text-4xl font-extrabold mb-4">
+        Your Next Injured Worker Deserves a Team That's Ready
+      </h2>
+      <p class="text-gray-300 text-lg mb-8">
+        Book a free 20-minute call. We'll show you exactly which roles will have the biggest impact on your workers' comp practice — and what it costs.
+      </p>
+      <button onclick="openBooking('Workers Comp Firm')" class="bg-yellow-400 hover:bg-yellow-300 text-[#1b1e2b] font-bold px-10 py-4 rounded-lg text-lg transition">
+        Book My Free Strategy Call
+      </button>
+      <p class="text-gray-400 text-sm mt-4">Starting at $7.50/hr &nbsp;·&nbsp; No contracts &nbsp;·&nbsp; 72-hr onboarding</p>
+    </div>
+  </section>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="bg-gray-900 text-gray-400 py-8 px-4 text-center text-sm">
+    <p class="mb-1">&copy; 2025 YVA Law Staffing &mdash; <a href="/" class="text-yellow-400 hover:underline">yvastaffing.agency</a></p>
+    <p>Virtual legal staff for workers' comp firms across the U.S.</p>
+  </footer>
+
+  <!-- ===== BOOKING MODAL ===== -->
+  <div id="booking-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+    <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeBooking()"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto z-10">
+
+      <!-- Form Step -->
+      <div id="form-step">
+        <div class="bg-[#1b1e2b] text-white px-6 py-5 rounded-t-2xl">
+          <div class="flex justify-between items-start">
+            <div>
+              <h2 class="text-xl font-bold">Book Your Free Strategy Call</h2>
+              <p class="text-gray-300 text-sm mt-1">Tell us about your firm — we'll do the rest.</p>
+            </div>
+            <button onclick="closeBooking()" class="text-gray-400 hover:text-white ml-4 mt-1">
+              <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+          </div>
+        </div>
+
+        <form id="booking-form" class="p-6 space-y-4" onsubmit="submitBooking(event)">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
+              <input type="text" name="first_name" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none" placeholder="Maria" />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
+              <input type="text" name="last_name" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none" placeholder="Lopez" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Work Email *</label>
+            <input type="email" name="email" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none" placeholder="maria@yourfirm.com" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
+            <input type="tel" name="phone" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none" placeholder="+1 (305) 000-0000" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Firm Name *</label>
+            <input type="text" name="firm_name" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none" placeholder="Lopez Law Group" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">I'm interested in</label>
+            <select name="service" id="service-select" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none">
+              <option value="Workers Comp Firm">Staffing for My Workers' Comp Firm</option>
+              <option value="Legal Intake">Legal Intake Specialist</option>
+              <option value="Legal Assistant">Legal Assistant</option>
+              <option value="Case Manager">Case Manager</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Message (optional)</label>
+            <textarea name="message" rows="3" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none" placeholder="Tell us about your caseload or current pain points..."></textarea>
+          </div>
+
+          <div id="form-error" class="hidden text-red-600 text-sm bg-red-50 border border-red-200 rounded-lg p-3"></div>
+
+          <button type="submit" id="submit-btn" class="w-full bg-yellow-400 hover:bg-yellow-300 text-[#1b1e2b] font-bold py-3 rounded-lg transition text-sm">
+            Book My Free Call →
+          </button>
+          <p class="text-xs text-gray-400 text-center">No spam. No sales pressure. Just a real conversation.</p>
+        </form>
+      </div>
+
+      <!-- Calendly Step -->
+      <div id="calendly-step">
+        <div class="bg-[#1b1e2b] text-white px-6 py-5 rounded-t-2xl flex justify-between items-center">
+          <div>
+            <h2 class="text-xl font-bold">Pick a Time That Works</h2>
+            <p class="text-gray-300 text-sm mt-1">Choose a slot and you're confirmed.</p>
+          </div>
+          <button onclick="closeBooking()" class="text-gray-400 hover:text-white">
+            <i data-lucide="x" class="w-5 h-5"></i>
+          </button>
+        </div>
+        <div class="p-4">
+          <div class="calendly-inline-widget" data-url="https://calendly.com/contact-yvastaffing-vuu8/new-meeting" style="min-width:280px;height:500px;"></div>
+          <script type="text/javascript" src="https://assets.calendly.com/assets/external/widget.js" async></script>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // Init Lucide icons
+    lucide.createIcons();
+
+    // EmailJS init
+    emailjs.init('Vsnmntfk0c8ChKXVL');
+
+    // ---- Booking Modal ----
+    function openBooking(service) {
+      const modal = document.getElementById('booking-modal');
+      const select = document.getElementById('service-select');
+      if (service && select) {
+        for (let opt of select.options) {
+          if (opt.value === service) { opt.selected = true; break; }
+        }
+      }
+      document.getElementById('form-step').style.display = '';
+      document.getElementById('calendly-step').classList.remove('active');
+      modal.classList.add('open');
+      document.body.style.overflow = 'hidden';
+
+      gtag('event', 'open_booking', { event_category: 'landing_workers_comp', event_label: service || 'general' });
+    }
+
+    function closeBooking() {
+      document.getElementById('booking-modal').classList.remove('open');
+      document.body.style.overflow = '';
+    }
+
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeBooking();
+    });
+
+    async function submitBooking(e) {
+      e.preventDefault();
+      const btn = document.getElementById('submit-btn');
+      const errBox = document.getElementById('form-error');
+      errBox.classList.add('hidden');
+      btn.textContent = 'Sending…';
+      btn.disabled = true;
+
+      const form = e.target;
+      const data = {
+        first_name: form.first_name.value,
+        last_name: form.last_name.value,
+        email: form.email.value,
+        phone: form.phone.value,
+        firm_name: form.firm_name.value,
+        service: form.service.value,
+        message: form.message.value || 'N/A',
+        source: 'Workers\' Comp Landing Page'
+      };
+
+      try {
+        await emailjs.send('service_d485bxr', 'template_8gftonr', data);
+        await emailjs.send('service_d485bxr', 'template_9r6xtuw', data);
+
+        gtag('event', 'booking_submitted', { event_category: 'landing_workers_comp', event_label: data.service });
+
+        document.getElementById('form-step').style.display = 'none';
+        document.getElementById('calendly-step').classList.add('active');
+      } catch(err) {
+        errBox.textContent = 'Something went wrong. Please try again or email us at contact@yvastaffing.agency.';
+        errBox.classList.remove('hidden');
+        btn.textContent = 'Book My Free Call →';
+        btn.disabled = false;
+      }
+    }
+
+    // ---- FAQ Accordion ----
+    document.querySelectorAll('.faq-trigger').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        const item = btn.closest('.faq-item');
+        const answer = item.querySelector('.faq-answer');
+        const isOpen = item.classList.contains('open');
+
+        document.querySelectorAll('.faq-item').forEach(function(i) {
+          i.classList.remove('open');
+          i.querySelector('.faq-answer').classList.remove('open');
+        });
+
+        if (!isOpen) {
+          item.classList.add('open');
+          answer.classList.add('open');
+        }
+      });
+    });
+  </script>
+</body>
+</html>
