@@ -16,13 +16,13 @@
     <meta property="og:url" content="https://yvastaffing.agency">
     <meta property="og:title" content="YVA Law Staffing | Elite Bilingual Virtual Staffing for Law Firms">
     <meta property="og:description" content="Bilingual virtual professionals for law firms. Legal intake, demand writing, legal assistants & case managers starting at $7.50/hr. Start in 72 hours, no contracts.">
-    <meta property="og:image" content="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=1200">
+    <meta property="og:image" content="https://images.unsplash.com/photo-1600880292203-757bb62b4baf?auto=format&fit=crop&q=80&w=1200">
 
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="YVA Law Staffing | Elite Bilingual Virtual Staffing for Law Firms">
     <meta name="twitter:description" content="Bilingual virtual professionals for law firms. Starting at $7.50/hr. No contracts. Start in 72 hours.">
-    <meta name="twitter:image" content="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=1200">
+    <meta name="twitter:image" content="https://images.unsplash.com/photo-1600880292203-757bb62b4baf?auto=format&fit=crop&q=80&w=1200">
 
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-V2Q6V4HE4F"></script>
@@ -356,24 +356,6 @@
             transform: translateY(0);
         }
 
-        /* Lead Magnet Modal */
-        #lead-magnet-modal {
-            display: flex;
-            visibility: hidden;
-            opacity: 0;
-            transition: opacity 0.3s ease, visibility 0.3s ease;
-        }
-        #lead-magnet-modal.open {
-            visibility: visible;
-            opacity: 1;
-        }
-        #lead-magnet-modal .lm-panel {
-            transform: translateY(40px) scale(0.97);
-            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-        #lead-magnet-modal.open .lm-panel {
-            transform: translateY(0) scale(1);
-        }
 
         /* Language Toggle */
         .lang-btn {
@@ -575,7 +557,7 @@
                 <!-- Right Column -->
                 <div class="relative mt-8 lg:mt-0 px-4 lg:px-0">
                     <div class="relative z-10 rounded-[2rem] lg:rounded-[3rem] overflow-hidden shadow-[0_50px_100px_-20px_rgba(27,30,43,0.3)] border-[10px] lg:border-[16px] border-white">
-                        <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&q=80&w=1000" alt="Specialized Virtual Staffing" class="w-full h-[320px] sm:h-[450px] lg:h-[650px] object-cover">
+                        <img src="https://images.unsplash.com/photo-1600880292203-757bb62b4baf?auto=format&fit=crop&q=80&w=1000" alt="Specialized Virtual Staffing" class="w-full h-[320px] sm:h-[450px] lg:h-[650px] object-cover">
                         <div class="absolute inset-0 bg-gradient-to-t from-[#1b1e2b]/60 via-transparent to-transparent"></div>
                     </div>
 
@@ -1222,10 +1204,10 @@
                 <p class="text-slate-400 font-medium mt-4 max-w-2xl mx-auto" data-i18n="roiSub">Pick the roles you need and see your exact savings — updated in real time.</p>
             </div>
 
-            <div class="grid lg:grid-cols-2 gap-8 items-start">
+            <div class="grid lg:grid-cols-2 gap-0 lg:gap-8 items-start">
 
                 <!-- Left: Inputs -->
-                <div class="bg-white rounded-[2rem] p-8 lg:p-10">
+                <div class="bg-white rounded-[2rem] max-lg:rounded-b-none p-8 lg:p-10">
 
                     <!-- Hours Toggle -->
                     <div class="mb-8">
@@ -1293,10 +1275,10 @@
                 </div>
 
                 <!-- Right: Results -->
-                <div class="space-y-4 lg:sticky lg:top-28">
+                <div class="space-y-0 lg:space-y-4 lg:sticky lg:top-28">
 
                     <!-- No roles selected -->
-                    <div id="calc-empty" class="hidden bg-white/5 border border-white/10 rounded-[2rem] p-12 text-center">
+                    <div id="calc-empty" class="hidden bg-white/5 max-lg:bg-[#252839] border border-white/10 max-lg:border-t-0 rounded-[2rem] max-lg:rounded-t-none p-12 text-center">
                         <div class="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-4">
                             <i data-lucide="mouse-pointer-click" class="w-8 h-8 text-slate-500"></i>
                         </div>
@@ -1304,7 +1286,7 @@
                     </div>
 
                     <!-- Results card -->
-                    <div id="calc-results" class="relative bg-white/5 border border-white/10 rounded-[2rem] p-8 lg:p-10 overflow-hidden">
+                    <div id="calc-results" class="relative bg-white/5 max-lg:bg-[#252839] border border-white/10 max-lg:border-t-0 rounded-[2rem] max-lg:rounded-t-none p-8 lg:p-10 overflow-hidden">
 
                         <!-- Card glow -->
                         <div class="absolute -top-12 -right-12 w-56 h-56 bg-yellow-400/15 rounded-full blur-[70px] pointer-events-none"></div>
@@ -1349,25 +1331,6 @@
             </div>
         </div>
     </section>
-
-    <!-- Lead Magnet Strip -->
-    <div class="bg-white border-t border-b border-gray-100 py-10">
-        <div class="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-6">
-            <div class="flex items-center gap-4">
-                <div class="w-12 h-12 bg-yellow-400 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg">
-                    <i data-lucide="file-down" class="w-6 h-6 text-[#1b1e2b]"></i>
-                </div>
-                <div>
-                    <p class="text-yellow-500 text-[10px] font-black uppercase tracking-[0.3em] mb-0.5" data-i18n="lmLabel">Free Download</p>
-                    <p class="text-[#1b1e2b] font-black text-base" data-i18n="lmTitle">Legal Staffing Checklist</p>
-                    <p class="text-gray-500 text-xs font-medium" data-i18n="lmSub">10 questions to ask before hiring virtual legal staff</p>
-                </div>
-            </div>
-            <button onclick="openLeadMagnet()" class="flex-shrink-0 bg-[#1b1e2b] text-white px-8 py-3.5 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center gap-2 hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all shadow-lg whitespace-nowrap">
-                <span data-i18n="lmCta">Get Free Checklist</span> <i data-lucide="arrow-right" class="w-4 h-4"></i>
-            </button>
-        </div>
-    </div>
 
     <!-- How It Works Section -->
     <section id="how-it-works" class="bg-[#1b1e2b] py-20 lg:py-32 overflow-hidden">
@@ -1683,28 +1646,46 @@
             <!-- Founders -->
             <div class="border-t border-slate-100 pt-16">
                 <div class="text-center mb-6">
-                    <p class="text-yellow-500 font-black uppercase text-sm tracking-[0.3em] mb-2" data-i18n="founderSectionLabel">The Founder</p>
-                    <h3 class="text-2xl lg:text-3xl font-black text-[#1b1e2b] tracking-tight" data-i18n="founderSectionTitle">The Person Behind YVA</h3>
+                    <p class="text-yellow-500 font-black uppercase text-sm tracking-[0.3em] mb-2" data-i18n="founderSectionLabel">The Owners</p>
+                    <h3 class="text-2xl lg:text-3xl font-black text-[#1b1e2b] tracking-tight" data-i18n="founderSectionTitle">The People Behind YVA</h3>
                 </div>
 
-                <!-- Hidden founder cards, revealed on click -->
-                <div id="founders-cards" class="flex justify-center max-w-2xl mx-auto">
+                <!-- Hidden team cards, revealed on click -->
+                <div id="founders-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+
+                    <!-- Hans -->
+                    <div class="bg-[#1b1e2b] rounded-[2rem] p-8 relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 w-40 h-40 bg-yellow-400/10 rounded-full blur-[60px]"></div>
+                        <div class="w-16 h-16 bg-yellow-400 rounded-2xl flex items-center justify-center font-black text-[#1b1e2b] text-2xl mb-6 shadow-lg">H</div>
+                        <h4 class="text-white font-black text-xl mb-1">Hans Esmel</h4>
+                        <p class="text-yellow-400 text-xs font-black uppercase tracking-widest mb-4" data-i18n="hansRole">CEO & Founder</p>
+                        <p class="text-slate-400 text-base font-medium leading-relaxed" data-i18n="hansBio">Drives the vision and growth of YVA Law Staffing. Hans built the agency with a mission to connect U.S. law firms with elite bilingual talent — at a price that actually makes sense.</p>
+                    </div>
 
                     <!-- Paola -->
-                    <div class="bg-[#1b1e2b] rounded-[2rem] p-8 relative overflow-hidden group max-w-sm w-full">
+                    <div class="bg-[#1b1e2b] rounded-[2rem] p-8 relative overflow-hidden group">
                         <div class="absolute top-0 right-0 w-40 h-40 bg-yellow-400/10 rounded-full blur-[60px]"></div>
                         <div class="w-16 h-16 bg-yellow-400 rounded-2xl flex items-center justify-center font-black text-[#1b1e2b] text-2xl mb-6 shadow-lg">P</div>
                         <h4 class="text-white font-black text-xl mb-1">Paola Delgado</h4>
-                        <p class="text-yellow-400 text-xs font-black uppercase tracking-widest mb-4" data-i18n="paolaRole">Founder & CEO</p>
+                        <p class="text-yellow-400 text-xs font-black uppercase tracking-widest mb-4" data-i18n="paolaRole">Co-Founder & Director of Client Relations</p>
                         <p class="text-slate-400 text-base font-medium leading-relaxed" data-i18n="paolaBio">Leads client relations and team coordination. Paola ensures every placement is the right fit and that clients get the support they need from day one.</p>
+                    </div>
+
+                    <!-- Oven -->
+                    <div class="bg-[#1b1e2b] rounded-[2rem] p-8 relative overflow-hidden group">
+                        <div class="absolute top-0 right-0 w-40 h-40 bg-yellow-400/10 rounded-full blur-[60px]"></div>
+                        <div class="w-16 h-16 bg-yellow-400 rounded-2xl flex items-center justify-center font-black text-[#1b1e2b] text-2xl mb-6 shadow-lg">O</div>
+                        <h4 class="text-white font-black text-xl mb-1">Oven Valerio</h4>
+                        <p class="text-yellow-400 text-xs font-black uppercase tracking-widest mb-4" data-i18n="ovenRole">Operations Manager</p>
+                        <p class="text-slate-400 text-base font-medium leading-relaxed" data-i18n="ovenBio">Keeps the entire operation running smoothly. Oven oversees VA onboarding, quality control, and day-to-day workflows — making sure every client gets consistent, reliable service.</p>
                     </div>
 
                 </div>
 
                 <!-- Reveal Arrow -->
                 <div class="flex justify-center mt-8">
-                    <button id="founders-toggle" aria-label="Meet the founder" class="flex flex-col items-center gap-2 group">
-                        <span class="text-xs font-black uppercase tracking-widest text-slate-400 group-hover:text-yellow-500 transition-colors" data-i18n="meetFounder">Meet the Founder</span>
+                    <button id="founders-toggle" aria-label="Meet the team" class="flex flex-col items-center gap-2 group">
+                        <span class="text-xs font-black uppercase tracking-widest text-slate-400 group-hover:text-yellow-500 transition-colors" data-i18n="meetFounder">Meet the Team</span>
                         <div class="w-10 h-10 bg-[#1b1e2b] rounded-full flex items-center justify-center group-hover:bg-yellow-400 transition-all shadow-lg">
                             <i data-lucide="chevron-down" class="founders-arrow w-5 h-5 text-yellow-400 group-hover:text-[#1b1e2b]"></i>
                         </div>
@@ -2496,7 +2477,7 @@
                 foundersCards.style.maxHeight = foundersCards.scrollHeight + 'px';
                 foundersCards.classList.add('revealed');
                 foundersArrow.classList.add('rotated');
-                foundersToggleLabel.textContent = 'Hide Founder';
+                foundersToggleLabel.textContent = 'Hide Team';
                 setTimeout(() => { foundersCards.style.maxHeight = 'none'; }, 620);
             } else {
                 foundersCards.style.maxHeight = foundersCards.scrollHeight + 'px';
@@ -2504,7 +2485,7 @@
                     foundersCards.style.maxHeight = '0px';
                     foundersCards.classList.remove('revealed');
                     foundersArrow.classList.remove('rotated');
-                    foundersToggleLabel.textContent = 'Meet the Founder';
+                    foundersToggleLabel.textContent = 'Meet the Team';
                 });
             }
         });
@@ -2844,64 +2825,6 @@
         }
     </script>
 
-    <!-- Lead Magnet Modal -->
-    <div id="lead-magnet-modal" class="fixed inset-0 z-[100] items-center justify-center p-4 md:p-8" role="dialog" aria-modal="true" aria-label="Free Checklist">
-        <div id="lm-backdrop" class="absolute inset-0 bg-[#1b1e2b]/80 backdrop-blur-sm"></div>
-        <div class="lm-panel relative w-full max-w-md bg-white rounded-[2rem] overflow-hidden shadow-[0_40px_80px_-20px_rgba(27,30,43,0.5)] border-4 border-white">
-
-            <!-- Header -->
-            <div class="bg-[#1b1e2b] px-8 py-5 flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                    <div class="bg-yellow-400 w-9 h-9 rounded-xl flex items-center justify-center">
-                        <i data-lucide="file-down" class="w-5 h-5 text-[#1b1e2b]"></i>
-                    </div>
-                    <div>
-                        <p class="text-white font-black text-sm tracking-widest uppercase">Free Download</p>
-                        <p class="text-slate-400 text-[11px] font-bold uppercase tracking-wider">Legal Staffing Checklist</p>
-                    </div>
-                </div>
-                <button id="lm-close" aria-label="Close" class="text-slate-400 hover:text-yellow-400 transition-colors p-2 rounded-xl hover:bg-white/10">
-                    <i data-lucide="x" class="w-6 h-6"></i>
-                </button>
-            </div>
-
-            <!-- Form -->
-            <div id="lm-form-step" class="px-8 py-7 space-y-4">
-                <p class="text-slate-600 text-sm font-medium leading-relaxed">Get our free <strong class="text-[#1b1e2b]">10-question checklist</strong> — everything you need to evaluate before hiring virtual legal staff.</p>
-                <div>
-                    <label class="block text-xs font-black text-[#1b1e2b] uppercase tracking-widest mb-2">Your Name <span class="text-yellow-500">*</span></label>
-                    <input id="lm-name" type="text" placeholder="Jane Smith" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20 transition">
-                </div>
-                <div>
-                    <label class="block text-xs font-black text-[#1b1e2b] uppercase tracking-widest mb-2">Work Email <span class="text-yellow-500">*</span></label>
-                    <input id="lm-email" type="email" placeholder="jane@lawfirm.com" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20 transition">
-                </div>
-                <p id="lm-error" class="hidden text-red-500 text-xs font-bold">Please fill in all required fields.</p>
-                <button id="lm-submit" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all shadow-lg">
-                    Send Me the Checklist <i data-lucide="arrow-right" class="w-4 h-4"></i>
-                </button>
-                <p class="text-center text-slate-400 text-xs font-medium">No spam, ever. Unsubscribe anytime.</p>
-            </div>
-
-            <!-- Success Step -->
-            <div id="lm-success-step" class="hidden px-8 py-10 text-center space-y-5">
-                <div class="w-16 h-16 bg-yellow-400 rounded-2xl flex items-center justify-center mx-auto shadow-lg">
-                    <i data-lucide="check" class="w-8 h-8 text-[#1b1e2b]"></i>
-                </div>
-                <div>
-                    <p class="text-[#1b1e2b] font-black text-xl mb-2">Your checklist is ready!</p>
-                    <p class="text-slate-500 text-sm font-medium">We also sent a copy to your email.</p>
-                </div>
-                <a href="checklist.html" target="_blank" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all shadow-lg">
-                    Open Checklist <i data-lucide="external-link" class="w-4 h-4"></i>
-                </a>
-                <button onclick="closeLeadMagnet(); openCalendly();" class="w-full border-2 border-[#1b1e2b] text-[#1b1e2b] py-3.5 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-[#1b1e2b] hover:text-white transition-all">
-                    Book a Free Call Instead
-                </button>
-            </div>
-        </div>
-    </div>
-
     <script>
 
         // ── Sticky CTA Bar ────────────────────────────────────────────────
@@ -2918,54 +2841,6 @@
         document.getElementById('sticky-cta-close').addEventListener('click', () => {
             stickyCta.classList.remove('visible');
             sessionStorage.setItem('yva_sticky_closed', '1');
-        });
-
-        // ── Lead Magnet Modal ─────────────────────────────────────────────
-        const lmModal = document.getElementById('lead-magnet-modal');
-
-        function openLeadMagnet() {
-            document.getElementById('lm-form-step').classList.remove('hidden');
-            document.getElementById('lm-success-step').classList.add('hidden');
-            lmModal.classList.add('open');
-            document.body.style.overflow = 'hidden';
-            if (typeof gtag !== 'undefined') gtag('event', 'open_lead_magnet', { event_category: 'lead_magnet' });
-        }
-
-        function closeLeadMagnet() {
-            lmModal.classList.remove('open');
-            document.body.style.overflow = '';
-        }
-
-        document.getElementById('lm-close').addEventListener('click', closeLeadMagnet);
-        document.getElementById('lm-backdrop').addEventListener('click', closeLeadMagnet);
-
-        document.getElementById('lm-submit').addEventListener('click', async () => {
-            const name = document.getElementById('lm-name').value.trim();
-            const email = document.getElementById('lm-email').value.trim();
-            const errEl = document.getElementById('lm-error');
-            const btn = document.getElementById('lm-submit');
-            if (!name || !email) { errEl.classList.remove('hidden'); return; }
-            errEl.classList.add('hidden');
-            btn.textContent = 'Sending...';
-            btn.disabled = true;
-            try {
-                await emailjs.send('service_d485bxr', 'template_8gftonr', {
-                    name, email, company: 'Lead Magnet Download',
-                    service: 'Free Checklist Download', website: '',
-                    message: 'Downloaded the Legal Staffing Checklist.',
-                    time: new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })
-                });
-                await emailjs.send('service_d485bxr', 'template_9r6xtuw', {
-                    first_name: name, name, email,
-                    service: 'Legal Staffing Checklist',
-                    message: 'Your free Legal Staffing Checklist is attached below. Access it here: https://yvastaffing.agency/checklist.html'
-                });
-            } catch(e) { console.error('EmailJS lead magnet error:', e); }
-            document.getElementById('lm-form-step').classList.add('hidden');
-            document.getElementById('lm-success-step').classList.remove('hidden');
-            if (typeof gtag !== 'undefined') gtag('event', 'download_checklist', { event_category: 'lead_magnet' });
-            btn.textContent = 'Send Me the Checklist';
-            btn.disabled = false;
         });
 
         // ── Language Toggle ───────────────────────────────────────────────
@@ -2986,8 +2861,6 @@
                 badge4: 'No Contracts', badge4sub: 'Cancel any time',
                 badge5: 'Vetted Talent', badge5sub: 'Rigorously screened',
                 badge6: 'Free Replacement', badge6sub: 'Not a fit? We fix it',
-                lmLabel: 'Free Download', lmTitle: 'Legal Staffing Checklist',
-                lmSub: '10 questions to ask before hiring virtual legal staff', lmCta: 'Get Free Checklist',
                 pillarsLabel: 'Service Expertise', pillarsTitle: 'Tailored Support for Your Industry',
                 pillarsSub: 'High-impact virtual staffing across specialized sectors.',
                 pillar0Title: 'Legal Intake', pillar0Sub: 'Lead capture, screening & scheduling.',
@@ -3055,10 +2928,14 @@
                 stat4Label: 'Client Team Growth', stat4Hover: 'One client started with 2 VAs and now runs a 27-member team — all placed and trained by YVA.',
                 stat5Label: 'Avg. Productivity Increase', stat5Hover: 'Attorneys and managers reclaim hours every week when admin, intake, and follow-ups are fully delegated.',
                 stat6Label: 'Avg. Profit Growth', stat6Hover: 'Lower overhead, more capacity, faster turnaround — our clients close more cases and keep more revenue.',
-                founderSectionLabel: 'The Founder', founderSectionTitle: 'The Person Behind YVA',
-                paolaRole: 'Founder & CEO',
+                founderSectionLabel: 'The Owners', founderSectionTitle: 'The People Behind YVA',
+                hansRole: 'CEO & Founder',
+                hansBio: 'Drives the vision and growth of YVA Law Staffing. Hans built the agency with a mission to connect U.S. law firms with elite bilingual talent — at a price that actually makes sense.',
+                paolaRole: 'Co-Founder & Director of Client Relations',
                 paolaBio: 'Leads client relations and team coordination. Paola ensures every placement is the right fit and that clients get the support they need from day one.',
-                meetFounder: 'Meet the Founder',
+                ovenRole: 'Operations Manager',
+                ovenBio: 'Keeps the entire operation running smoothly. Oven oversees VA onboarding, quality control, and day-to-day workflows — making sure every client gets consistent, reliable service.',
+                meetFounder: 'Meet the Team',
                 footerDesc: 'Elite bilingual virtual staffing for law firms and professional services. Starting at <span class="text-yellow-400 font-bold">$7.50/hr</span>.',
                 footerQuickLinks: 'Quick Links', footerOurServices: 'Our Services', footerGetInTouch: 'Get In Touch',
                 footerTestimonials: 'Testimonials', footerFaq: 'FAQ', footerBlog: 'Blog',
@@ -3090,8 +2967,6 @@
                 badge4: 'Sin Contratos', badge4sub: 'Cancela cuando quieras',
                 badge5: 'Talento Verificado', badge5sub: 'Selección rigurosa',
                 badge6: 'Reemplazo Gratuito', badge6sub: '¿No es el indicado? Lo solucionamos',
-                lmLabel: 'Descarga Gratuita', lmTitle: 'Lista de Verificación de Personal Legal',
-                lmSub: '10 preguntas antes de contratar personal legal virtual', lmCta: 'Descargar Gratis',
                 pillarsLabel: 'Nuestros Servicios', pillarsTitle: 'Apoyo Especializado para tu Firma',
                 pillarsSub: 'Personal virtual de alto impacto para firmas de abogados.',
                 pillar0Title: 'Intake Legal', pillar0Sub: 'Captación, filtrado y programación de consultas.',
@@ -3159,10 +3034,14 @@
                 stat4Label: 'Crecimiento del Equipo', stat4Hover: 'Un cliente comenzó con 2 VAs y ahora dirige un equipo de 27 personas — todas colocadas y capacitadas por YVA.',
                 stat5Label: 'Aumento Promedio de Productividad', stat5Hover: 'Los abogados y gerentes recuperan horas cada semana cuando la administración, el intake y los seguimientos están completamente delegados.',
                 stat6Label: 'Crecimiento Promedio de Rentabilidad', stat6Hover: 'Menos costos fijos, más capacidad, entregas más rápidas — nuestros clientes cierran más casos y retienen más ingresos.',
-                founderSectionLabel: 'La Fundadora', founderSectionTitle: 'La Persona Detrás de YVA',
-                paolaRole: 'Fundadora y CEO',
+                founderSectionLabel: 'Los Fundadores', founderSectionTitle: 'Las Personas Detrás de YVA',
+                hansRole: 'CEO y Fundador',
+                hansBio: 'Impulsa la visión y el crecimiento de YVA Law Staffing. Hans construyó la agencia con la misión de conectar firmas de abogados en EE.UU. con talento bilingüe de élite — a un precio que realmente tiene sentido.',
+                paolaRole: 'Co-Fundadora y Directora de Relaciones con Clientes',
                 paolaBio: 'Lidera las relaciones con clientes y la coordinación del equipo. Paola se asegura de que cada colocación sea la indicada y que los clientes obtengan el apoyo que necesitan desde el primer día.',
-                meetFounder: 'Conoce a la Fundadora',
+                ovenRole: 'Gerente de Operaciones',
+                ovenBio: 'Mantiene toda la operación funcionando sin problemas. Oven supervisa la incorporación de VAs, el control de calidad y los flujos de trabajo diarios — asegurando que cada cliente reciba un servicio consistente y confiable.',
+                meetFounder: 'Conoce al Equipo',
                 footerDesc: 'Personal virtual bilingüe de élite para firmas de abogados y servicios profesionales. Desde <span class="text-yellow-400 font-bold">$7.50/hr</span>.',
                 footerQuickLinks: 'Accesos Directos', footerOurServices: 'Nuestros Servicios', footerGetInTouch: 'Contáctanos',
                 footerTestimonials: 'Testimonios', footerFaq: 'Preguntas Frecuentes', footerBlog: 'Blog',
