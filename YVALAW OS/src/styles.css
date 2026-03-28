@@ -306,6 +306,39 @@ input, select, textarea { font-family: inherit; }
 .attention-item-title { font-size: 13px; font-weight: 600; color: var(--text); }
 .attention-item-sub   { font-size: 11px; color: var(--muted); margin-top: 1px; }
 
+/* ── INVOICE GROUPS ── */
+.invoice-group {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.invoice-group-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  cursor: pointer;
+  user-select: none;
+  background: var(--surf2);
+  border-bottom: 1px solid var(--border);
+  transition: background .15s;
+}
+.invoice-group-header:hover { background: var(--border); }
+.invoice-group-name {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--text);
+}
+.invoice-group-meta {
+  font-size: 12px;
+  color: var(--muted);
+}
+.invoice-group .table-wrap {
+  border: none;
+  border-radius: 0;
+}
+
 /* ── TABLE ── */
 .table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); }
 .data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
