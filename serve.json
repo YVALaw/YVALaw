@@ -1,0 +1,5 @@
+{
+  "rewrites": [
+    { "source": "/os/**", "destination": "/os/index.html" }
+  ]
+}
