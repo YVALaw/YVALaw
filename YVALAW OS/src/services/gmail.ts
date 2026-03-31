@@ -163,22 +163,60 @@ export async function disconnectGmail(): Promise<void> {
 }
 
 // ── Sending ───────────────────────────────────────────────────
-function buildRaw(to: string, subject: string, body: string, from: string): string {
-  const msg = [
-    `From: ${from}`,
-    `To: ${to}`,
-    `Subject: ${subject}`,
-    'MIME-Version: 1.0',
-    'Content-Type: text/plain; charset=utf-8',
-    '',
-    body,
-  ].join('\r\n')
-  // base64url encode
+type EmailAttachment = { name: string; content: string; mimeType: string }
+
+function toB64(str: string): string {
+  return btoa(unescape(encodeURIComponent(str)))
+}
+
+function wrapB64(b64: string, width = 76): string {
+  return b64.match(new RegExp(`.{1,${width}}`, 'g'))?.join('\r\n') ?? b64
+}
+
+function buildRaw(to: string, subject: string, body: string, from: string, attachment?: EmailAttachment): string {
+  let msg: string
+
+  if (attachment) {
+    const boundary = 'YVA_' + Math.random().toString(36).slice(2, 10).toUpperCase()
+    msg = [
+      `From: ${from}`,
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      'MIME-Version: 1.0',
+      `Content-Type: multipart/mixed; boundary="${boundary}"`,
+      '',
+      `--${boundary}`,
+      'Content-Type: text/plain; charset=utf-8',
+      'Content-Transfer-Encoding: base64',
+      '',
+      wrapB64(toB64(body)),
+      '',
+      `--${boundary}`,
+      `Content-Type: ${attachment.mimeType}; name="${attachment.name}"`,
+      `Content-Disposition: attachment; filename="${attachment.name}"`,
+      'Content-Transfer-Encoding: base64',
+      '',
+      wrapB64(toB64(attachment.content)),
+      '',
+      `--${boundary}--`,
+    ].join('\r\n')
+  } else {
+    msg = [
+      `From: ${from}`,
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      'MIME-Version: 1.0',
+      'Content-Type: text/plain; charset=utf-8',
+      '',
+      body,
+    ].join('\r\n')
+  }
+
   return btoa(unescape(encodeURIComponent(msg)))
     .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
 }
 
-export async function sendGmailMessage(to: string, subject: string, body: string): Promise<void> {
+export async function sendGmailMessage(to: string, subject: string, body: string, attachment?: EmailAttachment): Promise<void> {
   const userData = await getGmailUserData()
   if (!userData.gmailEmail) throw new Error('Gmail not connected.')
   const token = await getValidToken()
@@ -187,7 +225,7 @@ export async function sendGmailMessage(to: string, subject: string, body: string
   const res = await fetch(SEND_ENDPOINT, {
     method:  'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ raw: buildRaw(to, subject, body, userData.gmailEmail) }),
+    body:    JSON.stringify({ raw: buildRaw(to, subject, body, userData.gmailEmail, attachment) }),
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
@@ -196,17 +234,17 @@ export async function sendGmailMessage(to: string, subject: string, body: string
 }
 
 // ── Universal send (Gmail if connected, mailto: fallback) ─────
-export async function sendEmail(to: string, subject: string, body: string): Promise<void> {
+export async function sendEmail(to: string, subject: string, body: string, attachment?: EmailAttachment): Promise<void> {
   if (!to) return
   if (await isGmailConnected()) {
     try {
-      await sendGmailMessage(to, subject, body)
+      await sendGmailMessage(to, subject, body, attachment)
       return
     } catch (err) {
       console.error('Gmail send failed, falling back to mailto:', err)
     }
   }
-  // Mailto fallback
+  // Mailto fallback (no attachment support in mailto)
   window.location.href =
     `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
 }

@@ -209,7 +209,13 @@ function emailInvoice(inv: Invoice, settings: AppSettings) {
   const to      = inv.clientEmail || ''
   const subject = `Invoice ${inv.number} — ${settings.companyName || 'YVA Staffing'}`
   const body    = applyInvoiceTemplate(settings.invoiceEmailTemplate || DEFAULT_INVOICE_EMAIL, inv, settings)
-  sendEmail(to, subject, body)
+  // Attach invoice HTML (no DOP for client invoices — pass rate 0)
+  const invoiceHtml = buildInvoiceHTML(inv, 0, settings, false)
+  sendEmail(to, subject, body, {
+    name:     `invoice-${inv.number}.html`,
+    content:  invoiceHtml,
+    mimeType: 'text/html',
+  })
 }
 
 // ── Payment reminder email ──────────────────────────────────
@@ -703,7 +709,7 @@ export default function InvoicePage() {
                                     <button className="btn-xs btn-ghost" title="Payment reminder" onClick={() => { reminderEmail(inv, settings); showToast(`Payment reminder sent to ${inv.clientEmail}`); const cId = clients.find(c => c.name === inv.clientName)?.id; if (cId) void logComm(cId, `Payment reminder sent for Invoice ${inv.number}`, 'email') }}>⚠</button>
                                   )}
                                   <button className="btn-xs btn-ghost" title="Preview" onClick={() => setPreviewInv(inv)}>👁</button>
-                                  <button className="btn-xs btn-ghost" title="PDF" onClick={() => printInvoice(inv, settings.usdToDop, settings)}>⎙</button>
+                                  <button className="btn-xs btn-ghost" title="PDF" onClick={() => printInvoice(inv, 0, settings)}>⎙</button>
                                   <button className="btn-xs btn-ghost" title="Share portal" onClick={() => shareInvoice(inv, settings.usdToDop)}>🔗</button>
                                   <button className="btn-xs btn-ghost" title="Duplicate" onClick={() => duplicateInvoice(inv)}>⧉</button>
                                   <button className="btn-xs btn-ghost" title="Edit invoice" onClick={() => openEditInvoice(inv)}>✏</button>
@@ -922,12 +928,12 @@ export default function InvoicePage() {
                 <div style={{ fontSize: 12, color: 'var(--muted)' }}>{previewInv.clientName}</div>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <button className="btn-primary btn-sm" onClick={() => printInvoice(previewInv, settings.usdToDop, settings)}>⎙ Print / PDF</button>
+                <button className="btn-primary btn-sm" onClick={() => printInvoice(previewInv, 0, settings)}>⎙ Print / PDF</button>
                 <button className="modal-close btn-icon" onClick={() => setPreviewInv(null)}>✕</button>
               </div>
             </div>
             <iframe
-              srcDoc={buildInvoiceHTML(previewInv, settings.usdToDop, settings, false)}
+              srcDoc={buildInvoiceHTML(previewInv, 0, settings, false)}
               style={{ flex: 1, border: 'none', background: '#fff', minHeight: 500 }}
               title="Invoice Preview"
             />
