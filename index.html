@@ -323,22 +323,6 @@
             transform: translateY(0) scale(1);
         }
 
-        /* Founders reveal */
-        #founders-cards {
-            max-height: 0;
-            overflow: hidden;
-            opacity: 0;
-            transition: max-height 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease;
-        }
-        #founders-cards.revealed {
-            opacity: 1;
-        }
-        .founders-arrow {
-            transition: transform 0.3s ease;
-        }
-        .founders-arrow.rotated {
-            transform: rotate(180deg);
-        }
 
         /* Comparison mobile cards */
         .comparison-mobile-card {
@@ -1654,52 +1638,6 @@
                 </div>
             </div>
 
-            <!-- Founders -->
-            <div class="border-t border-slate-100 pt-16">
-                <div class="text-center mb-6">
-                    <p class="text-yellow-500 font-black uppercase text-sm tracking-[0.3em] mb-2" data-i18n="founderSectionLabel">The Owners</p>
-                    <h3 class="text-2xl lg:text-3xl font-black text-[#1b1e2b] tracking-tight" data-i18n="founderSectionTitle">The People Behind YVA</h3>
-                </div>
-
-                <!-- Hidden team cards, revealed on click -->
-                <div id="founders-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
-
-                    <!-- CEO -->
-                    <div class="bg-[#1b1e2b] rounded-[2rem] p-8 relative overflow-hidden group">
-                        <div class="absolute top-0 right-0 w-40 h-40 bg-yellow-400/10 rounded-full blur-[60px]"></div>
-                        <div class="w-16 h-16 bg-yellow-400 rounded-2xl flex items-center justify-center font-black text-[#1b1e2b] text-2xl mb-6 shadow-lg">C</div>
-                        <p class="text-yellow-400 text-xs font-black uppercase tracking-widest mb-4" data-i18n="hansRole">CEO & Founder</p>
-                        <p class="text-slate-400 text-base font-medium leading-relaxed" data-i18n="hansBio">Drives the vision and growth of YVA Law Staffing. Built the agency with a mission to connect U.S. law firms with elite bilingual talent — at a price that actually makes sense.</p>
-                    </div>
-
-                    <!-- Client Relations -->
-                    <div class="bg-[#1b1e2b] rounded-[2rem] p-8 relative overflow-hidden group">
-                        <div class="absolute top-0 right-0 w-40 h-40 bg-yellow-400/10 rounded-full blur-[60px]"></div>
-                        <div class="w-16 h-16 bg-yellow-400 rounded-2xl flex items-center justify-center font-black text-[#1b1e2b] text-2xl mb-6 shadow-lg">CR</div>
-                        <p class="text-yellow-400 text-xs font-black uppercase tracking-widest mb-4" data-i18n="paolaRole">Co-Founder & Director of Client Relations</p>
-                        <p class="text-slate-400 text-base font-medium leading-relaxed" data-i18n="paolaBio">Leads client relations and team coordination. Ensures every placement is the right fit and that clients get the support they need from day one.</p>
-                    </div>
-
-                    <!-- Operations -->
-                    <div class="bg-[#1b1e2b] rounded-[2rem] p-8 relative overflow-hidden group">
-                        <div class="absolute top-0 right-0 w-40 h-40 bg-yellow-400/10 rounded-full blur-[60px]"></div>
-                        <div class="w-16 h-16 bg-yellow-400 rounded-2xl flex items-center justify-center font-black text-[#1b1e2b] text-2xl mb-6 shadow-lg">OP</div>
-                        <p class="text-yellow-400 text-xs font-black uppercase tracking-widest mb-4" data-i18n="ovenRole">Operations Manager</p>
-                        <p class="text-slate-400 text-base font-medium leading-relaxed" data-i18n="ovenBio">Keeps the entire operation running smoothly. Oversees VA onboarding, quality control, and day-to-day workflows — making sure every client gets consistent, reliable service.</p>
-                    </div>
-
-                </div>
-
-                <!-- Reveal Arrow -->
-                <div class="flex justify-center mt-8">
-                    <button id="founders-toggle" aria-label="Meet the team" class="flex flex-col items-center gap-2 group">
-                        <span class="text-xs font-black uppercase tracking-widest text-slate-400 group-hover:text-yellow-500 transition-colors" data-i18n="meetFounder">Meet the Team</span>
-                        <div class="w-10 h-10 bg-[#1b1e2b] rounded-full flex items-center justify-center group-hover:bg-yellow-400 transition-all shadow-lg">
-                            <i data-lucide="chevron-down" class="founders-arrow w-5 h-5 text-yellow-400 group-hover:text-[#1b1e2b]"></i>
-                        </div>
-                    </button>
-                </div>
-            </div>
 
         </div>
     </section>
@@ -2472,31 +2410,6 @@
             tab.addEventListener('click', () => goToService(parseInt(tab.dataset.service)));
         });
 
-        // Founders Toggle
-        const foundersCards = document.getElementById('founders-cards');
-        const foundersToggle = document.getElementById('founders-toggle');
-        const foundersArrow = foundersToggle.querySelector('.founders-arrow');
-        const foundersToggleLabel = foundersToggle.querySelector('span');
-        let foundersRevealed = false;
-
-        foundersToggle.addEventListener('click', () => {
-            foundersRevealed = !foundersRevealed;
-            if (foundersRevealed) {
-                foundersCards.style.maxHeight = foundersCards.scrollHeight + 'px';
-                foundersCards.classList.add('revealed');
-                foundersArrow.classList.add('rotated');
-                foundersToggleLabel.textContent = 'Hide Team';
-                setTimeout(() => { foundersCards.style.maxHeight = 'none'; }, 620);
-            } else {
-                foundersCards.style.maxHeight = foundersCards.scrollHeight + 'px';
-                requestAnimationFrame(() => {
-                    foundersCards.style.maxHeight = '0px';
-                    foundersCards.classList.remove('revealed');
-                    foundersArrow.classList.remove('rotated');
-                    foundersToggleLabel.textContent = 'Meet the Team';
-                });
-            }
-        });
 
         // Testimonials Carousel
         const track = document.getElementById('testimonial-track');
