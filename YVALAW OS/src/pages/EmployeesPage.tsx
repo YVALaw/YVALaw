@@ -8,6 +8,7 @@ import {
 import { formatMoney, fmtHoursHM } from '../utils/money'
 import { useRole } from '../context/RoleContext'
 import { can } from '../lib/roles'
+import { sendEmail } from '../services/gmail'
 
 function uid() { return crypto.randomUUID() }
 
@@ -72,11 +73,8 @@ function getEmployeeInvoices(empName: string, invoices: Invoice[], from?: string
   })
 }
 
-async function printPayslip(emp: Employee, empInvoices: Invoice[], dateFrom: string, dateTo: string) {
-  const settings = await loadSettings()
+function buildStatementHTML(emp: Employee, empInvoices: Invoice[], dateFrom: string, dateTo: string, dopRate: number, autoPrint = false): string {
   const payRate = Number(emp.payRate) || 0
-  const dopRate = settings.usdToDop || 0
-
   const totalHours = empInvoices.reduce((s, inv) =>
     s + (inv.items||[]).filter(it=>it.employeeName?.toLowerCase()===emp.name.toLowerCase())
       .reduce((h,it)=>h+(Number(it.hoursTotal)||0),0), 0)
@@ -116,9 +114,7 @@ async function printPayslip(emp: Employee, empInvoices: Invoice[], dateFrom: str
   }).join('<hr style="border:none;border-top:1px solid #eee;margin:0 0 16px">')
 
   const period = dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : dateFrom || dateTo || 'All time'
-  const win = window.open('', '_blank', 'width=800,height=600')
-  if (!win) return
-  win.document.write(`<!DOCTYPE html><html><head>
+  return `<!DOCTYPE html><html><head>
   <title>Statement — ${emp.name}</title>
   <style>
     body{font-family:Arial,sans-serif;max-width:700px;margin:40px auto;color:#111}
@@ -154,8 +150,16 @@ async function printPayslip(emp: Employee, empInvoices: Invoice[], dateFrom: str
   </div>
   ${sections?sections+'<div style="text-align:right;font-weight:800;font-size:13px;padding:10px 0;border-top:2px solid #111;margin-top:4px">Total &nbsp;&nbsp; '+totalHours.toFixed(1)+'h &nbsp;&nbsp; '+(payRate>0?'$'+totalUSD.toFixed(2):'—')+'</div>':'<p style="color:#999;text-align:center;padding:24px">No invoice data for this period.</p>'}
   <div class="footer">YVA Staffing · Bilingual Virtual Professionals · yvastaffing.net</div>
-  <script>window.onload=function(){window.print()}</script>
-  </body></html>`)
+  ${autoPrint ? '<script>window.onload=function(){window.print()}</script>' : ''}
+  </body></html>`
+}
+
+async function printPayslip(emp: Employee, empInvoices: Invoice[], dateFrom: string, dateTo: string) {
+  const settings = await loadSettings()
+  const html = buildStatementHTML(emp, empInvoices, dateFrom, dateTo, settings.usdToDop || 0, true)
+  const win = window.open('', '_blank', 'width=800,height=600')
+  if (!win) return
+  win.document.write(html)
   win.document.close()
 }
 
@@ -170,8 +174,7 @@ async function emailStatement(emp: Employee, empInvoices: Invoice[], dateFrom: s
   const totalDOP = dopRate > 0 ? totalUSD * dopRate : 0
   const period = dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : dateFrom || dateTo || 'All time'
   const companyName = settings.companyName || 'YVA Staffing'
-
-  const subject = encodeURIComponent(`Your Earnings Statement — ${period} — ${companyName}`)
+  const subject = `Your Earnings Statement — ${period} — ${companyName}`
 
   let bodyText: string
   if (settings.statementEmailTemplate) {
@@ -188,7 +191,15 @@ async function emailStatement(emp: Employee, empInvoices: Invoice[], dateFrom: s
       `  Invoices: ${empInvoices.length}\n\n` +
       `Please reach out if you have any questions.\n\n${settings.emailSignature || companyName}`
   }
-  window.location.href = `mailto:${emp.email || ''}?subject=${subject}&body=${encodeURIComponent(bodyText)}`
+
+  const statementHtml = buildStatementHTML(emp, empInvoices, dateFrom, dateTo, dopRate, false)
+  const safeName = emp.name.replace(/\s+/g, '-').toLowerCase()
+  const periodSlug = period.replace(/\s/g, '').replace(/[^a-zA-Z0-9-]/g, '-')
+  await sendEmail(emp.email || '', subject, bodyText, {
+    name:     `statement-${safeName}-${periodSlug}.html`,
+    content:  statementHtml,
+    mimeType: 'text/html',
+  })
 }
 
 function EmployeeStatementsPanel({ emp, invoices, onInvoicesChange }: {
