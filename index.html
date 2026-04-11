@@ -1560,9 +1560,9 @@
                     <p class="text-yellow-500 font-black uppercase text-xs tracking-[0.3em] mb-3" data-i18n="aboutLabel">Our Story</p>
                     <h2 class="text-4xl lg:text-5xl font-black text-[#1b1e2b] tracking-tight leading-tight mb-6" data-i18n="aboutTitle">Built by People Who <span class="text-yellow-500">Lived the Problem.</span></h2>
                     <div class="space-y-5 text-slate-600 font-medium leading-relaxed">
-                        <p data-i18n="aboutP1">YVA Law Staffing didn't start in a boardroom — it started on the floor of a California law firm. Our founder was working remotely when the firm began asking her to refer talent. What started as a favor quickly revealed something bigger: a rare ability to identify, vet, and train high-performing professionals who integrated seamlessly into demanding legal environments.</p>
-                        <p data-i18n="aboutP2">As she looked at the market, one thing stood out — competitors were charging a premium for the same quality of service that she knew could be delivered at a fraction of the cost. Small and mid-size law firms were being priced out of the support they needed to grow.</p>
-                        <p data-i18n="aboutP3">In 2023, she founded YVA Law Staffing with a clear mission: <span class="font-black text-[#1b1e2b]">help law firms scale their teams without burning their budget.</span> Operating from a physical office in the Dominican Republic, YVA now provides fully bilingual, rigorously vetted virtual professionals who work in U.S. time zones and integrate directly into your firm's workflow — not as freelancers, but as real team members.</p>
+                        <p data-i18n="aboutP1">YVA Law Staffing didn't start in a boardroom — it started on the floor of a California law firm. Hans Henriquez, our CEO, was working closely with legal teams when the demand for quality bilingual talent became impossible to ignore. What started as informal referrals quickly revealed something bigger: a rare ability to identify, vet, and train high-performing professionals who integrated seamlessly into demanding legal environments.</p>
+                        <p data-i18n="aboutP2">As Hans and Sam Colas studied the market, one thing stood out — competitors were charging a premium for the same quality of service that could be delivered at a fraction of the cost. Small and mid-size law firms were being priced out of the support they needed to grow.</p>
+                        <p data-i18n="aboutP3">In 2023, they co-founded YVA Law Staffing with a clear mission: <span class="font-black text-[#1b1e2b]">help law firms scale their teams without burning their budget.</span> Operating from a physical office in the Dominican Republic, YVA now provides fully bilingual, rigorously vetted virtual professionals who work in U.S. time zones and integrate directly into your firm's workflow — not as freelancers, but as real team members.</p>
                     </div>
                 </div>
 
@@ -1608,8 +1608,8 @@
                         </div>
                         <div>
                             <p class="text-5xl font-black text-[#1b1e2b] leading-none mb-2">100x</p>
-                            <p class="text-slate-500 font-bold text-sm uppercase tracking-widest" data-i18n="stat4Label">Client Team Growth</p>
-                            <p class="text-slate-400 text-xs font-medium leading-relaxed mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300" data-i18n="stat4Hover">One client started with 2 VAs and now runs a 100-member team — all placed and trained by YVA.</p>
+                            <p class="text-slate-500 font-bold text-sm uppercase tracking-widest" data-i18n="stat4Label">Assistants Placed</p>
+                            <p class="text-slate-400 text-xs font-medium leading-relaxed mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300" data-i18n="stat4Hover">Over 100 bilingual virtual assistants placed and actively working inside U.S. law firms — all vetted and trained by YVA.</p>
                         </div>
                     </div>
 
@@ -1638,6 +1638,57 @@
                 </div>
             </div>
 
+            <!-- Meet the Founders -->
+            <div class="border-t border-slate-100 pt-16">
+
+                <!-- Header + Toggle -->
+                <div class="text-center mb-4">
+                    <p class="text-yellow-500 font-black uppercase text-xs tracking-[0.3em] mb-3" data-i18n="founderSectionLabel">The Founders</p>
+                    <h3 class="text-3xl lg:text-4xl font-black text-[#1b1e2b] tracking-tight" data-i18n="founderSectionTitle">Meet the Founders</h3>
+                </div>
+                <div class="flex justify-center mt-6 mb-8">
+                    <button id="founders-toggle" onclick="toggleFounders()" class="inline-flex flex-col items-center gap-1 text-slate-400 hover:text-yellow-500 transition-colors cursor-pointer group" aria-label="Expand founders">
+                        <span class="text-[10px] font-black uppercase tracking-[0.2em] group-hover:text-yellow-500 transition-colors" data-i18n="meetFounder">Meet the Founders</span>
+                        <i data-lucide="chevron-down" id="founders-arrow" class="w-6 h-6 transition-transform duration-300"></i>
+                    </button>
+                </div>
+
+                <!-- Founder Cards (hidden by default) -->
+                <div id="founders-cards" style="max-height: 0; overflow: hidden; transition: max-height 0.5s cubic-bezier(0.4,0,0.2,1);">
+                    <div class="grid md:grid-cols-2 gap-8 pb-8">
+
+                        <!-- Hans Henriquez -->
+                        <div class="bg-[#1b1e2b] rounded-[2rem] p-8 flex flex-col gap-6">
+                            <div class="flex items-center gap-5">
+                                <div class="w-16 h-16 rounded-2xl bg-yellow-400/20 flex items-center justify-center flex-shrink-0">
+                                    <i data-lucide="user" class="w-8 h-8 text-yellow-400"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xl font-black text-white">Hans Henriquez</p>
+                                    <p class="text-yellow-400 font-bold text-sm uppercase tracking-widest" data-i18n="hansRole">CEO & Co-Founder</p>
+                                </div>
+                            </div>
+                            <p class="text-slate-400 font-medium leading-relaxed" data-i18n="hansBio">Drives the vision and growth of YVA Law Staffing. Built the agency with a mission to connect U.S. law firms with elite bilingual talent — at a price that actually makes sense.</p>
+                        </div>
+
+                        <!-- Sam Colas -->
+                        <div class="bg-yellow-400 rounded-[2rem] p-8 flex flex-col gap-6">
+                            <div class="flex items-center gap-5">
+                                <div class="w-16 h-16 rounded-2xl bg-[#1b1e2b]/10 flex items-center justify-center flex-shrink-0">
+                                    <i data-lucide="user" class="w-8 h-8 text-[#1b1e2b]"></i>
+                                </div>
+                                <div>
+                                    <p class="text-xl font-black text-[#1b1e2b]">Sam Colas</p>
+                                    <p class="text-[#1b1e2b]/70 font-bold text-sm uppercase tracking-widest" data-i18n="samRole">CCO & Co-Founder</p>
+                                </div>
+                            </div>
+                            <p class="text-[#1b1e2b]/80 font-medium leading-relaxed" data-i18n="samBio">Leads client success and commercial strategy at YVA. Ensures every firm gets the right team, the right onboarding, and the results they were promised — from day one.</p>
+                        </div>
+
+                    </div>
+                </div>
+
+            </div>
 
         </div>
     </section>
@@ -2109,6 +2160,20 @@
         }
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeFaq(); closeCalendly(); closePrivacy(); closeMobileServiceModal(); } });
 
+
+        // Founders Toggle
+        function toggleFounders() {
+            const cards = document.getElementById('founders-cards');
+            const arrow = document.getElementById('founders-arrow');
+            const isOpen = cards.style.maxHeight !== '0px' && cards.style.maxHeight !== '0' && cards.style.maxHeight !== '';
+            if (isOpen) {
+                cards.style.maxHeight = '0';
+                arrow.style.transform = '';
+            } else {
+                cards.style.maxHeight = cards.scrollHeight + 'px';
+                arrow.style.transform = 'rotate(180deg)';
+            }
+        }
 
         // FAQ Accordion
         document.querySelectorAll('.faq-trigger').forEach(trigger => {
@@ -2840,23 +2905,21 @@
                 step3Title: 'Start in 48 Hours', step3Sub: 'Your VA joins your tools, gets briefed on your processes, and hits the ground running — fully integrated from day one.',
                 aboutLabel: 'Our Story',
                 aboutTitle: 'Built by People Who <span class="text-yellow-500">Lived the Problem.</span>',
-                aboutP1: 'YVA Law Staffing didn\'t start in a boardroom — it started on the floor of a California law firm. Our founder was working remotely when the firm began asking her to refer talent. What started as a favor quickly revealed something bigger: a rare ability to identify, vet, and train high-performing professionals who integrated seamlessly into demanding legal environments.',
-                aboutP2: 'As she looked at the market, one thing stood out — competitors were charging a premium for the same quality of service that she knew could be delivered at a fraction of the cost. Small and mid-size law firms were being priced out of the support they needed to grow.',
-                aboutP3: 'In 2023, she founded YVA Law Staffing with a clear mission: <span class="font-black text-[#1b1e2b]">help law firms scale their teams without burning their budget.</span> Operating from a physical office in the Dominican Republic, YVA now provides fully bilingual, rigorously vetted virtual professionals who work in U.S. time zones and integrate directly into your firm\'s workflow — not as freelancers, but as real team members.',
+                aboutP1: 'YVA Law Staffing didn\'t start in a boardroom — it started on the floor of a California law firm. Hans Henriquez, our CEO, was working closely with legal teams when the demand for quality bilingual talent became impossible to ignore. What started as informal referrals quickly revealed something bigger: a rare ability to identify, vet, and train high-performing professionals who integrated seamlessly into demanding legal environments.',
+                aboutP2: 'As Hans and Sam Colas studied the market, one thing stood out — competitors were charging a premium for the same quality of service that could be delivered at a fraction of the cost. Small and mid-size law firms were being priced out of the support they needed to grow.',
+                aboutP3: 'In 2023, they co-founded YVA Law Staffing with a clear mission: <span class="font-black text-[#1b1e2b]">help law firms scale their teams without burning their budget.</span> Operating from a physical office in the Dominican Republic, YVA now provides fully bilingual, rigorously vetted virtual professionals who work in U.S. time zones and integrate directly into your firm\'s workflow — not as freelancers, but as real team members.',
                 stat1Label: 'Founded', stat1Hover: 'From a single placement to a full agency in just 2 years — built on results, not promises.',
                 stat2Label: 'Avg. Cost Reduction', stat2Hover: 'Our clients consistently cut staffing costs in half while getting more done — no quality trade-off.',
                 stat3Label: 'Law Firms Served', stat3Hover: 'From solo practitioners to growing multi-attorney firms across the U.S. — all scaling smarter.',
-                stat4Label: 'Client Team Growth', stat4Hover: 'One client started with 2 VAs and now runs a 100-member team — all placed and trained by YVA.',
+                stat4Label: 'Assistants Placed', stat4Hover: 'Over 100 bilingual virtual assistants placed and actively working inside U.S. law firms — all vetted and trained by YVA.',
                 stat5Label: 'Avg. Productivity Increase', stat5Hover: 'Attorneys and managers reclaim hours every week when admin, intake, and follow-ups are fully delegated.',
                 stat6Label: 'Avg. Profit Growth', stat6Hover: 'Lower overhead, more capacity, faster turnaround — our clients close more cases and keep more revenue.',
-                founderSectionLabel: 'The Owners', founderSectionTitle: 'The People Behind YVA',
-                hansRole: 'CEO & Founder',
+                founderSectionLabel: 'The Founders', founderSectionTitle: 'Meet the Founders',
+                hansRole: 'CEO & Co-Founder',
                 hansBio: 'Drives the vision and growth of YVA Law Staffing. Built the agency with a mission to connect U.S. law firms with elite bilingual talent — at a price that actually makes sense.',
-                paolaRole: 'Co-Founder & Director of Client Relations',
-                paolaBio: 'Leads client relations and team coordination. Ensures every placement is the right fit and that clients get the support they need from day one.',
-                ovenRole: 'Operations Manager',
-                ovenBio: 'Keeps the entire operation running smoothly. Oversees VA onboarding, quality control, and day-to-day workflows — making sure every client gets consistent, reliable service.',
-                meetFounder: 'Meet the Team',
+                samRole: 'CCO & Co-Founder',
+                samBio: 'Leads client success and commercial strategy at YVA. Ensures every firm gets the right team, the right onboarding, and the results they were promised — from day one.',
+                meetFounder: 'Meet the Founders',
                 footerDesc: 'Elite bilingual virtual staffing for law firms and professional services. Starting at <span class="text-yellow-400 font-bold">$7.50/hr</span>.',
                 footerQuickLinks: 'Quick Links', footerOurServices: 'Our Services', footerGetInTouch: 'Get In Touch',
                 footerTestimonials: 'Testimonials', footerFaq: 'FAQ', footerBlog: 'Blog',
@@ -2946,23 +3009,21 @@
                 step3Title: 'Empieza en 48 Horas', step3Sub: 'Tu VA se incorpora a tus herramientas, aprende tus procesos y entra en acción — completamente integrado desde el primer día.',
                 aboutLabel: 'Nuestra Historia',
                 aboutTitle: 'Construido por Personas que <span class="text-yellow-500">Vivieron el Problema.</span>',
-                aboutP1: 'YVA Law Staffing no nació en una sala de juntas — nació en el piso de una firma de abogados en California. Nuestra fundadora trabajaba de forma remota cuando la firma comenzó a pedirle que recomendara talento. Lo que empezó como un favor reveló rápidamente algo más grande: una habilidad especial para identificar, evaluar y formar profesionales de alto rendimiento que se integraban perfectamente en entornos legales exigentes.',
-                aboutP2: 'Al analizar el mercado, algo saltaba a la vista — los competidores cobraban precios elevados por la misma calidad de servicio que ella sabía que podía ofrecerse a una fracción del costo. Las firmas pequeñas y medianas estaban siendo excluidas del apoyo que necesitaban para crecer.',
-                aboutP3: 'En 2023, fundó YVA Law Staffing con una misión clara: <span class="font-black text-[#1b1e2b]">ayudar a las firmas de abogados a crecer sin agotar su presupuesto.</span> Operando desde una oficina física en República Dominicana, YVA ofrece profesionales virtuales completamente bilingües, rigurosamente evaluados, que trabajan en los husos horarios de EE.UU. y se integran directamente al flujo de trabajo de tu firma — no como freelancers, sino como verdaderos miembros del equipo.',
+                aboutP1: 'YVA Law Staffing no nació en una sala de juntas — nació en el piso de una firma de abogados en California. Hans Henriquez, nuestro CEO, trabajaba de cerca con equipos legales cuando la demanda de talento bilingüe de calidad se volvió imposible de ignorar. Lo que empezó como referencias informales reveló rápidamente algo más grande: una habilidad especial para identificar, evaluar y formar profesionales de alto rendimiento que se integraban perfectamente en entornos legales exigentes.',
+                aboutP2: 'Al analizar el mercado junto a Sam Colas, algo saltaba a la vista — los competidores cobraban precios elevados por la misma calidad de servicio que podía ofrecerse a una fracción del costo. Las firmas pequeñas y medianas estaban siendo excluidas del apoyo que necesitaban para crecer.',
+                aboutP3: 'En 2023, co-fundaron YVA Law Staffing con una misión clara: <span class="font-black text-[#1b1e2b]">ayudar a las firmas de abogados a crecer sin agotar su presupuesto.</span> Operando desde una oficina física en República Dominicana, YVA ofrece profesionales virtuales completamente bilingües, rigurosamente evaluados, que trabajan en los husos horarios de EE.UU. y se integran directamente al flujo de trabajo de tu firma — no como freelancers, sino como verdaderos miembros del equipo.',
                 stat1Label: 'Fundada', stat1Hover: 'De una sola colocación a una agencia completa en apenas 2 años — construida sobre resultados, no promesas.',
                 stat2Label: 'Reducción Promedio de Costos', stat2Hover: 'Nuestros clientes reducen consistentemente sus costos de personal a la mitad mientras logran más — sin sacrificar calidad.',
                 stat3Label: 'Firmas Atendidas', stat3Hover: 'Desde abogados independientes hasta firmas con múltiples socios en EE.UU. — todos creciendo de forma más inteligente.',
-                stat4Label: 'Crecimiento del Equipo', stat4Hover: 'Un cliente comenzó con 2 VAs y ahora dirige un equipo de 100 personas — todas colocadas y capacitadas por YVA.',
+                stat4Label: 'Asistentes Colocados', stat4Hover: 'Más de 100 asistentes virtuales bilingües colocados y trabajando activamente en firmas de abogados en EE.UU. — todos evaluados y capacitados por YVA.',
                 stat5Label: 'Aumento Promedio de Productividad', stat5Hover: 'Los abogados y gerentes recuperan horas cada semana cuando la administración, el intake y los seguimientos están completamente delegados.',
                 stat6Label: 'Crecimiento Promedio de Rentabilidad', stat6Hover: 'Menos costos fijos, más capacidad, entregas más rápidas — nuestros clientes cierran más casos y retienen más ingresos.',
-                founderSectionLabel: 'Los Fundadores', founderSectionTitle: 'Las Personas Detrás de YVA',
-                hansRole: 'CEO y Fundador',
+                founderSectionLabel: 'Los Fundadores', founderSectionTitle: 'Conoce a los Fundadores',
+                hansRole: 'CEO y Co-Fundador',
                 hansBio: 'Impulsa la visión y el crecimiento de YVA Law Staffing. Construyó la agencia con la misión de conectar firmas de abogados en EE.UU. con talento bilingüe de élite — a un precio que realmente tiene sentido.',
-                paolaRole: 'Co-Fundadora y Directora de Relaciones con Clientes',
-                paolaBio: 'Lidera las relaciones con clientes y la coordinación del equipo. Se asegura de que cada colocación sea la indicada y que los clientes obtengan el apoyo que necesitan desde el primer día.',
-                ovenRole: 'Gerente de Operaciones',
-                ovenBio: 'Mantiene toda la operación funcionando sin problemas. Supervisa la incorporación de VAs, el control de calidad y los flujos de trabajo diarios — asegurando que cada cliente reciba un servicio consistente y confiable.',
-                meetFounder: 'Conoce al Equipo',
+                samRole: 'CCO y Co-Fundadora',
+                samBio: 'Lidera el éxito del cliente y la estrategia comercial en YVA. Se asegura de que cada firma obtenga el equipo adecuado, la incorporación correcta y los resultados prometidos — desde el primer día.',
+                meetFounder: 'Conoce a los Fundadores',
                 footerDesc: 'Personal virtual bilingüe de élite para firmas de abogados y servicios profesionales. Desde <span class="text-yellow-400 font-bold">$7.50/hr</span>.',
                 footerQuickLinks: 'Accesos Directos', footerOurServices: 'Nuestros Servicios', footerGetInTouch: 'Contáctanos',
                 footerTestimonials: 'Testimonios', footerFaq: 'Preguntas Frecuentes', footerBlog: 'Blog',
