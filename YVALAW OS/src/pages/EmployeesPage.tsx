@@ -10,6 +10,7 @@ import { useRole } from '../context/RoleContext'
 import { can } from '../lib/roles'
 import { sendEmail } from '../services/gmail'
 import { buildStatementHTML } from '../utils/statementHtml'
+import { employeePremiumConfig, normalizeClockInput, payrollFromInvoiceItem } from '../utils/payroll'
 
 function uid() { return crypto.randomUUID() }
 
@@ -53,11 +54,13 @@ const TYPE_OPTIONS   = ['', 'Full-time', 'Part-time', 'Project-based']
 
 type FormData = {
   name: string; email: string; phone: string; payRate: string
+  defaultShiftStart: string; defaultShiftEnd: string
+  premiumEnabled: boolean; premiumStartTime: string; premiumPercent: string
   role: string; employmentType: string; location: string
   timezone: string; startYear: string; status: string; notes: string
 }
 const EMPTY: FormData = {
-  name: '', email: '', phone: '', payRate: '', role: '', employmentType: '',
+  name: '', email: '', phone: '', payRate: '', defaultShiftStart: '', defaultShiftEnd: '', premiumEnabled: false, premiumStartTime: '21:00', premiumPercent: '15', role: '', employmentType: '',
   location: '', timezone: '', startYear: '', status: 'Active', notes: '',
 }
 
@@ -74,6 +77,26 @@ function getEmployeeInvoices(empName: string, invoices: Invoice[], from?: string
   })
 }
 
+function getEmployeeInvoiceItems(emp: Employee, inv: Invoice) {
+  return (inv.items || []).filter(it =>
+    (it.employeeId && it.employeeId === emp.id) ||
+    it.employeeName?.toLowerCase() === emp.name.toLowerCase()
+  )
+}
+
+function summarizeEmployeeInvoices(emp: Employee, invoices: Invoice[]) {
+  return invoices.reduce((summary, inv) => {
+    for (const item of getEmployeeInvoiceItems(emp, inv)) {
+      const payroll = payrollFromInvoiceItem(item, emp)
+      summary.hours += payroll.totalHours
+      summary.regularHours += payroll.regularHours
+      summary.premiumHours += payroll.premiumHours
+      summary.totalPay += payroll.totalPay
+    }
+    return summary
+  }, { hours: 0, regularHours: 0, premiumHours: 0, totalPay: 0 })
+}
+
 
 async function printPayslip(emp: Employee, empInvoices: Invoice[], dateFrom: string, dateTo: string) {
   const settings = await loadSettings()
@@ -88,10 +111,9 @@ async function emailStatement(emp: Employee, empInvoices: Invoice[], dateFrom: s
   const settings = await loadSettings()
   const payRate = Number(emp.payRate) || 0
   const dopRate = settings.usdToDop || 0
-  const totalHours = empInvoices.reduce((s, inv) =>
-    s + (inv.items||[]).filter(it=>it.employeeName?.toLowerCase()===emp.name.toLowerCase())
-      .reduce((h,it)=>h+(Number(it.hoursTotal)||0),0), 0)
-  const totalUSD = totalHours * payRate
+  const summary = summarizeEmployeeInvoices(emp, empInvoices)
+  const totalHours = summary.hours
+  const totalUSD = summary.totalPay
   const totalDOP = dopRate > 0 ? totalUSD * dopRate : 0
   const period = dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : dateFrom || dateTo || 'All time'
   const companyName = settings.companyName || 'YVA Staffing'
@@ -144,33 +166,31 @@ function EmployeeStatementsPanel({ emp, invoices, onInvoicesChange }: {
   const empInvoices = getEmployeeInvoices(emp.name, invoices, dateFrom || undefined, dateTo || undefined)
   const payRate = Number(emp.payRate) || 0
 
-  const totalHours = empInvoices.reduce((s, inv) => {
-    return s + (inv.items || []).filter(it => it.employeeName?.toLowerCase() === emp.name.toLowerCase())
-      .reduce((h, it) => h + (Number(it.hoursTotal) || 0), 0)
-  }, 0)
-  const totalEarned = payRate > 0 ? totalHours * payRate : 0
+  const premiumConfig = employeePremiumConfig(emp)
+  const summary = summarizeEmployeeInvoices(emp, empInvoices)
+  const totalHours = summary.hours
+  const totalEarned = summary.totalPay
 
-  const paidCount   = empInvoices.filter(inv => inv.employeePayments?.[emp.name]?.status === 'paid').length
+  const paidCount   = empInvoices.filter(inv => (inv.employeePayments?.[emp.id] || inv.employeePayments?.[emp.name])?.status === 'paid').length
   const pendingCount = empInvoices.length - paidCount
   const totalPaid   = empInvoices.reduce((s, inv) => {
-    if (inv.employeePayments?.[emp.name]?.status !== 'paid') return s
-    const items = (inv.items || []).filter(it => it.employeeName?.toLowerCase() === emp.name.toLowerCase())
-    const hrs = items.reduce((h, it) => h + (Number(it.hoursTotal) || 0), 0)
-    return s + hrs * payRate
+    if ((inv.employeePayments?.[emp.id] || inv.employeePayments?.[emp.name])?.status !== 'paid') return s
+    return s + getEmployeeInvoiceItems(emp, inv).reduce((itemTotal, item) => itemTotal + payrollFromInvoiceItem(item, emp).totalPay, 0)
   }, 0)
 
   function getEmpPayment(inv: Invoice) {
-    return inv.employeePayments?.[emp.name]
+    return inv.employeePayments?.[emp.id] || inv.employeePayments?.[emp.name]
   }
 
   async function markPaid(inv: Invoice) {
-    const hrs = (inv.items || []).filter(it => it.employeeName?.toLowerCase() === emp.name.toLowerCase())
-      .reduce((h, it) => h + (Number(it.hoursTotal) || 0), 0)
+    const amount = getEmployeeInvoiceItems(emp, inv).reduce((sum, item) => sum + payrollFromInvoiceItem(item, emp).totalPay, 0)
+    const existingPayments = { ...(inv.employeePayments || {}) }
+    if (emp.name in existingPayments && emp.id !== emp.name) delete existingPayments[emp.name]
     const updated = invoices.map(i => i.id === inv.id ? {
       ...i,
       employeePayments: {
-        ...(i.employeePayments || {}),
-        [emp.name]: { status: 'paid' as const, paidDate: payDate || new Date().toISOString().slice(0,10), amount: hrs * payRate, notes: payNotes || undefined }
+        ...(i.id === inv.id ? existingPayments : i.employeePayments || {}),
+        [emp.id]: { status: 'paid' as const, paidDate: payDate || new Date().toISOString().slice(0,10), amount, notes: payNotes || undefined }
       }
     } : i)
     onInvoicesChange(updated)
@@ -181,11 +201,13 @@ function EmployeeStatementsPanel({ emp, invoices, onInvoicesChange }: {
   }
 
   async function markPending(inv: Invoice) {
+    const existingPayments = { ...(inv.employeePayments || {}) }
+    if (emp.name in existingPayments && emp.id !== emp.name) delete existingPayments[emp.name]
     const updated = invoices.map(i => i.id === inv.id ? {
       ...i,
       employeePayments: {
-        ...(i.employeePayments || {}),
-        [emp.name]: { status: 'pending' as const }
+        ...(i.id === inv.id ? existingPayments : i.employeePayments || {}),
+        [emp.id]: { status: 'pending' as const }
       }
     } : i)
     onInvoicesChange(updated)
@@ -194,15 +216,15 @@ function EmployeeStatementsPanel({ emp, invoices, onInvoicesChange }: {
 
   const byProject = new Map<string, { hours: number; earned: number }>()
   for (const inv of empInvoices) {
-    const items = (inv.items || []).filter(it => it.employeeName?.toLowerCase() === emp.name.toLowerCase())
-    const projName = inv.projectName || 'No project'
-    const pp = byProject.get(projName) || { hours: 0, earned: 0 }
-    for (const it of items) {
-      const h = Number(it.hoursTotal) || 0
-      pp.hours  += h
-      pp.earned += h * (payRate || 0)
-    }
-    byProject.set(projName, pp)
+      const items = getEmployeeInvoiceItems(emp, inv)
+      const projName = inv.projectName || 'No project'
+      const pp = byProject.get(projName) || { hours: 0, earned: 0 }
+      for (const it of items) {
+      const payroll = payrollFromInvoiceItem(it, emp)
+      pp.hours  += payroll.totalHours
+      pp.earned += payroll.totalPay
+      }
+      byProject.set(projName, pp)
   }
   const projectTotals = Array.from(byProject.entries()).map(([name, pp]) => ({ name, ...pp }))
 
@@ -287,8 +309,14 @@ function EmployeeStatementsPanel({ emp, invoices, onInvoicesChange }: {
         <>
           <div>
             {empInvoices.map(inv => {
-              const items = (inv.items || []).filter(it => it.employeeName?.toLowerCase() === emp.name.toLowerCase())
-              const hrs = items.reduce((h, it) => h + (Number(it.hoursTotal) || 0), 0)
+              const items = getEmployeeInvoiceItems(emp, inv)
+              const payrollSummary = items.reduce((acc, item) => {
+                const payroll = payrollFromInvoiceItem(item, emp)
+                acc.hours += payroll.totalHours
+                acc.totalPay += payroll.totalPay
+                return acc
+              }, { hours: 0, totalPay: 0 })
+              const hrs = payrollSummary.hours
               const invPeriod = inv.billingStart
                 ? `${inv.billingStart}${inv.billingEnd ? ' – ' + inv.billingEnd : ''}`
                 : (inv.date || '—')
@@ -359,7 +387,7 @@ function EmployeeStatementsPanel({ emp, invoices, onInvoicesChange }: {
                           })}
                           <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmtHoursHM(hrs)}</td>
                           <td style={{ textAlign: 'right', color: 'var(--muted)', fontSize: 11 }}>{payRate > 0 ? `$${payRate}/hr` : '—'}</td>
-                          <td style={{ textAlign: 'right', color: 'var(--gold)', fontWeight: 700 }}>{payRate > 0 ? formatMoney(hrs * payRate) : '—'}</td>
+                            <td style={{ textAlign: 'right', color: 'var(--gold)', fontWeight: 700 }}>{payRate > 0 ? formatMoney(payrollSummary.totalPay) : '—'}</td>
                         </tr>
                       </tbody>
                     </table>
@@ -447,6 +475,7 @@ export default function EmployeesPage() {
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [search, setSearch]     = useState('')
   const [filterStatus, setFilterStatus] = useState('')
+  const [teamView, setTeamView] = useState<'projects' | 'cards'>('projects')
 
   function persist(next: Employee[]) { setEmployees(next); void saveEmployees(next) }
 
@@ -455,6 +484,11 @@ export default function EmployeesPage() {
     setForm({
       name: e.name, email: e.email ?? '', phone: e.phone ?? '',
       payRate: e.payRate != null ? String(e.payRate) : '',
+      defaultShiftStart: e.defaultShiftStart || '',
+      defaultShiftEnd: e.defaultShiftEnd || '',
+      premiumEnabled: Boolean(e.premiumEnabled),
+      premiumStartTime: e.premiumStartTime || '21:00',
+      premiumPercent: e.premiumPercent != null ? String(e.premiumPercent) : '15',
       role: (e as { role?: string }).role ?? '',
       employmentType: (e as { employmentType?: string }).employmentType ?? '',
       location: (e as { location?: string }).location ?? '',
@@ -484,15 +518,42 @@ export default function EmployeesPage() {
 
   async function saveForm() {
     if (!form.name.trim()) return
+    const employeePayload: Omit<Employee, 'id'> = {
+      ...form,
+      payRate: form.payRate ? Number(form.payRate) : undefined,
+      defaultShiftStart: form.defaultShiftStart || undefined,
+      defaultShiftEnd: form.defaultShiftEnd || undefined,
+      premiumEnabled: form.premiumEnabled || undefined,
+      premiumStartTime: form.premiumEnabled ? (form.premiumStartTime || '21:00') : undefined,
+      premiumPercent: form.premiumEnabled ? Number(form.premiumPercent || 0) : undefined,
+      startYear: form.startYear ? Number(form.startYear) : undefined,
+      notes: form.notes || undefined,
+      email: form.email || undefined,
+      phone: form.phone || undefined,
+      role: form.role || undefined,
+      employmentType: form.employmentType || undefined,
+      location: form.location || undefined,
+      timezone: form.timezone || undefined,
+    }
     if (modal === 'add') {
       const empNum = await generateEmployeeNumber()
-      persist([...employees, { ...form, id: uid(), employeeNumber: empNum, attachments } as Employee])
+      persist([...employees, { ...employeePayload, id: uid(), employeeNumber: empNum, attachments }])
     } else if (editId) {
-      persist(employees.map((e) => e.id === editId ? { ...e, ...form, attachments } : e))
+      persist(employees.map((e) => e.id === editId ? { ...e, ...employeePayload, attachments } : e))
     }
     setModal(null)
   }
   function doDelete(id: string) { persist(employees.filter((e) => e.id !== id)); setConfirmDelete(null) }
+
+  const groupedProjects = projects
+    .map(project => ({
+      project,
+      employees: employees.filter(e => (project.employeeIds || []).includes(e.id)),
+    }))
+    .filter(group => group.employees.length > 0)
+    .sort((a, b) => a.project.name.localeCompare(b.project.name))
+
+  const unassignedEmployees = employees.filter(emp => !projects.some(project => (project.employeeIds || []).includes(emp.id)))
 
   const filtered = employees.filter((e) => {
     const matchSearch = `${e.name} ${e.email ?? ''} ${(e as {role?:string}).role ?? ''}`.toLowerCase().includes(search.toLowerCase())
@@ -508,6 +569,10 @@ export default function EmployeesPage() {
           <p className="page-sub">{employees.length} member{employees.length !== 1 ? 's' : ''}</p>
         </div>
         <div className="page-header-actions">
+          <div className="view-toggle">
+            <button className={`view-toggle-btn ${teamView === 'projects' ? 'active' : ''}`} onClick={() => setTeamView('projects')}>Projects</button>
+            <button className={`view-toggle-btn ${teamView === 'cards' ? 'active' : ''}`} onClick={() => setTeamView('cards')}>Cards</button>
+          </div>
           <input className="form-input" style={{ width: 190 }} placeholder="Search team..." value={search} onChange={(e) => setSearch(e.target.value)} />
           <select className="form-select" style={{ width: 130 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
             <option value="">All statuses</option>
@@ -579,6 +644,81 @@ export default function EmployeesPage() {
         )
       })()}
 
+      {teamView === 'projects' ? (
+        <div className="project-board-grid">
+          {groupedProjects.map(({ project, employees: projectEmployees }) => (
+            <div key={project.id} className="project-lane">
+              <div className="project-lane-header">
+                <div>
+                  <div className="project-lane-title">{project.name}</div>
+                  <div className="project-lane-sub">{projectEmployees.length} employee{projectEmployees.length !== 1 ? 's' : ''}</div>
+                </div>
+                <span className="badge badge-blue">{project.status || 'Active'}</span>
+              </div>
+              <div className="project-lane-body">
+                {projectEmployees.map((e) => {
+                  const color = avatarColor(e.name)
+                  const empInvoiceCount = invoices.filter(inv => (inv.items||[]).some(it => it.employeeName?.toLowerCase() === e.name.toLowerCase())).length
+                  return (
+                    <div key={`${project.id}-${e.id}`} className="project-employee-card" onClick={() => navigate('/employees/' + e.id)}>
+                      <div className="card-top">
+                        <div className="card-top-left">
+                          <div className="avatar" style={{ background: color }}>{initials(e.name)}</div>
+                          <div>
+                            <div className="card-name">{e.name}</div>
+                            <div className="card-sub">{e.employeeNumber ? `${e.employeeNumber} · ` : ''}{(e as {role?:string}).role || e.email || 'No email'}</div>
+                          </div>
+                        </div>
+                        <span className={`badge ${statusBadge(e.status)}`}>{e.status || 'Active'}</span>
+                      </div>
+                      <div className="project-employee-meta">
+                        {showPayRates && e.payRate && <span className="project-employee-chip">${e.payRate}/hr</span>}
+                        {e.timezone && <span className="project-employee-chip">{e.timezone}</span>}
+                        {empInvoiceCount > 0 && <span className="project-employee-chip">{empInvoiceCount} invoices</span>}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+          {unassignedEmployees.length > 0 && (
+            <div className="project-lane">
+              <div className="project-lane-header">
+                <div>
+                  <div className="project-lane-title">Unassigned</div>
+                  <div className="project-lane-sub">{unassignedEmployees.length} employee{unassignedEmployees.length !== 1 ? 's' : ''}</div>
+                </div>
+              </div>
+              <div className="project-lane-body">
+                {unassignedEmployees.map((e) => {
+                  const color = avatarColor(e.name)
+                  const empInvoiceCount = invoices.filter(inv => (inv.items||[]).some(it => it.employeeName?.toLowerCase() === e.name.toLowerCase())).length
+                  return (
+                    <div key={`unassigned-${e.id}`} className="project-employee-card" onClick={() => navigate('/employees/' + e.id)}>
+                      <div className="card-top">
+                        <div className="card-top-left">
+                          <div className="avatar" style={{ background: color }}>{initials(e.name)}</div>
+                          <div>
+                            <div className="card-name">{e.name}</div>
+                            <div className="card-sub">{e.employeeNumber ? `${e.employeeNumber} · ` : ''}{(e as {role?:string}).role || e.email || 'No email'}</div>
+                          </div>
+                        </div>
+                        <span className={`badge ${statusBadge(e.status)}`}>{e.status || 'Active'}</span>
+                      </div>
+                      <div className="project-employee-meta">
+                        {showPayRates && e.payRate && <span className="project-employee-chip">${e.payRate}/hr</span>}
+                        {e.timezone && <span className="project-employee-chip">{e.timezone}</span>}
+                        {empInvoiceCount > 0 && <span className="project-employee-chip">{empInvoiceCount} invoices</span>}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
       <div className="card-grid">
         {filtered.map((e) => {
           const color = avatarColor(e.name)
@@ -649,6 +789,7 @@ export default function EmployeesPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* Statements Modal */}
       {modal === 'statements' && selectedEmp && (
@@ -706,6 +847,37 @@ export default function EmployeesPage() {
                     <label className="form-label">Pay Rate ($/hr)</label>
                     <input className="form-input" type="number" value={form.payRate} onChange={(e) => setForm({ ...form, payRate: e.target.value })} placeholder="4.50" />
                   </div>
+                )}
+                {showPayRates && (
+                  <>
+                    <div className="form-group">
+                      <label className="form-label">Default Shift Start</label>
+                      <input className="form-input" value={form.defaultShiftStart} onChange={(e) => setForm({ ...form, defaultShiftStart: e.target.value })} onBlur={(e) => setForm({ ...form, defaultShiftStart: normalizeClockInput(e.target.value) })} placeholder="4:00 pm" />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Default Shift End</label>
+                      <input className="form-input" value={form.defaultShiftEnd} onChange={(e) => setForm({ ...form, defaultShiftEnd: e.target.value })} onBlur={(e) => setForm({ ...form, defaultShiftEnd: normalizeClockInput(e.target.value) })} placeholder="12:00 am" />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Premium Rule</label>
+                      <select className="form-select" value={form.premiumEnabled ? 'night' : ''} onChange={(e) => setForm({ ...form, premiumEnabled: e.target.value === 'night' })}>
+                        <option value="">No premium pay</option>
+                        <option value="night">Night shift premium</option>
+                      </select>
+                    </div>
+                    {form.premiumEnabled && (
+                      <>
+                        <div className="form-group">
+                          <label className="form-label">Premium Starts At</label>
+                          <input className="form-input" value={form.premiumStartTime} onChange={(e) => setForm({ ...form, premiumStartTime: e.target.value })} onBlur={(e) => setForm({ ...form, premiumStartTime: normalizeClockInput(e.target.value) || '21:00' })} placeholder="9:00 pm" />
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Premium Increase %</label>
+                          <input className="form-input" type="number" value={form.premiumPercent} onChange={(e) => setForm({ ...form, premiumPercent: e.target.value })} placeholder="15" />
+                        </div>
+                      </>
+                    )}
+                  </>
                 )}
                 <div className="form-group">
                   <label className="form-label">Status</label>

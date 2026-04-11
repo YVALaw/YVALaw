@@ -12,6 +12,7 @@ import { loadSettings, loadGeneralExpenses, loadCandidates } from '../services/s
 import type { AppSettings, Candidate, DataSnapshot, Expense, Invoice } from '../data/types'
 import { useRole } from '../context/RoleContext'
 import { can } from '../lib/roles'
+import { payrollFromInvoiceItem } from '../utils/payroll'
 
 function downloadCSV(filename: string, rows: string[][]): void {
   const escape = (v: string) => `"${String(v ?? '').replace(/"/g, '""')}"`
@@ -1187,10 +1188,14 @@ export default function ReportsPage() {
           const rowsOut: string[][] = []
           for (const inv of histFiltered) {
             for (const item of (inv.items || [])) {
-              const emp = store.employees.find(e => e.name.toLowerCase() === item.employeeName.toLowerCase())
+              const emp = store.employees.find(e =>
+                (item.employeeId && e.id === item.employeeId) ||
+                e.name.toLowerCase() === item.employeeName.toLowerCase()
+              )
+              const payroll = payrollFromInvoiceItem(item, emp)
+              const hrs = payroll.totalHours
+              const usd = payroll.totalPay
               const payRate = Number(emp?.payRate) || 0
-              const hrs = Number(item.hoursTotal) || 0
-              const usd = hrs * payRate
               const dop = dopRate > 0 ? String((usd * dopRate).toFixed(0)) : ''
               rowsOut.push([item.employeeName, String(hrs), String(payRate), String(usd.toFixed(2)), dop, inv.number || '', inv.date || ''])
             }

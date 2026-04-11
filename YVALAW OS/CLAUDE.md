@@ -1,7 +1,7 @@
 # YVA LawOS — Claude Project Context
 
 ## Project Location
-`C:\Users\cronu\Desktop\YVALAW OS\`
+`C:\Users\cronu\Desktop\LegalWebs\YVALAW OS\`
 
 ## Tech Stack
 - React 18 + TypeScript + Vite
@@ -10,6 +10,24 @@
 - Plain CSS (no Tailwind) — design system in `src/styles.css`
 - No npm UI libraries — all components hand-built
 - Deployed on **Netlify** from GitHub repo: https://github.com/YVALaw/YVA-OS.git
+
+---
+
+## Current Logic Updates
+- Employee schedule and premium-rate logic now live in the app layer: default shift start/end plus premium start time and premium percent are stored on each employee.
+- Invoice calculations now use the saved employee schedule when available. Premium time increases both client billing and employee payroll; missing schedule falls back to regular rate.
+- Daily-grid invoice entries and simple total-hour entries both use the same payroll split logic.
+- Reports payroll CSV now uses premium-aware invoice items instead of raw hours × rate.
+- Per-project invoice numbering now recovers from saved invoices if `nextInvoiceSeq` drifts, instead of blindly trusting the cached counter.
+- Hour parsing accepts decimal hours, `h:mm`, and legacy minute-style values like `3.08` meaning `3h 08m`.
+- Gmail auth now uses a Netlify server function for token exchange and refresh; the Google client secret lives in `GMAIL_CLIENT_SECRET` on Netlify, not in the browser.
+- USD→DOP auto-fetch now comes from InfoDolar Banco BHD data via a Netlify function, with manual entry still available.
+- Candidate conversion now creates the employee record when moved to hired and removes the candidate card once conversion is complete.
+
+## UI Notes
+- Projects cards keep their action buttons inside the card on narrow widths; the footer now wraps instead of overflowing.
+- The Projects pipeline uses the same wrapped action layout so buttons stay inside the card at smaller display sizes.
+- Team has a project-grouped view that nests employees under each assigned project and keeps an Unassigned lane for staff without a project.
 
 ## Data Storage (Supabase tables)
 | Table | Contents |
@@ -84,21 +102,23 @@ All data is scoped to the authenticated user via Supabase RLS.
   - Per-employee daily hours grid OR simple total hours mode
   - Auto-generates invoice number: per-project prefix (FNPR0001) or global INV-001
   - Fields: client, project, invoice date, due date, billing period, notes/message
-  - Supports h:mm and comma-decimal hour formats (8:30 = 8.5h)
+  - Supports h:mm, comma-decimal, and legacy minute-style hour formats (8:30 = 8.5h, 3.08 = 3h08m)
   - Templates: save current form as reusable template, load from list
+  - Employee rows can inherit saved shift start/end and premium pay settings from the employee profile
+  - Premium math is shared between billing, payroll estimates, and statement reporting
 - **"Quick Invoice"** → simple modal for fixed-price invoices — always creates as `sent`, auto-emails client
 - When invoice is created via builder or Quick Invoice → status auto-set to `sent` + email auto-sent
 - Invoices page is **project-grouped**: collapsible sections per project, table rows per invoice; Unassigned section at bottom
   - **All groups collapsed by default** — uses an `expanded` Set (empty = all closed)
   - Each group header shows **unpaid count** (sent/overdue/partial) in red dot badge
 - Each project group has "+ Quick" and "+ Invoice" buttons that pre-fill the project
-- Email button: sends via Gmail if connected, otherwise opens mailto:
-- PDF button: opens print-formatted window with logo, due date, notes, DOP
+- Email button: sends via Gmail if connected, otherwise opens mailto: — **invoice HTML attached as `invoice-{number}.html`**
+- PDF button: opens print-formatted window with logo, due date, notes — **no DOP on client-facing PDFs**
 - Share button: copies base64 portal link to clipboard
 
 ## Per-Project Invoice Numbering
 - First letter of each word in project name → prefix (max 5 chars, uppercase)
-- Project stores `nextInvoiceSeq` (starts at 1, auto-increments)
+- Project stores `nextInvoiceSeq` but the builder also recovers from the highest saved invoice number for that project
 - e.g. "Food Net PR" → `FNPR0001`, `FNPR0002`, ...
 - Falls back to global `INV-NNN` when no project selected
 
@@ -114,12 +134,17 @@ All data is scoped to the authenticated user via Supabase RLS.
 - Share button on invoice cards copies the portal URL to clipboard
 
 ## Employee Statements
-- Each employee card has a "Statements" button
+- Available on both EmployeesPage (panel) and EmployeeProfilePage (inline section)
 - Date range filter (From/To) with quick Clear
-- Summary: total hours (h mm), total billed, total payroll cost
-- Per-invoice table with Project column
-- "Totals by Project" breakdown section
-- Print PDF button in modal footer
+- Summary: total hours, base rate, premium-adjusted total USD, total DOP (if rate set)
+- Per-invoice breakdown with daily hours grid if available
+- Premium split is shown when an employee has a saved premium schedule
+- "Totals by Project" section
+- **PDF Payslip** — opens print-formatted window (includes DOP)
+- **Email Statement** — sends via Gmail API with statement attached as `statement-{name}-{period}.html`
+  - Button shows "Sending…" while in flight; disabled to prevent double-send
+  - Green toast on success, error toast if Gmail fails
+  - Shared HTML builder: `src/utils/statementHtml.ts` → `buildStatementHTML()`
 
 ## Activity Log (Clients)
 - "Activity" button on each client card (both views)
@@ -164,9 +189,10 @@ Also shows: Employee Performance table, Revenue by Client/Project, All-Time Clie
 
 ## Currency Conversion
 - Settings page has USD→DOP exchange rate field
-- "Auto-fetch" button tries `allorigins.win` proxy → `lafise.com/blrd/` to extract Compra rate
+- "Auto-fetch" button hits a Netlify function that scrapes InfoDolar Banco BHD sell rate
 - Rate stored in `settings` table
-- Shown on invoice cards, PDFs, and portal as `RD$XXXXX`
+- **DOP shown only in employee-facing outputs** (statements, payslips, internal invoice cards)
+- **DOP never shown on client-facing outputs** (invoice PDF, invoice preview, invoice email attachment, portal)
 
 ## Notifications
 - Browser Notification API
@@ -183,13 +209,17 @@ Also shows: Employee Performance table, Revenue by Client/Project, All-Time Clie
 - Partial payment amount editable in the status-change modal
 
 ## Gmail Integration
-- Service: `src/services/gmail.ts` — OAuth2 PKCE flow, token refresh, `sendGmailMessage()`, `sendEmail()` (universal)
-- `sendEmail(to, subject, body)` — uses Gmail API if connected, falls back to `mailto:` if not
+- Service: `src/services/gmail.ts` — OAuth2 PKCE flow, Netlify-backed token exchange/refresh, `sendGmailMessage()`, `sendEmail()` (universal)
+- `sendEmail(to, subject, body, attachment?)` — uses Gmail API if connected, falls back to `mailto:` if not
+  - Optional `attachment: { name, content, mimeType }` — builds multipart/mixed MIME when provided
+  - Attachment content is base64-encoded and line-wrapped at 76 chars per RFC 2822
+  - `mailto:` fallback does not support attachments (browser limitation)
 - **Per-user OAuth**: each logged-in user connects their own Gmail account independently
   - `gmailClientId` stored in shared `settings` table (one per org)
+  - `GMAIL_CLIENT_SECRET` lives in Netlify environment variables
   - `gmailAccessToken`, `gmailRefreshToken`, `gmailTokenExpiry`, `gmailEmail` stored in **Supabase user metadata** (`supabase.auth.updateUser({ data: {...} })`)
   - Read via `supabase.auth.getUser()` → `user.user_metadata`
-- **OAuth flow**: User enters Google OAuth Client ID in Settings → clicks "Connect Gmail" → PKCE redirect to Google → callback at `/oauth-callback` → tokens saved to user metadata
+- **OAuth flow**: User enters Google OAuth Client ID in Settings → clicks "Connect Gmail" → PKCE redirect to Google → callback at `/oauth-callback` → token exchange/refresh handled by `/.netlify/functions/gmail-oauth` → tokens saved to user metadata
 - Token auto-refreshes on expiry using stored refresh token
 - Disconnect option in Settings clears all Gmail tokens from user metadata
 - **Setup**: Google Cloud Console → enable Gmail API → OAuth 2.0 Client ID (Web application) → add `{origin}/oauth-callback` as Authorized Redirect URI
@@ -225,14 +255,17 @@ Also shows: Employee Performance table, Revenue by Client/Project, All-Time Clie
 - Shows active employees, their assigned projects, hours billed this month, and earnings
 
 ## Employee Payslip PDF
-- EmployeesPage Statements modal: "PDF Payslip" button opens a print-formatted window
-- Includes: logo, period, KPI grid (hours, USD, DOP), invoice table, auto-prints
+- Both EmployeesPage and EmployeeProfilePage: "PDF Payslip" opens print-formatted window
+- Includes: logo, period, KPI grid (hours, USD, DOP), per-invoice breakdown, auto-prints
+- Uses shared `buildStatementHTML()` from `src/utils/statementHtml.ts`
 
 ## Employee Statement Email
-- EmployeesPage Statements modal: "Email Statement" button opens mailto: with summary body
+- Both EmployeesPage and EmployeeProfilePage: "Email Statement" sends via Gmail API
+- Attaches full statement HTML as `statement-{name}-{period}.html`
+- Includes sending state + toast confirmation (see Employee Statements section)
 
 ## Onboarding Checklist
-- CandidatesPage: dragging/moving a candidate to `hired` stage auto-opens onboarding checklist modal
+- CandidatesPage: dragging/moving a candidate to `hired` stage creates the employee record, removes the candidate card, and auto-opens onboarding checklist modal
 - 8 standard onboarding tasks with checkboxes, progress counter, "All Done!" button
 
 ---
@@ -243,7 +276,7 @@ Also shows: Employee Performance table, Revenue by Client/Project, All-Time Clie
 - [x] Kanban pipelines: Invoices, Clients, Projects, Candidates
 - [x] Invoice pipeline (Draft/Sent/Viewed/Paid/Overdue)
 - [x] Full React invoice builder (daily hours grid, simple mode, templates)
-- [x] Per-project invoice numbering (PREFIX + sequence)
+- [x] Per-project invoice numbering (PREFIX + sequence, recovers from saved invoices when the counter drifts)
 - [x] Invoice due date field (shown on cards, PDF, portal)
 - [x] Invoice notes/message field (shown on cards, PDF, portal)
 - [x] Invoice templates (save/load reusable builder state)
@@ -259,9 +292,9 @@ Also shows: Employee Performance table, Revenue by Client/Project, All-Time Clie
 - [x] Per-project task board (3-column kanban in modal)
 - [x] Employee-to-project assignment UI (multi-select checkboxes, shown on cards)
 - [x] Document/link storage on Client and Project records
-- [x] Employee email invoices (mailto: with pre-filled content)
-- [x] Invoice PDF export (print window with logo + DOP + notes + due date)
-- [x] USD→DOP currency conversion (manual + auto-fetch from Lafise)
+- [x] Employee email invoices (Gmail API with invoice HTML attached; mailto: fallback)
+- [x] Invoice PDF export (print window with logo + notes + due date — no DOP on client invoices)
+- [x] USD→DOP currency conversion (manual + auto-fetch from InfoDolar Banco BHD)
 - [x] Browser notifications (overdue/draft invoice alerts)
 - [x] Settings: company info, email signature, exchange rate, backup/restore
 - [x] Reports: full KPI dashboard, bar chart, employee performance, all-time analytics
@@ -274,8 +307,15 @@ Also shows: Employee Performance table, Revenue by Client/Project, All-Time Clie
 - [x] Contract renewal alerts (client cards + dashboard Needs Attention panel)
 - [x] Expense tracking per project (log expenses, budget vs actual, category)
 - [x] Employee capacity view (toggle in EmployeesPage — projects + hours this month)
-- [x] Employee payslip PDF (print-formatted window from Statements modal)
-- [x] Employee statement email (mailto: from Statements modal)
+- [x] Employee payslip PDF (print-formatted window; shared `buildStatementHTML` util)
+- [x] Employee statement email (Gmail API with HTML attachment; sending state + toast confirmation)
+- [x] Candidate hire conversion (creates employee record, removes candidate card, opens onboarding checklist)
+- [x] Employee schedule + premium pay rules (saved shift defaults, night premium start/percent)
+- [x] Premium-aware invoice/payroll math (billing + statements)
+- [x] Legacy minute-style hour parsing (`3.08` = 3h08m)
+- [x] Per-project invoice counter recovery from real saved invoices
+- [x] Gmail server-side token exchange/refresh via Netlify function
+- [x] InfoDolar Banco BHD USD→DOP auto-fetch via Netlify function
 - [x] Onboarding checklist (auto-opens when candidate moved to Hired stage)
 - [x] Weekly invoice reminder scheduler (day-of-week trigger, fires on app open)
 - [x] Full-page profile routes for Employees, Clients, Projects, Candidates (no more modals)
@@ -288,7 +328,7 @@ Also shows: Employee Performance table, Revenue by Client/Project, All-Time Clie
 - [x] Profile photo upload on Employee and Client profile pages (base64 dataUrl, camera overlay on hover)
 - [x] Invoice page: project-grouped collapsible list view (replaced kanban — sections per project, table rows per invoice)
 - [x] Invoice auto-send on creation (status → `sent` + email via `sendEmail()`)
-- [x] Gmail OAuth2 PKCE integration (`src/services/gmail.ts`) — actual Gmail API send, mailto: fallback if not connected
+- [x] Gmail OAuth2 PKCE integration (`src/services/gmail.ts`) — actual Gmail API send, Netlify-backed token exchange/refresh, mailto: fallback if not connected
 - [x] **Supabase migration** — all data moved from localStorage to Supabase PostgreSQL + Auth
 - [x] **Login page** — email/password auth with sign-up toggle and Remember Me checkbox
 - [x] **Invoice groups collapsed by default** — all project sections closed on load; unpaid count shown in header
@@ -333,9 +373,9 @@ Single module exports all load/save functions. No direct Supabase calls in pages
 ### Invoice builder (`src/components/InvoiceBuilder.tsx`)
 Standalone component used inside the builder modal in InvoicePage. Handles:
 - Employee row management, daily hours grid, simple totals mode
-- `parseHours(val)` supports: `"8"`, `"8.5"`, `"8,5"`, `"8:30"` → decimal
+- `parseHours(val)` supports: `"8"`, `"8.5"`, `"8,5"`, `"8:30"`, `"3.08"` → decimal
 - Template save/load via `invoice_templates` table
-- Per-project invoice number generation with `nextInvoiceSeq` mutation
+- Per-project invoice number generation with `nextInvoiceSeq` mutation plus fallback recovery from saved invoices
 
 ### New Supabase tables needed (run when reconnecting)
 When the new Supabase project is set up, create these tables in addition to existing ones:
@@ -375,10 +415,10 @@ When the new Supabase project is set up, create these tables in addition to exis
 ## Business Context
 - **Company:** YVA Staffing — bilingual virtual staffing (DR/Latin America) for U.S. businesses
 - **Billing:** USD (invoiced to clients), paid to employees in DOP
-- **Exchange rate source:** Banco Lafise RD → https://www.lafise.com/blrd/ → "Compra" under USD/DOP
+- **Exchange rate source:** InfoDolar Banco BHD → https://www.infodolar.com.do/precio-dolar-entidad-banco-bhd.aspx → sell rate under USD/DOP
 - **Invoice model:** Hourly (hours per employee × rate per hour = invoice total)
 - **Clients:** Professional services, law firms, startups
-- **Team size:** ~27 members
+- **Team size:** ~100 members
 
 ## Key Constraints
 - No npm UI libraries — keep CSS self-contained

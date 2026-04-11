@@ -12,18 +12,145 @@ import { initiateGmailAuth, disconnectGmail, isGmailConnected, sendEmail } from 
 import { useRole } from '../context/RoleContext'
 import { can, ROLE_LABELS, ROLE_OPTIONS } from '../lib/roles'
 
+type InfoDolarBhdResponse = {
+  provider: string
+  entity: string
+  buy: number
+  sell: number
+  timestamp?: string
+  sourceUrl: string
+}
 
-async function fetchLafiseRate(): Promise<number | null> {
-  try {
-    const res  = await fetch('https://open.er-api.com/v6/latest/USD')
-    if (!res.ok) return null
-    const data = await res.json() as { rates?: Record<string, number> }
-    const rate = data.rates?.DOP
-    if (rate && rate > 50 && rate < 100) return Math.round(rate * 100) / 100
-    return null
-  } catch {
-    return null
+function normalizeImportedEmployee(row: Record<string, unknown>): Record<string, unknown> {
+  const next = { ...row }
+  if (next.startYear == null) {
+    const legacyYear = next.hireYear ?? next.hire_year
+    if (legacyYear != null && legacyYear !== '') {
+      next.startYear = legacyYear
+    }
   }
+  delete next.hireYear
+  delete next.hire_year
+  return next
+}
+
+function isUuidLike(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+}
+
+function remapId(value: unknown, map: Map<string, string>): string | null {
+  if (typeof value !== 'string' || !value.trim()) return null
+  return map.get(value) || (isUuidLike(value) ? value : null)
+}
+
+function createIdMap(items: unknown[]): Map<string, string> {
+  const map = new Map<string, string>()
+  for (const item of items) {
+    const oldId = (item as { id?: unknown } | undefined)?.id
+    if (typeof oldId === 'string' && oldId.trim()) {
+      map.set(oldId, crypto.randomUUID())
+    }
+  }
+  return map
+}
+
+function pickFields(row: Record<string, unknown>, keys: string[]): Record<string, unknown> {
+  return Object.fromEntries(keys.filter(key => key in row).map(key => [key, row[key]]))
+}
+
+function normalizeImportedEmployees(items: unknown[], idMap: Map<string, string>): Record<string, unknown>[] {
+  const allowed = [
+    'id', 'name', 'userId', 'employeeNumber', 'email', 'phone', 'payRate',
+    'defaultShiftStart', 'defaultShiftEnd', 'premiumEnabled', 'premiumStartTime', 'premiumPercent',
+    'role', 'employmentType', 'location', 'timezone', 'startYear', 'status', 'notes',
+    'photoUrl', 'attachments',
+  ]
+  return items.map(item => {
+    const row = normalizeImportedEmployee(item as Record<string, unknown>)
+    const oldId = (item as { id?: unknown } | undefined)?.id
+    const id = typeof oldId === 'string' && oldId.trim()
+      ? (idMap.get(oldId) || crypto.randomUUID())
+      : crypto.randomUUID()
+    return { ...pickFields(row, allowed), id }
+  })
+}
+
+function normalizeImportedClients(items: unknown[], idMap: Map<string, string>): Record<string, unknown>[] {
+  const allowed = [
+    'id', 'name', 'company', 'email', 'phone', 'address', 'timezone', 'defaultRate',
+    'paymentTerms', 'tags', 'notes', 'status', 'contractEnd', 'photoUrl', 'links', 'contracts',
+  ]
+  return items.map(item => {
+    const row = item as Record<string, unknown>
+    const oldId = typeof row.id === 'string' ? row.id : ''
+    const id = oldId ? (idMap.get(oldId) || crypto.randomUUID()) : crypto.randomUUID()
+    return { ...pickFields(row, allowed), id }
+  })
+}
+
+function normalizeImportedProjects(
+  items: unknown[],
+  maps: { projectIds: Map<string, string>; clientIds: Map<string, string>; employeeIds: Map<string, string> },
+): Record<string, unknown>[] {
+  const allowed = [
+    'id', 'name', 'rate', 'budget', 'clientId', 'employeeIds', 'nextInvoiceSeq', 'status',
+    'billingModel', 'startDate', 'endDate', 'description', 'projectNeeds', 'notes', 'tags',
+    'links', 'contracts',
+  ]
+  return items.map(item => {
+    const row = item as Record<string, unknown>
+    const oldId = typeof row.id === 'string' ? row.id : ''
+    const employeeIds = Array.isArray(row.employeeIds)
+      ? row.employeeIds.map(empId => remapId(empId, maps.employeeIds)).filter((v): v is string => !!v)
+      : []
+    const clientId = remapId(row.clientId, maps.clientIds)
+    const id = oldId ? (maps.projectIds.get(oldId) || crypto.randomUUID()) : crypto.randomUUID()
+    return { ...pickFields(row, allowed), id, clientId, employeeIds }
+  })
+}
+
+function normalizeImportedInvoices(
+  items: unknown[],
+  maps: { invoiceIds: Map<string, string>; projectIds: Map<string, string>; employeeIds: Map<string, string> },
+): Record<string, unknown>[] {
+  const allowed = [
+    'id', 'number', 'date', 'dueDate', 'clientName', 'clientEmail', 'clientAddress',
+    'billingStart', 'billingEnd', 'projectId', 'projectName', 'status', 'subtotal', 'amountPaid',
+    'notes', 'items', 'statusHistory', 'employeePayments', 'tags', 'createdAt', 'updatedAt',
+  ]
+  return items.map(item => {
+    const row = item as Record<string, unknown>
+    const oldId = typeof row.id === 'string' ? row.id : ''
+    const id = oldId ? (maps.invoiceIds.get(oldId) || crypto.randomUUID()) : crypto.randomUUID()
+    const projectId = remapId(row.projectId, maps.projectIds)
+    const items = Array.isArray(row.items)
+      ? row.items.map(rawItem => {
+          const it = rawItem as Record<string, unknown>
+          const employeeId = remapId(it.employeeId, maps.employeeIds)
+          return employeeId ? { ...it, employeeId } : (() => { const copy = { ...it }; delete copy.employeeId; return copy })()
+        })
+      : row.items
+    const employeePayments = row.employeePayments && typeof row.employeePayments === 'object'
+      ? Object.fromEntries(Object.entries(row.employeePayments as Record<string, unknown>).map(([key, value]) => {
+          const mappedKey = maps.employeeIds.get(key)
+          return [mappedKey || key, value]
+        }))
+      : row.employeePayments
+    return { ...pickFields(row, allowed), id, projectId, items, employeePayments }
+  })
+}
+
+function normalizeImportedCandidates(items: unknown[], idMap: Map<string, string>): Record<string, unknown>[] {
+  const allowed = [
+    'id', 'name', 'email', 'phone', 'role', 'source', 'stage', 'notes', 'resumeUrl',
+    'linkedinUrl', 'appliedAt', 'updatedAt', 'attachments',
+  ]
+  return items.map(item => {
+    const row = item as Record<string, unknown>
+    const oldId = typeof row.id === 'string' ? row.id : ''
+    const id = oldId ? (idMap.get(oldId) || crypto.randomUUID()) : crypto.randomUUID()
+    return { ...pickFields(row, allowed), id }
+  })
 }
 
 type SettingsTab = 'company' | 'email' | 'integrations' | 'currency' | 'notifications' | 'data' | 'access'
@@ -68,6 +195,7 @@ export default function SettingsPage() {
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteSending, setInviteSending] = useState(false)
   const [inviteMsg, setInviteMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [rateSourceMeta, setRateSourceMeta] = useState<InfoDolarBhdResponse | null>(null)
 
   useEffect(() => {
     void loadSettings().then(setSettingsState)
@@ -126,13 +254,28 @@ export default function SettingsPage() {
   async function handleFetchRate() {
     setFetchingRate(true)
     setFetchMsg(null)
-    const rate = await fetchLafiseRate()
+    let payload: InfoDolarBhdResponse | null = null
+    try {
+      const res = await fetch('/.netlify/functions/infodolar-bhd')
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setFetchingRate(false)
+        setFetchMsg(data?.error || 'Could not auto-fetch from InfoDolar BHD.')
+        return
+      }
+      payload = data as InfoDolarBhdResponse
+    } catch {
+      setFetchingRate(false)
+      setFetchMsg('Could not auto-fetch from InfoDolar BHD. Try again or enter the rate manually.')
+      return
+    }
     setFetchingRate(false)
-    if (rate) {
-      updateSettings({ usdToDop: rate })
-      setFetchMsg(`Rate updated to RD$${rate} / $1 USD`)
+    if (payload?.sell) {
+      updateSettings({ usdToDop: payload.sell })
+      setRateSourceMeta(payload)
+      setFetchMsg(`Rate updated from ${payload.entity} via ${payload.provider}: RD$${payload.sell} / $1 USD`)
     } else {
-      setFetchMsg('Could not auto-fetch rate — enter manually below.')
+      setFetchMsg('Could not auto-fetch from InfoDolar BHD. Try again or enter the rate manually.')
     }
   }
 
@@ -173,14 +316,26 @@ export default function SettingsPage() {
       try {
         const data = JSON.parse(e.target?.result as string) as Partial<DataSnapshot & { candidates: unknown[]; invoiceCounter: number }>
         void (async () => {
-          let count = 0
-          if (Array.isArray(data.employees)) { await saveEmployees(data.employees); count++ }
-          if (Array.isArray(data.projects))  { await saveProjects(data.projects);   count++ }
-          if (Array.isArray(data.clients))   { await saveClients(data.clients);     count++ }
-          if (Array.isArray(data.invoices))  { await saveInvoices(data.invoices);   count++ }
-          if (typeof data.invoiceCounter === 'number') { await saveInvoiceCounter(data.invoiceCounter); count++ }
-          if (Array.isArray(data.candidates)) { await saveCandidates(data.candidates as Parameters<typeof saveCandidates>[0]); count++ }
-          setImportStatus(`Imported ${count} data set${count !== 1 ? 's' : ''} successfully. Reload the page to see changes.`)
+          try {
+            let count = 0
+            const employeeIdMap = Array.isArray(data.employees) ? createIdMap(data.employees) : new Map<string, string>()
+            const clientIdMap = Array.isArray(data.clients) ? createIdMap(data.clients) : new Map<string, string>()
+            const projectIdMap = Array.isArray(data.projects) ? createIdMap(data.projects) : new Map<string, string>()
+            const invoiceIdMap = Array.isArray(data.invoices) ? createIdMap(data.invoices) : new Map<string, string>()
+            const candidateIdMap = Array.isArray(data.candidates) ? createIdMap(data.candidates) : new Map<string, string>()
+
+            if (Array.isArray(data.employees)) { await saveEmployees(normalizeImportedEmployees(data.employees, employeeIdMap) as Parameters<typeof saveEmployees>[0]); count++ }
+            if (Array.isArray(data.projects))  { await saveProjects(normalizeImportedProjects(data.projects, { projectIds: projectIdMap, clientIds: clientIdMap, employeeIds: employeeIdMap }) as Parameters<typeof saveProjects>[0]);   count++ }
+            if (Array.isArray(data.clients))   { await saveClients(normalizeImportedClients(data.clients, clientIdMap) as Parameters<typeof saveClients>[0]);     count++ }
+            if (Array.isArray(data.invoices))  { await saveInvoices(normalizeImportedInvoices(data.invoices, { invoiceIds: invoiceIdMap, projectIds: projectIdMap, employeeIds: employeeIdMap }) as Parameters<typeof saveInvoices>[0]);   count++ }
+            if (typeof data.invoiceCounter === 'number') { await saveInvoiceCounter(data.invoiceCounter); count++ }
+            if (Array.isArray(data.candidates)) { await saveCandidates(normalizeImportedCandidates(data.candidates, candidateIdMap) as Parameters<typeof saveCandidates>[0]); count++ }
+            if (count === 0) throw new Error('No supported data sets found in this file.')
+            setImportStatus(`Imported ${count} data set${count !== 1 ? 's' : ''} successfully. Reloading…`)
+            setTimeout(() => window.location.reload(), 900)
+          } catch (error) {
+            setImportStatus(`Import failed — ${error instanceof Error ? error.message : 'Unknown error'}`)
+          }
         })()
       } catch { setImportStatus('Import failed — invalid JSON file.') }
     }
@@ -448,20 +603,6 @@ export default function SettingsPage() {
               </div>
               <div className="settings-row">
                 <div className="settings-row-info">
-                  <div className="settings-row-label">Google OAuth Client Secret</div>
-                  <div className="settings-row-sub">Required for Web application OAuth clients.</div>
-                </div>
-                <input
-                  className="form-input"
-                  style={{ width: 320, fontSize: 12 }}
-                  type="password"
-                  placeholder="GOCSPX-…"
-                  value={settings.gmailClientSecret || ''}
-                  onChange={e => updateSettings({ gmailClientSecret: e.target.value })}
-                />
-              </div>
-              <div className="settings-row">
-                <div className="settings-row-info">
                   <div className="settings-row-label">Connect Gmail</div>
                   <div className="settings-row-sub">
                     All emails (invoices, statements, reminders) will be sent directly via your Gmail.
@@ -479,7 +620,7 @@ export default function SettingsPage() {
                 <strong style={{ color: 'var(--gold)' }}>Setup guide:</strong>{' '}
                 Go to <strong>console.cloud.google.com</strong> → New Project → Enable <strong>Gmail API</strong> →
                 Create <strong>OAuth 2.0 Client ID</strong> (Web application) → add the redirect URI above →
-                paste the Client ID here → click Connect.
+                paste the Client ID here → add the Google client secret to Netlify as <code style={{ background: 'rgba(255,255,255,.07)', padding: '1px 5px', borderRadius: 3, fontSize: 11 }}>GMAIL_CLIENT_SECRET</code> → click Connect.
               </div>
             </>
           )}
@@ -494,7 +635,7 @@ export default function SettingsPage() {
             <div className="settings-row-info">
               <div className="settings-row-label">Exchange Rate (USD → DOP)</div>
               <div className="settings-row-sub">
-                Auto-fetched from open.er-api.com (live mid-market rate). Click Auto-fetch or enter manually.
+                Auto-fetched from InfoDolar using Banco BHD sell rate. Click Auto-fetch or enter manually.
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -513,6 +654,16 @@ export default function SettingsPage() {
           {fetchMsg && (
             <div className={`settings-notice ${fetchMsg.startsWith('Could') ? 'settings-notice-error' : 'settings-notice-success'}`}>
               {fetchMsg}
+            </div>
+          )}
+          {rateSourceMeta && (
+            <div className="settings-notice">
+              Source: <strong>{rateSourceMeta.entity}</strong> via {rateSourceMeta.provider}
+              {typeof rateSourceMeta.buy === 'number' ? ` · Buy RD$${rateSourceMeta.buy}` : ''}
+              {typeof rateSourceMeta.sell === 'number' ? ` · Sell RD$${rateSourceMeta.sell}` : ''}
+              {rateSourceMeta.timestamp ? ` · ${rateSourceMeta.timestamp}` : ''}
+              {' · '}
+              <a href={rateSourceMeta.sourceUrl} target="_blank" rel="noreferrer">Open source</a>
             </div>
           )}
           {settings.usdToDop > 0 && (

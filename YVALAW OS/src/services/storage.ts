@@ -46,7 +46,10 @@ async function syncAll<T extends { id: string }>(
   // Delete removed rows
   const toDelete = existingIds.filter(id => !newIds.has(id))
   if (toDelete.length > 0) {
-    await supabase.from(table).delete().in('id', toDelete)
+    const { error: deleteError } = await supabase.from(table).delete().in('id', toDelete)
+    if (deleteError) {
+      throw new Error(`syncAll(${table}) delete failed: ${deleteError.message}`)
+    }
   }
 
   // Upsert current rows
@@ -61,7 +64,9 @@ async function syncAll<T extends { id: string }>(
       return row
     })
     const { error } = await supabase.from(table).upsert(rows)
-    if (error) console.error(`syncAll(${table})`, error)
+    if (error) {
+      throw new Error(`syncAll(${table}) upsert failed: ${error.message}`)
+    }
   }
 }
 
@@ -190,7 +195,8 @@ export async function loadInvoiceCounter(): Promise<number> {
   return (data as { value: number } | null)?.value ?? 1
 }
 export async function saveInvoiceCounter(n: number): Promise<void> {
-  await supabase.from('counters').update({ value: n }).eq('key', 'invoice')
+  const { error } = await supabase.from('counters').update({ value: n }).eq('key', 'invoice')
+  if (error) throw new Error(`saveInvoiceCounter failed: ${error.message}`)
 }
 
 export async function loadEmployeeCounter(): Promise<number> {
@@ -198,7 +204,8 @@ export async function loadEmployeeCounter(): Promise<number> {
   return (data as { value: number } | null)?.value ?? 1
 }
 export async function saveEmployeeCounter(n: number): Promise<void> {
-  await supabase.from('counters').update({ value: n }).eq('key', 'employee')
+  const { error } = await supabase.from('counters').update({ value: n }).eq('key', 'employee')
+  if (error) throw new Error(`saveEmployeeCounter failed: ${error.message}`)
 }
 
 // ─── Settings ─────────────────────────────────────────────────────────────────

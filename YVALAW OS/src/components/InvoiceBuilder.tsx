@@ -6,9 +6,16 @@ import {
   loadProjects, saveProjects,
   loadInvoiceTemplates, saveInvoiceTemplates,
 } from '../services/storage'
+import { computePayrollBreakdown, computePremiumAdjustedAmount, employeePremiumConfig } from '../utils/payroll'
 
 function projectPrefix(name: string): string {
   return name.split(/\s+/).map(w => w[0] || '').join('').toUpperCase().slice(0, 5)
+}
+
+function parseInvoiceSequence(value?: string): number {
+  if (!value) return 0
+  const match = value.match(/(\d+)(?!.*\d)/)
+  return match ? parseInt(match[1], 10) : 0
 }
 
 function uid() { return crypto.randomUUID() }
@@ -41,15 +48,24 @@ function parseHours(val: string): number {
     const [h, m] = v.split(':')
     return (parseInt(h, 10) || 0) + (parseInt(m, 10) || 0) / 60
   }
+  const minuteStyle = v.match(/^(\d+)\.(\d{2})$/)
+  if (minuteStyle) {
+    const hours = parseInt(minuteStyle[1], 10) || 0
+    const minutes = parseInt(minuteStyle[2], 10) || 0
+    if (minutes < 60) return hours + minutes / 60
+  }
   return parseFloat(v) || 0
 }
 
 type BuilderRow = {
   _id: string
+  employeeId?: string
   employeeName: string
   position: string
   rate: string
   hoursManual: string       // used when no date range
+  shiftStart: string
+  shiftEnd: string
   daily: Record<string, string>
 }
 
@@ -65,7 +81,7 @@ function rowAmount(row: BuilderRow, dates: string[]): number {
 }
 
 function emptyRow(): BuilderRow {
-  return { _id: uid(), employeeName: '', position: '', rate: '', hoursManual: '', daily: {} }
+  return { _id: uid(), employeeId: undefined, employeeName: '', position: '', rate: '', hoursManual: '', shiftStart: '', shiftEnd: '', daily: {} }
 }
 
 type Props = {
@@ -79,6 +95,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
   const [employees, setEmployees] = useState<Employee[]>([])
   const [clients,   setClients]   = useState<Client[]>([])
   const [projects,  setProjects]  = useState<Project[]>([])
+  const [invoices,  setInvoices]  = useState<Invoice[]>([])
   const [templates, setTemplates] = useState<InvoiceTemplate[]>([])
   const [settings,  setSettings]  = useState<AppSettings>({ usdToDop: 0, companyName: '', companyEmail: '', emailSignature: '' })
 
@@ -87,6 +104,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
       setEmployees(snap.employees)
       setClients(snap.clients)
       setProjects(snap.projects)
+      setInvoices(snap.invoices)
     })
     void loadInvoiceTemplates().then(setTemplates)
     void loadSettings().then(setSettings)
@@ -119,10 +137,13 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
     if (editInvoice.items && editInvoice.items.length > 0) {
       setRows(editInvoice.items.map(it => ({
         _id: uid(),
+        employeeId: it.employeeId,
         employeeName: it.employeeName,
         position: it.position || '',
         rate: String(it.rate),
         hoursManual: String(it.hoursTotal),
+        shiftStart: it.shiftStart || '',
+        shiftEnd: it.shiftEnd || '',
         daily: it.daily ? { ...it.daily } : {},
       })))
     }
@@ -163,7 +184,92 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
     ? employees.filter(e => selectedProject.employeeIds!.includes(e.id))
     : employees
 
-  const grandTotal = rows.reduce((s, r) => s + rowAmount(r, dates), 0)
+  function nextProjectInvoiceSeq(project: Project, allInvoices: Invoice[]): number {
+    const maxExisting = allInvoices.reduce((max, invoice) => {
+      const belongsToProject = invoice.projectId === project.id || invoice.projectName === project.name
+      if (!belongsToProject) return max
+      const seq = parseInvoiceSequence(invoice.number)
+      return Number.isFinite(seq) ? Math.max(max, seq) : max
+    }, 0)
+    if (maxExisting > 0) return maxExisting + 1
+    return Math.max(project.nextInvoiceSeq ?? 1, 1)
+  }
+
+  function rowEmployee(row: BuilderRow) {
+    return employees.find(e => e.id === row.employeeId) || employees.find(e => e.name === row.employeeName)
+  }
+
+  function effectiveShift(row: BuilderRow) {
+    const employee = rowEmployee(row)
+    if (employee?.defaultShiftStart && employee?.defaultShiftEnd) {
+      return { shiftStart: employee.defaultShiftStart, shiftEnd: employee.defaultShiftEnd, linked: true }
+    }
+    return { shiftStart: '', shiftEnd: '', linked: false }
+  }
+
+  function rowComp(row: BuilderRow, currentDates: string[]) {
+    const employee = rowEmployee(row)
+    const premiumConfig = employeePremiumConfig(employee)
+    const shift = effectiveShift(row)
+    const rate = parseFloat(row.rate) || 0
+
+    if (currentDates.length > 0) {
+      return currentDates.reduce((acc, day) => {
+        const hours = parseHours(row.daily[day] || '')
+        const payroll = computePayrollBreakdown(hours, employee, shift.shiftStart, shift.shiftEnd)
+        const billing = computePremiumAdjustedAmount(
+          hours,
+          rate,
+          premiumConfig.percent,
+          premiumConfig.enabled && shift.linked,
+          shift.shiftStart,
+          shift.shiftEnd,
+          premiumConfig.startTime,
+        )
+        acc.hours += hours
+        acc.regularHours += payroll.regularHours
+        acc.premiumHours += payroll.premiumHours
+        acc.billAmount += billing.totalAmount
+        acc.payrollAmount += payroll.totalPay
+        return acc
+      }, {
+        hours: 0,
+        regularHours: 0,
+        premiumHours: 0,
+        billAmount: 0,
+        payrollAmount: 0,
+        basePayRate: Number(employee?.payRate || 0) || 0,
+        premiumPercent: premiumConfig.percent,
+        shift,
+        premiumEnabled: premiumConfig.enabled && shift.linked,
+      })
+    }
+
+    const hours = rowHours(row, currentDates)
+    const payroll = computePayrollBreakdown(hours, employee, shift.shiftStart, shift.shiftEnd)
+    const billing = computePremiumAdjustedAmount(
+      hours,
+      rate,
+      premiumConfig.percent,
+      premiumConfig.enabled && shift.linked,
+      shift.shiftStart,
+      shift.shiftEnd,
+      premiumConfig.startTime,
+    )
+    return {
+      hours,
+      regularHours: payroll.regularHours,
+      premiumHours: payroll.premiumHours,
+      billAmount: billing.totalAmount,
+      payrollAmount: payroll.totalPay,
+      basePayRate: payroll.basePayRate,
+      premiumPercent: payroll.premiumPercent,
+      shift,
+      premiumEnabled: premiumConfig.enabled && shift.linked,
+    }
+  }
+
+  const grandTotal = rows.reduce((s, r) => s + rowComp(r, dates).billAmount, 0)
 
   function updateRow(id: string, patch: Partial<BuilderRow>) {
     setRows(prev => prev.map(r => r._id === id ? { ...r, ...patch } : r))
@@ -179,7 +285,13 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
     const billingRate = selectedProject?.rate != null && selectedProject.rate !== ''
       ? String(selectedProject.rate)
       : emp?.payRate != null ? String(emp.payRate) : ''
-    updateRow(rowId, { employeeName: name, rate: billingRate })
+    updateRow(rowId, {
+      employeeId: emp?.id,
+      employeeName: name,
+      rate: billingRate,
+      shiftStart: emp?.defaultShiftStart || '',
+      shiftEnd: emp?.defaultShiftEnd || '',
+    })
   }
 
   function addRow() { setRows(prev => [...prev, emptyRow()]) }
@@ -191,7 +303,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
     setBillingStart(t.billingStart ?? '')
     setBillingEnd(t.billingEnd ?? '')
     setNotes(t.notes ?? '')
-    setRows(t.rows.map(r => ({ ...r, _id: uid() })))
+    setRows(t.rows.map(r => ({ ...emptyRow(), ...r, _id: uid() })))
     setLoadTemplateModal(false)
   }
 
@@ -228,13 +340,25 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
     void (async () => {
       const items: InvoiceItem[] = rows
         .filter(r => r.employeeName.trim())
-        .map(r => ({
-          employeeName: r.employeeName,
-          position:     r.position || undefined,
-          hoursTotal:   rowHours(r, dates),
-          rate:         parseFloat(r.rate) || 0,
-          daily:        dates.length > 0 ? { ...r.daily } : undefined,
-        }))
+        .map(r => {
+          const employee = employees.find(e => e.id === r.employeeId) || employees.find(e => e.name === r.employeeName)
+          const totals = rowComp(r, dates)
+          return {
+            employeeId: employee?.id,
+            employeeName: r.employeeName,
+            position:     r.position || undefined,
+            hoursTotal:   totals.hours,
+            rate:         parseFloat(r.rate) || 0,
+            shiftStart:   totals.shift.shiftStart || undefined,
+            shiftEnd:     totals.shift.shiftEnd || undefined,
+            regularHours: totals.regularHours,
+            premiumHours: totals.premiumHours,
+            basePayRate:  totals.basePayRate,
+            premiumPercent: totals.premiumPercent,
+            totalPay:     totals.payrollAmount,
+            daily:        dates.length > 0 ? { ...r.daily } : undefined,
+          }
+        })
 
       if (editInvoice) {
         // Update existing invoice
@@ -264,20 +388,21 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
       // Create new invoice
       let invNumber: string
       if (selectedProject) {
+        const existingInvoices = await loadInvoices()
         const allProjects = await loadProjects()
         const projIdx = allProjects.findIndex(p => p.id === selectedProject.id)
         const proj = projIdx >= 0 ? allProjects[projIdx] : selectedProject
-        const seq = (proj.nextInvoiceSeq ?? 1)
+        const seq = nextProjectInvoiceSeq(proj, existingInvoices)
         const prefix = projectPrefix(selectedProject.name)
         invNumber = `${prefix}${String(seq).padStart(4, '0')}`
         if (projIdx >= 0) {
           allProjects[projIdx] = { ...proj, nextInvoiceSeq: seq + 1 }
-          void saveProjects(allProjects)
+          await saveProjects(allProjects)
         }
       } else {
         const counter = await loadInvoiceCounter()
         invNumber = `INV-${String(counter).padStart(3, '0')}`
-        void saveInvoiceCounter(counter + 1)
+        await saveInvoiceCounter(counter + 1)
       }
 
       const inv: Invoice = {
@@ -302,6 +427,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
 
       const existing = await loadInvoices()
       await saveInvoices([inv, ...existing])
+      setInvoices([inv, ...existing])
       setSaving(false)
       onCreated(inv)
     })()
@@ -370,7 +496,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
                 {selectedClient.address && <div style={{ fontSize: 11, color: 'var(--muted)' }}>{selectedClient.address}</div>}
                 {selectedProject && (
                   <div style={{ fontSize: 11, color: 'var(--gold)', marginTop: 4 }}>
-                    Next #: {projectPrefix(selectedProject.name)}{String(selectedProject.nextInvoiceSeq ?? 1).padStart(4, '0')}
+                    Next #: {projectPrefix(selectedProject.name)}{String(nextProjectInvoiceSeq(selectedProject, invoices)).padStart(4, '0')}
                   </div>
                 )}
               </>
@@ -432,8 +558,9 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
               </thead>
               <tbody>
                 {rows.map(row => {
-                  const hrs = rowHours(row, dates)
-                  const amt = rowAmount(row, dates)
+                  const comp = rowComp(row, dates)
+                  const hrs = comp.hours
+                  const amt = comp.billAmount
                   return (
                     <tr key={row._id}>
                       <td>
@@ -499,8 +626,11 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
           /* Simple total hours mode */
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {rows.map(row => {
-              const hrs = rowHours(row, dates)
-              const amt = rowAmount(row, dates)
+              const comp = rowComp(row, dates)
+              const employee = rowEmployee(row)
+              const premiumConfig = employeePremiumConfig(employee)
+              const hrs = comp.hours
+              const amt = comp.billAmount
               return (
                 <div key={row._id} className="builder-simple-row">
                   <div className="form-group" style={{ flex: 2 }}>
@@ -523,14 +653,30 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
                     <input className="form-input" type="text" inputMode="decimal" value={row.hoursManual} onChange={e => updateRow(row._id, { hoursManual: e.target.value })} placeholder="0" />
                   </div>
                   <div className="form-group" style={{ flex: 1 }}>
-                    {rows.indexOf(row) === 0 && <label className="form-label">Amount</label>}
+                    {rows.indexOf(row) === 0 && <label className="form-label">Bill Amount</label>}
                     <div className="builder-amount-display">{amt > 0 ? `$${amt.toFixed(2)}` : '—'}</div>
+                  </div>
+                  <div className="form-group" style={{ flex: 1 }}>
+                    {rows.indexOf(row) === 0 && <label className="form-label">Payroll Est.</label>}
+                    <div className="builder-amount-display" style={{ color: comp.payrollAmount > 0 ? 'var(--soft)' : 'var(--muted)' }}>
+                      {comp.payrollAmount > 0 ? `$${comp.payrollAmount.toFixed(2)}` : '—'}
+                    </div>
                   </div>
                   <div style={{ alignSelf: 'flex-end', paddingBottom: 2 }}>
                     {rows.length > 1 && (
                       <button className="btn-icon btn-danger btn-xs" onClick={() => removeRow(row._id)}>×</button>
                     )}
                   </div>
+                  {employee && premiumConfig.enabled && (
+                    <div className="form-group" style={{ flexBasis: '100%', marginTop: -2 }}>
+                      <div className="settings-notice settings-notice-info" style={{ margin: 0 }}>
+                        {comp.shift.linked
+                          ? `Using saved employee shift ${comp.shift.shiftStart} to ${comp.shift.shiftEnd}. `
+                          : 'No saved shift on the employee profile, so this row is using the regular rate only. '}
+                        Premium split: {comp.regularHours.toFixed(2)}h regular + {comp.premiumHours.toFixed(2)}h at +{premiumConfig.percent}% after {premiumConfig.startTime}. Bill: ${comp.billAmount.toFixed(2)}. Payroll: ${comp.payrollAmount.toFixed(2)}.
+                      </div>
+                    </div>
+                  )}
                 </div>
               )
             })}

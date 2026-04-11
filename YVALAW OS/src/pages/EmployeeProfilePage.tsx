@@ -6,6 +6,7 @@ import { uploadFile, deleteFile } from '../services/fileStorage'
 import { sendEmail } from '../services/gmail'
 import { buildStatementHTML } from '../utils/statementHtml'
 import { formatMoney, fmtHoursHM } from '../utils/money'
+import { employeePremiumConfig, normalizeClockInput, payrollFromInvoiceItem } from '../utils/payroll'
 
 function uid() { return crypto.randomUUID() }
 
@@ -75,14 +76,33 @@ function getEmpInvoices(name: string, invoices: Invoice[], from?: string, to?: s
   })
 }
 
+function getEmployeeInvoiceItems(emp: Employee, inv: Invoice) {
+  return (inv.items || []).filter(it =>
+    (it.employeeId && it.employeeId === emp.id) ||
+    it.employeeName?.toLowerCase() === emp.name.toLowerCase()
+  )
+}
+
+function summarizeEmployeeInvoices(emp: Employee, invoices: Invoice[]) {
+  return invoices.reduce((summary, inv) => {
+    for (const item of getEmployeeInvoiceItems(emp, inv)) {
+      const payroll = payrollFromInvoiceItem(item, emp)
+      summary.hours += payroll.totalHours
+      summary.regularHours += payroll.regularHours
+      summary.premiumHours += payroll.premiumHours
+      summary.totalPay += payroll.totalPay
+    }
+    return summary
+  }, { hours: 0, regularHours: 0, premiumHours: 0, totalPay: 0 })
+}
+
 async function emailStatement(emp: Employee, empInvoices: Invoice[], dateFrom: string, dateTo: string) {
   const settings = await loadSettings()
   const payRate  = Number(emp.payRate) || 0
   const dopRate  = settings.usdToDop || 0
-  const totalHours = empInvoices.reduce((s, inv) =>
-    s + (inv.items||[]).filter(it=>it.employeeName?.toLowerCase()===emp.name.toLowerCase())
-      .reduce((h,it)=>h+(Number(it.hoursTotal)||0),0), 0)
-  const totalUSD = totalHours * payRate
+  const summary = summarizeEmployeeInvoices(emp, empInvoices)
+  const totalHours = summary.hours
+  const totalUSD = summary.totalPay
   const totalDOP = dopRate > 0 ? totalUSD * dopRate : 0
   const period   = dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : dateFrom || dateTo || 'All time'
   const companyName = settings.companyName || 'YVA Staffing'
@@ -142,7 +162,7 @@ export default function EmployeeProfilePage() {
 
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({
-    name: '', email: '', phone: '', payRate: '', role: '',
+    name: '', email: '', phone: '', payRate: '', defaultShiftStart: '', defaultShiftEnd: '', premiumEnabled: false, premiumStartTime: '21:00', premiumPercent: '15', role: '',
     employmentType: '', location: '', timezone: '', startYear: '', status: 'Active', notes: '',
   })
   const [attachments, setAttachments] = useState<Attachment[]>([])
@@ -156,6 +176,11 @@ export default function EmployeeProfilePage() {
         email:          emp.email ?? '',
         phone:          emp.phone ?? '',
         payRate:        emp.payRate != null ? String(emp.payRate) : '',
+        defaultShiftStart: emp.defaultShiftStart ?? '',
+        defaultShiftEnd: emp.defaultShiftEnd ?? '',
+        premiumEnabled: Boolean(emp.premiumEnabled),
+        premiumStartTime: emp.premiumStartTime ?? '21:00',
+        premiumPercent: emp.premiumPercent != null ? String(emp.premiumPercent) : '15',
         role:           emp.role ?? '',
         employmentType: emp.employmentType ?? '',
         location:       emp.location ?? '',
@@ -203,27 +228,26 @@ export default function EmployeeProfilePage() {
 
   const empInvoices = getEmpInvoices(empNN.name, invoices, dateFrom || undefined, dateTo || undefined)
   const payRate     = Number(empNN.payRate) || 0
-  const totalHours  = empInvoices.reduce((s, inv) =>
-    s + (inv.items||[]).filter(it => it.employeeName?.toLowerCase() === empNN.name.toLowerCase())
-      .reduce((h, it) => h + (Number(it.hoursTotal)||0), 0), 0)
-  const totalEarned  = payRate > 0 ? totalHours * payRate : 0
-  const paidCount    = empInvoices.filter(inv => inv.employeePayments?.[empNN.name]?.status === 'paid').length
+  const premiumConfig = employeePremiumConfig(empNN)
+  const summary = summarizeEmployeeInvoices(empNN, empInvoices)
+  const totalHours  = summary.hours
+  const totalEarned  = summary.totalPay
+  const paidCount    = empInvoices.filter(inv => (inv.employeePayments?.[empNN.id] || inv.employeePayments?.[empNN.name])?.status === 'paid').length
   const pendingCount = empInvoices.length - paidCount
   const totalPaid    = empInvoices.reduce((s, inv) => {
-    if (inv.employeePayments?.[empNN.name]?.status !== 'paid') return s
-    const hrs = (inv.items||[]).filter(it => it.employeeName?.toLowerCase() === empNN.name.toLowerCase())
-      .reduce((h, it) => h + (Number(it.hoursTotal)||0), 0)
-    return s + hrs * payRate
+    if ((inv.employeePayments?.[empNN.id] || inv.employeePayments?.[empNN.name])?.status !== 'paid') return s
+    return s + getEmployeeInvoiceItems(empNN, inv).reduce((itemTotal, item) => itemTotal + payrollFromInvoiceItem(item, empNN).totalPay, 0)
   }, 0)
 
   async function markPaid(inv: Invoice) {
-    const hrs = (inv.items||[]).filter(it => it.employeeName?.toLowerCase() === empNN.name.toLowerCase())
-      .reduce((h, it) => h + (Number(it.hoursTotal)||0), 0)
+    const amount = getEmployeeInvoiceItems(empNN, inv).reduce((sum, item) => sum + payrollFromInvoiceItem(item, empNN).totalPay, 0)
+    const existingPayments = { ...(inv.employeePayments || {}) }
+    if (empNN.name in existingPayments && empNN.id !== empNN.name) delete existingPayments[empNN.name]
     const updated = invoices.map(i => i.id === inv.id ? {
       ...i,
       employeePayments: {
-        ...(i.employeePayments || {}),
-        [empNN.name]: { status: 'paid' as const, paidDate: payDate || new Date().toISOString().slice(0,10), amount: hrs * payRate, notes: payNotes || undefined }
+        ...(i.id === inv.id ? existingPayments : i.employeePayments || {}),
+        [empNN.id]: { status: 'paid' as const, paidDate: payDate || new Date().toISOString().slice(0,10), amount, notes: payNotes || undefined }
       }
     } : i)
     setInvoices(updated)
@@ -232,9 +256,11 @@ export default function EmployeeProfilePage() {
   }
 
   async function markPending(inv: Invoice) {
+    const existingPayments = { ...(inv.employeePayments || {}) }
+    if (empNN.name in existingPayments && empNN.id !== empNN.name) delete existingPayments[empNN.name]
     const updated = invoices.map(i => i.id === inv.id ? {
       ...i,
-      employeePayments: { ...(i.employeePayments || {}), [empNN.name]: { status: 'pending' as const } }
+      employeePayments: { ...(i.id === inv.id ? existingPayments : i.employeePayments || {}), [empNN.id]: { status: 'pending' as const } }
     } : i)
     setInvoices(updated)
     await saveInvoices(updated)
@@ -256,6 +282,11 @@ export default function EmployeeProfilePage() {
       email: form.email || undefined,
       phone: form.phone || undefined,
       payRate: form.payRate ? Number(form.payRate) : undefined,
+      defaultShiftStart: form.defaultShiftStart || undefined,
+      defaultShiftEnd: form.defaultShiftEnd || undefined,
+      premiumEnabled: form.premiumEnabled || undefined,
+      premiumStartTime: form.premiumEnabled ? (form.premiumStartTime || '21:00') : undefined,
+      premiumPercent: form.premiumEnabled ? Number(form.premiumPercent || 0) : undefined,
       role: form.role || undefined,
       employmentType: form.employmentType || undefined,
       location: form.location || undefined,
@@ -288,6 +319,11 @@ export default function EmployeeProfilePage() {
       email: empNN.email ?? '',
       phone: empNN.phone ?? '',
       payRate: empNN.payRate != null ? String(empNN.payRate) : '',
+      defaultShiftStart: empNN.defaultShiftStart ?? '',
+      defaultShiftEnd: empNN.defaultShiftEnd ?? '',
+      premiumEnabled: Boolean(empNN.premiumEnabled),
+      premiumStartTime: empNN.premiumStartTime ?? '21:00',
+      premiumPercent: empNN.premiumPercent != null ? String(empNN.premiumPercent) : '15',
       role: empNN.role ?? '',
       employmentType: empNN.employmentType ?? '',
       location: empNN.location ?? '',
@@ -442,12 +478,39 @@ export default function EmployeeProfilePage() {
                     <span className="profile-field-label">Phone</span>
                     <input className="form-input form-input-sm" value={form.phone} onChange={e => setForm(f => ({...f, phone: e.target.value}))} placeholder="+1 555 000 0000" />
                   </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Pay Rate ($/hr)</span>
-                    <input className="form-input form-input-sm" type="number" value={form.payRate} onChange={e => setForm(f => ({...f, payRate: e.target.value}))} placeholder="8.50" />
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Location</span>
+                    <div className="profile-field">
+                      <span className="profile-field-label">Pay Rate ($/hr)</span>
+                      <input className="form-input form-input-sm" type="number" value={form.payRate} onChange={e => setForm(f => ({...f, payRate: e.target.value}))} placeholder="8.50" />
+                    </div>
+                    <div className="profile-field">
+                      <span className="profile-field-label">Default Shift Start</span>
+                      <input className="form-input form-input-sm" value={form.defaultShiftStart} onChange={e => setForm(f => ({...f, defaultShiftStart: e.target.value}))} onBlur={e => setForm(f => ({...f, defaultShiftStart: normalizeClockInput(e.target.value)}))} placeholder="4:00 pm" />
+                    </div>
+                    <div className="profile-field">
+                      <span className="profile-field-label">Default Shift End</span>
+                      <input className="form-input form-input-sm" value={form.defaultShiftEnd} onChange={e => setForm(f => ({...f, defaultShiftEnd: e.target.value}))} onBlur={e => setForm(f => ({...f, defaultShiftEnd: normalizeClockInput(e.target.value)}))} placeholder="12:00 am" />
+                    </div>
+                    <div className="profile-field">
+                      <span className="profile-field-label">Premium Rule</span>
+                      <select className="form-select form-input-sm" value={form.premiumEnabled ? 'night' : ''} onChange={e => setForm(f => ({...f, premiumEnabled: e.target.value === 'night'}))}>
+                        <option value="">No premium pay</option>
+                        <option value="night">Night shift premium</option>
+                      </select>
+                    </div>
+                    {form.premiumEnabled && (
+                      <>
+                        <div className="profile-field">
+                          <span className="profile-field-label">Premium Starts At</span>
+                          <input className="form-input form-input-sm" value={form.premiumStartTime} onChange={e => setForm(f => ({...f, premiumStartTime: e.target.value}))} onBlur={e => setForm(f => ({...f, premiumStartTime: normalizeClockInput(e.target.value) || '21:00'}))} placeholder="9:00 pm" />
+                        </div>
+                        <div className="profile-field">
+                          <span className="profile-field-label">Premium Increase %</span>
+                          <input className="form-input form-input-sm" type="number" value={form.premiumPercent} onChange={e => setForm(f => ({...f, premiumPercent: e.target.value}))} placeholder="15" />
+                        </div>
+                      </>
+                    )}
+                    <div className="profile-field">
+                      <span className="profile-field-label">Location</span>
                     <input className="form-input form-input-sm" value={form.location} onChange={e => setForm(f => ({...f, location: e.target.value}))} placeholder="Santo Domingo, DR" />
                   </div>
                   <div className="profile-field">
@@ -472,6 +535,8 @@ export default function EmployeeProfilePage() {
                     { label: 'Email',           value: empNN.email },
                     { label: 'Phone',           value: empNN.phone },
                     { label: 'Pay Rate',        value: empNN.payRate ? `$${empNN.payRate}/hr` : undefined },
+                    { label: 'Default Shift',   value: empNN.defaultShiftStart || empNN.defaultShiftEnd ? `${empNN.defaultShiftStart || '—'} to ${empNN.defaultShiftEnd || '—'}` : undefined },
+                    { label: 'Premium Rule',    value: empNN.premiumEnabled ? `+${empNN.premiumPercent || 0}% after ${empNN.premiumStartTime || '21:00'}` : undefined },
                     { label: 'Location',        value: empNN.location },
                     { label: 'Timezone',        value: empNN.timezone },
                     { label: 'Start Year',      value: empNN.startYear ? String(empNN.startYear) : undefined },
@@ -618,8 +683,14 @@ export default function EmployeeProfilePage() {
           ) : (
             <div>
               {empInvoices.map(inv => {
-                const items = (inv.items||[]).filter(it => it.employeeName?.toLowerCase() === empNN.name.toLowerCase())
-                const hrs   = items.reduce((h,it) => h+(Number(it.hoursTotal)||0), 0)
+                const items = getEmployeeInvoiceItems(empNN, inv)
+                const payrollSummary = items.reduce((acc, item) => {
+                  const payroll = payrollFromInvoiceItem(item, empNN)
+                  acc.hours += payroll.totalHours
+                  acc.totalPay += payroll.totalPay
+                  return acc
+                }, { hours: 0, totalPay: 0 })
+                const hrs   = payrollSummary.hours
                 const period2 = inv.billingStart
                   ? `${inv.billingStart}${inv.billingEnd ? ' – ' + inv.billingEnd : ''}`
                   : (inv.date || '—')
@@ -635,7 +706,7 @@ export default function EmployeeProfilePage() {
                     allDates = Object.keys(daily).filter(d => parseFloat(daily[d]) > 0).sort()
                   }
                 }
-                const payment = inv.employeePayments?.[empNN.name]
+                const payment = inv.employeePayments?.[empNN.id] || inv.employeePayments?.[empNN.name]
                 const isPaid  = payment?.status === 'paid'
                 return (
                   <div key={inv.id} style={{ marginBottom: 10, border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
@@ -690,7 +761,7 @@ export default function EmployeeProfilePage() {
                             })}
                             <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmtHoursHM(hrs)}</td>
                             <td style={{ textAlign: 'right', color: 'var(--muted)', fontSize: 11 }}>{payRate > 0 ? `$${payRate}/hr` : '—'}</td>
-                            <td style={{ textAlign: 'right', color: 'var(--gold)', fontWeight: 700 }}>{payRate > 0 ? formatMoney(hrs * payRate) : '—'}</td>
+                            <td style={{ textAlign: 'right', color: 'var(--gold)', fontWeight: 700 }}>{payRate > 0 ? formatMoney(payrollSummary.totalPay) : '—'}</td>
                           </tr>
                         </tbody>
                       </table>

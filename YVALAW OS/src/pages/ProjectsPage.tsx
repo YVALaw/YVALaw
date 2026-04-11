@@ -263,7 +263,7 @@ export default function ProjectsPage() {
             const expTotal = projectExpenseTotal(p)
             const budgetPct = p.budget && p.budget > 0 ? Math.min(100, Math.round((billed / p.budget) * 100)) : null
             return (
-              <div key={p.id} className="entity-card" style={{ borderTop: `2px solid ${stageColor(p.status)}`, cursor: 'pointer' }} onClick={() => navigate('/projects/' + p.id)}>
+              <div key={p.id} className="entity-card project-card" style={{ borderTop: `2px solid ${stageColor(p.status)}`, cursor: 'pointer' }} onClick={() => navigate('/projects/' + p.id)}>
                 <div className="card-top">
                   <div>
                     <div className="card-name">{p.name}</div>
@@ -271,7 +271,7 @@ export default function ProjectsPage() {
                   </div>
                   <span className={`badge ${stageBadge(p.status)}`}>{p.status || 'Planning'}</span>
                 </div>
-                <div className="card-stats">
+                <div className="card-stats project-card-stats">
                   {p.rate && (
                     <div className="stat-item">
                       <div className="stat-label">Rate</div>
@@ -317,14 +317,14 @@ export default function ProjectsPage() {
                 </div>
                 {p.notes && <div className="card-detail">{p.notes}</div>}
                 {(p.tags ?? []).length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+                  <div className="project-card-tags">
                     {(p.tags ?? []).map(label => (
                       <TagBadge key={label} label={label} color={getTagColor(label)} />
                     ))}
                   </div>
                 )}
                 {(p.employeeIds ?? []).length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
+                  <div className="project-card-employees">
                     {(p.employeeIds ?? []).map(eid => {
                       const emp = employees.find(e => e.id === eid)
                       return emp ? (
@@ -334,13 +334,13 @@ export default function ProjectsPage() {
                   </div>
                 )}
                 {(p.links ?? []).length > 0 && (
-                  <div className="card-links">
+                  <div className="card-links project-card-links">
                     {(p.links ?? []).map((lk, i) => (
                       <a key={i} href={lk.url} target="_blank" rel="noopener noreferrer" className="card-link-pill">{lk.label}</a>
                     ))}
                   </div>
                 )}
-                <div className="card-footer">
+                <div className="card-footer project-card-footer">
                   <button className="btn-xs btn-ghost" onClick={ev => { ev.stopPropagation(); navigate('/projects/' + p.id) }}>View Profile</button>
                   <button className="btn-xs btn-ghost" onClick={ev => { ev.stopPropagation(); openEdit(p) }}>Edit</button>
                   <button className="btn-xs btn-danger" onClick={ev => { ev.stopPropagation(); setConfirmDelete(p.id) }}>Remove</button>

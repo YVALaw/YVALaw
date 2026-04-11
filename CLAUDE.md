@@ -129,6 +129,11 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 
 ## Things Completed
 
+### Session 8 (cleanup + fixes)
+- Removed all founder names (Hans Esmel, Paola Delgado, Oven Valerio) from all HTML, translations (EN + ES), and about section
+- Removed the entire Meet the Team / founders section from index.html (HTML, CSS, JS)
+- Updated stats: 10+ → 50+ Law Firms Served; 27x → 100x Client Team Growth (EN + ES)
+
 ### Session 7 (marketing enhancements + translation)
 - Removed Hans co-founder — Paola Delgado is now sole founder; updated all copy, grid layout, section labels, JS toggle labels
 - Added `FAQPage` JSON-LD schema in `<head>` (8 Q&A pairs — triggers Google FAQ rich results)

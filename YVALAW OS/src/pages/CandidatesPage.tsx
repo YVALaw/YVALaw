@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { Attachment, Candidate, CandidateStage } from '../data/types'
-import { loadCandidates, saveCandidates } from '../services/storage'
+import type { Attachment, Candidate, CandidateStage, Employee } from '../data/types'
+import { loadCandidates, loadEmployeeCounter, loadEmployees, saveCandidates, saveEmployeeCounter, saveEmployees } from '../services/storage'
 import { useRole } from '../context/RoleContext'
 import { can } from '../lib/roles'
 
@@ -27,6 +27,13 @@ const STAGES: { key: CandidateStage; label: string }[] = [
 
 function uid() {
   return crypto.randomUUID()
+}
+
+async function generateEmployeeNumber(): Promise<string> {
+  const year = String(new Date().getFullYear()).slice(-2)
+  const counter = await loadEmployeeCounter()
+  await saveEmployeeCounter(counter + 1)
+  return `YVA${year}${String(counter).padStart(3, '0')}`
 }
 
 const EMPTY_FORM: Omit<Candidate, 'id' | 'updatedAt'> = {
@@ -94,12 +101,43 @@ export default function CandidatesPage() {
     setConfirmDelete(null)
   }
 
-  function moveStage(id: string, stage: CandidateStage) {
-    persist(candidates.map((c) => (c.id === id ? { ...c, stage, updatedAt: Date.now() } : c)))
-    if (stage === 'hired') {
-      const cand = candidates.find(c => c.id === id)
-      if (cand) { setOnboardingCandidate(cand); setCheckedTasks(new Set()) }
+  async function convertCandidateToEmployee(cand: Candidate) {
+    const employees = await loadEmployees()
+    const existing = employees.find(e =>
+      e.name.toLowerCase() === cand.name.toLowerCase() ||
+      (cand.email && e.email?.toLowerCase() === cand.email.toLowerCase())
+    )
+    if (existing) return existing
+    const empNum = await generateEmployeeNumber()
+    const nextEmployee: Employee = {
+      id: uid(),
+      employeeNumber: empNum,
+      name: cand.name,
+      email: cand.email || undefined,
+      phone: cand.phone || undefined,
+      role: cand.role || undefined,
+      notes: cand.notes || undefined,
+      attachments: cand.attachments || [],
+      status: 'Onboarding',
     }
+    await saveEmployees([...employees, nextEmployee])
+    return nextEmployee
+  }
+
+  function moveStage(id: string, stage: CandidateStage) {
+    void (async () => {
+      const cand = candidates.find(c => c.id === id)
+      if (!cand) return
+      if (stage === 'hired') {
+        await convertCandidateToEmployee({ ...cand, stage: 'hired', updatedAt: Date.now() })
+        const next = candidates.filter(c => c.id !== id)
+        persist(next)
+        setOnboardingCandidate({ ...cand, stage: 'hired', updatedAt: Date.now() })
+        setCheckedTasks(new Set())
+        return
+      }
+      persist(candidates.map((c) => (c.id === id ? { ...c, stage, updatedAt: Date.now() } : c)))
+    })()
   }
 
   // drag and drop

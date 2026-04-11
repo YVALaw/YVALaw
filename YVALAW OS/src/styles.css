@@ -175,6 +175,119 @@ input, select, textarea { font-family: inherit; }
   align-items: start;
 }
 
+.project-card {
+  overflow: hidden;
+  min-width: 0;
+}
+
+.project-card-stats {
+  gap: 12px;
+}
+
+.project-card-tags,
+.project-card-employees,
+.project-card-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.project-card-footer {
+  width: 100%;
+}
+
+.project-card .card-footer.project-card-footer {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 8px;
+  justify-content: stretch;
+  align-items: stretch;
+}
+
+.project-card .card-footer.project-card-footer > .btn-xs {
+  width: 100%;
+  min-width: 0;
+  justify-content: center;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.15;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.project-board-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.project-lane {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.project-lane-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surf2);
+}
+
+.project-lane-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.project-lane-sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.project-lane-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 16px;
+}
+
+.project-employee-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.project-employee-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.project-employee-chip {
+  font-size: 11px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: var(--surf2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 /* ── ENTITY CARD ── */
 .entity-card {
   background: var(--surface);
@@ -552,6 +665,8 @@ input, select, textarea { font-family: inherit; }
   cursor: grab; user-select: none;
   box-shadow: 0 1px 3px rgba(0,0,0,0.05);
   transition: transform .1s, box-shadow .1s, border-color .15s;
+  min-width: 0;
+  overflow: hidden;
 }
 .kanban-card:hover { border-color: var(--gold); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,.1); }
 .kanban-card-name    { font-size: 12px; font-weight: 700; margin-bottom: 2px; color: var(--text); }
@@ -559,7 +674,23 @@ input, select, textarea { font-family: inherit; }
 .kanban-card-meta    { font-size: 11px; color: var(--muted); }
 .kanban-card-amount  { font-size: 14px; font-weight: 800; color: var(--text); margin: 4px 0; }
 .kanban-card-source  { font-size: 10px; color: var(--muted); opacity: .7; }
-.kanban-card-actions { display: flex; gap: 4px; margin-top: 7px; justify-content: flex-end; }
+.kanban-card-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(72px, 1fr));
+  gap: 4px;
+  margin-top: 7px;
+  width: 100%;
+}
+.kanban-card-actions > .btn-xs {
+  width: 100%;
+  min-width: 0;
+  justify-content: center;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.15;
+  padding-left: 6px;
+  padding-right: 6px;
+}
 
 /* ── KANBAN COLUMN COLORS ── */
 /* Candidates */
@@ -827,6 +958,12 @@ input, select, textarea { font-family: inherit; }
   .kpi-grid  { grid-template-columns: 1fr 1fr; }
   .form-grid-2 { grid-template-columns: 1fr; }
   .kanban-board { grid-template-columns: repeat(var(--kanban-cols, 5), 200px); }
+  .project-card .card-footer.project-card-footer {
+    grid-template-columns: 1fr;
+  }
+  .kanban-card-actions {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (max-width: 480px) {
