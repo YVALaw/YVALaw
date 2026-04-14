@@ -54,16 +54,16 @@ function brandIcon(brand: string) {
   }
 }
 
-// ── Card Element style (matches dark portal theme) ────────────────────────────
+// ── Card Element style ────────────────────────────────────────────────────────
 
 const CARD_STYLE = {
   base: {
-    color: '#f8fafc',
+    color: '#0f172a',
     fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
     fontSize: '14px',
     fontWeight: '500',
-    '::placeholder': { color: '#475569' },
-    iconColor: '#94a3b8',
+    '::placeholder': { color: '#64748b' },
+    iconColor: '#64748b',
   },
   invalid: {
     color: '#ef4444',
@@ -385,8 +385,9 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
                     ref={cardMountRef}
                     style={{
                       padding: '13px 14px', borderRadius: 10,
-                      border: '1px solid var(--border)',
-                      background: 'var(--surf2)',
+                      border: '1px solid #cbd5e1',
+                      background: '#ffffff',
+                      color: '#0f172a',
                     }}
                   />
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
