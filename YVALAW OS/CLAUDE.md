@@ -109,6 +109,15 @@ CREATE POLICY "client_update_prefs" ON working_hour_prefs FOR UPDATE TO authenti
 - **Payment hardening pass**: `create-payment-intent.cjs` now fetches invoice/client server-side, verifies invoice ownership, rejects non-payable statuses, and computes amount due from Supabase instead of trusting browser-supplied cents.
 - **Setup docs cleanup**: `.env.example` now lists frontend Vite vars plus Netlify function vars; dashboard payment CTA now routes to Billing; Messages placeholder says Phase 7.
 - **Dual invite modes**: Client profile now supports Supabase email invite and manual copy-link invite through `invite-client.cjs`.
+- **Production deploy plumbing**: root `netlify.toml` now points Netlify at `YVALAW OS/netlify/functions`, fixing 404s for `/.netlify/functions/invite-client`.
+- **Supabase Auth config fixed by user**: invite links now work after setting Supabase auth Site URL / redirect URLs for `https://yvastaffing.agency/os/**`.
+- **Stripe Card Element fixes**: card input text is visible on the light modal, and Pay is disabled until Stripe fires the Card Element `ready` event.
+- **Latest pushed commits**:
+  - `e248901` — Add LawOS client portal payments
+  - `b1af500` — Add manual client portal invite links
+  - `38ba3de` — Deploy LawOS Netlify functions
+  - `8b371f3` — Fix Stripe card input visibility
+  - `7fd00cd` — Wait for Stripe card element readiness
 
 ---
 
@@ -138,42 +147,56 @@ NOTIFY pgrst, 'reload schema';
 
 ---
 
-### 2. Environment variables
+### 2. Environment variables ✅ Mostly set on 2026-04-14
 
-**Local dev — create `.env` in project root:**
+**Local dev `.env` currently has:**
 ```
-VITE_STRIPE_PUBLISHABLE_KEY=pk_test_xxx
+VITE_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY
 ```
 
-**Netlify dashboard — add these env vars:**
+**Netlify dashboard vars set during this session:**
 ```
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_SERVICE_ROLE_KEY=eyJxxx
-STRIPE_SECRET_KEY=sk_live_xxx
-STRIPE_WEBHOOK_SECRET=whsec_xxx
-GMAIL_CLIENT_SECRET=xxx   ← already set
+SUPABASE_URL
+VITE_SUPABASE_URL
+VITE_SUPABASE_ANON_KEY
+SUPABASE_SERVICE_ROLE_KEY
+VITE_STRIPE_PUBLISHABLE_KEY   (test mode key)
+STRIPE_SECRET_KEY             (test mode key)
+STRIPE_WEBHOOK_SECRET         (test mode webhook)
 ```
+
+`GMAIL_CLIENT_SECRET` was skipped because Gmail is not connected for this project yet. Add it later only when Gmail OAuth is configured.
 
 ---
 
-### 3. Stripe Dashboard setup
+### 3. Stripe Dashboard setup ✅ Test mode
 
-1. Go to **Stripe Dashboard → Developers → Webhooks → Add endpoint**
-2. URL: `https://your-netlify-site.netlify.app/.netlify/functions/stripe-webhook`
-3. Select event: `payment_intent.succeeded`
-4. Click **Add endpoint** → copy the **Signing secret** (`whsec_xxx`)
-5. Paste it as `STRIPE_WEBHOOK_SECRET` in Netlify env vars
+Stripe test-mode webhook destination was created.
+
+Webhook endpoint:
+```text
+https://yvastaffing.agency/.netlify/functions/stripe-webhook
+```
+
+Subscribed event:
+```text
+payment_intent.succeeded
+```
+
+Test-mode webhook signing secret was added to Netlify as `STRIPE_WEBHOOK_SECRET`.
 
 ---
 
 ### 4. Deploy checklist
-- [ ] Push repo to GitHub (`git push`)
-- [ ] Netlify auto-deploys from GitHub — confirm build passes
+- [x] Push repo to GitHub (`git push`)
+- [ ] Netlify auto-deploys from GitHub — confirm latest build passes for commit `7fd00cd`
 - [x] Run `YVALAW OS/supabase/client-portal.sql` in Supabase
-- [ ] Set all Netlify env vars (Supabase + Stripe)
-- [ ] Set up Stripe webhook + copy signing secret
-- [ ] Add `VITE_STRIPE_PUBLISHABLE_KEY` to Netlify env (Vite needs it at build time)
-- [ ] Test invite flow end-to-end on production URL
+- [x] Set Netlify env vars (Supabase + Stripe test mode)
+- [x] Set up Stripe webhook + copy signing secret
+- [x] Add `VITE_STRIPE_PUBLISHABLE_KEY` to Netlify env (Vite needs it at build time)
+- [x] Test manual invite link flow enough to confirm Supabase redirect config works
+- [ ] Retest Stripe payment after commit `7fd00cd` deploys
 - [ ] Test portal on mobile (bottom nav, upload, PDF, Pay button)
 - [ ] Run a test Stripe payment with card `4242 4242 4242 4242` (test mode)
 
@@ -187,14 +210,16 @@ GMAIL_CLIENT_SECRET=xxx   ← already set
 - Implementation: ~30 lines — load Crisp script, call `window.$crisp.push(["set", "user:email", [email]])`
 
 #### Phase 8 — Deploy to Production
-1. Push current branch to GitHub → Netlify auto-deploys
-2. Set Netlify environment variables:
-   - `SUPABASE_URL`
-   - `SUPABASE_SERVICE_ROLE_KEY`
-   - `GMAIL_CLIENT_SECRET` (already set)
-3. Run all pending SQL in Supabase SQL editor (see above)
-4. Test invite flow end-to-end on production URL
-5. Test portal on mobile (bottom nav, upload, PDF download)
+1. Wait for Netlify to deploy latest commit `7fd00cd`.
+2. Retest client Billing payment modal:
+   - Card digits should be visible.
+   - Pay button should show `Loading card form…` until Stripe Card Element is ready.
+   - Test card: `4242 4242 4242 4242`.
+3. Verify successful Stripe payment marks the invoice paid in portal and internal LawOS.
+4. Test client document upload from portal, then confirm file appears on internal client profile.
+5. Test staff request from portal, then confirm it appears in internal `/requests`.
+6. Test mobile portal nav and PDF download.
+7. Gmail integration remains optional/pending until Google OAuth client ID/secret are configured.
 
 #### Optional Enhancements (post-deploy)
 - **Notification preferences** — toggle email alerts for new invoices, document shares
