@@ -40,9 +40,9 @@
 - `supabase/client-portal.sql` — tables + RLS (run after rls.sql)
 
 ### Invite Flow
-1. Admin opens a Client profile → clicks **Invite to Portal** button
-2. Calls `/.netlify/functions/invite-client` with Bearer token + `{ clientId, email }`
-3. Function creates Supabase auth user, inserts `client_users` row, sends invite email
+1. Admin opens a Client profile and chooses one of two invite actions:
+   - **Email Invite** calls `/.netlify/functions/invite-client` with `{ clientId, email, mode: 'email' }`, creates the auth user, inserts `client_users`, and lets Supabase send the invite email.
+   - **Copy Invite Link** calls the same function with `{ clientId, email, mode: 'link' }`, creates the auth user, inserts `client_users`, and returns a one-time invite link for manual delivery.
 4. Client clicks magic link → `must_change_password: true` detected → `/portal/set-password`
 5. Sets password → `must_change_password: false` cleared → `/portal/dashboard`
 
@@ -108,6 +108,7 @@ CREATE POLICY "client_update_prefs" ON working_hour_prefs FOR UPDATE TO authenti
 - **SQL alignment pass**: `supabase/client-portal.sql` now includes Stripe customer IDs, staff request columns, portal document insert policy, client phone update policy, and scoped `time_entries` RLS.
 - **Payment hardening pass**: `create-payment-intent.cjs` now fetches invoice/client server-side, verifies invoice ownership, rejects non-payable statuses, and computes amount due from Supabase instead of trusting browser-supplied cents.
 - **Setup docs cleanup**: `.env.example` now lists frontend Vite vars plus Netlify function vars; dashboard payment CTA now routes to Billing; Messages placeholder says Phase 7.
+- **Dual invite modes**: Client profile now supports Supabase email invite and manual copy-link invite through `invite-client.cjs`.
 
 ---
 

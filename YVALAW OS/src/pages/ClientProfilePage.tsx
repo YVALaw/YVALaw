@@ -77,7 +77,7 @@ export default function ClientProfilePage() {
   const [activityType, setActivityType] = useState<CommEntryType>('note')
 
   // Portal invite
-  const [inviteLoading, setInviteLoading] = useState(false)
+  const [inviteLoading, setInviteLoading] = useState<'email' | 'link' | null>(null)
   const [inviteMsg,     setInviteMsg]     = useState<{ ok: boolean; text: string } | null>(null)
 
   // Contracts
@@ -370,33 +370,52 @@ export default function ClientProfilePage() {
     setClientDocs(prev => prev.filter(d => d.id !== doc.id))
   }
 
-  async function sendPortalInvite() {
+  async function sendPortalInvite(mode: 'email' | 'link') {
     if (!clientNN.email) { setInviteMsg({ ok: false, text: 'Add an email address to this client before inviting.' }); return }
-    setInviteLoading(true)
+    setInviteLoading(mode)
     setInviteMsg(null)
 
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { setInviteLoading(false); setInviteMsg({ ok: false, text: 'You must be logged in.' }); return }
+    if (!session) { setInviteLoading(null); setInviteMsg({ ok: false, text: 'You must be logged in.' }); return }
 
     try {
+      const base = `${window.location.origin}${import.meta.env.BASE_URL}`.replace(/\/+$/, '/')
       const res = await fetch('/.netlify/functions/invite-client', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ clientId: clientNN.id, email: clientNN.email }),
+        body: JSON.stringify({
+          clientId:   clientNN.id,
+          email:      clientNN.email,
+          mode,
+          redirectTo: `${base}portal/set-password`,
+        }),
       })
       const data = await res.json()
       if (!res.ok) {
         setInviteMsg({ ok: false, text: data.error || 'Failed to send invitation.' })
+      } else if (mode === 'link') {
+        const inviteLink = data.inviteLink as string | undefined
+        if (!inviteLink) {
+          setInviteMsg({ ok: false, text: 'Invite was created but no link was returned.' })
+          return
+        }
+        try {
+          await navigator.clipboard.writeText(inviteLink)
+          setInviteMsg({ ok: true, text: `Invite link copied for ${clientNN.email}. You can paste it into your own email or message.` })
+        } catch {
+          window.prompt('Copy this portal invite link:', inviteLink)
+          setInviteMsg({ ok: true, text: `Invite link created for ${clientNN.email}.` })
+        }
       } else {
         setInviteMsg({ ok: true, text: `Invitation sent to ${clientNN.email}` })
       }
     } catch {
-      setInviteMsg({ ok: false, text: 'Network error — could not send invitation.' })
+      setInviteMsg({ ok: false, text: 'Network error — could not create invitation.' })
     } finally {
-      setInviteLoading(false)
+      setInviteLoading(null)
     }
   }
 
@@ -470,12 +489,21 @@ export default function ClientProfilePage() {
               )}
               <button
                 className="btn-ghost btn-sm"
-                onClick={sendPortalInvite}
-                disabled={inviteLoading}
+                onClick={() => void sendPortalInvite('email')}
+                disabled={inviteLoading !== null}
                 title="Send client portal invitation email"
                 style={{ color: 'var(--gold)', borderColor: 'rgba(250,204,21,0.3)' }}
               >
-                {inviteLoading ? 'Sending…' : '🔑 Invite to Portal'}
+                {inviteLoading === 'email' ? 'Sending…' : '🔑 Email Invite'}
+              </button>
+              <button
+                className="btn-ghost btn-sm"
+                onClick={() => void sendPortalInvite('link')}
+                disabled={inviteLoading !== null}
+                title="Create and copy a portal invite link to send manually"
+                style={{ color: '#16a34a', borderColor: 'rgba(22,163,74,0.25)' }}
+              >
+                {inviteLoading === 'link' ? 'Creating…' : '🔗 Copy Invite Link'}
               </button>
               <button
                 className="btn-ghost btn-sm"

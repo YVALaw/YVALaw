@@ -1,10 +1,11 @@
 /**
  * invite-client — Netlify Function
- * Creates a Supabase Auth account for a client and sends them an invitation email.
+ * Creates a Supabase Auth account for a client and either sends Supabase's
+ * invitation email or returns a one-time invite link for manual delivery.
  *
  * POST /.netlify/functions/invite-client
  * Headers: Authorization: Bearer <caller_access_token>
- * Body:    { clientId: string, email: string }
+ * Body:    { clientId: string, email: string, mode?: 'email' | 'link', redirectTo?: string }
  *
  * Required Netlify env vars:
  *   SUPABASE_URL              — your Supabase project URL
@@ -43,11 +44,13 @@ exports.handler = async function handler(event) {
   }
 
   // ── Parse body ────────────────────────────────────────────────────────────
-  let clientId, email
+  let clientId, email, mode, redirectTo
   try {
     const body = JSON.parse(event.body || '{}')
-    clientId = body.clientId
-    email    = body.email
+    clientId   = body.clientId
+    email      = body.email
+    mode       = body.mode || 'email'
+    redirectTo = body.redirectTo
   } catch {
     return json(400, { error: 'Invalid JSON body' })
   }
@@ -59,6 +62,9 @@ exports.handler = async function handler(event) {
   // Basic email sanity check
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return json(400, { error: 'Invalid email address' })
+  }
+  if (mode !== 'email' && mode !== 'link') {
+    return json(400, { error: 'mode must be email or link' })
   }
 
   // ── Verify caller is an authenticated internal user ───────────────────────
@@ -129,8 +135,47 @@ exports.handler = async function handler(event) {
     }
   }
 
-  // ── Create the Supabase auth user via admin inviteUserByEmail ─────────────
-  const inviteRes = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+  // ── Create the Supabase auth user ─────────────────────────────────────────
+  let newUserId
+  let actionLink
+
+  if (mode === 'link') {
+    // generate_link creates the invite user but does not send email.
+    const linkRes = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${serviceRoleKey}`,
+        apikey: serviceRoleKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        type: 'invite',
+        email,
+        data: {
+          must_change_password: true,
+          client_id:            clientId,
+          role:                 'client',
+        },
+        ...(redirectTo ? { redirect_to: redirectTo } : {}),
+      }),
+    })
+
+    if (!linkRes.ok) {
+      const linkErr = await linkRes.json().catch(() => ({}))
+      if (linkErr?.msg?.includes('already registered') || linkErr?.code === 'email_exists') {
+        return json(409, { error: 'A user with this email already exists in the system' })
+      }
+      return json(500, {
+        error: linkErr?.msg || linkErr?.message || 'Failed to generate invitation link',
+      })
+    }
+
+    const linkData = await linkRes.json()
+    newUserId = linkData?.user?.id || linkData?.id
+    actionLink = linkData?.action_link || linkData?.actionLink
+  } else {
+    // Admin user creation with invite=true sends Supabase's invitation email.
+    const inviteRes = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${serviceRoleKey}`,
@@ -147,26 +192,37 @@ exports.handler = async function handler(event) {
         role:                 'client',
       },
     }),
-  })
+    })
 
-  if (!inviteRes.ok) {
-    const inviteErr = await inviteRes.json().catch(() => ({}))
+    if (!inviteRes.ok) {
+      const inviteErr = await inviteRes.json().catch(() => ({}))
 
-    // Handle "user already registered" gracefully
-    if (inviteErr?.msg?.includes('already registered') || inviteErr?.code === 'email_exists') {
-      return json(409, { error: 'A user with this email already exists in the system' })
+      // Handle "user already registered" gracefully
+      if (inviteErr?.msg?.includes('already registered') || inviteErr?.code === 'email_exists') {
+        return json(409, { error: 'A user with this email already exists in the system' })
+      }
+
+      return json(500, {
+        error: inviteErr?.msg || inviteErr?.message || 'Failed to create client account',
+      })
     }
 
-    return json(500, {
-      error: inviteErr?.msg || inviteErr?.message || 'Failed to create client account',
-    })
+    const newUser = await inviteRes.json()
+    newUserId = newUser?.id
   }
-
-  const newUser = await inviteRes.json()
-  const newUserId = newUser?.id
 
   if (!newUserId) {
     return json(500, { error: 'User created but ID not returned' })
+  }
+  if (mode === 'link' && !actionLink) {
+    await fetch(`${supabaseUrl}/auth/v1/admin/users/${newUserId}`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${serviceRoleKey}`,
+        apikey: serviceRoleKey,
+      },
+    })
+    return json(500, { error: 'Invite link was not returned — invite rolled back' })
   }
 
   // ── Insert into client_users table ────────────────────────────────────────
@@ -199,7 +255,9 @@ exports.handler = async function handler(event) {
 
   return json(200, {
     success: true,
-    message: `Invitation sent to ${email}`,
+    mode,
+    message: mode === 'link' ? `Invitation link created for ${email}` : `Invitation sent to ${email}`,
     userId:  newUserId,
+    inviteLink: actionLink,
   })
 }
