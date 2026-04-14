@@ -84,6 +84,7 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
   const [selectedMethod, setSelectedMethod] = useState<'new' | string>('new')
   const [errorMsg,       setErrorMsg]       = useState('')
   const [paidAmount,     setPaidAmount]     = useState(amountToPay)
+  const [cardReady,      setCardReady]      = useState(false)
 
   const cardMountRef = useRef<HTMLDivElement>(null)
   const cardElemRef  = useRef<StripeCardElement | null>(null)
@@ -138,6 +139,7 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
 
   // ── Mount / unmount Stripe Card Element when "new card" selected ─────────────
   useEffect(() => {
+    setCardReady(selectedMethod !== 'new')
     if (step !== 'form' || selectedMethod !== 'new' || !stripeObj) return
     if (!cardMountRef.current) return
 
@@ -146,11 +148,13 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
       style:          CARD_STYLE,
       hidePostalCode: true,
     })
+    card.on('ready', () => setCardReady(true))
     card.mount(cardMountRef.current)
     elementsRef.current = elements
     cardElemRef.current = card
 
     return () => {
+      setCardReady(false)
       card.destroy()
       cardElemRef.current = null
       elementsRef.current = null
@@ -167,7 +171,7 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
       let result
 
       if (selectedMethod === 'new') {
-        if (!cardElemRef.current) throw new Error('Card form not loaded')
+        if (!cardElemRef.current || !cardReady) throw new Error('Card form is still loading. Please try again in a moment.')
         result = await stripeObj.confirmCardPayment(clientSecret, {
           payment_method: { card: cardElemRef.current },
         })
@@ -419,11 +423,13 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
               <button
                 className="btn-primary"
                 onClick={() => void handlePay()}
-                disabled={step === 'processing'}
+                disabled={step === 'processing' || !cardReady}
                 style={{ width: '100%', fontSize: 15, fontWeight: 800, padding: '13px', justifyContent: 'center' }}
               >
                 {step === 'processing'
                   ? 'Processing…'
+                  : !cardReady
+                    ? 'Loading card form…'
                   : `Pay ${fmtUSD(amountToPay)}`
                 }
               </button>
