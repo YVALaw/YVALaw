@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabase'
 import type {
   ActivityLogEntry, AppSettings, Candidate, CommEntryType, DataSnapshot,
   Employee, Client, Expense, Invoice, InvoiceTemplate, Project, Task,
-  Estimate, TimeEntry, RecurringInvoice,
+  Estimate, TimeEntry, RecurringInvoice, StaffRequest, ClientDocument,
 } from '../data/types'
 
 // ─── Generic helpers ──────────────────────────────────────────────────────────
@@ -333,4 +333,68 @@ export async function loadRecurringInvoices(): Promise<RecurringInvoice[]> {
 }
 export async function saveRecurringInvoices(items: RecurringInvoice[]): Promise<void> {
   return syncAll('recurring_invoices', items)
+}
+
+// ─── Client Documents ─────────────────────────────────────────────────────────
+
+export async function loadClientDocuments(clientId: string): Promise<ClientDocument[]> {
+  const { data, error } = await supabase
+    .from('client_documents')
+    .select('*')
+    .eq('client_id', clientId)
+    .order('uploaded_at', { ascending: false })
+  if (error) { console.error('loadClientDocuments', error); return [] }
+  return (data || []).map(r => {
+    const doc = toCamel<ClientDocument>(r as Record<string, unknown>)
+    // uploaded_at is timestamptz in DB — normalise to ms number
+    if (typeof (doc as unknown as Record<string,unknown>).uploadedAt === 'string') {
+      doc.uploadedAt = new Date((doc as unknown as Record<string,unknown>).uploadedAt as string).getTime()
+    }
+    return doc
+  })
+}
+
+export async function addClientDocument(doc: ClientDocument): Promise<void> {
+  const row = toSnake(doc as unknown as Record<string, unknown>)
+  delete row['created_at']
+  // uploaded_at column is timestamptz — send as ISO string, not ms integer
+  row['uploaded_at'] = new Date(doc.uploadedAt).toISOString()
+  const { error } = await supabase.from('client_documents').insert(row)
+  if (error) throw new Error(error.message)
+}
+
+export async function removeClientDocument(id: string): Promise<void> {
+  const { error } = await supabase.from('client_documents').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+// ─── Staff Requests ───────────────────────────────────────────────────────────
+
+export async function loadStaffRequests(): Promise<StaffRequest[]> {
+  const { data, error } = await supabase
+    .from('staff_requests')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (error) { console.error('loadStaffRequests', error); return [] }
+  return (data || []).map(row => toCamel<StaffRequest>(row as Record<string, unknown>))
+}
+
+export async function updateStaffRequestStatus(
+  id: string,
+  status: StaffRequest['status']
+): Promise<void> {
+  const { error } = await supabase
+    .from('staff_requests')
+    .update({ status })
+    .eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+export async function countPendingStaffRequests(): Promise<number> {
+  const { count, error } = await supabase
+    .from('staff_requests')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'pending')
+  if (error) return 0
+  return count ?? 0
 }

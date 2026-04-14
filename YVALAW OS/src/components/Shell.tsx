@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { loadSnapshot, loadCandidates } from '../services/storage'
+import { loadSnapshot, loadCandidates, countPendingStaffRequests } from '../services/storage'
 import { useRole } from '../context/RoleContext'
 import { can, ROLE_LABELS } from '../lib/roles'
 import { useActiveTimer, formatElapsed, elapsedSeconds } from '../hooks/useActiveTimer'
@@ -136,6 +136,10 @@ const navSections = [
         to: '/estimates', label: 'Estimates', end: false,
         icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
       },
+      {
+        to: '/requests', label: 'Requests', end: false,
+        icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>,
+      },
     ],
   },
   {
@@ -215,6 +219,11 @@ export default function Shell({ children }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { timer, elapsed, stop } = useActiveTimer()
   const linkedEmployeeId = sessionStorage.getItem('linkedEmployeeId')
+  const [pendingRequests, setPendingRequests] = useState(0)
+
+  useEffect(() => {
+    void countPendingStaffRequests().then(setPendingRequests)
+  }, [location.pathname])
 
   const prevPath = useRef(location.pathname)
   if (prevPath.current !== location.pathname) {
@@ -223,7 +232,7 @@ export default function Shell({ children }: Props) {
   }
 
   // Routes that are not yet built show a "coming soon" placeholder
-  const builtRoutes = ['/', '/invoice', '/clients', '/employees', '/candidates', '/projects', '/expenses', '/settings', '/estimates', '/time', '/calendar']
+  const builtRoutes = ['/', '/invoice', '/clients', '/employees', '/candidates', '/projects', '/expenses', '/settings', '/estimates', '/time', '/calendar', '/requests']
 
   function isVisible(to: string) {
     if (to === '/invoice')    return can.viewInvoices(role)
@@ -265,11 +274,20 @@ export default function Shell({ children }: Props) {
                 >
                   <span className="sidebar-nav-icon">{item.icon}</span>
                   <span>{item.label}</span>
-                  {!builtRoutes.includes(item.to) && (
+                  {item.to === '/requests' && pendingRequests > 0 ? (
+                    <span style={{
+                      fontSize: 10, fontWeight: 800,
+                      background: '#ef4444', color: '#fff',
+                      padding: '1px 6px', borderRadius: 999, marginLeft: 'auto',
+                      minWidth: 18, textAlign: 'center',
+                    }}>
+                      {pendingRequests}
+                    </span>
+                  ) : !builtRoutes.includes(item.to) ? (
                     <span style={{ fontSize: 9, fontWeight: 700, background: 'rgba(250,204,21,.2)', color: '#facc15', padding: '1px 6px', borderRadius: 999, marginLeft: 'auto' }}>
                       SOON
                     </span>
-                  )}
+                  ) : null}
                 </NavLink>
               ))}
             </div>
@@ -300,7 +318,7 @@ export default function Shell({ children }: Props) {
             </div>
           )}
           <div className="sidebar-footer-label" style={{ color: '#facc15', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.06em' }}>
-            {ROLE_LABELS[role]}
+            {ROLE_LABELS[role as import('../lib/roles').UserRole] ?? role}
           </div>
         </div>
       </aside>

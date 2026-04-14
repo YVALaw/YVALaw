@@ -8,6 +8,7 @@ node_modules/
 
 # Build output (committed intentionally for Netlify — remove this line if switching to Netlify CI build)
 # dist/
+tsconfig.tsbuildinfo
 
 # Editor
 .vscode/

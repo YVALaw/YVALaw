@@ -104,10 +104,10 @@ export default function LoginPage() {
             <span style={{ fontSize: 22, fontWeight: 900, color: '#1b1e2b' }}>Y</span>
           </div>
           <div style={{ fontSize: 26, fontWeight: 900, color: 'var(--text)', letterSpacing: '-.02em' }}>
-            YVA LawOS
+            YVA Staffing
           </div>
           <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 5 }}>
-            Internal law operations platform
+            Sign in to continue
           </div>
         </div>
 

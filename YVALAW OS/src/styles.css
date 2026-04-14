@@ -325,6 +325,44 @@ input, select, textarea { font-family: inherit; }
   flex-shrink: 0; color: #1b1e2b;
 }
 
+/* Profile-page large avatar (80×80) */
+.profile-avatar {
+  width: 80px !important; height: 80px !important;
+  border-radius: 18px !important; font-size: 26px !important;
+  flex-shrink: 0;
+}
+
+/* Clickable avatar wrapper — constrains the photo to a perfect square */
+.avatar-wrap {
+  position: relative;
+  width: 80px; height: 80px;
+  border-radius: 18px;
+  overflow: hidden;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.avatar-wrap:hover .avatar-cam { opacity: 1; }
+
+/* Photo always fills the wrapper — object-fit:cover keeps it square regardless of source ratio */
+.avatar-photo {
+  display: block;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  border-radius: 0;
+}
+
+/* Camera overlay shown on hover */
+.avatar-cam {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(0,0,0,0.45);
+  font-size: 20px;
+  opacity: 0;
+  transition: opacity 0.18s;
+  pointer-events: none;
+}
+
 /* Card divider */
 .card-divider { height: 1px; background: var(--border); }
 
@@ -969,4 +1007,138 @@ input, select, textarea { font-family: inherit; }
 @media (max-width: 480px) {
   .kpi-grid { grid-template-columns: 1fr; }
   .main-content { padding: 12px; }
+}
+
+
+/* =====================================================
+   CLIENT PORTAL — Layout & Components
+   ===================================================== */
+
+/* ── Portal shell (flex layout — sidebar + main) ── */
+.portal-shell {
+  display: flex;
+  min-height: 100vh;
+  background: var(--bg);
+  position: relative;
+}
+
+/* ── Desktop sidebar (reuses existing sidebar vars) ── */
+.portal-sidebar {
+  width: var(--sidebar-w);
+  background: var(--sidebar-bg);
+  display: flex;
+  flex-direction: column;
+  padding: 14px 10px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+/* ── Portal main area ── */
+.portal-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* ── Portal topbar ── */
+.portal-topbar {
+  height: var(--topbar-h);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+/* Mobile brand (only visible on small screens where sidebar is hidden) */
+.portal-mobile-brand {
+  display: none;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ── Portal content area ── */
+.portal-content {
+  flex: 1;
+  padding: 28px;
+  overflow-y: auto;
+}
+
+/* ── Mobile bottom navigation bar ── */
+.portal-bottom-nav {
+  display: none; /* hidden on desktop */
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--sidebar-bg);
+  border-top: 1px solid rgba(255,255,255,0.08);
+  z-index: 50;
+  /* iOS safe area support */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.portal-bottom-nav-items {
+  display: flex;
+  height: 58px;
+}
+
+.portal-bottom-nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.45);
+  cursor: pointer;
+  transition: color 0.15s;
+  border: none;
+  background: none;
+  text-decoration: none;
+  padding: 0;
+  font-family: inherit;
+  letter-spacing: 0;
+}
+
+.portal-bottom-nav-item.active {
+  color: var(--gold);
+}
+
+.portal-bottom-nav-item:hover:not(.active) {
+  color: rgba(255,255,255,0.75);
+}
+
+/* ── Mobile breakpoint: switch to bottom nav ── */
+@media (max-width: 768px) {
+  .portal-sidebar       { display: none; }
+  .portal-bottom-nav    { display: block; }
+  .portal-mobile-brand  { display: flex; }
+
+  /* Extra bottom padding so content doesn't hide under the nav bar */
+  .portal-content {
+    padding: 16px 16px calc(58px + env(safe-area-inset-bottom, 0px) + 12px);
+  }
+}
+
+@media (max-width: 480px) {
+  .portal-topbar { padding: 0 16px; }
+
+  /* Fewer visible nav items on very small screens — show icons only */
+  .portal-bottom-nav-item {
+    font-size: 9px;
+    gap: 2px;
+  }
 }

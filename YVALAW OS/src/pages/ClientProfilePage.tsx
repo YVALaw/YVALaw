@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import type { ActivityLogEntry, Client, CommEntryType, Contract, ContractStatus, Invoice, Project } from '../data/types'
-import { loadSnapshot, saveClients, loadActivityLog, saveActivityLog, loadSettings } from '../services/storage'
+import type { ActivityLogEntry, Client, ClientDocument, CommEntryType, Contract, ContractStatus, Invoice, Project } from '../data/types'
+import { loadSnapshot, saveClients, loadActivityLog, saveActivityLog, loadSettings, loadClientDocuments, addClientDocument, removeClientDocument } from '../services/storage'
 import { sendEmail } from '../services/gmail'
 import { uploadFile, deleteFile } from '../services/fileStorage'
+import { supabase } from '../lib/supabase'
 
 function uid() { return crypto.randomUUID() }
 
@@ -53,6 +54,7 @@ export default function ClientProfilePage() {
     loadActivityLog().then(all => {
       setActivityLog(all.filter(e => e.clientId === id).sort((a, b) => b.createdAt - a.createdAt))
     })
+    if (id) loadClientDocuments(id).then(setClientDocs)
   }, [id])
 
   const client = clients.find(c => c.id === id)
@@ -74,6 +76,10 @@ export default function ClientProfilePage() {
   const [activityNote, setActivityNote] = useState('')
   const [activityType, setActivityType] = useState<CommEntryType>('note')
 
+  // Portal invite
+  const [inviteLoading, setInviteLoading] = useState(false)
+  const [inviteMsg,     setInviteMsg]     = useState<{ ok: boolean; text: string } | null>(null)
+
   // Contracts
   const [contractPanelOpen, setContractPanelOpen] = useState(false)
   const [contractEditId, setContractEditId] = useState<string | null>(null)
@@ -84,6 +90,14 @@ export default function ClientProfilePage() {
   const [contractFile, setContractFile] = useState<File | null>(null)
   const [contractUploading, setContractUploading] = useState(false)
   const contractFileRef = useRef<HTMLInputElement>(null)
+
+  // Shared documents (portal-visible)
+  const [clientDocs,      setClientDocs]      = useState<ClientDocument[]>([])
+  const [docCategory,     setDocCategory]     = useState<ClientDocument['category']>('other')
+  const [docFile,         setDocFile]         = useState<File | null>(null)
+  const [docUploading,    setDocUploading]    = useState(false)
+  const [docError,        setDocError]        = useState<string | null>(null)
+  const docFileRef = useRef<HTMLInputElement>(null)
 
   // Sync form/photo from client once data loads
   useEffect(() => {
@@ -319,6 +333,73 @@ export default function ClientProfilePage() {
     persistUpdate({ ...clientNN, contracts: updatedContracts })
   }
 
+  async function uploadClientDoc() {
+    if (!docFile || !clientNN) return
+    setDocUploading(true)
+    setDocError(null)
+    try {
+      const { storageUrl, storagePath } = await uploadFile(docFile, `client-docs/${clientNN.id}`)
+      const { data: { user } } = await supabase.auth.getUser()
+      const doc: ClientDocument = {
+        id:         uid(),
+        clientId:   clientNN.id,
+        name:       docFile.name,
+        category:   docCategory,
+        fileUrl:    storageUrl,
+        filePath:   storagePath,
+        fileSize:   docFile.size,
+        uploadedAt: Date.now(),
+        uploadedBy: user?.email ?? 'YVA Team',
+      }
+      await addClientDocument(doc)
+      setClientDocs(prev => [doc, ...prev])
+      setDocFile(null)
+      setDocCategory('other')
+      if (docFileRef.current) docFileRef.current.value = ''
+    } catch (err) {
+      console.error('Doc upload failed:', err)
+      setDocError(err instanceof Error ? err.message : 'Upload failed. Make sure the client_documents table exists in Supabase.')
+    } finally {
+      setDocUploading(false)
+    }
+  }
+
+  async function deleteClientDoc(doc: ClientDocument) {
+    await removeClientDocument(doc.id)
+    await deleteFile(doc.filePath).catch(() => {/* ignore */})
+    setClientDocs(prev => prev.filter(d => d.id !== doc.id))
+  }
+
+  async function sendPortalInvite() {
+    if (!clientNN.email) { setInviteMsg({ ok: false, text: 'Add an email address to this client before inviting.' }); return }
+    setInviteLoading(true)
+    setInviteMsg(null)
+
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { setInviteLoading(false); setInviteMsg({ ok: false, text: 'You must be logged in.' }); return }
+
+    try {
+      const res = await fetch('/.netlify/functions/invite-client', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ clientId: clientNN.id, email: clientNN.email }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setInviteMsg({ ok: false, text: data.error || 'Failed to send invitation.' })
+      } else {
+        setInviteMsg({ ok: true, text: `Invitation sent to ${clientNN.email}` })
+      }
+    } catch {
+      setInviteMsg({ ok: false, text: 'Network error — could not send invitation.' })
+    } finally {
+      setInviteLoading(false)
+    }
+  }
+
   async function sendReminder() {
     const settings = await loadSettings()
     const unpaidInvs = clientInvoices.filter(inv =>
@@ -387,9 +468,36 @@ export default function ClientProfilePage() {
               {outstanding > 0 && clientNN.email && (
                 <button className="btn-ghost btn-sm" style={{ color: '#fb923c' }} onClick={sendReminder}>✉ Remind</button>
               )}
+              <button
+                className="btn-ghost btn-sm"
+                onClick={sendPortalInvite}
+                disabled={inviteLoading}
+                title="Send client portal invitation email"
+                style={{ color: 'var(--gold)', borderColor: 'rgba(250,204,21,0.3)' }}
+              >
+                {inviteLoading ? 'Sending…' : '🔑 Invite to Portal'}
+              </button>
+              <button
+                className="btn-ghost btn-sm"
+                onClick={() => window.open(`${import.meta.env.BASE_URL}portal/dashboard?preview=${clientNN.id}`, '_blank')}
+                title="Preview this client's portal view"
+                style={{ color: '#60a5fa', borderColor: 'rgba(96,165,250,0.3)' }}
+              >
+                👁 Preview Portal
+              </button>
               <button className="btn-ghost btn-sm" onClick={() => setEditing(true)}>Edit Profile</button>
               <button className="btn-danger btn-sm" onClick={() => setConfirmDelete(true)}>Delete</button>
             </>
+          )}
+          {inviteMsg && (
+            <div style={{
+              marginTop: 8, fontSize: 12, padding: '6px 12px', borderRadius: 8,
+              background: inviteMsg.ok ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)',
+              color: inviteMsg.ok ? '#15803d' : '#ef4444',
+              border: `1px solid ${inviteMsg.ok ? 'rgba(34,197,94,.2)' : 'rgba(239,68,68,.2)'}`,
+            }}>
+              {inviteMsg.text}
+            </div>
           )}
         </div>
       </div>
@@ -717,6 +825,86 @@ export default function ClientProfilePage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+      </div>
+
+      {/* Shared Documents (portal-visible) */}
+      <div className="data-card" style={{ marginTop: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <div>
+            <div className="data-card-title" style={{ marginBottom: 2 }}>Shared Documents</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Visible to this client in their portal</div>
+          </div>
+        </div>
+
+        {/* Upload row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 16, padding: '12px 14px', background: 'var(--surf2)', borderRadius: 10, border: '1px solid var(--border)' }}>
+          <input
+            ref={docFileRef}
+            type="file"
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+            style={{ display: 'none' }}
+            onChange={e => setDocFile(e.target.files?.[0] ?? null)}
+          />
+          <button className="btn-ghost btn-sm" onClick={() => docFileRef.current?.click()} style={{ fontSize: 12 }}>
+            Choose File
+          </button>
+          <span style={{ fontSize: 12, color: 'var(--muted)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {docFile ? docFile.name : 'No file selected'}
+          </span>
+          <select
+            value={docCategory}
+            onChange={e => setDocCategory(e.target.value as ClientDocument['category'])}
+            style={{ fontSize: 12, padding: '5px 8px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
+          >
+            <option value="contract">Contract</option>
+            <option value="nda">NDA</option>
+            <option value="report">Report</option>
+            <option value="invoice">Invoice</option>
+            <option value="other">Other</option>
+          </select>
+          <button
+            className="btn-primary btn-sm"
+            onClick={() => void uploadClientDoc()}
+            disabled={!docFile || docUploading}
+            style={{ fontSize: 12, whiteSpace: 'nowrap' }}
+          >
+            {docUploading ? 'Uploading…' : 'Share'}
+          </button>
+        </div>
+
+        {docError && (
+          <div style={{ fontSize: 12, color: '#ef4444', padding: '8px 12px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 8, marginBottom: 10 }}>
+            {docError}
+          </div>
+        )}
+
+        {clientDocs.length === 0 ? (
+          <div style={{ color: 'var(--muted)', fontSize: 13, textAlign: 'center', padding: '12px 0' }}>
+            No documents shared yet.
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {clientDocs.map(doc => (
+              <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: 'var(--surf2)', borderRadius: 9, border: '1px solid var(--border)' }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.name}</div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                    {doc.category.toUpperCase()} · {new Date(doc.uploadedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    {doc.uploadedBy ? ` · ${doc.uploadedBy}` : ''}
+                  </div>
+                </div>
+                <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: 'var(--gold)', textDecoration: 'none', fontWeight: 600, flexShrink: 0 }}>
+                  View
+                </a>
+                <button
+                  className="btn-icon btn-danger"
+                  style={{ fontSize: 11, padding: '2px 6px', flexShrink: 0 }}
+                  onClick={() => { if (window.confirm(`Remove "${doc.name}"?`)) void deleteClientDoc(doc) }}
+                >×</button>
+              </div>
+            ))}
           </div>
         )}
       </div>

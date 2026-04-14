@@ -13,6 +13,195 @@
 
 ---
 
+## Client Portal ✅ (Phases 1–6 complete)
+
+### Architecture
+- Single `/login` page routes users to OS or portal based on role after sign-in
+- `AppRole = UserRole | 'client'` — clients are a distinct role, never in internal OS routes
+- `RoleContext` checks `user_roles` first (internal), then `client_users` (portal clients)
+- `must_change_password: true` in Supabase `user_metadata` forces password set on first login
+- Old shareable invoice view moved from `/portal` → `/invoice-view`
+- Preview Portal: internal user can open any client's portal via `?preview=clientId` — uses `ClientShell` with gold banner; `portalNav()` helper preserves param across all navigate() calls
+- DOP never shown on client-facing outputs — always pass `rate: 0` from portal to `buildInvoiceHTML`
+- `uploaded_at` in `client_documents` is `timestamptz` — always send as ISO string, not ms integer
+
+### Portal Files
+- `src/components/ClientShell.tsx` — portal layout: dark navy sidebar desktop, bottom tab nav mobile; preview mode gold banner + Exit button
+- `src/pages/portal/PortalSetPassword.tsx` — first-login forced password change
+- `src/pages/portal/PortalDashboard.tsx` — KPIs, team cards (clickable → modal), latest invoice, projects; all hours from `time_entries` table
+- `src/pages/portal/PortalBilling.tsx` — invoice list, status badges, filter tabs, PDF download (printInvoice rate:0), pay stub placeholder
+- `src/pages/portal/PortalProjects.tsx` — project cards with team avatars, per-project billing summary
+- `src/pages/portal/PortalTeam.tsx` — team grid, project filter tabs, employee detail modal, staff request CTA → modal
+- `src/pages/portal/PortalDocuments.tsx` — client upload + download; synced with LawOS client profile
+- `src/pages/portal/PortalSettings.tsx` — Account info (phone edit), Working Hours per-day schedule, Change Password
+- `src/services/portalStorage.ts` — client-scoped data fetching (never use storage.ts in portal pages); includes `loadPortalWorkingHours` / `savePortalWorkingHours`
+- `src/utils/invoiceHtml.ts` — shared `buildInvoiceHTML` / `printInvoice`; used by InvoicePage and PortalBilling
+- `netlify/functions/invite-client.cjs` — server-side invite: creates auth user + sends email
+- `supabase/client-portal.sql` — tables + RLS (run after rls.sql)
+
+### Invite Flow
+1. Admin opens a Client profile → clicks **Invite to Portal** button
+2. Calls `/.netlify/functions/invite-client` with Bearer token + `{ clientId, email }`
+3. Function creates Supabase auth user, inserts `client_users` row, sends invite email
+4. Client clicks magic link → `must_change_password: true` detected → `/portal/set-password`
+5. Sets password → `must_change_password: false` cleared → `/portal/dashboard`
+
+### Env Vars Needed (Netlify)
+- `SUPABASE_URL` — Supabase project URL
+- `SUPABASE_SERVICE_ROLE_KEY` — service role key (never expose in frontend)
+
+### Portal Routes (all live)
+- `/portal/dashboard` — Home ✅
+- `/portal/billing` — My Billing ✅
+- `/portal/team` — My Team ✅
+- `/portal/projects` — My Projects ✅
+- `/portal/documents` — Documents ✅ (client + internal upload, shared table)
+- `/portal/messages` — Messages / Crisp chat (Phase 7 — pending Crisp account)
+- `/portal/settings` — Settings ✅ (account info, working hours, change password)
+
+### Settings Page — SQL Required
+Run in Supabase SQL editor before using Settings → Working Hours:
+```sql
+CREATE TABLE IF NOT EXISTS working_hour_prefs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id uuid REFERENCES clients(id) ON DELETE CASCADE,
+  monday_start text, monday_end text,
+  tuesday_start text, tuesday_end text,
+  wednesday_start text, wednesday_end text,
+  thursday_start text, thursday_end text,
+  friday_start text, friday_end text,
+  timezone text, notes text,
+  updated_at timestamptz DEFAULT now(),
+  UNIQUE(client_id)
+);
+ALTER TABLE working_hour_prefs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "client_read_prefs"   ON working_hour_prefs FOR SELECT TO authenticated USING (client_id = portal_client_id() OR is_internal());
+CREATE POLICY "client_insert_prefs" ON working_hour_prefs FOR INSERT TO authenticated WITH CHECK (client_id = portal_client_id() OR is_internal());
+CREATE POLICY "client_update_prefs" ON working_hour_prefs FOR UPDATE TO authenticated USING (client_id = portal_client_id() OR is_internal());
+```
+
+### Staff Requests (OS side)
+- `/requests` — OS page under CRM nav; shows all client staff requests with status workflow
+- Shell sidebar: red badge on Requests nav item showing pending count (refreshes on navigation)
+- `staff_requests` table: `client_name`, `hours_per_week`, `start_date` columns added to existing table
+- RLS: internal read/update/insert + portal client insert/read-own
+
+### Client Documents
+- `client_documents` table: internal team uploads from ClientProfilePage; clients upload from PortalDocuments
+- Both sides read the same table — uploads from either appear in both places
+- `uploaded_at` is `timestamptz` — convert to/from ISO string in storage functions
+
+### Security
+- `client_users` table RLS: client can only read/update own row
+- `is_internal()` helper gates all OS data from client users at DB level
+- Separate portal-scoped read policies per table (clients, projects, invoices, employees, time_entries, client_documents, staff_requests)
+- Invite function validates caller is internal staff before creating accounts
+- Service role key lives in Netlify env only — never in frontend
+
+---
+
+## Session Progress — Client Portal
+
+### Completed This Session
+- **Phase 6 — Settings** (`/portal/settings`): account info, working hours per-day schedule, change password
+- **Stripe Payments**: Pay button live on PortalBilling; PaymentModal with saved cards + Card Element; server functions for PaymentIntent + webhook
+- **SQL alignment pass**: `supabase/client-portal.sql` now includes Stripe customer IDs, staff request columns, portal document insert policy, client phone update policy, and scoped `time_entries` RLS.
+- **Payment hardening pass**: `create-payment-intent.cjs` now fetches invoice/client server-side, verifies invoice ownership, rejects non-payable statuses, and computes amount due from Supabase instead of trusting browser-supplied cents.
+- **Setup docs cleanup**: `.env.example` now lists frontend Vite vars plus Netlify function vars; dashboard payment CTA now routes to Billing; Messages placeholder says Phase 7.
+
+---
+
+## ⚠️ PENDING SETUP — Must complete before portal is fully live
+
+### 1. Supabase SQL ✅ Run on 2026-04-14
+
+The full updated script was run successfully in Supabase SQL Editor:
+
+```text
+YVALAW OS/supabase/client-portal.sql
+```
+
+This supersedes the older three separate SQL blocks. It now includes:
+- `client_users.stripe_customer_id`
+- `working_hour_prefs`
+- portal-scoped `time_entries` read policy
+- `staff_requests.client_name`, `hours_per_week`, `start_date`
+- portal document upload insert policy
+- client profile phone update policy
+
+If the script is changed later, run it again and then run:
+
+```sql
+NOTIFY pgrst, 'reload schema';
+```
+
+---
+
+### 2. Environment variables
+
+**Local dev — create `.env` in project root:**
+```
+VITE_STRIPE_PUBLISHABLE_KEY=pk_test_xxx
+```
+
+**Netlify dashboard — add these env vars:**
+```
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJxxx
+STRIPE_SECRET_KEY=sk_live_xxx
+STRIPE_WEBHOOK_SECRET=whsec_xxx
+GMAIL_CLIENT_SECRET=xxx   ← already set
+```
+
+---
+
+### 3. Stripe Dashboard setup
+
+1. Go to **Stripe Dashboard → Developers → Webhooks → Add endpoint**
+2. URL: `https://your-netlify-site.netlify.app/.netlify/functions/stripe-webhook`
+3. Select event: `payment_intent.succeeded`
+4. Click **Add endpoint** → copy the **Signing secret** (`whsec_xxx`)
+5. Paste it as `STRIPE_WEBHOOK_SECRET` in Netlify env vars
+
+---
+
+### 4. Deploy checklist
+- [ ] Push repo to GitHub (`git push`)
+- [ ] Netlify auto-deploys from GitHub — confirm build passes
+- [x] Run `YVALAW OS/supabase/client-portal.sql` in Supabase
+- [ ] Set all Netlify env vars (Supabase + Stripe)
+- [ ] Set up Stripe webhook + copy signing secret
+- [ ] Add `VITE_STRIPE_PUBLISHABLE_KEY` to Netlify env (Vite needs it at build time)
+- [ ] Test invite flow end-to-end on production URL
+- [ ] Test portal on mobile (bottom nav, upload, PDF, Pay button)
+- [ ] Run a test Stripe payment with card `4242 4242 4242 4242` (test mode)
+
+---
+
+### Next Steps
+
+#### Phase 7 — Messages (requires Crisp account)
+- `/portal/messages` — embed Crisp live chat widget; identify user by email + clientId on load
+- **Blocked:** need Crisp website ID from user before this can be built
+- Implementation: ~30 lines — load Crisp script, call `window.$crisp.push(["set", "user:email", [email]])`
+
+#### Phase 8 — Deploy to Production
+1. Push current branch to GitHub → Netlify auto-deploys
+2. Set Netlify environment variables:
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `GMAIL_CLIENT_SECRET` (already set)
+3. Run all pending SQL in Supabase SQL editor (see above)
+4. Test invite flow end-to-end on production URL
+5. Test portal on mobile (bottom nav, upload, PDF download)
+
+#### Optional Enhancements (post-deploy)
+- **Notification preferences** — toggle email alerts for new invoices, document shares
+- **Portal analytics** — track client logins and portal activity in `activity_log`
+- **Stripe Customer Portal** — let clients manage saved cards themselves via Stripe's hosted portal
+
+---
+
 ## Current Logic Updates
 - Employee schedule and premium-rate logic now live in the app layer: default shift start/end plus premium start time and premium percent are stored on each employee.
 - Invoice calculations now use the saved employee schedule when available. Premium time increases both client billing and employee payroll; missing schedule falls back to regular rate.

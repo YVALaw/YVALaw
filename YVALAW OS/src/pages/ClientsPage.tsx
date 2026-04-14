@@ -349,7 +349,7 @@ export default function ClientsPage() {
               </div>
               <div className="kanban-cards" onDragOver={(e) => e.preventDefault()} onDrop={() => { if (dragId.current) { moveStage(dragId.current, key); dragId.current = null } }}>
                 {byStage(key).map((c) => (
-                  <div key={c.id} className="kanban-card" draggable onDragStart={() => { dragId.current = c.id }}>
+                  <div key={c.id} className="kanban-card" draggable onDragStart={() => { dragId.current = c.id }} style={{ cursor: 'pointer' }} onClick={() => navigate('/clients/' + c.id)}>
                     <div className="kanban-card-name">{c.name}</div>
                     <div className="kanban-card-meta">{c.email || 'No email'}</div>
                     {normTags(c.tags).length > 0 && (
@@ -367,9 +367,9 @@ export default function ClientsPage() {
                       </div>
                     )}
                     <div className="kanban-card-actions">
-                      <button className="btn-xs btn-ghost" onClick={() => openActivity(c)}>Activity</button>
-                      <button className="btn-xs btn-ghost" onClick={() => openEdit(c)}>Edit</button>
-                      <button className="btn-xs btn-danger" onClick={() => setConfirmDelete(c.id)}>×</button>
+                      <button className="btn-xs btn-ghost" onClick={e => { e.stopPropagation(); openActivity(c) }}>Activity</button>
+                      <button className="btn-xs btn-ghost" onClick={e => { e.stopPropagation(); openEdit(c) }}>Edit</button>
+                      <button className="btn-xs btn-danger" onClick={e => { e.stopPropagation(); setConfirmDelete(c.id) }}>×</button>
                     </div>
                   </div>
                 ))}

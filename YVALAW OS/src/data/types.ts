@@ -318,3 +318,87 @@ export type Contract = {
   fileName?: string     // original file name
   createdAt: number
 }
+
+// ─── Client Portal ────────────────────────────────────────────────────────────
+
+/** Links a Supabase Auth user to a Client record for portal access */
+export type ClientUser = {
+  id: string
+  authId: string        // Supabase auth.users UUID
+  clientId: string      // references clients.id
+  invitedAt?: string
+  lastLoginAt?: string
+  createdAt?: number
+}
+
+/** Client-initiated request for staff replacement or additional staff */
+export type StaffRequest = {
+  id: string
+  clientId: string
+  clientName?: string
+  type: 'replacement' | 'additional'
+  employeeId?: string   // for replacements — who to replace
+  employeeName?: string
+  role?: string
+  hoursPerWeek?: number
+  startDate?: string
+  notes?: string
+  status: 'pending' | 'in_review' | 'fulfilled' | 'declined'
+  createdAt: number
+}
+
+/** Client rating/review for a team member */
+export type TeamReview = {
+  id: string
+  clientId: string
+  employeeId: string
+  employeeName: string
+  rating: 1 | 2 | 3 | 4 | 5
+  comment?: string
+  period?: string       // e.g. "April 2026"
+  createdAt: number
+}
+
+/** Client-initiated performance bonus for a team member */
+export type BonusRequest = {
+  id: string
+  clientId: string
+  employeeId: string
+  employeeName: string
+  amount: number        // USD
+  note?: string
+  status: 'pending' | 'approved' | 'declined'
+  createdAt: number
+}
+
+/** Working hour preferences set by the client */
+export type WorkingHourPrefs = {
+  id: string
+  clientId: string
+  mondayStart?: string
+  mondayEnd?: string
+  tuesdayStart?: string
+  tuesdayEnd?: string
+  wednesdayStart?: string
+  wednesdayEnd?: string
+  thursdayStart?: string
+  thursdayEnd?: string
+  fridayStart?: string
+  fridayEnd?: string
+  timezone?: string
+  notes?: string
+  updatedAt?: number
+}
+
+/** Document stored in Supabase Storage and linked to a client */
+export type ClientDocument = {
+  id: string
+  clientId: string
+  name: string
+  category: 'contract' | 'nda' | 'report' | 'invoice' | 'other'
+  fileUrl: string
+  filePath: string
+  fileSize?: number
+  uploadedAt: number
+  uploadedBy?: string   // internal user name/email
+}

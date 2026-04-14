@@ -1,5 +1,8 @@
 export type UserRole = 'ceo' | 'admin' | 'accounting' | 'recruiter' | 'lead_gen'
 
+/** All roles in the system — UserRole covers internal staff, 'client' covers portal users */
+export type AppRole = UserRole | 'client'
+
 export const ROLE_LABELS: Record<UserRole, string> = {
   ceo:        'CEO',
   admin:      'Admin',
@@ -10,17 +13,19 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 
 export const ROLE_OPTIONS: UserRole[] = ['ceo', 'admin', 'accounting', 'recruiter', 'lead_gen']
 
+// All can.* functions accept AppRole so OS pages don't need casts.
+// 'client' will never match any internal-role check, so it returns false safely.
 export const can = {
-  viewInvoices:      (r: UserRole) => r === 'ceo' || r === 'admin' || r === 'accounting',
-  viewFinancials:    (r: UserRole) => r === 'ceo' || r === 'admin' || r === 'accounting',
-  viewPayRates:      (r: UserRole) => r === 'ceo' || r === 'admin' || r === 'accounting',
-  viewAllCandidates: (r: UserRole) => r === 'ceo' || r === 'admin' || r === 'recruiter',
-  viewHiredOnly:     (r: UserRole) => r === 'accounting',
-  viewClients:       (r: UserRole) => r !== 'recruiter',
-  viewExpenses:      (r: UserRole) => r === 'ceo' || r === 'admin' || r === 'accounting',
-  viewReports:       (r: UserRole) => r === 'ceo' || r === 'admin' || r === 'accounting',
-  viewEmployees:     (r: UserRole) => r !== 'lead_gen',
-  manageRoles:       (r: UserRole) => r === 'ceo',
+  viewInvoices:      (r: AppRole) => r === 'ceo' || r === 'admin' || r === 'accounting',
+  viewFinancials:    (r: AppRole) => r === 'ceo' || r === 'admin' || r === 'accounting',
+  viewPayRates:      (r: AppRole) => r === 'ceo' || r === 'admin' || r === 'accounting',
+  viewAllCandidates: (r: AppRole) => r === 'ceo' || r === 'admin' || r === 'recruiter',
+  viewHiredOnly:     (r: AppRole) => r === 'accounting',
+  viewClients:       (r: AppRole) => r !== 'recruiter' && r !== 'client',
+  viewExpenses:      (r: AppRole) => r === 'ceo' || r === 'admin' || r === 'accounting',
+  viewReports:       (r: AppRole) => r === 'ceo' || r === 'admin' || r === 'accounting',
+  viewEmployees:     (r: AppRole) => r !== 'lead_gen' && r !== 'client',
+  manageRoles:       (r: AppRole) => r === 'ceo',
   // CEO-only: revenue totals, payroll, net earnings
-  viewOwnerStats:    (r: UserRole) => r === 'ceo',
+  viewOwnerStats:    (r: AppRole) => r === 'ceo',
 }
