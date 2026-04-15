@@ -4,9 +4,12 @@ import { useRole } from '../../context/RoleContext'
 import {
   loadPortalClient,
   loadPortalInvoices,
+  loadPortalBillingSettings,
   computeOutstanding,
   fmtUSD,
   markPortalInvoicePaid,
+  savePortalAutoPaySettings,
+  type PortalBillingSettings,
 } from '../../services/portalStorage'
 import { printInvoice } from '../../utils/invoiceHtml'
 import PaymentModal from '../../components/PaymentModal'
@@ -70,6 +73,9 @@ export default function PortalBilling() {
   const [loading,      setLoading]      = useState(true)
   const [filter,       setFilter]       = useState<Filter>('all')
   const [payingInvoice, setPayingInvoice] = useState<Invoice | null>(null)
+  const [billingSettings, setBillingSettings] = useState<PortalBillingSettings>({ autoPayEnabled: false })
+  const [autoPaySaving, setAutoPaySaving] = useState(false)
+  const [autoPayMsg,    setAutoPayMsg]    = useState<{ ok: boolean; text: string } | null>(null)
 
   useEffect(() => {
     if (!clientId) return
@@ -78,11 +84,30 @@ export default function PortalBilling() {
       const c = await loadPortalClient(clientId)
       setClient(c)
       if (!c) { setLoading(false); return }
-      const invs = await loadPortalInvoices(c.name)
+      const [invs, settings] = await Promise.all([
+        loadPortalInvoices(c.name),
+        loadPortalBillingSettings(clientId),
+      ])
       setInvoices(invs)
+      setBillingSettings(settings)
       setLoading(false)
     })()
   }, [clientId])
+
+  async function disableAutoPay() {
+    if (!clientId) return
+    setAutoPaySaving(true)
+    setAutoPayMsg(null)
+    try {
+      await savePortalAutoPaySettings({ clientId, enabled: false })
+      setBillingSettings(prev => ({ ...prev, autoPayEnabled: false, autoPayDisabledAt: new Date().toISOString() }))
+      setAutoPayMsg({ ok: true, text: 'AutoPay is off.' })
+    } catch (err) {
+      setAutoPayMsg({ ok: false, text: err instanceof Error ? err.message : 'Could not turn off AutoPay.' })
+    } finally {
+      setAutoPaySaving(false)
+    }
+  }
 
   const filtered = invoices.filter(inv => {
     if (filter === 'unpaid') return isUnpaid(inv)
@@ -154,6 +179,55 @@ export default function PortalBilling() {
           <div className="kpi-value" style={{ fontSize: 20 }}>{nextDue ? fmtDate(nextDue) : '—'}</div>
           <div className="kpi-sub">{nextDue ? 'Earliest unpaid invoice' : 'No pending invoices'}</div>
         </div>
+      </div>
+
+      {/* AutoPay settings */}
+      <div style={{
+        background: billingSettings.autoPayEnabled ? 'rgba(34,197,94,.06)' : 'var(--surface)',
+        border: `1px solid ${billingSettings.autoPayEnabled ? 'rgba(34,197,94,.22)' : 'var(--border)'}`,
+        borderRadius: 16,
+        padding: '18px 22px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 16,
+        flexWrap: 'wrap',
+      }}>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 8 }}>
+            AutoPay {billingSettings.autoPayEnabled ? 'is on' : 'is off'}
+            <span style={{
+              fontSize: 10,
+              fontWeight: 800,
+              padding: '2px 8px',
+              borderRadius: 999,
+              background: billingSettings.autoPayEnabled ? 'rgba(34,197,94,.12)' : 'var(--surf2)',
+              color: billingSettings.autoPayEnabled ? '#15803d' : 'var(--muted)',
+            }}>
+              {billingSettings.autoPayEnabled ? 'ACTIVE' : 'OPTIONAL'}
+            </span>
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4, maxWidth: 560 }}>
+            {billingSettings.autoPayEnabled
+              ? 'Future due invoices will be charged automatically to the saved card you authorized.'
+              : 'To enable automatic deductions, pay an invoice and check the AutoPay authorization box before submitting payment.'}
+          </div>
+          {autoPayMsg && (
+            <div style={{ fontSize: 12, color: autoPayMsg.ok ? '#15803d' : '#ef4444', marginTop: 8, fontWeight: 700 }}>
+              {autoPayMsg.text}
+            </div>
+          )}
+        </div>
+        {billingSettings.autoPayEnabled && (
+          <button
+            className="btn-ghost btn-sm"
+            onClick={() => void disableAutoPay()}
+            disabled={autoPaySaving}
+            style={{ fontSize: 12, color: '#ef4444', borderColor: 'rgba(239,68,68,.24)' }}
+          >
+            {autoPaySaving ? 'Saving…' : 'Turn Off AutoPay'}
+          </button>
+        )}
       </div>
 
       {/* Filter tabs */}
@@ -309,16 +383,27 @@ export default function PortalBilling() {
           invoice={payingInvoice}
           clientId={clientId}
           onClose={() => setPayingInvoice(null)}
-          onSuccess={async (paidAmount) => {
+          onSuccess={async (paidAmount, options) => {
+            const previousPaid = Number(payingInvoice.amountPaid) || 0
+            const totalDue     = Number(payingInvoice.subtotal) || 0
+            const paidTotal    = Math.min(totalDue, previousPaid + paidAmount)
+
             // Optimistic update — mark as paid in local state immediately
             setInvoices(prev => prev.map(inv =>
               inv.id === payingInvoice.id
-                ? { ...inv, status: 'paid', amountPaid: paidAmount }
+                ? { ...inv, status: 'paid', amountPaid: paidTotal }
                 : inv
             ))
-            setPayingInvoice(null)
+            if (options?.autoPayEnabled) {
+              setBillingSettings(prev => ({
+                ...prev,
+                autoPayEnabled: true,
+                defaultPaymentMethodId: options.paymentMethodId ?? prev.defaultPaymentMethodId,
+                autoPayAuthorizedAt: new Date().toISOString(),
+              }))
+            }
             // Best-effort DB update (webhook also does this, this is the safety net)
-            await markPortalInvoicePaid(payingInvoice.id, paidAmount).catch(console.error)
+            await markPortalInvoicePaid(payingInvoice.id, paidTotal).catch(console.error)
           }}
         />
       )}

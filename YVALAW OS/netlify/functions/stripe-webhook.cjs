@@ -68,6 +68,20 @@ async function supabasePatch(table, filter, body) {
   return res.ok
 }
 
+async function supabaseGet(path) {
+  const url = process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const res = await fetch(`${url}/rest/v1/${path}`, {
+    headers: {
+      Authorization: `Bearer ${key}`,
+      apikey: key,
+      Accept: 'application/json',
+    },
+  })
+  if (!res.ok) return []
+  return res.json()
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 exports.handler = async function handler(event) {
@@ -112,9 +126,15 @@ exports.handler = async function handler(event) {
       return { statusCode: 200, body: JSON.stringify({ received: true }) }
     }
 
+    const invoiceRows = await supabaseGet(`invoices?id=eq.${invoiceId}&select=subtotal,amount_paid`)
+    const invoice = Array.isArray(invoiceRows) ? invoiceRows[0] : null
+    const totalPaid = invoice?.subtotal != null
+      ? Number(invoice.subtotal)
+      : amountPaid
+
     const ok = await supabasePatch('invoices', `id=eq.${invoiceId}`, {
       status:      'paid',
-      amount_paid: amountPaid,
+      amount_paid: totalPaid,
     })
 
     if (ok) {

@@ -15,6 +15,7 @@ import { loadStripe } from '@stripe/stripe-js'
 import type { Stripe, StripeCardElement, StripeElements } from '@stripe/stripe-js'
 import { supabase } from '../lib/supabase'
 import type { Invoice } from '../data/types'
+import { savePortalAutoPaySettings } from '../services/portalStorage'
 
 // Initialise Stripe once at module level — not inside component
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string)
@@ -35,7 +36,7 @@ interface Props {
   invoice: Invoice
   clientId: string
   onClose: () => void
-  onSuccess: (paidAmount: number) => void
+  onSuccess: (paidAmount: number, options?: { autoPayEnabled?: boolean; paymentMethodId?: string }) => void
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -88,6 +89,8 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
   const [isProcessing,   setIsProcessing]   = useState(false)
   const [billingName,    setBillingName]    = useState(invoice.clientName ?? '')
   const [billingPostal,  setBillingPostal]  = useState('')
+  const [autoPayConsent, setAutoPayConsent] = useState(false)
+  const [successNote,    setSuccessNote]    = useState('')
 
   const cardMountRef = useRef<HTMLDivElement>(null)
   const cardElemRef  = useRef<StripeCardElement | null>(null)
@@ -203,9 +206,34 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
 
       if (result.paymentIntent?.status === 'succeeded') {
         const paid = (result.paymentIntent.amount ?? amountCents) / 100
+        const paymentMethodId = typeof result.paymentIntent.payment_method === 'string'
+          ? result.paymentIntent.payment_method
+          : selectedMethod !== 'new'
+            ? selectedMethod
+            : undefined
+
+        let autoPayEnabled = false
+        if (autoPayConsent) {
+          if (paymentMethodId) {
+            try {
+              await savePortalAutoPaySettings({ clientId, enabled: true, paymentMethodId })
+              autoPayEnabled = true
+              setSuccessNote('AutoPay is now enabled for future due invoices. You can turn it off from Billing.')
+            } catch (autoPayErr) {
+              console.error('AutoPay enable failed:', autoPayErr)
+              setSuccessNote('Payment succeeded, but AutoPay could not be enabled. Please try again on your next payment.')
+            }
+          } else {
+            setSuccessNote('Payment succeeded, but Stripe did not return a reusable card for AutoPay.')
+          }
+        } else {
+          setSuccessNote('')
+        }
+
         setPaidAmount(paid)
         setStep('success')
-        onSuccess(paid)
+        setIsProcessing(false)
+        onSuccess(paid, { autoPayEnabled, paymentMethodId })
       } else {
         throw new Error(`Unexpected payment status: ${result.paymentIntent?.status}`)
       }
@@ -319,6 +347,20 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
               <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>
                 {fmtUSD(paidAmount)} received. Invoice #{invoice.number} has been marked paid.
               </div>
+              {successNote && (
+                <div style={{
+                  fontSize: 12,
+                  color: successNote.startsWith('AutoPay') ? '#15803d' : '#f97316',
+                  background: successNote.startsWith('AutoPay') ? 'rgba(34,197,94,.08)' : 'rgba(249,115,22,.08)',
+                  border: `1px solid ${successNote.startsWith('AutoPay') ? 'rgba(34,197,94,.22)' : 'rgba(249,115,22,.22)'}`,
+                  borderRadius: 10,
+                  padding: '10px 12px',
+                  marginBottom: 18,
+                  lineHeight: 1.45,
+                }}>
+                  {successNote}
+                </div>
+              )}
               <button
                 className="btn-primary"
                 onClick={onClose}
@@ -450,6 +492,34 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
                   Processing payment…
                 </div>
               )}
+
+              {/* AutoPay consent */}
+              <label style={{
+                display: 'flex',
+                gap: 10,
+                alignItems: 'flex-start',
+                padding: '12px 14px',
+                borderRadius: 10,
+                background: 'rgba(245,181,51,.06)',
+                border: '1px solid rgba(245,181,51,.24)',
+                marginBottom: 16,
+                cursor: 'pointer',
+              }}>
+                <input
+                  type="checkbox"
+                  checked={autoPayConsent}
+                  onChange={e => setAutoPayConsent(e.target.checked)}
+                  style={{ marginTop: 2, accentColor: 'var(--gold)' }}
+                />
+                <span>
+                  <span style={{ display: 'block', fontSize: 13, fontWeight: 800, color: 'var(--text)' }}>
+                    Authorize AutoPay for future invoices
+                  </span>
+                  <span style={{ display: 'block', marginTop: 3, fontSize: 11, lineHeight: 1.45, color: 'var(--muted)' }}>
+                    YVA may charge this saved card for future due invoices. You can turn AutoPay off from Billing.
+                  </span>
+                </span>
+              </label>
 
               {/* Pay button */}
               <button

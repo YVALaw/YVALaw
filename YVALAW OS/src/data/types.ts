@@ -326,6 +326,11 @@ export type ClientUser = {
   id: string
   authId: string        // Supabase auth.users UUID
   clientId: string      // references clients.id
+  stripeCustomerId?: string
+  autoPayEnabled?: boolean
+  defaultPaymentMethodId?: string
+  autoPayAuthorizedAt?: string
+  autoPayDisabledAt?: string
   invitedAt?: string
   lastLoginAt?: string
   createdAt?: number

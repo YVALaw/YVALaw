@@ -113,6 +113,7 @@ CREATE POLICY "client_update_prefs" ON working_hour_prefs FOR UPDATE TO authenti
 - **Supabase Auth config fixed by user**: invite links now work after setting Supabase auth Site URL / redirect URLs for `https://yvastaffing.agency/os/**`.
 - **Stripe Card Element fixes**: card input text is visible on the light modal, and Pay is disabled until Stripe fires the Card Element `ready` event.
 - **Local-only Stripe modal refactor after production test**: PaymentModal now keeps the Stripe Card Element mounted during submission by using `isProcessing` instead of switching `step` to `processing`. This should fix `We could not retrieve data from the specified Element...`. It also asks for only cardholder name + ZIP/postal code before the Stripe Card Element and sends those as `billing_details` to Stripe.
+- **AutoPay ready for deploy testing**: Client Billing now has explicit AutoPay consent while paying, stores only Stripe customer/payment method IDs in `client_users`, and adds scheduled `run-autopay` Netlify function to charge due unpaid invoices for opted-in clients. Run the updated `supabase/client-portal.sql` before enabling AutoPay in production.
 - **Latest pushed commits**:
   - `e248901` — Add LawOS client portal payments
   - `b1af500` — Add manual client portal invite links
@@ -120,8 +121,7 @@ CREATE POLICY "client_update_prefs" ON working_hour_prefs FOR UPDATE TO authenti
   - `8b371f3` — Fix Stripe card input visibility
   - `7fd00cd` — Wait for Stripe card element readiness
 - **Local only, not pushed**:
-  - CLAUDE.md handoff update commit exists locally only (`03861c7`) and should not be pushed by itself.
-  - PaymentModal mounted-element refactor and simplified billing details are currently local and uncommitted as of this handoff.
+  - AutoPay changes are currently local and uncommitted as of this handoff.
 
 ---
 
@@ -137,6 +137,7 @@ YVALAW OS/supabase/client-portal.sql
 
 This supersedes the older three separate SQL blocks. It now includes:
 - `client_users.stripe_customer_id`
+- `client_users.auto_pay_enabled`, `default_payment_method_id`, `auto_pay_authorized_at`, `auto_pay_disabled_at`
 - `working_hour_prefs`
 - portal-scoped `time_entries` read policy
 - `staff_requests.client_name`, `hours_per_week`, `start_date`
@@ -203,6 +204,8 @@ Test-mode webhook signing secret was added to Netlify as `STRIPE_WEBHOOK_SECRET`
 - [ ] Commit/push the local PaymentModal refactor after review, then retest Stripe payment after deploy
 - [ ] Test portal on mobile (bottom nav, upload, PDF, Pay button)
 - [ ] Run a test Stripe payment with card `4242 4242 4242 4242` (test mode)
+- [ ] Run updated `supabase/client-portal.sql` again before testing AutoPay
+- [ ] After deploy, verify Netlify shows `run-autopay` with a Scheduled badge and use Run now for an opted-in test client with a due invoice
 
 ---
 
@@ -227,7 +230,13 @@ Test-mode webhook signing secret was added to Netlify as `STRIPE_WEBHOOK_SECRET`
 6. Test client document upload from portal, then confirm file appears on internal client profile.
 7. Test staff request from portal, then confirm it appears in internal `/requests`.
 8. Test mobile portal nav and PDF download.
-9. Gmail integration remains optional/pending until Google OAuth client ID/secret are configured.
+9. Test AutoPay:
+   - Run updated `supabase/client-portal.sql`.
+   - Pay one invoice as a real portal client and check the AutoPay authorization box.
+   - Confirm `client_users.auto_pay_enabled = true` and `default_payment_method_id` is set.
+   - Create a new due unpaid invoice for the same client.
+   - In Netlify Functions, run `run-autopay` manually and confirm Stripe payment succeeds and LawOS marks the invoice paid.
+10. Gmail integration remains optional/pending until Google OAuth client ID/secret are configured.
 
 #### Optional Enhancements (post-deploy)
 - **Notification preferences** — toggle email alerts for new invoices, document shares

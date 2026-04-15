@@ -20,6 +20,10 @@ CREATE TABLE IF NOT EXISTS client_users (
 
 -- Stripe customer ID is set by netlify/functions/create-payment-intent.cjs.
 ALTER TABLE client_users ADD COLUMN IF NOT EXISTS stripe_customer_id text;
+ALTER TABLE client_users ADD COLUMN IF NOT EXISTS auto_pay_enabled boolean NOT NULL DEFAULT false;
+ALTER TABLE client_users ADD COLUMN IF NOT EXISTS default_payment_method_id text;
+ALTER TABLE client_users ADD COLUMN IF NOT EXISTS auto_pay_authorized_at timestamptz;
+ALTER TABLE client_users ADD COLUMN IF NOT EXISTS auto_pay_disabled_at timestamptz;
 
 ALTER TABLE client_users ENABLE ROW LEVEL SECURITY;
 

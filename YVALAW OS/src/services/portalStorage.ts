@@ -8,6 +8,14 @@
 import { supabase } from '../lib/supabase'
 import type { Client, ClientDocument, Employee, Invoice, Project, TimeEntry, WorkingHourPrefs } from '../data/types'
 
+export type PortalBillingSettings = {
+  stripeCustomerId?: string
+  autoPayEnabled: boolean
+  defaultPaymentMethodId?: string
+  autoPayAuthorizedAt?: string
+  autoPayDisabledAt?: string
+}
+
 // ── Snake-to-camel key conversion (mirrors storage.ts) ───────────────────────
 
 function toCamel(obj: Record<string, unknown>): Record<string, unknown> {
@@ -250,14 +258,62 @@ export async function savePortalWorkingHours(prefs: WorkingHourPrefs): Promise<v
   if (error) throw new Error(error.message)
 }
 
+/** Load Stripe/AutoPay settings for the authenticated portal client */
+export async function loadPortalBillingSettings(clientId: string): Promise<PortalBillingSettings> {
+  const { data, error } = await supabase
+    .from('client_users')
+    .select('stripe_customer_id, auto_pay_enabled, default_payment_method_id, auto_pay_authorized_at, auto_pay_disabled_at')
+    .eq('client_id', clientId)
+    .maybeSingle()
+
+  if (error || !data) {
+    return { autoPayEnabled: false }
+  }
+
+  const row = toCamel(data as Record<string, unknown>) as Record<string, unknown>
+  return {
+    stripeCustomerId:        row.stripeCustomerId as string | undefined,
+    autoPayEnabled:         row.autoPayEnabled === true,
+    defaultPaymentMethodId: row.defaultPaymentMethodId as string | undefined,
+    autoPayAuthorizedAt:    row.autoPayAuthorizedAt as string | undefined,
+    autoPayDisabledAt:      row.autoPayDisabledAt as string | undefined,
+  }
+}
+
+/** Enable or disable AutoPay for the authenticated portal client */
+export async function savePortalAutoPaySettings(params: {
+  clientId: string
+  enabled: boolean
+  paymentMethodId?: string
+}): Promise<void> {
+  const row: Record<string, unknown> = {
+    auto_pay_enabled: params.enabled,
+  }
+
+  if (params.enabled) {
+    if (!params.paymentMethodId) throw new Error('A saved card is required to enable AutoPay.')
+    row.default_payment_method_id = params.paymentMethodId
+    row.auto_pay_authorized_at = new Date().toISOString()
+    row.auto_pay_disabled_at = null
+  } else {
+    row.auto_pay_disabled_at = new Date().toISOString()
+  }
+
+  const { error } = await supabase
+    .from('client_users')
+    .update(row)
+    .eq('client_id', params.clientId)
+  if (error) throw new Error(error.message)
+}
+
 /**
  * Mark an invoice as paid after a successful Stripe payment.
  * The webhook also updates this, but this call gives instant UI feedback.
  */
-export async function markPortalInvoicePaid(invoiceId: string, amountPaid: number): Promise<void> {
+export async function markPortalInvoicePaid(invoiceId: string, totalPaid: number): Promise<void> {
   const { error } = await supabase
     .from('invoices')
-    .update({ status: 'paid', amount_paid: amountPaid })
+    .update({ status: 'paid', amount_paid: totalPaid })
     .eq('id', invoiceId)
   if (error) throw new Error(error.message)
 }
