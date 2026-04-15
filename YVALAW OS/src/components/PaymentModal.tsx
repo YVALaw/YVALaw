@@ -29,7 +29,7 @@ type SavedCard = {
   expYear: number
 }
 
-type Step = 'loading' | 'form' | 'processing' | 'success' | 'error'
+type Step = 'loading' | 'form' | 'success' | 'error'
 
 interface Props {
   invoice: Invoice
@@ -85,6 +85,9 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
   const [errorMsg,       setErrorMsg]       = useState('')
   const [paidAmount,     setPaidAmount]     = useState(amountToPay)
   const [cardReady,      setCardReady]      = useState(false)
+  const [isProcessing,   setIsProcessing]   = useState(false)
+  const [billingName,    setBillingName]    = useState(invoice.clientName ?? '')
+  const [billingPostal,  setBillingPostal]  = useState('')
 
   const cardMountRef = useRef<HTMLDivElement>(null)
   const cardElemRef  = useRef<StripeCardElement | null>(null)
@@ -163,8 +166,12 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
 
   // ── Confirm payment ──────────────────────────────────────────────────────────
   async function handlePay() {
-    if (!stripeObj || !clientSecret || step !== 'form') return
-    setStep('processing')
+    if (!stripeObj || !clientSecret || step !== 'form' || isProcessing) return
+    if (selectedMethod === 'new') {
+      if (!billingName.trim()) { setErrorMsg('Enter the cardholder name.'); return }
+      if (!billingPostal.trim()) { setErrorMsg('Enter the billing ZIP/postal code.'); return }
+    }
+    setIsProcessing(true)
     setErrorMsg('')
 
     try {
@@ -173,7 +180,15 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
       if (selectedMethod === 'new') {
         if (!cardElemRef.current || !cardReady) throw new Error('Card form is still loading. Please try again in a moment.')
         result = await stripeObj.confirmCardPayment(clientSecret, {
-          payment_method: { card: cardElemRef.current },
+          payment_method: {
+            card: cardElemRef.current,
+            billing_details: {
+              name: billingName.trim(),
+              address: {
+                postal_code: billingPostal.trim(),
+              },
+            },
+          },
         })
       } else {
         // Pay with saved card
@@ -196,7 +211,7 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
       }
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Payment failed. Please try again.')
-      setStep('form')
+      setIsProcessing(false)
     }
   }
 
@@ -205,7 +220,7 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
   return (
     <div
       className="modal-overlay"
-      onClick={step === 'processing' ? undefined : onClose}
+      onClick={isProcessing ? undefined : onClose}
       style={{ zIndex: 300 }}
     >
       <div
@@ -224,7 +239,7 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
             <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--text)' }}>Pay Invoice</div>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{invoice.number}</div>
           </div>
-          {step !== 'processing' && (
+          {!isProcessing && (
             <button
               onClick={onClose}
               className="modal-close btn-icon"
@@ -315,8 +330,8 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
           )}
 
           {/* Payment form */}
-          {(step === 'form' || step === 'processing') && (
-            <div style={{ opacity: step === 'processing' ? 0.6 : 1, pointerEvents: step === 'processing' ? 'none' : 'auto' }}>
+          {step === 'form' && (
+            <div style={{ opacity: isProcessing ? 0.6 : 1, pointerEvents: isProcessing ? 'none' : 'auto' }}>
 
               {/* Saved cards */}
               {savedMethods.length > 0 && (
@@ -380,6 +395,23 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
               {/* Card Element (shown when "new card" selected) */}
               {selectedMethod === 'new' && (
                 <div style={{ marginBottom: 20 }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 10 }}>
+                    BILLING DETAILS
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10, marginBottom: 16 }}>
+                    <input
+                      value={billingName}
+                      onChange={e => setBillingName(e.target.value)}
+                      placeholder="Cardholder name"
+                      style={billingInputStyle}
+                    />
+                    <input
+                      value={billingPostal}
+                      onChange={e => setBillingPostal(e.target.value)}
+                      placeholder="ZIP / postal code"
+                      style={billingInputStyle}
+                    />
+                  </div>
                   {savedMethods.length === 0 && (
                     <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 10 }}>
                       CARD DETAILS
@@ -413,7 +445,7 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
               )}
 
               {/* Processing spinner */}
-              {step === 'processing' && (
+              {isProcessing && (
                 <div style={{ textAlign: 'center', marginBottom: 16, fontSize: 13, color: 'var(--muted)' }}>
                   Processing payment…
                 </div>
@@ -423,10 +455,10 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
               <button
                 className="btn-primary"
                 onClick={() => void handlePay()}
-                disabled={step === 'processing' || !cardReady}
+                disabled={isProcessing || !cardReady}
                 style={{ width: '100%', fontSize: 15, fontWeight: 800, padding: '13px', justifyContent: 'center' }}
               >
-                {step === 'processing'
+                {isProcessing
                   ? 'Processing…'
                   : !cardReady
                     ? 'Loading card form…'
@@ -446,4 +478,16 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
       </div>
     </div>
   )
+}
+
+const billingInputStyle: React.CSSProperties = {
+  width: '100%',
+  boxSizing: 'border-box',
+  padding: '10px 12px',
+  borderRadius: 8,
+  border: '1px solid #cbd5e1',
+  background: '#ffffff',
+  color: '#0f172a',
+  fontSize: 13,
+  outline: 'none',
 }

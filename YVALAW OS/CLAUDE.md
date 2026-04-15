@@ -112,12 +112,16 @@ CREATE POLICY "client_update_prefs" ON working_hour_prefs FOR UPDATE TO authenti
 - **Production deploy plumbing**: root `netlify.toml` now points Netlify at `YVALAW OS/netlify/functions`, fixing 404s for `/.netlify/functions/invite-client`.
 - **Supabase Auth config fixed by user**: invite links now work after setting Supabase auth Site URL / redirect URLs for `https://yvastaffing.agency/os/**`.
 - **Stripe Card Element fixes**: card input text is visible on the light modal, and Pay is disabled until Stripe fires the Card Element `ready` event.
+- **Local-only Stripe modal refactor after production test**: PaymentModal now keeps the Stripe Card Element mounted during submission by using `isProcessing` instead of switching `step` to `processing`. This should fix `We could not retrieve data from the specified Element...`. It also asks for only cardholder name + ZIP/postal code before the Stripe Card Element and sends those as `billing_details` to Stripe.
 - **Latest pushed commits**:
   - `e248901` — Add LawOS client portal payments
   - `b1af500` — Add manual client portal invite links
   - `38ba3de` — Deploy LawOS Netlify functions
   - `8b371f3` — Fix Stripe card input visibility
   - `7fd00cd` — Wait for Stripe card element readiness
+- **Local only, not pushed**:
+  - CLAUDE.md handoff update commit exists locally only (`03861c7`) and should not be pushed by itself.
+  - PaymentModal mounted-element refactor and simplified billing details are currently local and uncommitted as of this handoff.
 
 ---
 
@@ -196,7 +200,7 @@ Test-mode webhook signing secret was added to Netlify as `STRIPE_WEBHOOK_SECRET`
 - [x] Set up Stripe webhook + copy signing secret
 - [x] Add `VITE_STRIPE_PUBLISHABLE_KEY` to Netlify env (Vite needs it at build time)
 - [x] Test manual invite link flow enough to confirm Supabase redirect config works
-- [ ] Retest Stripe payment after commit `7fd00cd` deploys
+- [ ] Commit/push the local PaymentModal refactor after review, then retest Stripe payment after deploy
 - [ ] Test portal on mobile (bottom nav, upload, PDF, Pay button)
 - [ ] Run a test Stripe payment with card `4242 4242 4242 4242` (test mode)
 
@@ -210,16 +214,20 @@ Test-mode webhook signing secret was added to Netlify as `STRIPE_WEBHOOK_SECRET`
 - Implementation: ~30 lines — load Crisp script, call `window.$crisp.push(["set", "user:email", [email]])`
 
 #### Phase 8 — Deploy to Production
-1. Wait for Netlify to deploy latest commit `7fd00cd`.
-2. Retest client Billing payment modal:
+1. Review the local PaymentModal refactor in `src/components/PaymentModal.tsx`.
+2. Commit and push it when ready; it is not live yet.
+3. Wait for Netlify to deploy that new commit.
+4. Retest client Billing payment modal:
    - Card digits should be visible.
-   - Pay button should show `Loading card form…` until Stripe Card Element is ready.
+   - Cardholder name and ZIP/postal fields should appear immediately when the modal opens.
+   - Pay should no longer destroy/unmount the Stripe element before confirmation.
+   - Pay button should show `Loading card form…` until Stripe Card Element is ready and `Processing…` during submission.
    - Test card: `4242 4242 4242 4242`.
-3. Verify successful Stripe payment marks the invoice paid in portal and internal LawOS.
-4. Test client document upload from portal, then confirm file appears on internal client profile.
-5. Test staff request from portal, then confirm it appears in internal `/requests`.
-6. Test mobile portal nav and PDF download.
-7. Gmail integration remains optional/pending until Google OAuth client ID/secret are configured.
+5. Verify successful Stripe payment marks the invoice paid in portal and internal LawOS.
+6. Test client document upload from portal, then confirm file appears on internal client profile.
+7. Test staff request from portal, then confirm it appears in internal `/requests`.
+8. Test mobile portal nav and PDF download.
+9. Gmail integration remains optional/pending until Google OAuth client ID/secret are configured.
 
 #### Optional Enhancements (post-deploy)
 - **Notification preferences** — toggle email alerts for new invoices, document shares
