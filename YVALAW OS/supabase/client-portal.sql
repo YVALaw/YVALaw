@@ -27,6 +27,11 @@ ALTER TABLE client_users ADD COLUMN IF NOT EXISTS auto_pay_disabled_at timestamp
 
 ALTER TABLE client_users ENABLE ROW LEVEL SECURITY;
 
+-- Internal staff can read portal billing status for client profiles.
+DROP POLICY IF EXISTS "client_users_internal_read" ON client_users;
+CREATE POLICY "client_users_internal_read" ON client_users
+  FOR SELECT TO authenticated USING (public.is_internal());
+
 -- Clients can only read/update their own row (no delete, no insert — managed by invite function)
 DROP POLICY IF EXISTS "client_users_own_read" ON client_users;
 CREATE POLICY "client_users_own_read" ON client_users

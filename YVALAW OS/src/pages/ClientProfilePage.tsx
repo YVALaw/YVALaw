@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { ActivityLogEntry, Client, ClientDocument, CommEntryType, Contract, ContractStatus, Invoice, Project } from '../data/types'
-import { loadSnapshot, saveClients, loadActivityLog, saveActivityLog, loadSettings, loadClientDocuments, addClientDocument, removeClientDocument } from '../services/storage'
+import { loadSnapshot, saveClients, loadActivityLog, saveActivityLog, loadSettings, loadClientDocuments, addClientDocument, removeClientDocument, loadClientPortalBillingStatus, type ClientPortalBillingStatus } from '../services/storage'
 import { sendEmail } from '../services/gmail'
 import { uploadFile, deleteFile } from '../services/fileStorage'
 import { supabase } from '../lib/supabase'
@@ -30,6 +30,10 @@ function statusBadge(s: string): string { return stageBadge(s) }
 function fmtTimestamp(ts: number): string {
   return new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
+function fmtDateTime(iso?: string): string | undefined {
+  if (!iso) return undefined
+  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
 
 const STAGES = [
   { key: 'lead', label: 'Lead' }, { key: 'prospect', label: 'Prospect' },
@@ -54,7 +58,10 @@ export default function ClientProfilePage() {
     loadActivityLog().then(all => {
       setActivityLog(all.filter(e => e.clientId === id).sort((a, b) => b.createdAt - a.createdAt))
     })
-    if (id) loadClientDocuments(id).then(setClientDocs)
+    if (id) {
+      loadClientDocuments(id).then(setClientDocs)
+      loadClientPortalBillingStatus(id).then(setPortalBilling)
+    }
   }, [id])
 
   const client = clients.find(c => c.id === id)
@@ -79,6 +86,11 @@ export default function ClientProfilePage() {
   // Portal invite
   const [inviteLoading, setInviteLoading] = useState<'email' | 'link' | null>(null)
   const [inviteMsg,     setInviteMsg]     = useState<{ ok: boolean; text: string } | null>(null)
+  const [portalBilling, setPortalBilling] = useState<ClientPortalBillingStatus>({
+    hasPortalAccount: false,
+    autoPayEnabled: false,
+    hasSavedPaymentMethod: false,
+  })
 
   // Contracts
   const [contractPanelOpen, setContractPanelOpen] = useState(false)
@@ -484,6 +496,31 @@ export default function ClientProfilePage() {
           ) : (
             <>
               <span className={`badge ${statusBadge(clientNN.status || 'lead')}`} style={{ fontSize: 13 }}>{clientNN.status || 'Lead'}</span>
+              <span
+                title={
+                  portalBilling.autoPayEnabled
+                    ? `AutoPay authorized${fmtDateTime(portalBilling.autoPayAuthorizedAt) ? ` on ${fmtDateTime(portalBilling.autoPayAuthorizedAt)}` : ''}`
+                    : portalBilling.hasSavedPaymentMethod
+                      ? 'Client has a saved card but AutoPay is off'
+                      : portalBilling.hasPortalAccount
+                        ? 'Client portal account exists, but no AutoPay authorization yet'
+                        : 'No client portal account yet'
+                }
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  padding: '5px 10px',
+                  borderRadius: 999,
+                  fontSize: 12,
+                  fontWeight: 800,
+                  background: portalBilling.autoPayEnabled ? 'rgba(34,197,94,.1)' : portalBilling.hasSavedPaymentMethod ? 'rgba(245,181,51,.12)' : 'var(--surf2)',
+                  color: portalBilling.autoPayEnabled ? '#15803d' : portalBilling.hasSavedPaymentMethod ? '#a16207' : 'var(--muted)',
+                  border: `1px solid ${portalBilling.autoPayEnabled ? 'rgba(34,197,94,.22)' : portalBilling.hasSavedPaymentMethod ? 'rgba(245,181,51,.26)' : 'var(--border)'}`,
+                }}
+              >
+                {portalBilling.autoPayEnabled ? 'AutoPay On' : portalBilling.hasSavedPaymentMethod ? 'Card Saved' : portalBilling.hasPortalAccount ? 'AutoPay Off' : 'No Portal'}
+              </span>
               {outstanding > 0 && clientNN.email && (
                 <button className="btn-ghost btn-sm" style={{ color: '#fb923c' }} onClick={sendReminder}>✉ Remind</button>
               )}
@@ -635,6 +672,16 @@ export default function ClientProfilePage() {
                     { label: 'Timezone',        value: clientNN.timezone },
                     { label: 'Default Rate',    value: clientNN.defaultRate ? `$${clientNN.defaultRate}/hr` : undefined },
                     { label: 'Payment Terms',   value: clientNN.paymentTerms },
+                    {
+                      label: 'AutoPay',
+                      value: portalBilling.autoPayEnabled
+                        ? `On${fmtDateTime(portalBilling.autoPayAuthorizedAt) ? ` since ${fmtDateTime(portalBilling.autoPayAuthorizedAt)}` : ''}`
+                        : portalBilling.hasSavedPaymentMethod
+                          ? 'Off — saved card available'
+                          : portalBilling.hasPortalAccount
+                            ? 'Off'
+                            : 'No portal account',
+                    },
                     { label: 'Contract End',    value: clientNN.contractEnd },
                     { label: 'Tags',            value: clientNN.tags },
                   ].map(({ label, value }) => value ? (

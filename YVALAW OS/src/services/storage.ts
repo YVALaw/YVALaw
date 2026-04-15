@@ -5,6 +5,14 @@ import type {
   Estimate, TimeEntry, RecurringInvoice, StaffRequest, ClientDocument,
 } from '../data/types'
 
+export type ClientPortalBillingStatus = {
+  hasPortalAccount: boolean
+  autoPayEnabled: boolean
+  hasSavedPaymentMethod: boolean
+  autoPayAuthorizedAt?: string
+  autoPayDisabledAt?: string
+}
+
 // ─── Generic helpers ──────────────────────────────────────────────────────────
 
 /** snake_case DB row → camelCase TS object (top-level keys only; JSONB values untouched) */
@@ -397,4 +405,25 @@ export async function countPendingStaffRequests(): Promise<number> {
     .eq('status', 'pending')
   if (error) return 0
   return count ?? 0
+}
+
+export async function loadClientPortalBillingStatus(clientId: string): Promise<ClientPortalBillingStatus> {
+  const { data, error } = await supabase
+    .from('client_users')
+    .select('auto_pay_enabled, default_payment_method_id, auto_pay_authorized_at, auto_pay_disabled_at')
+    .eq('client_id', clientId)
+    .maybeSingle()
+
+  if (error || !data) {
+    return { hasPortalAccount: false, autoPayEnabled: false, hasSavedPaymentMethod: false }
+  }
+
+  const row = toCamel<Record<string, unknown>>(data as Record<string, unknown>)
+  return {
+    hasPortalAccount:       true,
+    autoPayEnabled:        row.autoPayEnabled === true,
+    hasSavedPaymentMethod: Boolean(row.defaultPaymentMethodId),
+    autoPayAuthorizedAt:   row.autoPayAuthorizedAt as string | undefined,
+    autoPayDisabledAt:     row.autoPayDisabledAt as string | undefined,
+  }
 }
