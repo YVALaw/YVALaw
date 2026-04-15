@@ -112,16 +112,18 @@ CREATE POLICY "client_update_prefs" ON working_hour_prefs FOR UPDATE TO authenti
 - **Production deploy plumbing**: root `netlify.toml` now points Netlify at `YVALAW OS/netlify/functions`, fixing 404s for `/.netlify/functions/invite-client`.
 - **Supabase Auth config fixed by user**: invite links now work after setting Supabase auth Site URL / redirect URLs for `https://yvastaffing.agency/os/**`.
 - **Stripe Card Element fixes**: card input text is visible on the light modal, and Pay is disabled until Stripe fires the Card Element `ready` event.
-- **Local-only Stripe modal refactor after production test**: PaymentModal now keeps the Stripe Card Element mounted during submission by using `isProcessing` instead of switching `step` to `processing`. This should fix `We could not retrieve data from the specified Element...`. It also asks for only cardholder name + ZIP/postal code before the Stripe Card Element and sends those as `billing_details` to Stripe.
-- **AutoPay ready for deploy testing**: Client Billing now has explicit AutoPay consent while paying, stores only Stripe customer/payment method IDs in `client_users`, and adds scheduled `run-autopay` Netlify function to charge due unpaid invoices for opted-in clients. Run the updated `supabase/client-portal.sql` before enabling AutoPay in production.
+- **Stripe modal refactor deployed/tested**: PaymentModal keeps the Stripe Card Element mounted during submission by using `isProcessing` instead of switching `step` to `processing`, fixing `We could not retrieve data from the specified Element...`. It asks for only cardholder name + ZIP/postal code before the Stripe Card Element and sends those as `billing_details` to Stripe.
+- **AutoPay deployed/tested**: Client Billing has explicit AutoPay consent while paying, stores only Stripe customer/payment method IDs in `client_users`, and adds scheduled `run-autopay` Netlify function to charge due unpaid invoices for opted-in clients. Tested successfully: saved card, enabled AutoPay, ran AutoPay, Stripe payment succeeded, invoice marked paid.
+- **Internal AutoPay visibility deployed**: Client profile header shows `AutoPay On`, `Card Saved`, `AutoPay Off`, or `No Portal`; Client Information includes an AutoPay row. SQL policy `client_users_internal_read` was added and run so internal users can read portal billing status.
 - **Latest pushed commits**:
   - `e248901` — Add LawOS client portal payments
   - `b1af500` — Add manual client portal invite links
   - `38ba3de` — Deploy LawOS Netlify functions
   - `8b371f3` — Fix Stripe card input visibility
   - `7fd00cd` — Wait for Stripe card element readiness
-- **Local only, not pushed**:
-  - AutoPay changes are currently local and uncommitted as of this handoff.
+  - `14a8dd9` — Fix client portal payment modal
+  - `45ebaa4` — Add client portal AutoPay
+  - `01354f5` — Show client AutoPay status internally
 
 ---
 
@@ -138,6 +140,7 @@ YVALAW OS/supabase/client-portal.sql
 This supersedes the older three separate SQL blocks. It now includes:
 - `client_users.stripe_customer_id`
 - `client_users.auto_pay_enabled`, `default_payment_method_id`, `auto_pay_authorized_at`, `auto_pay_disabled_at`
+- `client_users_internal_read` policy so internal profiles can read AutoPay/portal billing status
 - `working_hour_prefs`
 - portal-scoped `time_entries` read policy
 - `staff_requests.client_name`, `hours_per_week`, `start_date`
@@ -195,17 +198,18 @@ Test-mode webhook signing secret was added to Netlify as `STRIPE_WEBHOOK_SECRET`
 
 ### 4. Deploy checklist
 - [x] Push repo to GitHub (`git push`)
-- [ ] Netlify auto-deploys from GitHub — confirm latest build passes for commit `7fd00cd`
+- [x] Netlify auto-deploys from GitHub — latest tested payment/AutoPay work through commit `01354f5`
 - [x] Run `YVALAW OS/supabase/client-portal.sql` in Supabase
 - [x] Set Netlify env vars (Supabase + Stripe test mode)
 - [x] Set up Stripe webhook + copy signing secret
 - [x] Add `VITE_STRIPE_PUBLISHABLE_KEY` to Netlify env (Vite needs it at build time)
 - [x] Test manual invite link flow enough to confirm Supabase redirect config works
-- [ ] Commit/push the local PaymentModal refactor after review, then retest Stripe payment after deploy
-- [ ] Test portal on mobile (bottom nav, upload, PDF, Pay button)
-- [ ] Run a test Stripe payment with card `4242 4242 4242 4242` (test mode)
-- [ ] Run updated `supabase/client-portal.sql` again before testing AutoPay
-- [ ] After deploy, verify Netlify shows `run-autopay` with a Scheduled badge and use Run now for an opted-in test client with a due invoice
+- [x] Commit/push PaymentModal refactor and retest Stripe payment after deploy
+- [ ] Test portal on mobile (bottom nav, upload, PDF, Pay button, AutoPay status)
+- [x] Run a test Stripe payment with card `4242 4242 4242 4242` (test mode)
+- [x] Run updated `supabase/client-portal.sql` before testing AutoPay
+- [x] Verify Netlify `run-autopay` works for an opted-in test client with a due invoice
+- [x] Verify internal client profile shows AutoPay status
 
 ---
 
@@ -216,27 +220,16 @@ Test-mode webhook signing secret was added to Netlify as `STRIPE_WEBHOOK_SECRET`
 - **Blocked:** need Crisp website ID from user before this can be built
 - Implementation: ~30 lines — load Crisp script, call `window.$crisp.push(["set", "user:email", [email]])`
 
-#### Phase 8 — Deploy to Production
-1. Review the local PaymentModal refactor in `src/components/PaymentModal.tsx`.
-2. Commit and push it when ready; it is not live yet.
-3. Wait for Netlify to deploy that new commit.
-4. Retest client Billing payment modal:
-   - Card digits should be visible.
-   - Cardholder name and ZIP/postal fields should appear immediately when the modal opens.
-   - Pay should no longer destroy/unmount the Stripe element before confirmation.
-   - Pay button should show `Loading card form…` until Stripe Card Element is ready and `Processing…` during submission.
-   - Test card: `4242 4242 4242 4242`.
-5. Verify successful Stripe payment marks the invoice paid in portal and internal LawOS.
-6. Test client document upload from portal, then confirm file appears on internal client profile.
-7. Test staff request from portal, then confirm it appears in internal `/requests`.
-8. Test mobile portal nav and PDF download.
-9. Test AutoPay:
-   - Run updated `supabase/client-portal.sql`.
-   - Pay one invoice as a real portal client and check the AutoPay authorization box.
-   - Confirm `client_users.auto_pay_enabled = true` and `default_payment_method_id` is set.
-   - Create a new due unpaid invoice for the same client.
-   - In Netlify Functions, run `run-autopay` manually and confirm Stripe payment succeeds and LawOS marks the invoice paid.
-10. Gmail integration remains optional/pending until Google OAuth client ID/secret are configured.
+#### Phase 8 — Production Payment Operations
+Payments and AutoPay are now working in test mode. The next missing operational pieces:
+1. **Payment attempt history** — persist Stripe payment attempts per invoice/client (`payment_attempts` table or activity log extension). Include invoice ID, client ID, Stripe payment intent ID, amount, status, failure reason, and timestamp.
+2. **AutoPay failure tracking** — if `run-autopay` gets a declined/off-session error, mark the client/invoice with an internal visible failure state instead of relying on Netlify/Stripe logs.
+3. **Client profile billing panel** — expand the current AutoPay badge into a richer internal panel: portal account status, last login, AutoPay status, saved card brand/last4 if available, outstanding balance, last payment, last AutoPay attempt, and quick portal preview/invite actions.
+4. **Payment receipts** — enable Stripe receipts or send custom YVA receipt emails for successful portal payments and AutoPay charges.
+5. **AutoPay notifications** — notify clients when AutoPay succeeds/fails and optionally notify internal accounting on failed charges.
+6. **Mobile portal QA** — test bottom nav, Billing, payment modal, AutoPay status, Documents upload/download, PDF download, Team cards, and Staff Request modal on mobile.
+7. **Live-mode readiness** — before real charges, switch Stripe keys/webhook from test to live, create the live webhook endpoint, verify live env vars, and repeat a small live payment test.
+8. Gmail integration remains optional/pending until Google OAuth client ID/secret are configured.
 
 #### Optional Enhancements (post-deploy)
 - **Notification preferences** — toggle email alerts for new invoices, document shares
