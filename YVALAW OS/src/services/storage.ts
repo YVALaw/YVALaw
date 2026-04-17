@@ -3,6 +3,7 @@ import type {
   ActivityLogEntry, AppSettings, Candidate, CommEntryType, DataSnapshot,
   Employee, Client, Expense, Invoice, InvoiceTemplate, Project, Task,
   Estimate, TimeEntry, RecurringInvoice, StaffRequest, ClientDocument,
+  PaymentAttempt,
 } from '../data/types'
 
 export type ClientPortalBillingStatus = {
@@ -11,6 +12,13 @@ export type ClientPortalBillingStatus = {
   hasSavedPaymentMethod: boolean
   autoPayAuthorizedAt?: string
   autoPayDisabledAt?: string
+}
+
+export type ClientBillingSummary = ClientPortalBillingStatus & {
+  recentAttempts: PaymentAttempt[]
+  lastAttempt?: PaymentAttempt
+  lastSuccessfulAttempt?: PaymentAttempt
+  lastFailedAttempt?: PaymentAttempt
 }
 
 // ─── Generic helpers ──────────────────────────────────────────────────────────
@@ -425,5 +433,36 @@ export async function loadClientPortalBillingStatus(clientId: string): Promise<C
     hasSavedPaymentMethod: Boolean(row.defaultPaymentMethodId),
     autoPayAuthorizedAt:   row.autoPayAuthorizedAt as string | undefined,
     autoPayDisabledAt:     row.autoPayDisabledAt as string | undefined,
+  }
+}
+
+export async function loadClientPaymentAttempts(clientId: string, limit = 8): Promise<PaymentAttempt[]> {
+  const { data, error } = await supabase
+    .from('payment_attempts')
+    .select('*')
+    .eq('client_id', clientId)
+    .order('attempted_at', { ascending: false })
+    .limit(limit)
+
+  if (error || !data) {
+    if (error && error.code !== '42P01') console.error('loadClientPaymentAttempts', error)
+    return []
+  }
+
+  return (data || []).map(row => toCamel<PaymentAttempt>(row as Record<string, unknown>))
+}
+
+export async function loadClientBillingSummary(clientId: string): Promise<ClientBillingSummary> {
+  const [status, recentAttempts] = await Promise.all([
+    loadClientPortalBillingStatus(clientId),
+    loadClientPaymentAttempts(clientId),
+  ])
+
+  return {
+    ...status,
+    recentAttempts,
+    lastAttempt: recentAttempts[0],
+    lastSuccessfulAttempt: recentAttempts.find(a => a.status === 'succeeded'),
+    lastFailedAttempt: recentAttempts.find(a => a.status === 'failed'),
   }
 }

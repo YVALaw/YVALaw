@@ -336,6 +336,36 @@ export type ClientUser = {
   createdAt?: number
 }
 
+export type PaymentAttemptStatus =
+  | 'created'
+  | 'processing'
+  | 'succeeded'
+  | 'failed'
+  | 'requires_action'
+  | 'requires_payment_method'
+  | 'canceled'
+
+export type PaymentAttemptSource = 'portal' | 'autopay'
+
+export type PaymentAttempt = {
+  id: string
+  invoiceId?: string
+  clientId: string
+  clientName?: string
+  invoiceNumber?: string
+  stripePaymentIntentId?: string
+  stripeCustomerId?: string
+  stripePaymentMethodId?: string
+  amount: number
+  currency: string
+  source: PaymentAttemptSource
+  status: PaymentAttemptStatus
+  failureReason?: string
+  attemptedAt?: string
+  updatedAt?: string
+  createdAt?: string
+}
+
 /** Client-initiated request for staff replacement or additional staff */
 export type StaffRequest = {
   id: string

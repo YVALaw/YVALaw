@@ -101,6 +101,34 @@ async function supabasePatch(table, filter, body) {
   if (!res.ok) throw new Error(`Supabase PATCH ${table} failed: ${res.status}`)
 }
 
+async function supabaseInsert(table, body) {
+  const url = process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const res = await fetch(`${url}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${key}`,
+      apikey: key,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`Supabase INSERT ${table} failed: ${res.status}`)
+}
+
+async function recordPaymentAttempt(row) {
+  try {
+    await supabaseInsert('payment_attempts', {
+      ...row,
+      attempted_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+  } catch (err) {
+    console.warn('create-payment-intent: payment_attempts insert skipped', err?.message || err)
+  }
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 exports.handler = async function handler(event) {
@@ -232,6 +260,19 @@ exports.handler = async function handler(event) {
     'metadata[invoiceId]':     invoiceId,
     'metadata[clientId]':      clientId,
     'metadata[invoiceNumber]': invoice.number || '',
+  })
+
+  await recordPaymentAttempt({
+    invoice_id:               invoiceId,
+    client_id:                clientId,
+    client_name:              client.name || null,
+    invoice_number:           invoice.number || null,
+    stripe_payment_intent_id: intent.id,
+    stripe_customer_id:       customerId,
+    amount:                   serverAmountCents / 100,
+    currency:                 'usd',
+    source:                   'portal',
+    status:                   intent.status || 'created',
   })
 
   return json(200, {

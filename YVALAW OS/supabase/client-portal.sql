@@ -48,23 +48,38 @@ CREATE POLICY "client_users_own_update" ON client_users
 -- SECURITY DEFINER: runs with elevated privileges so it can always query these tables.
 
 CREATE OR REPLACE FUNCTION public.is_internal()
-RETURNS BOOLEAN LANGUAGE SQL SECURITY DEFINER STABLE AS $$
+RETURNS BOOLEAN
+LANGUAGE SQL
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.user_roles
-    WHERE user_id = auth.uid()::text
+    WHERE user_id::text = auth.uid()::text
     AND   role   != 'client'
   )
 $$;
 
 CREATE OR REPLACE FUNCTION public.is_portal_client()
-RETURNS BOOLEAN LANGUAGE SQL SECURITY DEFINER STABLE AS $$
+RETURNS BOOLEAN
+LANGUAGE SQL
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.client_users WHERE auth_id = auth.uid()
   )
 $$;
 
 CREATE OR REPLACE FUNCTION public.portal_client_id()
-RETURNS UUID LANGUAGE SQL SECURITY DEFINER STABLE AS $$
+RETURNS UUID
+LANGUAGE SQL
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
   SELECT client_id FROM public.client_users WHERE auth_id = auth.uid() LIMIT 1
 $$;
 
@@ -304,6 +319,53 @@ DROP POLICY IF EXISTS "portal_read" ON client_documents;
 CREATE POLICY "portal_read"  ON client_documents FOR SELECT TO authenticated USING (public.is_portal_client() AND client_id = public.portal_client_id());
 DROP POLICY IF EXISTS "portal_insert" ON client_documents;
 CREATE POLICY "portal_insert" ON client_documents FOR INSERT TO authenticated WITH CHECK (public.is_portal_client() AND client_id = public.portal_client_id());
+
+
+-- Payment attempts (portal payments + scheduled AutoPay audit trail)
+CREATE TABLE IF NOT EXISTS payment_attempts (
+  id                       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  invoice_id               uuid,
+  client_id                uuid NOT NULL,
+  client_name              text,
+  invoice_number           text,
+  stripe_payment_intent_id text,
+  stripe_customer_id       text,
+  stripe_payment_method_id text,
+  amount                   numeric NOT NULL DEFAULT 0,
+  currency                 text NOT NULL DEFAULT 'usd',
+  source                   text NOT NULL DEFAULT 'portal' CHECK (source IN ('portal', 'autopay')),
+  status                   text NOT NULL DEFAULT 'created' CHECK (status IN ('created', 'processing', 'succeeded', 'failed', 'requires_action', 'requires_payment_method', 'canceled')),
+  failure_reason           text,
+  attempted_at             timestamptz DEFAULT now(),
+  updated_at               timestamptz DEFAULT now(),
+  created_at               timestamptz DEFAULT now()
+);
+
+ALTER TABLE payment_attempts ENABLE ROW LEVEL SECURITY;
+
+CREATE UNIQUE INDEX IF NOT EXISTS payment_attempts_stripe_payment_intent_id_key
+  ON payment_attempts (stripe_payment_intent_id)
+  WHERE stripe_payment_intent_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS payment_attempts_client_id_attempted_at_idx
+  ON payment_attempts (client_id, attempted_at DESC);
+
+CREATE INDEX IF NOT EXISTS payment_attempts_invoice_id_idx
+  ON payment_attempts (invoice_id);
+
+DROP POLICY IF EXISTS "internal_all" ON payment_attempts;
+CREATE POLICY "internal_all" ON payment_attempts
+  FOR ALL TO authenticated
+  USING (public.is_internal())
+  WITH CHECK (public.is_internal());
+
+DROP POLICY IF EXISTS "portal_read" ON payment_attempts;
+CREATE POLICY "portal_read" ON payment_attempts
+  FOR SELECT TO authenticated
+  USING (
+    public.is_portal_client()
+    AND client_id = public.portal_client_id()
+  );
 
 
 -- Working hour preferences (client can set their preferred schedule)

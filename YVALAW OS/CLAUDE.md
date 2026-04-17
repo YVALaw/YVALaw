@@ -115,6 +115,9 @@ CREATE POLICY "client_update_prefs" ON working_hour_prefs FOR UPDATE TO authenti
 - **Stripe modal refactor deployed/tested**: PaymentModal keeps the Stripe Card Element mounted during submission by using `isProcessing` instead of switching `step` to `processing`, fixing `We could not retrieve data from the specified Element...`. It asks for only cardholder name + ZIP/postal code before the Stripe Card Element and sends those as `billing_details` to Stripe.
 - **AutoPay deployed/tested**: Client Billing has explicit AutoPay consent while paying, stores only Stripe customer/payment method IDs in `client_users`, and adds scheduled `run-autopay` Netlify function to charge due unpaid invoices for opted-in clients. Tested successfully: saved card, enabled AutoPay, ran AutoPay, Stripe payment succeeded, invoice marked paid.
 - **Internal AutoPay visibility deployed**: Client profile header shows `AutoPay On`, `Card Saved`, `AutoPay Off`, or `No Portal`; Client Information includes an AutoPay row. SQL policy `client_users_internal_read` was added and run so internal users can read portal billing status.
+- **Supabase Security Advisor cleanup**: RLS was enabled on the timesheet import tables, overly broad `auth_all` / `team_all` policies were replaced with scoped internal/portal policies, helper functions now have fixed `search_path = public`, and the final function diagnostic showed `current_user_role`, `is_internal`, `is_portal_client`, and `portal_client_id` all configured with `["search_path=public"]`.
+- **Supabase Performance Advisor cleanup started**: A no-comments SQL cleanup query was copied to the clipboard to fix `auth_rls_initplan` warnings and consolidate duplicate permissive policies. Needs final confirmation by rerunning Supabase Performance Advisor and pasting any remaining rows.
+- **Payment attempt history implemented locally**: Added `payment_attempts` SQL/RLS, portal payment intent logging, Stripe webhook success/failure updates, scheduled AutoPay success/failure logging, and internal Client Profile Billing Activity table. Needs Supabase SQL run and deploy before testing in production.
 - **Latest pushed commits**:
   - `e248901` — Add LawOS client portal payments
   - `b1af500` — Add manual client portal invite links
@@ -152,6 +155,65 @@ If the script is changed later, run it again and then run:
 ```sql
 NOTIFY pgrst, 'reload schema';
 ```
+
+---
+
+### 1B. Supabase Security / Performance Advisor Cleanup — 2026-04-16
+
+Security Advisor items handled:
+- Critical `rls_disabled_in_public` on these public tables:
+  - `timesheet_batch_invoices`
+  - `timesheet_import_batches`
+  - `timesheet_import_rows`
+  - `timesheet_mappings`
+- Function Search Path Mutable warnings fixed for:
+  - `current_user_role`
+  - `is_internal`
+  - `is_portal_client`
+  - `portal_client_id`
+- Broad authenticated `USING (true)` / `WITH CHECK (true)` policies were replaced with scoped policies for internal staff and portal clients.
+- User confirmed the Security Advisor looked good after these changes.
+
+Performance Advisor items addressed by the cleanup SQL copied on 2026-04-16:
+- `auth_rls_initplan` warnings by wrapping auth calls as `(select auth.uid())`.
+- Duplicate permissive policies on portal/internal tables by consolidating same-role/same-action policy sets.
+
+Validation still needed after running the Performance Advisor cleanup:
+
+```sql
+SELECT
+  schemaname,
+  tablename,
+  policyname,
+  cmd,
+  roles,
+  qual AS using_expression,
+  with_check AS with_check_expression
+FROM pg_policies
+WHERE schemaname = 'public'
+  AND cmd <> 'SELECT'
+  AND (
+    qual = 'true'
+    OR with_check = 'true'
+  )
+ORDER BY tablename, policyname;
+```
+
+Expected result: `0 rows` for non-SELECT policies with unrestricted `true` checks.
+
+Then rerun Supabase Dashboard → Database → Advisors → Performance and paste any remaining warnings before changing more SQL.
+
+Post-RLS regression checklist:
+- Internal LawOS login: dashboard, clients, invoices, projects, employees, tasks, settings.
+- Client portal login: invoices, documents, requests, working-hour prefs, team reviews, bonus requests.
+- Two-client isolation check: Client A must not see Client B invoices, projects, documents, employees, or requests.
+- Payments: create test invoice, pay from portal, confirm Stripe payment and paid invoice status.
+- AutoPay: verify saved card / AutoPay status, then run Netlify `run-autopay` against an eligible due invoice.
+- Documents: upload/view/download internally and from portal if enabled.
+- Internal CRUD: create/edit client, invoice, project/task, and delete a document if internal deletion is needed.
+
+Remaining advisor item that is not SQL:
+- Enable Supabase Auth leaked password protection in the Supabase dashboard if it still appears in Security Advisor.
 
 ---
 
@@ -222,9 +284,9 @@ Test-mode webhook signing secret was added to Netlify as `STRIPE_WEBHOOK_SECRET`
 
 #### Phase 8 — Production Payment Operations
 Payments and AutoPay are now working in test mode. The next missing operational pieces:
-1. **Payment attempt history** — persist Stripe payment attempts per invoice/client (`payment_attempts` table or activity log extension). Include invoice ID, client ID, Stripe payment intent ID, amount, status, failure reason, and timestamp.
-2. **AutoPay failure tracking** — if `run-autopay` gets a declined/off-session error, mark the client/invoice with an internal visible failure state instead of relying on Netlify/Stripe logs.
-3. **Client profile billing panel** — expand the current AutoPay badge into a richer internal panel: portal account status, last login, AutoPay status, saved card brand/last4 if available, outstanding balance, last payment, last AutoPay attempt, and quick portal preview/invite actions.
+1. **Payment attempt history** — implemented locally via `payment_attempts`; run updated `supabase/client-portal.sql`, deploy, then test manual payment + AutoPay success/failure records.
+2. **AutoPay failure tracking** — implemented locally in `run-autopay`; failed off-session charges now write `payment_attempts.status = 'failed'` with `failure_reason` and show internally on Client Profile.
+3. **Client profile billing panel** — first pass implemented locally: AutoPay badge + Last Payment / Last Attempt + Billing Activity table. Later expansion can add saved card brand/last4 and last portal login.
 4. **Payment receipts** — enable Stripe receipts or send custom YVA receipt emails for successful portal payments and AutoPay charges.
 5. **AutoPay notifications** — notify clients when AutoPay succeeds/fails and optionally notify internal accounting on failed charges.
 6. **Mobile portal QA** — test bottom nav, Billing, payment modal, AutoPay status, Documents upload/download, PDF download, Team cards, and Staff Request modal on mobile.

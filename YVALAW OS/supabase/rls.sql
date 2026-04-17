@@ -9,9 +9,14 @@
 -- always read user_roles regardless of other RLS policies.
 
 CREATE OR REPLACE FUNCTION public.current_user_role()
-RETURNS TEXT AS $$
-  SELECT role FROM public.user_roles WHERE user_id = auth.uid() LIMIT 1
-$$ LANGUAGE SQL SECURITY DEFINER STABLE;
+RETURNS TEXT
+LANGUAGE SQL
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
+  SELECT role FROM public.user_roles WHERE user_id::text = auth.uid()::text LIMIT 1
+$$;
 
 
 -- ── Step 2: Enable RLS on every table ────────────────────────────────────────

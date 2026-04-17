@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import type { ActivityLogEntry, Client, ClientDocument, CommEntryType, Contract, ContractStatus, Invoice, Project } from '../data/types'
-import { loadSnapshot, saveClients, loadActivityLog, saveActivityLog, loadSettings, loadClientDocuments, addClientDocument, removeClientDocument, loadClientPortalBillingStatus, type ClientPortalBillingStatus } from '../services/storage'
+import type { ActivityLogEntry, Client, ClientDocument, CommEntryType, Contract, ContractStatus, Invoice, Project, PaymentAttempt } from '../data/types'
+import { loadSnapshot, saveClients, loadActivityLog, saveActivityLog, loadSettings, loadClientDocuments, addClientDocument, removeClientDocument, loadClientBillingSummary, type ClientBillingSummary } from '../services/storage'
 import { sendEmail } from '../services/gmail'
 import { uploadFile, deleteFile } from '../services/fileStorage'
 import { supabase } from '../lib/supabase'
@@ -34,6 +34,25 @@ function fmtDateTime(iso?: string): string | undefined {
   if (!iso) return undefined
   return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
+function fmtAttemptDate(iso?: string): string {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+function fmtUSD(n?: number): string {
+  return `$${(Number(n) || 0).toFixed(2)}`
+}
+function paymentAttemptBadge(attempt: PaymentAttempt): string {
+  switch (attempt.status) {
+    case 'succeeded': return 'badge-green'
+    case 'failed': return 'badge-red'
+    case 'processing': return 'badge-yellow'
+    case 'requires_action':
+    case 'requires_payment_method':
+      return 'badge-orange'
+    case 'canceled': return 'badge-gray'
+    default: return 'badge-blue'
+  }
+}
 
 const STAGES = [
   { key: 'lead', label: 'Lead' }, { key: 'prospect', label: 'Prospect' },
@@ -60,7 +79,7 @@ export default function ClientProfilePage() {
     })
     if (id) {
       loadClientDocuments(id).then(setClientDocs)
-      loadClientPortalBillingStatus(id).then(setPortalBilling)
+      loadClientBillingSummary(id).then(setPortalBilling)
     }
   }, [id])
 
@@ -86,10 +105,11 @@ export default function ClientProfilePage() {
   // Portal invite
   const [inviteLoading, setInviteLoading] = useState<'email' | 'link' | null>(null)
   const [inviteMsg,     setInviteMsg]     = useState<{ ok: boolean; text: string } | null>(null)
-  const [portalBilling, setPortalBilling] = useState<ClientPortalBillingStatus>({
+  const [portalBilling, setPortalBilling] = useState<ClientBillingSummary>({
     hasPortalAccount: false,
     autoPayEnabled: false,
     hasSavedPaymentMethod: false,
+    recentAttempts: [],
   })
 
   // Contracts
@@ -521,6 +541,24 @@ export default function ClientProfilePage() {
               >
                 {portalBilling.autoPayEnabled ? 'AutoPay On' : portalBilling.hasSavedPaymentMethod ? 'Card Saved' : portalBilling.hasPortalAccount ? 'AutoPay Off' : 'No Portal'}
               </span>
+              {portalBilling.lastAttempt?.status === 'failed' && (
+                <span
+                  title={portalBilling.lastAttempt.failureReason || 'Latest payment attempt failed'}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    padding: '5px 10px',
+                    borderRadius: 999,
+                    fontSize: 12,
+                    fontWeight: 800,
+                    background: 'rgba(239,68,68,.1)',
+                    color: '#dc2626',
+                    border: '1px solid rgba(239,68,68,.22)',
+                  }}
+                >
+                  Payment Failed
+                </span>
+              )}
               {outstanding > 0 && clientNN.email && (
                 <button className="btn-ghost btn-sm" style={{ color: '#fb923c' }} onClick={sendReminder}>✉ Remind</button>
               )}
@@ -682,6 +720,18 @@ export default function ClientProfilePage() {
                             ? 'Off'
                             : 'No portal account',
                     },
+                    {
+                      label: 'Last Payment',
+                      value: portalBilling.lastSuccessfulAttempt
+                        ? `${fmtUSD(portalBilling.lastSuccessfulAttempt.amount)} on ${fmtAttemptDate(portalBilling.lastSuccessfulAttempt.attemptedAt)}`
+                        : undefined,
+                    },
+                    {
+                      label: 'Last Attempt',
+                      value: portalBilling.lastAttempt
+                        ? `${portalBilling.lastAttempt.status.replace(/_/g, ' ')} · ${fmtAttemptDate(portalBilling.lastAttempt.attemptedAt)}`
+                        : undefined,
+                    },
                     { label: 'Contract End',    value: clientNN.contractEnd },
                     { label: 'Tags',            value: clientNN.tags },
                   ].map(({ label, value }) => value ? (
@@ -710,6 +760,52 @@ export default function ClientProfilePage() {
               )}
             </div>
           </div>
+
+          {/* Billing activity */}
+          {(portalBilling.hasPortalAccount || portalBilling.recentAttempts.length > 0) && (
+            <div className="data-card">
+              <div className="data-card-title">Billing Activity</div>
+              {portalBilling.recentAttempts.length === 0 ? (
+                <div style={{ color: 'var(--muted)', fontSize: 13, textAlign: 'center', padding: '16px 0' }}>
+                  No payment attempts recorded yet.
+                </div>
+              ) : (
+                <div className="table-wrap">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Invoice</th>
+                        <th>Source</th>
+                        <th>Status</th>
+                        <th>Amount</th>
+                        <th>Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {portalBilling.recentAttempts.map(attempt => (
+                        <tr key={attempt.id}>
+                          <td className="td-name">{attempt.invoiceNumber || '—'}</td>
+                          <td className="td-muted" style={{ textTransform: 'capitalize' }}>{attempt.source}</td>
+                          <td>
+                            <span className={`badge ${paymentAttemptBadge(attempt)}`} style={{ fontSize: 11, textTransform: 'capitalize' }}>
+                              {attempt.status.replace(/_/g, ' ')}
+                            </span>
+                            {attempt.failureReason && (
+                              <div style={{ color: '#dc2626', fontSize: 11, marginTop: 3, maxWidth: 220, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {attempt.failureReason}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ color: 'var(--gold)', fontWeight: 700 }}>{fmtUSD(attempt.amount)}</td>
+                          <td className="td-muted">{fmtAttemptDate(attempt.attemptedAt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Projects */}
           {clientProjects.length > 0 && (

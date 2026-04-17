@@ -53,7 +53,12 @@ async function stripe(method, path, body, opts = {}) {
 
   const res = await fetch(`https://api.stripe.com/v1${path}`, req)
   const data = await res.json()
-  if (!res.ok) throw new Error(data?.error?.message || `Stripe ${method} ${path} failed`)
+  if (!res.ok) {
+    const err = new Error(data?.error?.message || `Stripe ${method} ${path} failed`)
+    err.stripeError = data?.error
+    err.paymentIntent = data?.error?.payment_intent
+    throw err
+  }
   return data
 }
 
@@ -81,6 +86,60 @@ async function supabasePatch(table, filter, body) {
     body: JSON.stringify(body),
   })
   if (!res.ok) throw new Error(`Supabase PATCH ${table} failed: ${res.status}`)
+}
+
+async function supabasePatchRows(table, filter, body) {
+  const url = process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const res = await fetch(`${url}/rest/v1/${table}?${filter}`, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${key}`,
+      apikey: key,
+      'Content-Type': 'application/json',
+      Prefer: 'return=representation',
+    },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) return []
+  return res.json()
+}
+
+async function supabaseInsert(table, body) {
+  const url = process.env.SUPABASE_URL
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const res = await fetch(`${url}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${key}`,
+      apikey: key,
+      'Content-Type': 'application/json',
+      Prefer: 'return=minimal',
+    },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error(`Supabase INSERT ${table} failed: ${res.status}`)
+}
+
+async function recordPaymentAttempt(row) {
+  try {
+    const now = new Date().toISOString()
+    const body = { ...row, updated_at: now }
+    if (row.stripe_payment_intent_id) {
+      const updated = await supabasePatchRows(
+        'payment_attempts',
+        `stripe_payment_intent_id=eq.${enc(row.stripe_payment_intent_id)}`,
+        body
+      )
+      if (Array.isArray(updated) && updated.length > 0) return
+    }
+    await supabaseInsert('payment_attempts', {
+      ...body,
+      attempted_at: row.attempted_at || now,
+    })
+  } catch (err) {
+    console.warn('run-autopay: payment_attempts write skipped', err?.message || err)
+  }
 }
 
 function isDue(invoice, today) {
@@ -123,9 +182,11 @@ export default async function handler() {
       if (invoices.length === 0) { summary.skipped += 1; continue }
 
       for (const invoice of invoices) {
+        const amountCents = centsFromUSD(Number(invoice.subtotal) - Number(invoice.amount_paid || 0))
+        let intent = null
+
         try {
-          const amountCents = centsFromUSD(Number(invoice.subtotal) - Number(invoice.amount_paid || 0))
-          const intent = await stripe('POST', '/payment_intents', {
+          intent = await stripe('POST', '/payment_intents', {
             amount:                    amountCents,
             currency:                  'usd',
             customer:                  billing.stripe_customer_id,
@@ -143,7 +204,47 @@ export default async function handler() {
           if (intent.status !== 'succeeded') {
             throw new Error(`Unexpected Stripe status: ${intent.status}`)
           }
+        } catch (stripeErr) {
+          const stripeIntent = stripeErr?.paymentIntent || stripeErr?.stripeError?.payment_intent || intent
+          await recordPaymentAttempt({
+            invoice_id:               invoice.id,
+            client_id:                billing.client_id,
+            client_name:              client.name || null,
+            invoice_number:           invoice.number || null,
+            stripe_payment_intent_id: stripeIntent?.id || null,
+            stripe_customer_id:       billing.stripe_customer_id,
+            stripe_payment_method_id: billing.default_payment_method_id,
+            amount:                   amountCents / 100,
+            currency:                 stripeIntent?.currency || 'usd',
+            source:                   'autopay',
+            status:                   'failed',
+            failure_reason:           stripeErr instanceof Error ? stripeErr.message : 'AutoPay charge failed',
+          })
+          summary.failed += 1
+          summary.errors.push({
+            invoiceId: invoice.id,
+            invoiceNumber: invoice.number,
+            error: stripeErr instanceof Error ? stripeErr.message : 'AutoPay charge failed',
+          })
+          continue
+        }
 
+        await recordPaymentAttempt({
+          invoice_id:               invoice.id,
+          client_id:                billing.client_id,
+          client_name:              client.name || null,
+          invoice_number:           invoice.number || null,
+          stripe_payment_intent_id: intent.id,
+          stripe_customer_id:       billing.stripe_customer_id,
+          stripe_payment_method_id: billing.default_payment_method_id,
+          amount:                   amountCents / 100,
+          currency:                 intent.currency || 'usd',
+          source:                   'autopay',
+          status:                   'succeeded',
+          failure_reason:           null,
+        })
+
+        try {
           await supabasePatch('invoices', `id=eq.${invoice.id}`, {
             status: 'paid',
             amount_paid: Number(invoice.subtotal) || amountCents / 100,
@@ -154,7 +255,7 @@ export default async function handler() {
           summary.errors.push({
             invoiceId: invoice.id,
             invoiceNumber: invoice.number,
-            error: invoiceErr instanceof Error ? invoiceErr.message : 'AutoPay charge failed',
+            error: invoiceErr instanceof Error ? invoiceErr.message : 'AutoPay invoice update failed',
           })
         }
       }
