@@ -118,6 +118,7 @@ CREATE POLICY "client_update_prefs" ON working_hour_prefs FOR UPDATE TO authenti
 - **Supabase Security Advisor cleanup**: RLS was enabled on the timesheet import tables, overly broad `auth_all` / `team_all` policies were replaced with scoped internal/portal policies, helper functions now have fixed `search_path = public`, and the final function diagnostic showed `current_user_role`, `is_internal`, `is_portal_client`, and `portal_client_id` all configured with `["search_path=public"]`.
 - **Supabase Performance Advisor cleanup started**: A no-comments SQL cleanup query was copied to the clipboard to fix `auth_rls_initplan` warnings and consolidate duplicate permissive policies. Needs final confirmation by rerunning Supabase Performance Advisor and pasting any remaining rows.
 - **Payment attempt history implemented locally**: Added `payment_attempts` SQL/RLS, portal payment intent logging, Stripe webhook success/failure updates, scheduled AutoPay success/failure logging, and internal Client Profile Billing Activity table. Needs Supabase SQL run and deploy before testing in production.
+- **Payment operations polish implemented locally**: Portal Billing now shows failed latest payment/AutoPay warnings, saved card brand/last4/expiry when available, and hides setup-only payment attempts in the internal Billing Activity table. Stripe PaymentIntents now include `receipt_email`, successful webhooks/AutoPay update saved card metadata, and payment success/failure events write system entries to the client activity timeline.
 - **Latest pushed commits**:
   - `e248901` — Add LawOS client portal payments
   - `b1af500` — Add manual client portal invite links
@@ -284,11 +285,11 @@ Test-mode webhook signing secret was added to Netlify as `STRIPE_WEBHOOK_SECRET`
 
 #### Phase 8 — Production Payment Operations
 Payments and AutoPay are now working in test mode. The next missing operational pieces:
-1. **Payment attempt history** — implemented locally via `payment_attempts`; run updated `supabase/client-portal.sql`, deploy, then test manual payment + AutoPay success/failure records.
-2. **AutoPay failure tracking** — implemented locally in `run-autopay`; failed off-session charges now write `payment_attempts.status = 'failed'` with `failure_reason` and show internally on Client Profile.
-3. **Client profile billing panel** — first pass implemented locally: AutoPay badge + Last Payment / Last Attempt + Billing Activity table. Later expansion can add saved card brand/last4 and last portal login.
-4. **Payment receipts** — enable Stripe receipts or send custom YVA receipt emails for successful portal payments and AutoPay charges.
-5. **AutoPay notifications** — notify clients when AutoPay succeeds/fails and optionally notify internal accounting on failed charges.
+1. **Payment attempt history** — implemented via `payment_attempts`; manual payment success tested in Supabase. Next test AutoPay success/failure after deploying the latest local polish.
+2. **AutoPay failure tracking** — implemented in `run-autopay`; failed off-session charges write `payment_attempts.status = 'failed'` with `failure_reason`, client activity log entries, portal Billing warning, and internal Client Profile visibility.
+3. **Client profile billing panel** — first pass implemented: AutoPay badge + Saved Card + Last Payment / Last Attempt + Billing Activity table. Later expansion can add last portal login.
+4. **Payment receipts** — PaymentIntents now include `receipt_email`; confirm Stripe receipt behavior in test/live mode before relying on it operationally.
+5. **AutoPay notifications** — internal timeline notifications are implemented. Email/SMS notification remains optional later.
 6. **Mobile portal QA** — test bottom nav, Billing, payment modal, AutoPay status, Documents upload/download, PDF download, Team cards, and Staff Request modal on mobile.
 7. **Live-mode readiness** — before real charges, switch Stripe keys/webhook from test to live, create the live webhook endpoint, verify live env vars, and repeat a small live payment test.
 8. Gmail integration remains optional/pending until Google OAuth client ID/secret are configured.

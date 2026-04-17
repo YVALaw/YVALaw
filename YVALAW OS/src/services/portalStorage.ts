@@ -6,12 +6,16 @@
  */
 
 import { supabase } from '../lib/supabase'
-import type { Client, ClientDocument, Employee, Invoice, Project, TimeEntry, WorkingHourPrefs } from '../data/types'
+import type { Client, ClientDocument, Employee, Invoice, PaymentAttempt, Project, TimeEntry, WorkingHourPrefs } from '../data/types'
 
 export type PortalBillingSettings = {
   stripeCustomerId?: string
   autoPayEnabled: boolean
   defaultPaymentMethodId?: string
+  defaultCardBrand?: string
+  defaultCardLast4?: string
+  defaultCardExpMonth?: number
+  defaultCardExpYear?: number
   autoPayAuthorizedAt?: string
   autoPayDisabledAt?: string
 }
@@ -262,7 +266,7 @@ export async function savePortalWorkingHours(prefs: WorkingHourPrefs): Promise<v
 export async function loadPortalBillingSettings(clientId: string): Promise<PortalBillingSettings> {
   const { data, error } = await supabase
     .from('client_users')
-    .select('stripe_customer_id, auto_pay_enabled, default_payment_method_id, auto_pay_authorized_at, auto_pay_disabled_at')
+    .select('stripe_customer_id, auto_pay_enabled, default_payment_method_id, default_card_brand, default_card_last4, default_card_exp_month, default_card_exp_year, auto_pay_authorized_at, auto_pay_disabled_at')
     .eq('client_id', clientId)
     .maybeSingle()
 
@@ -275,9 +279,29 @@ export async function loadPortalBillingSettings(clientId: string): Promise<Porta
     stripeCustomerId:        row.stripeCustomerId as string | undefined,
     autoPayEnabled:         row.autoPayEnabled === true,
     defaultPaymentMethodId: row.defaultPaymentMethodId as string | undefined,
+    defaultCardBrand:       row.defaultCardBrand as string | undefined,
+    defaultCardLast4:       row.defaultCardLast4 as string | undefined,
+    defaultCardExpMonth:    row.defaultCardExpMonth as number | undefined,
+    defaultCardExpYear:     row.defaultCardExpYear as number | undefined,
     autoPayAuthorizedAt:    row.autoPayAuthorizedAt as string | undefined,
     autoPayDisabledAt:      row.autoPayDisabledAt as string | undefined,
   }
+}
+
+export async function loadPortalPaymentAttempts(clientId: string, limit = 5): Promise<PaymentAttempt[]> {
+  const { data, error } = await supabase
+    .from('payment_attempts')
+    .select('*')
+    .eq('client_id', clientId)
+    .order('attempted_at', { ascending: false })
+    .limit(limit)
+
+  if (error || !data) {
+    if (error && error.code !== '42P01') console.error('loadPortalPaymentAttempts', error)
+    return []
+  }
+
+  return (data as Record<string, unknown>[]).map(r => toCamel(r) as unknown as PaymentAttempt)
 }
 
 /** Enable or disable AutoPay for the authenticated portal client */
@@ -285,6 +309,10 @@ export async function savePortalAutoPaySettings(params: {
   clientId: string
   enabled: boolean
   paymentMethodId?: string
+  cardBrand?: string
+  cardLast4?: string
+  cardExpMonth?: number
+  cardExpYear?: number
 }): Promise<void> {
   const row: Record<string, unknown> = {
     auto_pay_enabled: params.enabled,
@@ -293,6 +321,10 @@ export async function savePortalAutoPaySettings(params: {
   if (params.enabled) {
     if (!params.paymentMethodId) throw new Error('A saved card is required to enable AutoPay.')
     row.default_payment_method_id = params.paymentMethodId
+    if (params.cardBrand) row.default_card_brand = params.cardBrand
+    if (params.cardLast4) row.default_card_last4 = params.cardLast4
+    if (params.cardExpMonth) row.default_card_exp_month = params.cardExpMonth
+    if (params.cardExpYear) row.default_card_exp_year = params.cardExpYear
     row.auto_pay_authorized_at = new Date().toISOString()
     row.auto_pay_disabled_at = null
   } else {

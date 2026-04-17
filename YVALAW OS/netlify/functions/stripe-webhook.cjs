@@ -15,6 +15,7 @@
  *   SUPABASE_URL
  *   SUPABASE_SERVICE_ROLE_KEY
  *   STRIPE_WEBHOOK_SECRET  — whsec_xxx from Stripe dashboard webhook settings
+ *   STRIPE_SECRET_KEY      — optional here; used to fetch card brand/last4
  */
 
 const crypto = require('crypto')
@@ -140,6 +141,65 @@ async function supabaseGet(path) {
   return res.json()
 }
 
+async function stripeGet(path) {
+  const key = process.env.STRIPE_SECRET_KEY
+  if (!key) return null
+  const res = await fetch(`https://api.stripe.com/v1${path}`, {
+    headers: {
+      Authorization: `Bearer ${key}`,
+      'Stripe-Version': '2024-06-20',
+    },
+  })
+  if (!res.ok) return null
+  return res.json()
+}
+
+function paymentActivityNote({ source, status, invoiceNumber, amount, failureReason, paymentIntentId }) {
+  const label = source === 'autopay' ? 'AutoPay' : 'Portal payment'
+  const invoiceLabel = invoiceNumber ? ` for invoice ${invoiceNumber}` : ''
+  const amountLabel = Number.isFinite(Number(amount)) ? ` (${Number(amount).toFixed(2)} USD)` : ''
+  const base = status === 'succeeded'
+    ? `${label} succeeded${invoiceLabel}${amountLabel}.`
+    : `${label} failed${invoiceLabel}${amountLabel}.${failureReason ? ` ${failureReason}` : ''}`
+  return paymentIntentId ? `${base} Stripe payment: ${paymentIntentId}` : base
+}
+
+async function logPaymentActivity(clientId, note) {
+  if (!clientId || !note) return
+  try {
+    const existing = await supabaseGet(`activity_log?client_id=eq.${enc(clientId)}&note=eq.${enc(note)}&select=id&limit=1`)
+    if (Array.isArray(existing) && existing.length > 0) return
+    await supabaseInsert('activity_log', {
+      id: crypto.randomUUID(),
+      client_id: clientId,
+      note,
+      created_at: Date.now(),
+      type: 'system',
+      auto: true,
+    })
+  } catch (err) {
+    console.warn('stripe-webhook: activity_log write skipped', err?.message || err)
+  }
+}
+
+async function updateClientCardMetadata(clientId, paymentMethodId) {
+  if (!clientId || !paymentMethodId) return
+  try {
+    const pm = await stripeGet(`/payment_methods/${paymentMethodId}`)
+    const card = pm?.card
+    if (!card) return
+    await supabasePatch('client_users', `client_id=eq.${enc(clientId)}`, {
+      default_payment_method_id: paymentMethodId,
+      default_card_brand: card.brand || null,
+      default_card_last4: card.last4 || null,
+      default_card_exp_month: card.exp_month || null,
+      default_card_exp_year: card.exp_year || null,
+    })
+  } catch (err) {
+    console.warn('stripe-webhook: card metadata update skipped', err?.message || err)
+  }
+}
+
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 exports.handler = async function handler(event) {
@@ -206,6 +266,14 @@ exports.handler = async function handler(event) {
         status:                   'succeeded',
         failure_reason:           null,
       })
+      await updateClientCardMetadata(clientId, obj?.payment_method)
+      await logPaymentActivity(clientId, paymentActivityNote({
+        source: obj?.metadata?.autoPay === 'true' ? 'autopay' : 'portal',
+        status: 'succeeded',
+        invoiceNumber: obj?.metadata?.invoiceNumber || invoice?.number || null,
+        amount: amountPaid,
+        paymentIntentId: obj?.id,
+      }))
     }
 
     const ok = await supabasePatch('invoices', `id=eq.${invoiceId}`, {
@@ -237,6 +305,14 @@ exports.handler = async function handler(event) {
         status:                   'failed',
         failure_reason:           obj?.last_payment_error?.message || 'Stripe payment failed',
       })
+      await logPaymentActivity(clientId, paymentActivityNote({
+        source: obj?.metadata?.autoPay === 'true' ? 'autopay' : 'portal',
+        status: 'failed',
+        invoiceNumber: obj?.metadata?.invoiceNumber || null,
+        amount: (obj?.amount ?? obj?.amount_received ?? 0) / 100,
+        failureReason: obj?.last_payment_error?.message || 'Stripe payment failed',
+        paymentIntentId: obj?.id,
+      }))
     }
   }
 

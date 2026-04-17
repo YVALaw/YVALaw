@@ -5,6 +5,7 @@ import {
   loadPortalClient,
   loadPortalInvoices,
   loadPortalBillingSettings,
+  loadPortalPaymentAttempts,
   computeOutstanding,
   fmtUSD,
   markPortalInvoicePaid,
@@ -13,7 +14,7 @@ import {
 } from '../../services/portalStorage'
 import { printInvoice } from '../../utils/invoiceHtml'
 import PaymentModal from '../../components/PaymentModal'
-import type { Client, Invoice } from '../../data/types'
+import type { Client, Invoice, PaymentAttempt } from '../../data/types'
 
 type Filter = 'all' | 'unpaid' | 'paid'
 
@@ -56,6 +57,19 @@ function nextDueDate(invoices: Invoice[]): string | null {
     .sort()
   return unpaid[0] ?? null
 }
+function isMeaningfulAttempt(attempt: PaymentAttempt) {
+  return attempt.status !== 'created' && attempt.status !== 'requires_payment_method'
+}
+function cardLabel(settings: PortalBillingSettings): string | null {
+  if (!settings.defaultCardLast4) return null
+  const brand = settings.defaultCardBrand
+    ? settings.defaultCardBrand.charAt(0).toUpperCase() + settings.defaultCardBrand.slice(1)
+    : 'Card'
+  const exp = settings.defaultCardExpMonth && settings.defaultCardExpYear
+    ? ` · expires ${String(settings.defaultCardExpMonth).padStart(2, '0')}/${String(settings.defaultCardExpYear).slice(-2)}`
+    : ''
+  return `${brand} ending ${settings.defaultCardLast4}${exp}`
+}
 
 export default function PortalBilling() {
   const { clientId: roleClientId } = useRole()
@@ -74,6 +88,7 @@ export default function PortalBilling() {
   const [filter,       setFilter]       = useState<Filter>('all')
   const [payingInvoice, setPayingInvoice] = useState<Invoice | null>(null)
   const [billingSettings, setBillingSettings] = useState<PortalBillingSettings>({ autoPayEnabled: false })
+  const [paymentAttempts, setPaymentAttempts] = useState<PaymentAttempt[]>([])
   const [autoPaySaving, setAutoPaySaving] = useState(false)
   const [autoPayMsg,    setAutoPayMsg]    = useState<{ ok: boolean; text: string } | null>(null)
 
@@ -84,12 +99,14 @@ export default function PortalBilling() {
       const c = await loadPortalClient(clientId)
       setClient(c)
       if (!c) { setLoading(false); return }
-      const [invs, settings] = await Promise.all([
+      const [invs, settings, attempts] = await Promise.all([
         loadPortalInvoices(c.name),
         loadPortalBillingSettings(clientId),
+        loadPortalPaymentAttempts(clientId),
       ])
       setInvoices(invs)
       setBillingSettings(settings)
+      setPaymentAttempts(attempts)
       setLoading(false)
     })()
   }, [clientId])
@@ -121,6 +138,8 @@ export default function PortalBilling() {
     .reduce((s, inv) => s + (Number(inv.subtotal) || 0), 0)
   const unpaidCount  = invoices.filter(isUnpaid).length
   const nextDue      = nextDueDate(invoices)
+  const latestPaymentAttempt = paymentAttempts.find(isMeaningfulAttempt)
+  const savedCardLabel = cardLabel(billingSettings)
 
   if (loading) {
     return (
@@ -181,6 +200,26 @@ export default function PortalBilling() {
         </div>
       </div>
 
+      {latestPaymentAttempt?.status === 'failed' && (
+        <div style={{
+          background: 'rgba(239,68,68,.08)',
+          border: '1px solid rgba(239,68,68,.24)',
+          borderRadius: 14,
+          padding: '14px 18px',
+          color: '#b91c1c',
+          fontSize: 13,
+          fontWeight: 700,
+          lineHeight: 1.45,
+        }}>
+          AutoPay could not process your latest invoice. Please update your card by paying manually, or contact YVA if you need help.
+          {latestPaymentAttempt.failureReason && (
+            <div style={{ marginTop: 4, fontWeight: 500, color: '#dc2626' }}>
+              {latestPaymentAttempt.failureReason}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* AutoPay settings */}
       <div style={{
         background: billingSettings.autoPayEnabled ? 'rgba(34,197,94,.06)' : 'var(--surface)',
@@ -212,6 +251,11 @@ export default function PortalBilling() {
               ? 'Future due invoices will be charged automatically to the saved card you authorized.'
               : 'To enable automatic deductions, pay an invoice and check the AutoPay authorization box before submitting payment.'}
           </div>
+          {savedCardLabel && (
+            <div style={{ fontSize: 12, color: 'var(--text)', marginTop: 6, fontWeight: 700 }}>
+              Saved card: {savedCardLabel}
+            </div>
+          )}
           {autoPayMsg && (
             <div style={{ fontSize: 12, color: autoPayMsg.ok ? '#15803d' : '#ef4444', marginTop: 8, fontWeight: 700 }}>
               {autoPayMsg.text}
@@ -399,6 +443,10 @@ export default function PortalBilling() {
                 ...prev,
                 autoPayEnabled: true,
                 defaultPaymentMethodId: options.paymentMethodId ?? prev.defaultPaymentMethodId,
+                defaultCardBrand: options.card?.brand ?? prev.defaultCardBrand,
+                defaultCardLast4: options.card?.last4 ?? prev.defaultCardLast4,
+                defaultCardExpMonth: options.card?.expMonth ?? prev.defaultCardExpMonth,
+                defaultCardExpYear: options.card?.expYear ?? prev.defaultCardExpYear,
                 autoPayAuthorizedAt: new Date().toISOString(),
               }))
             }

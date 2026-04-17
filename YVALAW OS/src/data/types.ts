@@ -329,6 +329,10 @@ export type ClientUser = {
   stripeCustomerId?: string
   autoPayEnabled?: boolean
   defaultPaymentMethodId?: string
+  defaultCardBrand?: string
+  defaultCardLast4?: string
+  defaultCardExpMonth?: number
+  defaultCardExpYear?: number
   autoPayAuthorizedAt?: string
   autoPayDisabledAt?: string
   invitedAt?: string

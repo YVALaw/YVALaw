@@ -22,6 +22,10 @@ CREATE TABLE IF NOT EXISTS client_users (
 ALTER TABLE client_users ADD COLUMN IF NOT EXISTS stripe_customer_id text;
 ALTER TABLE client_users ADD COLUMN IF NOT EXISTS auto_pay_enabled boolean NOT NULL DEFAULT false;
 ALTER TABLE client_users ADD COLUMN IF NOT EXISTS default_payment_method_id text;
+ALTER TABLE client_users ADD COLUMN IF NOT EXISTS default_card_brand text;
+ALTER TABLE client_users ADD COLUMN IF NOT EXISTS default_card_last4 text;
+ALTER TABLE client_users ADD COLUMN IF NOT EXISTS default_card_exp_month integer;
+ALTER TABLE client_users ADD COLUMN IF NOT EXISTS default_card_exp_year integer;
 ALTER TABLE client_users ADD COLUMN IF NOT EXISTS auto_pay_authorized_at timestamptz;
 ALTER TABLE client_users ADD COLUMN IF NOT EXISTS auto_pay_disabled_at timestamptz;
 

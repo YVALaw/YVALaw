@@ -36,7 +36,11 @@ interface Props {
   invoice: Invoice
   clientId: string
   onClose: () => void
-  onSuccess: (paidAmount: number, options?: { autoPayEnabled?: boolean; paymentMethodId?: string }) => void
+  onSuccess: (paidAmount: number, options?: {
+    autoPayEnabled?: boolean
+    paymentMethodId?: string
+    card?: SavedCard
+  }) => void
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -211,12 +215,23 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
           : selectedMethod !== 'new'
             ? selectedMethod
             : undefined
+        const selectedSavedCard = selectedMethod !== 'new'
+          ? savedMethods.find(card => card.id === selectedMethod)
+          : undefined
 
         let autoPayEnabled = false
         if (autoPayConsent) {
           if (paymentMethodId) {
             try {
-              await savePortalAutoPaySettings({ clientId, enabled: true, paymentMethodId })
+              await savePortalAutoPaySettings({
+                clientId,
+                enabled: true,
+                paymentMethodId,
+                cardBrand: selectedSavedCard?.brand,
+                cardLast4: selectedSavedCard?.last4,
+                cardExpMonth: selectedSavedCard?.expMonth,
+                cardExpYear: selectedSavedCard?.expYear,
+              })
               autoPayEnabled = true
               setSuccessNote('AutoPay is now enabled for future due invoices. You can turn it off from Billing.')
             } catch (autoPayErr) {
@@ -233,7 +248,7 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
         setPaidAmount(paid)
         setStep('success')
         setIsProcessing(false)
-        onSuccess(paid, { autoPayEnabled, paymentMethodId })
+        onSuccess(paid, { autoPayEnabled, paymentMethodId, card: selectedSavedCard })
       } else {
         throw new Error(`Unexpected payment status: ${result.paymentIntent?.status}`)
       }

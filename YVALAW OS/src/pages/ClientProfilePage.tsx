@@ -53,6 +53,19 @@ function paymentAttemptBadge(attempt: PaymentAttempt): string {
     default: return 'badge-blue'
   }
 }
+function isSetupOnlyPaymentAttempt(attempt: PaymentAttempt): boolean {
+  return attempt.status === 'created' || attempt.status === 'requires_payment_method'
+}
+function portalCardLabel(billing: ClientBillingSummary): string | undefined {
+  if (!billing.defaultCardLast4) return undefined
+  const brand = billing.defaultCardBrand
+    ? billing.defaultCardBrand.charAt(0).toUpperCase() + billing.defaultCardBrand.slice(1)
+    : 'Card'
+  const exp = billing.defaultCardExpMonth && billing.defaultCardExpYear
+    ? ` · expires ${String(billing.defaultCardExpMonth).padStart(2, '0')}/${String(billing.defaultCardExpYear).slice(-2)}`
+    : ''
+  return `${brand} ending ${billing.defaultCardLast4}${exp}`
+}
 
 const STAGES = [
   { key: 'lead', label: 'Lead' }, { key: 'prospect', label: 'Prospect' },
@@ -175,6 +188,9 @@ export default function ClientProfilePage() {
     .filter(inv => new Set(['sent','viewed','overdue','partial']).has((inv.status||'').toLowerCase()))
     .reduce((s, inv) => s + ((Number(inv.subtotal)||0) - (Number(inv.amountPaid)||0)), 0)
   const clientProjects = projects.filter(p => p.clientId === clientNN.id)
+  const visiblePaymentAttempts = portalBilling.recentAttempts.filter(attempt => !isSetupOnlyPaymentAttempt(attempt))
+  const hiddenSetupAttemptCount = portalBilling.recentAttempts.length - visiblePaymentAttempts.length
+  const billingActivityAttempts = visiblePaymentAttempts.length > 0 ? visiblePaymentAttempts : portalBilling.recentAttempts
 
   function persistUpdate(updated: Client) {
     const next = clients.map(c => c.id === updated.id ? updated : c)
@@ -720,6 +736,7 @@ export default function ClientProfilePage() {
                             ? 'Off'
                             : 'No portal account',
                     },
+                    { label: 'Saved Card', value: portalCardLabel(portalBilling) },
                     {
                       label: 'Last Payment',
                       value: portalBilling.lastSuccessfulAttempt
@@ -764,8 +781,15 @@ export default function ClientProfilePage() {
           {/* Billing activity */}
           {(portalBilling.hasPortalAccount || portalBilling.recentAttempts.length > 0) && (
             <div className="data-card">
-              <div className="data-card-title">Billing Activity</div>
-              {portalBilling.recentAttempts.length === 0 ? (
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
+                <div className="data-card-title" style={{ marginBottom: 0 }}>Billing Activity</div>
+                {hiddenSetupAttemptCount > 0 && visiblePaymentAttempts.length > 0 && (
+                  <div style={{ color: 'var(--muted)', fontSize: 11, textAlign: 'right', lineHeight: 1.4 }}>
+                    {hiddenSetupAttemptCount} setup {hiddenSetupAttemptCount === 1 ? 'attempt' : 'attempts'} hidden
+                  </div>
+                )}
+              </div>
+              {billingActivityAttempts.length === 0 ? (
                 <div style={{ color: 'var(--muted)', fontSize: 13, textAlign: 'center', padding: '16px 0' }}>
                   No payment attempts recorded yet.
                 </div>
@@ -782,14 +806,21 @@ export default function ClientProfilePage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {portalBilling.recentAttempts.map(attempt => (
-                        <tr key={attempt.id}>
+                      {billingActivityAttempts.map(attempt => {
+                        const setupOnly = isSetupOnlyPaymentAttempt(attempt)
+                        return (
+                        <tr key={attempt.id} style={{ opacity: setupOnly ? 0.58 : 1 }}>
                           <td className="td-name">{attempt.invoiceNumber || '—'}</td>
                           <td className="td-muted" style={{ textTransform: 'capitalize' }}>{attempt.source}</td>
                           <td>
                             <span className={`badge ${paymentAttemptBadge(attempt)}`} style={{ fontSize: 11, textTransform: 'capitalize' }}>
-                              {attempt.status.replace(/_/g, ' ')}
+                              {setupOnly ? 'started' : attempt.status.replace(/_/g, ' ')}
                             </span>
+                            {setupOnly && (
+                              <div style={{ color: 'var(--muted)', fontSize: 11, marginTop: 3 }}>
+                                Card confirmation was started but not completed.
+                              </div>
+                            )}
                             {attempt.failureReason && (
                               <div style={{ color: '#dc2626', fontSize: 11, marginTop: 3, maxWidth: 220, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                                 {attempt.failureReason}
@@ -799,7 +830,8 @@ export default function ClientProfilePage() {
                           <td style={{ color: 'var(--gold)', fontWeight: 700 }}>{fmtUSD(attempt.amount)}</td>
                           <td className="td-muted">{fmtAttemptDate(attempt.attemptedAt)}</td>
                         </tr>
-                      ))}
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>

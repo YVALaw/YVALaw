@@ -255,6 +255,7 @@ exports.handler = async function handler(event) {
     amount:                    serverAmountCents,
     currency:                  'usd',
     customer:                  customerId,
+    receipt_email:             user.email || client?.email || undefined,
     'payment_method_types[]':  'card',
     setup_future_usage:        'off_session',   // saves card for future invoices
     'metadata[invoiceId]':     invoiceId,

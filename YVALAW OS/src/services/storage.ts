@@ -10,6 +10,10 @@ export type ClientPortalBillingStatus = {
   hasPortalAccount: boolean
   autoPayEnabled: boolean
   hasSavedPaymentMethod: boolean
+  defaultCardBrand?: string
+  defaultCardLast4?: string
+  defaultCardExpMonth?: number
+  defaultCardExpYear?: number
   autoPayAuthorizedAt?: string
   autoPayDisabledAt?: string
 }
@@ -418,7 +422,7 @@ export async function countPendingStaffRequests(): Promise<number> {
 export async function loadClientPortalBillingStatus(clientId: string): Promise<ClientPortalBillingStatus> {
   const { data, error } = await supabase
     .from('client_users')
-    .select('auto_pay_enabled, default_payment_method_id, auto_pay_authorized_at, auto_pay_disabled_at')
+    .select('auto_pay_enabled, default_payment_method_id, default_card_brand, default_card_last4, default_card_exp_month, default_card_exp_year, auto_pay_authorized_at, auto_pay_disabled_at')
     .eq('client_id', clientId)
     .maybeSingle()
 
@@ -431,6 +435,10 @@ export async function loadClientPortalBillingStatus(clientId: string): Promise<C
     hasPortalAccount:       true,
     autoPayEnabled:        row.autoPayEnabled === true,
     hasSavedPaymentMethod: Boolean(row.defaultPaymentMethodId),
+    defaultCardBrand:      row.defaultCardBrand as string | undefined,
+    defaultCardLast4:      row.defaultCardLast4 as string | undefined,
+    defaultCardExpMonth:   row.defaultCardExpMonth as number | undefined,
+    defaultCardExpYear:    row.defaultCardExpYear as number | undefined,
     autoPayAuthorizedAt:   row.autoPayAuthorizedAt as string | undefined,
     autoPayDisabledAt:     row.autoPayDisabledAt as string | undefined,
   }

@@ -11,6 +11,8 @@
  *   STRIPE_SECRET_KEY
  */
 
+import { randomUUID } from 'node:crypto'
+
 const PAYABLE_STATUSES = new Set(['sent', 'viewed', 'overdue', 'partial'])
 
 function json(statusCode, body) {
@@ -60,6 +62,18 @@ async function stripe(method, path, body, opts = {}) {
     throw err
   }
   return data
+}
+
+async function stripeGet(path) {
+  const key = process.env.STRIPE_SECRET_KEY
+  const res = await fetch(`https://api.stripe.com/v1${path}`, {
+    headers: {
+      Authorization: `Bearer ${key}`,
+      'Stripe-Version': '2024-06-20',
+    },
+  })
+  if (!res.ok) return null
+  return res.json()
 }
 
 async function supabaseGet(path) {
@@ -142,6 +156,50 @@ async function recordPaymentAttempt(row) {
   }
 }
 
+function paymentActivityNote({ status, invoiceNumber, amount, failureReason, paymentIntentId }) {
+  const invoiceLabel = invoiceNumber ? ` for invoice ${invoiceNumber}` : ''
+  const amountLabel = Number.isFinite(Number(amount)) ? ` (${Number(amount).toFixed(2)} USD)` : ''
+  const base = status === 'succeeded'
+    ? `AutoPay succeeded${invoiceLabel}${amountLabel}.`
+    : `AutoPay failed${invoiceLabel}${amountLabel}.${failureReason ? ` ${failureReason}` : ''}`
+  return paymentIntentId ? `${base} Stripe payment: ${paymentIntentId}` : base
+}
+
+async function logPaymentActivity(clientId, note) {
+  if (!clientId || !note) return
+  try {
+    const existing = await supabaseGet(`activity_log?client_id=eq.${enc(clientId)}&note=eq.${enc(note)}&select=id&limit=1`)
+    if (Array.isArray(existing) && existing.length > 0) return
+    await supabaseInsert('activity_log', {
+      id: randomUUID(),
+      client_id: clientId,
+      note,
+      created_at: Date.now(),
+      type: 'system',
+      auto: true,
+    })
+  } catch (err) {
+    console.warn('run-autopay: activity_log write skipped', err?.message || err)
+  }
+}
+
+async function updateClientCardMetadata(clientId, paymentMethodId) {
+  if (!clientId || !paymentMethodId) return
+  try {
+    const pm = await stripeGet(`/payment_methods/${paymentMethodId}`)
+    const card = pm?.card
+    if (!card) return
+    await supabasePatch('client_users', `client_id=eq.${enc(clientId)}`, {
+      default_card_brand: card.brand || null,
+      default_card_last4: card.last4 || null,
+      default_card_exp_month: card.exp_month || null,
+      default_card_exp_year: card.exp_year || null,
+    })
+  } catch (err) {
+    console.warn('run-autopay: card metadata update skipped', err?.message || err)
+  }
+}
+
 function isDue(invoice, today) {
   if (!invoice.due_date) return true
   return String(invoice.due_date).slice(0, 10) <= today
@@ -191,6 +249,7 @@ export default async function handler() {
             currency:                  'usd',
             customer:                  billing.stripe_customer_id,
             payment_method:            billing.default_payment_method_id,
+            receipt_email:             client.email || undefined,
             off_session:               'true',
             confirm:                   'true',
             'metadata[invoiceId]':     invoice.id,
@@ -220,6 +279,13 @@ export default async function handler() {
             status:                   'failed',
             failure_reason:           stripeErr instanceof Error ? stripeErr.message : 'AutoPay charge failed',
           })
+          await logPaymentActivity(billing.client_id, paymentActivityNote({
+            status: 'failed',
+            invoiceNumber: invoice.number,
+            amount: amountCents / 100,
+            failureReason: stripeErr instanceof Error ? stripeErr.message : 'AutoPay charge failed',
+            paymentIntentId: stripeIntent?.id,
+          }))
           summary.failed += 1
           summary.errors.push({
             invoiceId: invoice.id,
@@ -243,6 +309,13 @@ export default async function handler() {
           status:                   'succeeded',
           failure_reason:           null,
         })
+        await updateClientCardMetadata(billing.client_id, billing.default_payment_method_id)
+        await logPaymentActivity(billing.client_id, paymentActivityNote({
+          status: 'succeeded',
+          invoiceNumber: invoice.number,
+          amount: amountCents / 100,
+          paymentIntentId: intent.id,
+        }))
 
         try {
           await supabasePatch('invoices', `id=eq.${invoice.id}`, {
