@@ -364,7 +364,7 @@ export async function loadClientDocuments(clientId: string): Promise<ClientDocum
     .eq('client_id', clientId)
     .order('uploaded_at', { ascending: false })
   if (error) { console.error('loadClientDocuments', error); return [] }
-  return (data || []).map(r => {
+  const docs = (data || []).map(r => {
     const doc = toCamel<ClientDocument>(r as Record<string, unknown>)
     // uploaded_at is timestamptz in DB — normalise to ms number
     if (typeof (doc as unknown as Record<string,unknown>).uploadedAt === 'string') {
@@ -372,6 +372,13 @@ export async function loadClientDocuments(clientId: string): Promise<ClientDocum
     }
     return doc
   })
+  return Promise.all(docs.map(async doc => {
+    if (!doc.filePath) return doc
+    const { data: signed } = await supabase.storage
+      .from('attachments')
+      .createSignedUrl(doc.filePath, 60 * 60)
+    return signed?.signedUrl ? { ...doc, fileUrl: signed.signedUrl } : doc
+  }))
 }
 
 export async function addClientDocument(doc: ClientDocument): Promise<void> {

@@ -262,7 +262,7 @@ export default function PortalBilling() {
             </div>
           )}
         </div>
-        {billingSettings.autoPayEnabled && (
+        {billingSettings.autoPayEnabled && !previewId && (
           <button
             className="btn-ghost btn-sm"
             onClick={() => void disableAutoPay()}
@@ -271,6 +271,11 @@ export default function PortalBilling() {
           >
             {autoPaySaving ? 'Saving…' : 'Turn Off AutoPay'}
           </button>
+        )}
+        {billingSettings.autoPayEnabled && previewId && (
+          <div style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 700 }}>
+            AutoPay changes are disabled in preview mode.
+          </div>
         )}
       </div>
 

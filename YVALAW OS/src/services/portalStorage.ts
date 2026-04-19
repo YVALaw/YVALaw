@@ -162,6 +162,21 @@ export function fmtUSD(n: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(n)
 }
 
+async function getSessionToken(): Promise<string> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) throw new Error('Not authenticated')
+  return session.access_token
+}
+
+async function signClientDocumentUrl(doc: ClientDocument): Promise<ClientDocument> {
+  if (!doc.filePath) return doc
+  const { data, error } = await supabase.storage
+    .from('attachments')
+    .createSignedUrl(doc.filePath, 60 * 60)
+  if (error || !data?.signedUrl) return doc
+  return { ...doc, fileUrl: data.signedUrl }
+}
+
 /** Upload a document from the client portal */
 export async function uploadPortalDocument(params: {
   clientId: string
@@ -177,14 +192,16 @@ export async function uploadPortalDocument(params: {
     .upload(path, params.file, { upsert: false, contentType: params.file.type })
   if (storageErr) throw new Error(storageErr.message)
 
-  const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(path)
+  const { data: signedData } = await supabase.storage
+    .from('attachments')
+    .createSignedUrl(path, 60 * 60)
 
   const doc: ClientDocument = {
     id:         crypto.randomUUID(),
     clientId:   params.clientId,
     name:       params.file.name,
     category:   params.category,
-    fileUrl:    urlData.publicUrl,
+    fileUrl:    signedData?.signedUrl ?? path,
     filePath:   path,
     fileSize:   params.file.size,
     uploadedAt: Date.now(),
@@ -196,7 +213,7 @@ export async function uploadPortalDocument(params: {
     client_id:   doc.clientId,
     name:        doc.name,
     category:    doc.category,
-    file_url:    doc.fileUrl,
+    file_url:    path,
     file_path:   doc.filePath,
     file_size:   doc.fileSize,
     uploaded_at: new Date(doc.uploadedAt).toISOString(),  // timestamptz column
@@ -216,7 +233,7 @@ export async function loadPortalDocuments(clientId: string): Promise<ClientDocum
     .eq('client_id', clientId)
     .order('uploaded_at', { ascending: false })
   if (error || !data) return []
-  return (data as Record<string, unknown>[]).map(r => {
+  const docs = (data as Record<string, unknown>[]).map(r => {
     const doc = toCamel(r) as unknown as ClientDocument
     // uploaded_at is timestamptz in DB — normalise to ms number
     if (typeof (doc as unknown as Record<string,unknown>).uploadedAt === 'string') {
@@ -224,6 +241,7 @@ export async function loadPortalDocuments(clientId: string): Promise<ClientDocum
     }
     return doc
   })
+  return Promise.all(docs.map(signClientDocumentUrl))
 }
 
 /** Load working hour preferences for this client */
@@ -313,29 +331,43 @@ export async function savePortalAutoPaySettings(params: {
   cardLast4?: string
   cardExpMonth?: number
   cardExpYear?: number
+}): Promise<{ card?: { brand: string; last4: string; expMonth: number; expYear: number } }> {
+  const token = await getSessionToken()
+  const res = await fetch('/.netlify/functions/update-autopay-settings', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      clientId: params.clientId,
+      enabled: params.enabled,
+      paymentMethodId: params.paymentMethodId,
+    }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Could not update AutoPay settings.')
+  return { card: data.card }
+}
+
+export async function savePortalProfilePhone(params: {
+  clientId: string
+  phone?: string
 }): Promise<void> {
-  const row: Record<string, unknown> = {
-    auto_pay_enabled: params.enabled,
-  }
-
-  if (params.enabled) {
-    if (!params.paymentMethodId) throw new Error('A saved card is required to enable AutoPay.')
-    row.default_payment_method_id = params.paymentMethodId
-    if (params.cardBrand) row.default_card_brand = params.cardBrand
-    if (params.cardLast4) row.default_card_last4 = params.cardLast4
-    if (params.cardExpMonth) row.default_card_exp_month = params.cardExpMonth
-    if (params.cardExpYear) row.default_card_exp_year = params.cardExpYear
-    row.auto_pay_authorized_at = new Date().toISOString()
-    row.auto_pay_disabled_at = null
-  } else {
-    row.auto_pay_disabled_at = new Date().toISOString()
-  }
-
-  const { error } = await supabase
-    .from('client_users')
-    .update(row)
-    .eq('client_id', params.clientId)
-  if (error) throw new Error(error.message)
+  const token = await getSessionToken()
+  const res = await fetch('/.netlify/functions/update-portal-profile', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      clientId: params.clientId,
+      phone: params.phone ?? '',
+    }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Could not update profile.')
 }
 
 /**

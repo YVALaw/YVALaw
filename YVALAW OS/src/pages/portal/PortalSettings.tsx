@@ -5,6 +5,7 @@ import { useRole } from '../../context/RoleContext'
 import {
   loadPortalClient,
   loadPortalWorkingHours,
+  savePortalProfilePhone,
   savePortalWorkingHours,
 } from '../../services/portalStorage'
 import type { Client, WorkingHourPrefs } from '../../data/types'
@@ -124,17 +125,15 @@ export default function PortalSettings() {
     if (!clientId) return
     setSavingAcct(true)
     setAcctMsg(null)
-    const { error } = await supabase
-      .from('clients')
-      .update({ phone: phone || null })
-      .eq('id', clientId)
-    setSavingAcct(false)
-    if (error) {
-      setAcctMsg({ text: 'Failed to save. Please try again.', ok: false })
-    } else {
+    try {
+      await savePortalProfilePhone({ clientId, phone })
       setAcctMsg({ text: 'Profile updated.', ok: true })
       showToast('Profile saved', true)
       setTimeout(() => setAcctMsg(null), 3000)
+    } catch {
+      setAcctMsg({ text: 'Failed to save. Please try again.', ok: false })
+    } finally {
+      setSavingAcct(false)
     }
   }
 

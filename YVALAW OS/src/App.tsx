@@ -79,7 +79,8 @@ function AuthenticatedRouter() {
 
   // ── Preview portal — internal user viewing as a client ─────────────────────
   const previewClientId = new URLSearchParams(location.search).get('preview')
-  if (role !== 'client' && previewClientId && location.pathname.startsWith('/portal')) {
+  const canPreviewPortal = role === 'ceo' || role === 'admin' || role === 'accounting'
+  if (canPreviewPortal && previewClientId && location.pathname.startsWith('/portal')) {
     return (
       <ClientShell previewClientId={previewClientId}>
         <Routes>

@@ -36,14 +36,13 @@ DROP POLICY IF EXISTS "client_users_internal_read" ON client_users;
 CREATE POLICY "client_users_internal_read" ON client_users
   FOR SELECT TO authenticated USING (public.is_internal());
 
--- Clients can only read/update their own row (no delete, no insert — managed by invite function)
+-- Clients can only read their own row (no delete, no insert — managed by invite function).
+-- Updates go through Netlify functions so only explicitly allowed fields change.
 DROP POLICY IF EXISTS "client_users_own_read" ON client_users;
 CREATE POLICY "client_users_own_read" ON client_users
   FOR SELECT USING (auth_id = auth.uid());
 
 DROP POLICY IF EXISTS "client_users_own_update" ON client_users;
-CREATE POLICY "client_users_own_update" ON client_users
-  FOR UPDATE USING (auth_id = auth.uid());
 
 -- Service role (Netlify functions) can do anything — no policy needed (bypasses RLS).
 
@@ -149,19 +148,9 @@ CREATE POLICY "portal_own_client" ON clients
     AND id = public.portal_client_id()
   );
 
--- Client portal Settings can update the authenticated client's phone number.
--- The frontend only sends { phone }, but RLS cannot restrict columns by itself.
+-- Portal profile updates go through netlify/functions/update-portal-profile.cjs.
+-- Do not recreate this policy; RLS cannot restrict UPDATE to only the phone column.
 DROP POLICY IF EXISTS "portal_update_own_client" ON clients;
-CREATE POLICY "portal_update_own_client" ON clients
-  FOR UPDATE TO authenticated
-  USING (
-    public.is_portal_client()
-    AND id = public.portal_client_id()
-  )
-  WITH CHECK (
-    public.is_portal_client()
-    AND id = public.portal_client_id()
-  );
 
 -- Projects assigned to this client
 -- NOTE: client_id is stored as text in some deployments — adjust cast if needed.
@@ -396,6 +385,27 @@ DROP POLICY IF EXISTS "portal_upsert" ON working_hour_prefs;
 CREATE POLICY "portal_upsert" ON working_hour_prefs FOR INSERT TO authenticated WITH CHECK (public.is_portal_client() AND client_id = public.portal_client_id());
 DROP POLICY IF EXISTS "portal_update" ON working_hour_prefs;
 CREATE POLICY "portal_update" ON working_hour_prefs FOR UPDATE TO authenticated USING (public.is_portal_client() AND client_id = public.portal_client_id());
+
+
+-- ── Step 5B: Storage policy hardening for portal documents ───────────────────
+-- Public buckets do not need broad SELECT/listing policies for object URLs.
+-- Portal document pages now request signed URLs for client_documents.file_path.
+DROP POLICY IF EXISTS "public_read" ON storage.objects;
+DROP POLICY IF EXISTS "auth_read" ON storage.objects;
+
+DROP POLICY IF EXISTS "attachments_internal_read" ON storage.objects;
+CREATE POLICY "attachments_internal_read" ON storage.objects
+  FOR SELECT TO authenticated
+  USING (bucket_id = 'attachments' AND public.is_internal());
+
+DROP POLICY IF EXISTS "attachments_client_docs_read" ON storage.objects;
+CREATE POLICY "attachments_client_docs_read" ON storage.objects
+  FOR SELECT TO authenticated
+  USING (
+    bucket_id = 'attachments'
+    AND public.is_portal_client()
+    AND name LIKE ('client-docs/' || public.portal_client_id()::text || '/%')
+  );
 
 
 -- ── Step 6: Reload PostgREST schema ──────────────────────────────────────────

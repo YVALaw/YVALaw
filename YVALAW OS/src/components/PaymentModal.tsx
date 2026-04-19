@@ -215,7 +215,7 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
           : selectedMethod !== 'new'
             ? selectedMethod
             : undefined
-        const selectedSavedCard = selectedMethod !== 'new'
+        let selectedSavedCard = selectedMethod !== 'new'
           ? savedMethods.find(card => card.id === selectedMethod)
           : undefined
 
@@ -223,7 +223,7 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
         if (autoPayConsent) {
           if (paymentMethodId) {
             try {
-              await savePortalAutoPaySettings({
+              const saved = await savePortalAutoPaySettings({
                 clientId,
                 enabled: true,
                 paymentMethodId,
@@ -232,6 +232,15 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
                 cardExpMonth: selectedSavedCard?.expMonth,
                 cardExpYear: selectedSavedCard?.expYear,
               })
+              if (!selectedSavedCard && saved.card) {
+                selectedSavedCard = {
+                  id: paymentMethodId,
+                  brand: saved.card.brand,
+                  last4: saved.card.last4,
+                  expMonth: saved.card.expMonth,
+                  expYear: saved.card.expYear,
+                }
+              }
               autoPayEnabled = true
               setSuccessNote('AutoPay is now enabled for future due invoices. You can turn it off from Billing.')
             } catch (autoPayErr) {

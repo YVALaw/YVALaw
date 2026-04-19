@@ -117,8 +117,9 @@ CREATE POLICY "client_update_prefs" ON working_hour_prefs FOR UPDATE TO authenti
 - **Internal AutoPay visibility deployed**: Client profile header shows `AutoPay On`, `Card Saved`, `AutoPay Off`, or `No Portal`; Client Information includes an AutoPay row. SQL policy `client_users_internal_read` was added and run so internal users can read portal billing status.
 - **Supabase Security Advisor cleanup**: RLS was enabled on the timesheet import tables, overly broad `auth_all` / `team_all` policies were replaced with scoped internal/portal policies, helper functions now have fixed `search_path = public`, and the final function diagnostic showed `current_user_role`, `is_internal`, `is_portal_client`, and `portal_client_id` all configured with `["search_path=public"]`.
 - **Supabase Performance Advisor cleanup started**: A no-comments SQL cleanup query was copied to the clipboard to fix `auth_rls_initplan` warnings and consolidate duplicate permissive policies. Needs final confirmation by rerunning Supabase Performance Advisor and pasting any remaining rows.
-- **Payment attempt history implemented locally**: Added `payment_attempts` SQL/RLS, portal payment intent logging, Stripe webhook success/failure updates, scheduled AutoPay success/failure logging, and internal Client Profile Billing Activity table. Needs Supabase SQL run and deploy before testing in production.
-- **Payment operations polish implemented locally**: Portal Billing now shows failed latest payment/AutoPay warnings, saved card brand/last4/expiry when available, and hides setup-only payment attempts in the internal Billing Activity table. Stripe PaymentIntents now include `receipt_email`, successful webhooks/AutoPay update saved card metadata, and payment success/failure events write system entries to the client activity timeline.
+- **Payment attempt history deployed/tested**: `payment_attempts` SQL/RLS was run, portal payment intent logging is live, Stripe webhook success/failure updates are live, and internal Client Profile Billing Activity is working. Manual portal payment produced expected `portal / succeeded` row in Supabase.
+- **Payment operations polish deployed/tested**: Portal Billing can show failed latest payment/AutoPay warnings, saved card brand/last4/expiry when available, and setup-only payment attempts are hidden/de-emphasized in the internal Billing Activity table. Stripe PaymentIntents include `receipt_email`; successful webhooks/AutoPay update saved card metadata; payment success/failure events write system entries to the client activity timeline. Manual portal payment test confirmed saved card metadata, Billing Activity, and Communications timeline were all good.
+- **Portal security hardening implemented locally**: Portal preview is restricted to CEO/Admin/Accounting, portal phone updates now go through `update-portal-profile.cjs`, AutoPay enable/disable now goes through `update-autopay-settings.cjs` with Stripe payment method ownership verification, direct portal RLS updates on `clients`/`client_users` were removed from `client-portal.sql`, and client document loads/uploads now use signed URLs for `client-docs/{clientId}/...` paths.
 - **Latest pushed commits**:
   - `e248901` — Add LawOS client portal payments
   - `b1af500` — Add manual client portal invite links
@@ -128,6 +129,8 @@ CREATE POLICY "client_update_prefs" ON working_hour_prefs FOR UPDATE TO authenti
   - `14a8dd9` — Fix client portal payment modal
   - `45ebaa4` — Add client portal AutoPay
   - `01354f5` — Show client AutoPay status internally
+  - `38b42df` — Add payment attempt tracking
+  - `4284a67` — Add payment operations notifications
 
 ---
 
@@ -253,6 +256,7 @@ https://yvastaffing.agency/.netlify/functions/stripe-webhook
 Subscribed event:
 ```text
 payment_intent.succeeded
+payment_intent.payment_failed
 ```
 
 Test-mode webhook signing secret was added to Netlify as `STRIPE_WEBHOOK_SECRET`.
@@ -273,6 +277,12 @@ Test-mode webhook signing secret was added to Netlify as `STRIPE_WEBHOOK_SECRET`
 - [x] Run updated `supabase/client-portal.sql` before testing AutoPay
 - [x] Verify Netlify `run-autopay` works for an opted-in test client with a due invoice
 - [x] Verify internal client profile shows AutoPay status
+- [x] Add and run `payment_attempts` SQL/RLS
+- [x] Add and run saved-card metadata columns on `client_users`
+- [x] Add `payment_intent.payment_failed` to the existing Stripe webhook destination
+- [x] Deploy commits `38b42df` and `4284a67`
+- [x] Test manual portal payment after deployment: `payment_attempts`, saved card metadata, Client Profile Billing Activity, and Communications system entry all looked good
+- [ ] Test AutoPay success/failure after the payment operations deployment
 
 ---
 
@@ -285,14 +295,29 @@ Test-mode webhook signing secret was added to Netlify as `STRIPE_WEBHOOK_SECRET`
 
 #### Phase 8 — Production Payment Operations
 Payments and AutoPay are now working in test mode. The next missing operational pieces:
-1. **Payment attempt history** — implemented via `payment_attempts`; manual payment success tested in Supabase. Next test AutoPay success/failure after deploying the latest local polish.
-2. **AutoPay failure tracking** — implemented in `run-autopay`; failed off-session charges write `payment_attempts.status = 'failed'` with `failure_reason`, client activity log entries, portal Billing warning, and internal Client Profile visibility.
+1. **Payment attempt history** — implemented/deployed via `payment_attempts`; manual payment success tested in Supabase and LawOS.
+2. **AutoPay failure tracking** — implemented/deployed in `run-autopay`; failed off-session charges should write `payment_attempts.status = 'failed'` with `failure_reason`, client activity log entries, portal Billing warning, and internal Client Profile visibility. Needs actual AutoPay failure test next.
 3. **Client profile billing panel** — first pass implemented: AutoPay badge + Saved Card + Last Payment / Last Attempt + Billing Activity table. Later expansion can add last portal login.
 4. **Payment receipts** — PaymentIntents now include `receipt_email`; confirm Stripe receipt behavior in test/live mode before relying on it operationally.
 5. **AutoPay notifications** — internal timeline notifications are implemented. Email/SMS notification remains optional later.
 6. **Mobile portal QA** — test bottom nav, Billing, payment modal, AutoPay status, Documents upload/download, PDF download, Team cards, and Staff Request modal on mobile.
 7. **Live-mode readiness** — before real charges, switch Stripe keys/webhook from test to live, create the live webhook endpoint, verify live env vars, and repeat a small live payment test.
 8. Gmail integration remains optional/pending until Google OAuth client ID/secret are configured.
+
+Tomorrow's suggested start:
+1. Create a small due unpaid invoice for an AutoPay-enabled test client.
+2. Run Netlify `run-autopay`.
+3. Verify Supabase `payment_attempts` gets `source = autopay` and `status = succeeded`.
+4. Repeat with a failing saved card if practical, expecting `status = failed`, a `failure_reason`, portal Billing warning, internal Payment Failed badge, Billing Activity row, and Communications system entry.
+5. If AutoPay testing passes, next build item is either mobile portal QA or Stripe Customer Portal for client-managed saved cards.
+
+Security hardening validation before push/deploy:
+1. Run updated `supabase/client-portal.sql` or at least the changed policy/storage section before testing the deployed functions.
+2. Confirm portal client can save phone number from Portal Settings.
+3. Confirm portal client can enable and disable AutoPay after a payment.
+4. Confirm recruiter/lead-gen cannot use `?preview=clientId`; CEO/Admin/Accounting still can.
+5. Confirm client Documents upload/download still works. Existing client documents should load through signed URLs when `file_path` is present.
+6. Recheck Supabase Security Advisor for public bucket listing warnings after the storage policy cleanup.
 
 #### Optional Enhancements (post-deploy)
 - **Notification preferences** — toggle email alerts for new invoices, document shares
