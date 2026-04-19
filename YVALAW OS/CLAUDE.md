@@ -120,6 +120,10 @@ CREATE POLICY "client_update_prefs" ON working_hour_prefs FOR UPDATE TO authenti
 - **Payment attempt history deployed/tested**: `payment_attempts` SQL/RLS was run, portal payment intent logging is live, Stripe webhook success/failure updates are live, and internal Client Profile Billing Activity is working. Manual portal payment produced expected `portal / succeeded` row in Supabase.
 - **Payment operations polish deployed/tested**: Portal Billing can show failed latest payment/AutoPay warnings, saved card brand/last4/expiry when available, and setup-only payment attempts are hidden/de-emphasized in the internal Billing Activity table. Stripe PaymentIntents include `receipt_email`; successful webhooks/AutoPay update saved card metadata; payment success/failure events write system entries to the client activity timeline. Manual portal payment test confirmed saved card metadata, Billing Activity, and Communications timeline were all good.
 - **Portal security hardening implemented locally**: Portal preview is restricted to CEO/Admin/Accounting, portal phone updates now go through `update-portal-profile.cjs`, AutoPay enable/disable now goes through `update-autopay-settings.cjs` with Stripe payment method ownership verification, direct portal RLS updates on `clients`/`client_users` were removed from `client-portal.sql`, and client document loads/uploads now use signed URLs for `client-docs/{clientId}/...` paths.
+- **Portal activity audit logging implemented**: Added `log-portal-activity.cjs`, `auditPortalActivity()`, portal login logging, document upload/download audit events, document ownership checks, and `client_users.last_login_at` updates through the server function instead of direct browser writes.
+- **Client portal UI polish**: ClientShell now has a desktop portal topbar title/subtitle, Documents and Settings use shared portal panel/section/upload/card classes, and the mobile portal bottom nav scrolls horizontally instead of squeezing or wrapping.
+- **LawOS profile UI consistency sweep**: Client, employee, and project profiles now use shared profile layout classes for headers, KPI grids, field groups, document rows, communication panels, and responsive profile grids. Team project employee cards now show pointer/hover/focus states, card subtitles and stats handle long text, and profile/report/calendar fixed grids were converted to responsive classes where they were most likely to overflow.
+- **Reports and Calendar UI cleanup**: Reports KPI drill-down cards now use the `clickable-card` hover/focus treatment, report two-column sections collapse on mobile, aging buckets use responsive metric grids, and Calendar uses responsive wrapper classes so the detail panel stacks below the calendar on smaller screens.
 - **Latest pushed commits**:
   - `e248901` — Add LawOS client portal payments
   - `b1af500` — Add manual client portal invite links
@@ -131,6 +135,11 @@ CREATE POLICY "client_update_prefs" ON working_hour_prefs FOR UPDATE TO authenti
   - `01354f5` — Show client AutoPay status internally
   - `38b42df` — Add payment attempt tracking
   - `4284a67` — Add payment operations notifications
+
+### UI QA Notes — Next Session
+- Retest LawOS desktop and mobile widths for: Clients, Client Profile, Team project view, Employee Profile, Project Profile, Reports, Calendar, Invoices, Estimates, and portal Documents/Settings.
+- Known recent focus areas: long names/emails/notes should stay inside cards; clickable cards should show hand cursor or hover state; fixed side panels/grids should stack cleanly on mobile; portal bottom nav should remain usable when all tabs are visible.
+- If more UI inconsistencies appear, prefer adding shared classes in `src/styles.css` over one-off inline styles so profile, portal, and report screens stay consistent.
 
 ---
 

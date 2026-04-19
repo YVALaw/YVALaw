@@ -168,6 +168,10 @@ export default function ClientShell({ children, previewClientId }: Props) {
         {/* Topbar */}
         <header className="portal-topbar">
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div className="portal-topbar-heading">
+              <div className="portal-topbar-title">{isPreview ? 'Portal Preview' : 'Client Portal'}</div>
+              <div className="portal-topbar-sub">{isPreview ? 'Internal view only' : 'YVA Staffing account workspace'}</div>
+            </div>
             <div className="portal-mobile-brand">
               <div style={{
                 width: 32, height: 32, borderRadius: 10,

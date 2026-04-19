@@ -493,7 +493,7 @@ export default function ClientProfilePage() {
   const color = avatarColor(clientNN.name)
 
   return (
-    <div className="page-wrap" style={{ maxWidth: 980 }}>
+    <div className="page-wrap client-profile-page">
       <input ref={photoInputRef} type="file" accept="image/*" style={{ display: 'none' }}
         onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f); e.target.value = '' }} />
 
@@ -609,8 +609,7 @@ export default function ClientProfilePage() {
             </>
           )}
           {inviteMsg && (
-            <div style={{
-              marginTop: 8, fontSize: 12, padding: '6px 12px', borderRadius: 8,
+            <div className="profile-actions-message" style={{
               background: inviteMsg.ok ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)',
               color: inviteMsg.ok ? '#15803d' : '#ef4444',
               border: `1px solid ${inviteMsg.ok ? 'rgba(34,197,94,.2)' : 'rgba(239,68,68,.2)'}`,
@@ -623,7 +622,7 @@ export default function ClientProfilePage() {
 
       {/* KPI row */}
       {!editing && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 20 }}>
+        <div className="profile-kpi-grid">
           {[
             { label: 'Total Revenue', value: `$${(totalRevenue/1000).toFixed(1)}k`, color: 'var(--gold)' },
             { label: 'Invoices', value: String(clientInvoices.length), color: 'var(--text)' },
@@ -640,7 +639,7 @@ export default function ClientProfilePage() {
 
       <div className="profile-grid">
         {/* Left */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="profile-main-stack">
 
           {/* Info */}
           <div className="data-card">
@@ -878,11 +877,11 @@ export default function ClientProfilePage() {
         </div>
 
         {/* Right — Comms Hub */}
-        <div className="data-card" style={{ alignSelf: 'start' }}>
+        <div className="data-card profile-comm-card">
           <div className="data-card-title">Communications</div>
 
           {/* Type selector + input */}
-          <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+          <div className="profile-comm-type-row">
             {(['note','call','email','meeting'] as CommEntryType[]).map(t => {
               const icons: Record<string, string> = { note: '💬', call: '📞', email: '📧', meeting: '🤝' }
               const active = activityType === t
@@ -898,10 +897,9 @@ export default function ClientProfilePage() {
               )
             })}
           </div>
-          <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+          <div className="profile-comm-input-row">
             <input
               className="form-input"
-              style={{ flex: 1 }}
               value={activityNote}
               onChange={e => setActivityNote(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addActivity() } }}
@@ -921,7 +919,7 @@ export default function ClientProfilePage() {
               No communications yet.
             </div>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+            <div className="profile-timeline">
               {activityLog.map((entry, idx) => {
                 const type = entry.type || 'note'
                 const cfg: Record<string, { icon: string; color: string; bg: string }> = {
@@ -970,7 +968,7 @@ export default function ClientProfilePage() {
 
       {/* Contracts */}
       <div className="data-card" style={{ marginTop: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <div className="profile-section-heading">
           <div className="data-card-title" style={{ marginBottom: 0 }}>Contracts</div>
           <button className="btn-primary btn-sm" onClick={openAddContractPanel}>+ Add Contract</button>
         </div>
@@ -1034,7 +1032,7 @@ export default function ClientProfilePage() {
 
       {/* Shared Documents (portal-visible) */}
       <div className="data-card" style={{ marginTop: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div className="profile-section-heading" style={{ marginBottom: 14 }}>
           <div>
             <div className="data-card-title" style={{ marginBottom: 2 }}>Shared Documents</div>
             <div style={{ fontSize: 12, color: 'var(--muted)' }}>Visible to this client in their portal</div>
@@ -1042,7 +1040,7 @@ export default function ClientProfilePage() {
         </div>
 
         {/* Upload row */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 16, padding: '12px 14px', background: 'var(--surf2)', borderRadius: 10, border: '1px solid var(--border)' }}>
+        <div className="profile-upload-row">
           <input
             ref={docFileRef}
             type="file"
@@ -1053,7 +1051,7 @@ export default function ClientProfilePage() {
           <button className="btn-ghost btn-sm" onClick={() => docFileRef.current?.click()} style={{ fontSize: 12 }}>
             Choose File
           </button>
-          <span style={{ fontSize: 12, color: 'var(--muted)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span className="profile-upload-name">
             {docFile ? docFile.name : 'No file selected'}
           </span>
           <select
@@ -1088,12 +1086,12 @@ export default function ClientProfilePage() {
             No documents shared yet.
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div className="profile-doc-list">
             {clientDocs.map(doc => (
-              <div key={doc.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: 'var(--surf2)', borderRadius: 9, border: '1px solid var(--border)' }}>
+              <div key={doc.id} className="profile-doc-item">
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.name}</div>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                  <div className="profile-doc-name">{doc.name}</div>
+                  <div className="profile-doc-meta">
                     {doc.category.toUpperCase()} · {new Date(doc.uploadedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     {doc.uploadedBy ? ` · ${doc.uploadedBy}` : ''}
                   </div>
@@ -1119,11 +1117,7 @@ export default function ClientProfilePage() {
             style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.25)', zIndex: 299 }}
             onClick={() => setContractPanelOpen(false)}
           />
-          <div style={{
-            position: 'fixed', top: 0, right: 0, width: 460, height: '100%',
-            background: '#fff', zIndex: 300, display: 'flex', flexDirection: 'column',
-            boxShadow: '-4px 0 24px rgba(0,0,0,0.12)',
-          }}>
+          <div className="profile-slide-panel">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 14px', borderBottom: '1px solid var(--border)' }}>
               <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text)' }}>
                 {contractEditId ? 'Edit Contract' : 'Add Contract'}

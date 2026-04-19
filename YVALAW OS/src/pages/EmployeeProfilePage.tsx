@@ -392,7 +392,7 @@ export default function EmployeeProfilePage() {
   const color = avatarColor(empNN.name)
 
   return (
-    <div className="page-wrap" style={{ maxWidth: 900 }}>
+    <div className="page-wrap client-profile-page">
       {toast && (
         <div style={{ position: 'fixed', bottom: 28, right: 28, zIndex: 9999, background: '#1e293b', border: '1px solid var(--border)', borderLeft: '3px solid #4ade80', color: 'var(--text)', fontSize: 13, fontWeight: 500, padding: '10px 16px', borderRadius: 8, boxShadow: '0 4px 24px rgba(0,0,0,.4)', maxWidth: 360 }}>
           ✓ {toast}
@@ -446,7 +446,7 @@ export default function EmployeeProfilePage() {
 
       <div className="profile-grid">
         {/* Left column */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="profile-main-stack">
 
           {/* Contact & Work Info */}
           <div className="data-card">
@@ -609,7 +609,7 @@ export default function EmployeeProfilePage() {
         </div>
 
         {/* Right column — Statements */}
-        <div className="data-card" style={{ alignSelf: 'start' }}>
+        <div className="data-card" style={{ alignSelf: 'start', minWidth: 0 }}>
           <div className="data-card-title">Earnings Statements</div>
 
           {/* Date filter */}
@@ -628,7 +628,7 @@ export default function EmployeeProfilePage() {
           </div>
 
           {/* KPI summary */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 8, marginBottom: 16 }}>
+          <div className="profile-stat-grid">
             <div className="settings-stat-card">
               <div className="settings-stat-count" style={{ fontSize: 16 }}>{empInvoices.length}</div>
               <div className="settings-stat-label">Invoices</div>

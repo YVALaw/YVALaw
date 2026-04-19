@@ -347,7 +347,7 @@ export default function ProjectProfilePage() {
   }
 
   return (
-    <div className="page-wrap" style={{ maxWidth: 1100 }}>
+    <div className="page-wrap client-profile-page">
       <button className="btn-ghost btn-sm" style={{ marginBottom: 16 }} onClick={() => navigate('/projects')}>
         ← Back to Projects
       </button>
@@ -386,7 +386,7 @@ export default function ProjectProfilePage() {
 
       {/* KPIs */}
       {!editing && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 20 }}>
+        <div className="profile-kpi-grid">
           {[
             { label: 'Total Billed', value: formatMoney(totalBilled), color: 'var(--gold)' },
             { label: 'Budget', value: projectNN.budget ? formatMoney(projectNN.budget) : '—', color: 'var(--text)' },
@@ -401,9 +401,9 @@ export default function ProjectProfilePage() {
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: 16, alignItems: 'start' }}>
+      <div className="project-profile-grid">
         {/* Left - details */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="profile-main-stack">
           <div className="data-card">
             <div className="data-card-title">Project Details</div>
             <div className="profile-fields">
@@ -576,11 +576,11 @@ export default function ProjectProfilePage() {
         </div>
 
         {/* Right - Tasks + Expenses */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="profile-main-stack">
           {/* Task Board */}
           <div className="data-card">
             <div className="data-card-title">Task Board ({tasks.length})</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+            <div className="project-task-board">
               {TASK_COLS.map(({ key, label }) => (
                 <div key={key} style={{ background: 'var(--surf3)', borderRadius: 8, padding: 10 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--muted)', marginBottom: 8 }}>
@@ -640,7 +640,7 @@ export default function ProjectProfilePage() {
           {/* Expenses */}
           <div className="data-card">
             <div className="data-card-title">Expenses — {formatMoney(totalExpenses)} total</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr auto auto auto', gap: 8, marginBottom: 12, alignItems: 'center' }}>
+            <div className="project-expense-form">
               <input className="form-input form-input-sm" placeholder="Description" value={expForm.description}
                 onChange={e => setExpForm(f => ({...f, description: e.target.value}))} />
               <input className="form-input form-input-sm" type="number" placeholder="Amount" style={{ width: 90 }}

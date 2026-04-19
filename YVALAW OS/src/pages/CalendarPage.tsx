@@ -282,7 +282,7 @@ export default function CalendarPage() {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ padding: '24px 28px', minHeight: '100vh', background: 'var(--bg)' }}>
+    <div className="calendar-page">
 
       {/* Page header */}
       <div className="page-header" style={{ marginBottom: 16 }}>
@@ -354,10 +354,10 @@ export default function CalendarPage() {
       </div>
 
       {/* Main layout: calendar + detail panel */}
-      <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+      <div className="calendar-layout">
 
         {/* Calendar grid */}
-        <div style={{
+        <div className="calendar-panel" style={{
           flex: 1,
           minWidth: 0,
           background: 'var(--surface)',
@@ -500,7 +500,7 @@ export default function CalendarPage() {
         </div>
 
         {/* Detail panel */}
-        <div style={{
+        <div className="calendar-detail" style={{
           width: 380,
           flexShrink: 0,
           background: 'var(--surface)',

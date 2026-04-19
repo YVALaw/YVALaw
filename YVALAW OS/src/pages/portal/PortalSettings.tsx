@@ -228,7 +228,7 @@ export default function PortalSettings() {
 
         <div style={{ marginTop: 16 }}>
           <label style={labelStyle}>Phone number</label>
-          <div style={{ display: 'flex', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
+          <div className="portal-settings-phone-row">
             <input
               type="tel"
               value={phone}
@@ -270,17 +270,8 @@ export default function PortalSettings() {
         {/* Per-day schedule */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
           {DAYS.map(({ key, label }) => (
-            <div key={key} style={{
-              display: 'grid',
-              gridTemplateColumns: '110px 1fr 1fr',
-              gap: 12,
-              alignItems: 'center',
-              padding: '12px 16px',
-              background: 'var(--surf2)',
-              borderRadius: 12,
-              border: '1px solid var(--border)',
-            }}>
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{label}</span>
+            <div key={key} className="portal-hours-row">
+              <span className="portal-hours-day">{label}</span>
               <div>
                 <label style={{ fontSize: 10, color: 'var(--muted)', display: 'block', marginBottom: 3 }}>Start</label>
                 <input
@@ -388,17 +379,9 @@ function Section({ title, icon, sub, children }: {
   title: string; icon: string; sub: string; children: React.ReactNode
 }) {
   return (
-    <div style={{
-      background: 'var(--surface)', border: '1px solid var(--border)',
-      borderRadius: 16, overflow: 'hidden',
-    }}>
+    <div className="portal-section">
       {/* Section header */}
-      <div style={{
-        padding: '18px 24px',
-        borderBottom: '1px solid var(--border)',
-        display: 'flex', alignItems: 'center', gap: 12,
-        background: 'var(--surf2)',
-      }}>
+      <div className="portal-section-header">
         <span style={{ fontSize: 20 }}>{icon}</span>
         <div>
           <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--text)' }}>{title}</div>
@@ -406,7 +389,7 @@ function Section({ title, icon, sub, children }: {
         </div>
       </div>
       {/* Section body */}
-      <div style={{ padding: '20px 24px' }}>
+      <div className="portal-section-body">
         {children}
       </div>
     </div>

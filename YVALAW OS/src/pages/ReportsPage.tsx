@@ -235,7 +235,7 @@ export default function ReportsPage() {
           ))}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16, alignItems: 'start' }}>
+        <div className="responsive-sidebar-grid">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="data-card">
               <div className="data-card-title">Invoice Status — Open</div>
@@ -391,7 +391,7 @@ export default function ReportsPage() {
           ))}
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16, alignItems: 'start' }}>
+        <div className="responsive-sidebar-grid">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div className="data-card">
               <div className="data-card-title">Outstanding Invoices</div>
@@ -558,7 +558,7 @@ export default function ReportsPage() {
             </div>
           ))}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
+        <div className="responsive-two-col" style={{ marginTop: 16 }}>
           <div className="data-card">
             <div className="data-card-title">Pipeline by Stage</div>
             {['applied','screening','interview','offer','hired','rejected'].map(stage => (
@@ -634,7 +634,7 @@ export default function ReportsPage() {
             </div>
           ))}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 16 }}>
+        <div className="responsive-two-col" style={{ marginTop: 16 }}>
           <div className="data-card">
             <div className="data-card-title">Contracts Expiring (60 days)</div>
             {contractsExpiring.length === 0 ? (
@@ -726,31 +726,31 @@ export default function ReportsPage() {
         return (
           <div className="kpi-grid">
             {can.viewOwnerStats(role) && (
-              <div className="kpi-card" style={cardStyle} onClick={() => setKpiDrill('billed')}>
+              <div className="kpi-card clickable-card" style={cardStyle} onClick={() => setKpiDrill('billed')}>
                 <div className="kpi-label">Total Billed</div>
                 <div className="kpi-value">{formatMoney(computed.totalBilled)}</div>
                 <div className="kpi-sub">{computed.invoiceCount} invoice{computed.invoiceCount === 1 ? '' : 's'} in range</div>
               </div>
             )}
-            <div className="kpi-card" style={cardStyle} onClick={() => setKpiDrill('hours')}>
+            <div className="kpi-card clickable-card" style={cardStyle} onClick={() => setKpiDrill('hours')}>
               <div className="kpi-label">Total Hours</div>
               <div className="kpi-value" style={{ fontSize: 22 }}>{fmtHoursHM(computed.totalHours)}</div>
               <div className="kpi-sub">billed in range</div>
             </div>
             {can.viewOwnerStats(role) && (
-              <div className="kpi-card" style={cardStyle} onClick={() => setKpiDrill('payroll')}>
+              <div className="kpi-card clickable-card" style={cardStyle} onClick={() => setKpiDrill('payroll')}>
                 <div className="kpi-label">Est. Payroll</div>
                 <div className="kpi-value" style={{ color: '#f87171' }}>{formatMoney(computed.totalPayroll)}</div>
                 <div className="kpi-sub">based on employee pay rates</div>
               </div>
             )}
-            <div className="kpi-card" style={cardStyle} onClick={() => setKpiDrill('expenses')}>
+            <div className="kpi-card clickable-card" style={cardStyle} onClick={() => setKpiDrill('expenses')}>
               <div className="kpi-label">Business Expenses</div>
               <div className="kpi-value" style={{ color: '#fb923c' }}>{formatMoney(totalExpenses)}</div>
               <div className="kpi-sub">{rangeExpenses.length} expense{rangeExpenses.length !== 1 ? 's' : ''} in range</div>
             </div>
             {can.viewOwnerStats(role) && (
-              <div className="kpi-card" style={cardStyle} onClick={() => setKpiDrill('net')}>
+              <div className="kpi-card clickable-card" style={cardStyle} onClick={() => setKpiDrill('net')}>
                 <div className="kpi-label">Net Earnings</div>
                 <div className="kpi-value" style={{ color: netAfterExpenses >= 0 ? '#4ade80' : '#f87171' }}>
                   {formatMoney(netAfterExpenses)}
@@ -758,27 +758,27 @@ export default function ReportsPage() {
                 <div className="kpi-sub">billed − payroll − expenses</div>
               </div>
             )}
-            <div className="kpi-card" style={cardStyle} onClick={() => setKpiDrill('paid')}>
+            <div className="kpi-card clickable-card" style={cardStyle} onClick={() => setKpiDrill('paid')}>
               <div className="kpi-label">Paid</div>
               <div className="kpi-value" style={{ color: '#4ade80' }}>{computed.paidCount}</div>
               <div className="kpi-sub">invoices marked paid</div>
             </div>
-            <div className="kpi-card" style={cardStyle} onClick={() => setKpiDrill('unpaid')}>
+            <div className="kpi-card clickable-card" style={cardStyle} onClick={() => setKpiDrill('unpaid')}>
               <div className="kpi-label">Unpaid</div>
               <div className="kpi-value kpi-value-warn">{computed.unpaidCount}</div>
               <div className="kpi-sub">awaiting payment</div>
             </div>
-            <div className="kpi-card" style={cardStyle} onClick={() => setKpiDrill('topClient')}>
+            <div className="kpi-card clickable-card" style={cardStyle} onClick={() => setKpiDrill('topClient')}>
               <div className="kpi-label">Top Client</div>
               <div className="kpi-value kpi-value-name">{topClient?.name || '—'}</div>
               <div className="kpi-sub">{topClient ? formatMoney(topClient.total) : 'No data'}</div>
             </div>
-            <div className="kpi-card" style={cardStyle} onClick={() => setKpiDrill('clients')}>
+            <div className="kpi-card clickable-card" style={cardStyle} onClick={() => setKpiDrill('clients')}>
               <div className="kpi-label">Clients</div>
               <div className="kpi-value" style={{ color: '#60a5fa' }}>{store.clients.length}</div>
               <div className="kpi-sub">total in system</div>
             </div>
-            <div className="kpi-card" style={cardStyle} onClick={() => setKpiDrill('team')}>
+            <div className="kpi-card clickable-card" style={cardStyle} onClick={() => setKpiDrill('team')}>
               <div className="kpi-label">Team</div>
               <div className="kpi-value" style={{ color: '#c084fc' }}>{store.employees.length}</div>
               <div className="kpi-sub">active members</div>
@@ -788,7 +788,7 @@ export default function ReportsPage() {
       })()}
 
       {/* Revenue chart + attention */}
-      <div style={{ display: 'grid', gridTemplateColumns: can.viewOwnerStats(role) ? '1fr 340px' : '340px', gap: 16, alignItems: 'start' }}>
+      <div className={can.viewOwnerStats(role) ? 'responsive-sidebar-grid' : 'responsive-metric-grid'}>
         {can.viewOwnerStats(role) && (
           <div className="data-card">
             <div className="data-card-title">Revenue — Last 6 Months</div>
@@ -857,7 +857,7 @@ export default function ReportsPage() {
       </div>
 
       {/* By client + by project */}
-      {can.viewOwnerStats(role) && <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      {can.viewOwnerStats(role) && <div className="responsive-two-col">
         <div className="data-card">
           <div className="data-card-title">Revenue by Client</div>
           <div className="table-wrap">
@@ -1026,7 +1026,7 @@ export default function ReportsPage() {
         return (
           <div className="data-card">
             <div className="data-card-title">Accounts Receivable Aging</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 16 }}>
+            <div className="responsive-metric-grid" style={{ marginBottom: 16 }}>
               {buckets.map(b => (
                 <div key={b.label} style={{ background: 'var(--surf2)', borderRadius: 12, padding: '14px 16px', borderTop: `2px solid ${b.color}` }}>
                   <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>{b.label}</div>
@@ -1094,7 +1094,7 @@ export default function ReportsPage() {
         })
 
         return (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <div className="responsive-two-col">
             <div className="data-card">
               <div className="data-card-title">Revenue Forecast</div>
               <div style={{ marginBottom: 16 }}>

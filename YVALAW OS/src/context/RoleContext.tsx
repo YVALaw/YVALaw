@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
 import type { AppRole, UserRole } from '../lib/roles'
+import { auditPortalActivity } from '../services/portalStorage'
 
 type RoleCtx = {
   role:               AppRole
@@ -13,6 +14,18 @@ type RoleCtx = {
 }
 
 const ROLE_CACHE_KEY = 'yva_role'
+const PORTAL_LOGIN_AUDIT_PREFIX = 'yva_portal_login_audit_'
+
+function portalLoginAuditKey(clientId: string, userId: string): string {
+  return `${PORTAL_LOGIN_AUDIT_PREFIX}${clientId}_${userId}`
+}
+
+function clearPortalLoginAuditKeys() {
+  for (let i = sessionStorage.length - 1; i >= 0; i -= 1) {
+    const key = sessionStorage.key(i)
+    if (key?.startsWith(PORTAL_LOGIN_AUDIT_PREFIX)) sessionStorage.removeItem(key)
+  }
+}
 
 const Ctx = createContext<RoleCtx>({
   role: 'recruiter', userId: null, email: null, loading: true,
@@ -71,11 +84,12 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         setIsClient(true)
         setClientId(clientRow.client_id)
         sessionStorage.setItem(ROLE_CACHE_KEY, 'client')
-        // Track last login
-        void supabase
-          .from('client_users')
-          .update({ last_login_at: new Date().toISOString() })
-          .eq('auth_id', user.id)
+        const auditKey = portalLoginAuditKey(clientRow.client_id, user.id)
+        if (!sessionStorage.getItem(auditKey)) {
+          void auditPortalActivity({ clientId: clientRow.client_id, eventType: 'portal_login' })
+            .then(() => sessionStorage.setItem(auditKey, '1'))
+            .catch(err => console.warn('portal login audit skipped', err))
+        }
         setLoading(false)
         return
       }
@@ -94,6 +108,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         sessionStorage.removeItem(ROLE_CACHE_KEY)
+        clearPortalLoginAuditKeys()
         setRole('recruiter')
         setUserId(null)
         setEmail(null)

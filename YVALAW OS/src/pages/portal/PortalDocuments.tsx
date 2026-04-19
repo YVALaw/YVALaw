@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useRole } from '../../context/RoleContext'
-import { loadPortalClient, loadPortalDocuments, uploadPortalDocument } from '../../services/portalStorage'
+import { auditPortalActivity, loadPortalClient, loadPortalDocuments, uploadPortalDocument } from '../../services/portalStorage'
 import type { Client, ClientDocument } from '../../data/types'
 
 type Category = 'all' | ClientDocument['category']
@@ -74,6 +74,10 @@ export default function PortalDocuments() {
         category:   uploadCat,
         uploadedBy: client?.name ?? 'Client',
       })
+      if (roleClientId && !previewId) {
+        void auditPortalActivity({ clientId: roleClientId, eventType: 'document_upload', documentId: doc.id })
+          .catch(err => console.warn('portal document upload audit skipped', err))
+      }
       setDocuments(prev => [doc, ...prev])
       setUploadFile(null)
       setUploadCat('other')
@@ -83,6 +87,12 @@ export default function PortalDocuments() {
     } finally {
       setUploading(false)
     }
+  }
+
+  function handleDownload(doc: ClientDocument) {
+    if (!roleClientId || previewId) return
+    void auditPortalActivity({ clientId: roleClientId, eventType: 'document_download', documentId: doc.id })
+      .catch(err => console.warn('portal document download audit skipped', err))
   }
 
   const filtered = filter === 'all' ? documents : documents.filter(d => d.category === filter)
@@ -126,13 +136,8 @@ export default function PortalDocuments() {
       </div>
 
       {/* Upload card */}
-      <div style={{
-        background: 'var(--surface)', border: '1px solid var(--border)',
-        borderRadius: 16, padding: '20px 24px',
-      }}>
-        <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', marginBottom: 14 }}>
-          Upload a Document
-        </div>
+      <div className="portal-panel">
+        <div className="portal-panel-title" style={{ marginBottom: 14 }}>Upload a Document</div>
         <input
           ref={fileInputRef}
           type="file"
@@ -140,7 +145,7 @@ export default function PortalDocuments() {
           style={{ display: 'none' }}
           onChange={e => setUploadFile(e.target.files?.[0] ?? null)}
         />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div className="portal-upload-row">
           <button
             className="btn-ghost btn-sm"
             onClick={() => fileInputRef.current?.click()}
@@ -148,7 +153,7 @@ export default function PortalDocuments() {
           >
             Choose File
           </button>
-          <span style={{ fontSize: 13, color: uploadFile ? 'var(--text)' : 'var(--muted)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span className="portal-upload-name" style={{ color: uploadFile ? 'var(--text)' : 'var(--muted)' }}>
             {uploadFile ? uploadFile.name : 'No file selected'}
           </span>
           <select
@@ -184,7 +189,7 @@ export default function PortalDocuments() {
 
       {/* Category filter tabs */}
       {documents.length > 0 && (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div className="portal-chip-tabs">
           {(['all', 'contract', 'nda', 'report', 'invoice', 'other'] as Category[]).map(f => {
             const count = counts[f as keyof typeof counts]
             if (f !== 'all' && count === 0) return null
@@ -195,14 +200,7 @@ export default function PortalDocuments() {
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                style={{
-                  padding: '6px 16px', borderRadius: 999, fontSize: 13, fontWeight: 600,
-                  border: '1px solid',
-                  borderColor: active ? 'var(--gold)' : 'var(--border)',
-                  background:  active ? 'rgba(245,181,51,.12)' : 'transparent',
-                  color:       active ? 'var(--gold)' : 'var(--muted)',
-                  cursor: 'pointer', transition: 'all 0.15s',
-                }}
+                className={`portal-chip-tab${active ? ' portal-chip-tab-active' : ''}`}
               >
                 {label}
               </button>
@@ -227,27 +225,20 @@ export default function PortalDocuments() {
           </div>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className="portal-card-list">
           {filtered.map(doc => {
             const meta = CATEGORY_META[doc.category]
             const size = fmtSize(doc.fileSize)
             return (
-              <div key={doc.id} style={{
-                background: 'var(--surface)', border: '1px solid var(--border)',
-                borderRadius: 14, padding: '16px 20px',
-                display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
-              }}>
+              <div key={doc.id} className="portal-document-card">
                 {/* Category icon */}
-                <div style={{
-                  width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-                  background: meta.bg, display: 'grid', placeItems: 'center', fontSize: 20,
-                }}>
+                <div className="portal-document-icon" style={{ background: meta.bg }}>
                   {meta.icon}
                 </div>
 
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
-                    <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>
+                  <div className="portal-document-title-row" style={{ alignItems: 'center', marginBottom: 4 }}>
+                    <span className="portal-document-name">
                       {doc.name}
                     </span>
                     <span style={{
@@ -257,17 +248,13 @@ export default function PortalDocuments() {
                       {meta.label}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-                      {fmtDate(doc.uploadedAt)}
-                    </span>
+                  <div className="portal-document-meta">
+                    <span>{fmtDate(doc.uploadedAt)}</span>
                     {doc.uploadedBy && (
-                      <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-                        {doc.uploadedBy}
-                      </span>
+                      <span>{doc.uploadedBy}</span>
                     )}
                     {size && (
-                      <span style={{ fontSize: 12, color: 'var(--muted)' }}>{size}</span>
+                      <span>{size}</span>
                     )}
                   </div>
                 </div>
@@ -277,6 +264,7 @@ export default function PortalDocuments() {
                   target="_blank"
                   rel="noopener noreferrer"
                   download
+                  onClick={() => handleDownload(doc)}
                   className="btn-ghost btn-sm"
                   style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, textDecoration: 'none' }}
                 >

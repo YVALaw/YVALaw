@@ -20,6 +20,8 @@ export type PortalBillingSettings = {
   autoPayDisabledAt?: string
 }
 
+export type PortalAuditEvent = 'portal_login' | 'document_upload' | 'document_download'
+
 // ── Snake-to-camel key conversion (mirrors storage.ts) ───────────────────────
 
 function toCamel(obj: Record<string, unknown>): Record<string, unknown> {
@@ -166,6 +168,26 @@ async function getSessionToken(): Promise<string> {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session?.access_token) throw new Error('Not authenticated')
   return session.access_token
+}
+
+export async function auditPortalActivity(params: {
+  clientId: string
+  eventType: PortalAuditEvent
+  documentId?: string
+}): Promise<void> {
+  const token = await getSessionToken()
+  const res = await fetch('/.netlify/functions/log-portal-activity', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(params),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.error || 'Could not write portal audit log.')
+  }
 }
 
 async function signClientDocumentUrl(doc: ClientDocument): Promise<ClientDocument> {
