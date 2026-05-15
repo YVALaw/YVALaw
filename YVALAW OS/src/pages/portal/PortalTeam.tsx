@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useRole } from '../../context/RoleContext'
+import { IconX, IconUsers, IconInfo, IconCheck, IconUserPlus, IconActivity, IconClock, IconFolder, IconAlert } from '../../components/Icon'
 import {
   loadPortalClient,
   loadPortalProjects,
@@ -27,11 +28,7 @@ function StatusBadge({ status }: { status?: string }) {
   const s = (status ?? '').toLowerCase()
   const active = s === 'active'
   return (
-    <span style={{
-      padding: '2px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700,
-      background: active ? 'rgba(34,197,94,.1)' : 'var(--surf2)',
-      color: active ? '#15803d' : 'var(--muted)',
-    }}>
+    <span className={`status-badge ${active ? 'status-badge-active' : 'status-badge-default'}`}>
       {s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Active'}
     </span>
   )
@@ -66,56 +63,50 @@ function EmpModal({
   function Row({ label, value }: { label: string; value?: string | null }) {
     if (!value) return null
     return (
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-        <span style={{ fontSize: 13, color: 'var(--muted)' }}>{label}</span>
-        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{value}</span>
+      <div className="portal-detail-row">
+        <span className="portal-detail-row-label">{label}</span>
+        <span className="portal-detail-row-value">{value}</span>
       </div>
     )
   }
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 200 }}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 420, width: '100%' }}>
-
+      <div className="modal modal-sm" onClick={e => e.stopPropagation()}>
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px', borderBottom: '1px solid var(--border)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+        <div className="portal-modal-header">
+          <div className="flex items-center" style={{ gap: 14 }}>
             {emp.photoUrl ? (
-              <img src={emp.photoUrl} alt={emp.name}
-                style={{ width: 52, height: 52, borderRadius: 14, objectFit: 'cover', objectPosition: 'center top', flexShrink: 0 }} />
+              <img src={emp.photoUrl} alt={emp.name} className="portal-modal-avatar" />
             ) : (
-              <div style={{
-                width: 52, height: 52, borderRadius: 14, flexShrink: 0,
-                background: avatarColor(emp.name), display: 'grid', placeItems: 'center',
-                fontSize: 18, fontWeight: 900, color: '#1b1e2b',
-              }}>
+              <div className="portal-modal-avatar-fallback" style={{ background: avatarColor(emp.name) }}>
                 {initials(emp.name)}
               </div>
             )}
             <div>
-              <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--text)' }}>{emp.name}</div>
-              {emp.role && <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>{emp.role}</div>}
-              {emp.status && <div style={{ marginTop: 6 }}><StatusBadge status={emp.status} /></div>}
+              <div className="portal-modal-name">{emp.name}</div>
+              {emp.role && <div className="portal-modal-role">{emp.role}</div>}
+              {emp.status && <div className="portal-modal-status"><StatusBadge status={emp.status} /></div>}
             </div>
           </div>
-          <button className="modal-close btn-icon" onClick={onClose}>✕</button>
+          <button className="modal-close btn-icon" onClick={onClose}><IconX size={14} /></button>
         </div>
 
         {/* Body */}
-        <div style={{ padding: '8px 24px 24px' }}>
+        <div className="portal-modal-body">
           {/* Hours KPIs */}
-          <div style={{ display: 'flex', gap: 12, margin: '16px 0' }}>
-            <div style={{ flex: 1, background: 'var(--surf2)', borderRadius: 12, padding: '12px 16px', border: '1px solid var(--border)', textAlign: 'center' }}>
-              <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--gold)' }}>
+          <div className="portal-hours-kpi-grid">
+            <div className="portal-hours-kpi">
+              <div className={`portal-hours-kpi-value${hrsMonth > 0 ? ' portal-hours-kpi-value-gold' : ''}`}>
                 {hrsMonth > 0 ? `${hrsMonth.toFixed(1)}h` : '—'}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>{monthName}</div>
+              <div className="portal-hours-kpi-label">{monthName}</div>
             </div>
-            <div style={{ flex: 1, background: 'var(--surf2)', borderRadius: 12, padding: '12px 16px', border: '1px solid var(--border)', textAlign: 'center' }}>
-              <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--text)' }}>
+            <div className="portal-hours-kpi">
+              <div className="portal-hours-kpi-value">
                 {hrsTotal > 0 ? `${hrsTotal.toFixed(1)}h` : '—'}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>All time</div>
+              <div className="portal-hours-kpi-label">All time</div>
             </div>
           </div>
 
@@ -126,13 +117,8 @@ function EmpModal({
           <Row label="Location"        value={emp.location} />
 
           {!hasSchedule && (
-            <div style={{
-              marginTop: 16, padding: '12px 16px',
-              background: 'rgba(245,181,51,.07)', border: '1px solid rgba(245,181,51,.2)',
-              borderRadius: 10, fontSize: 12, color: 'rgba(245,181,51,.9)',
-              display: 'flex', alignItems: 'center', gap: 8,
-            }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            <div className="portal-info-banner">
+              <IconInfo size={14} />
               Schedule details will appear here once configured.
             </div>
           )}
@@ -187,96 +173,72 @@ function StaffRequestModal({ clientId, clientName, onClose }: { clientId: string
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 200 }}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: 460, width: '100%' }}>
-
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px', borderBottom: '1px solid var(--border)' }}>
+      <div className="modal modal-md" onClick={e => e.stopPropagation()}>
+        <div className="portal-modal-header">
           <div>
-            <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--text)' }}>Request Additional Staff</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>We'll follow up within 1 business day</div>
+            <div className="portal-modal-name">Request Additional Staff</div>
+            <div className="portal-modal-role">We&apos;ll follow up within 1 business day</div>
           </div>
-          <button className="modal-close btn-icon" onClick={onClose}>✕</button>
+          <button className="modal-close btn-icon" onClick={onClose}><IconX size={14} /></button>
         </div>
 
         <div style={{ padding: '24px' }}>
           {sent ? (
             <div style={{ textAlign: 'center', padding: '24px 0' }}>
-              <div style={{
-                width: 52, height: 52, borderRadius: '50%',
-                background: 'rgba(34,197,94,.12)', display: 'grid', placeItems: 'center',
-                margin: '0 auto 16px', color: '#22c55e',
-              }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              <div className="portal-success-circle">
+                <IconCheck size={24} />
               </div>
-              <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--text)', marginBottom: 6 }}>Request sent!</div>
-              <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>
+              <div className="portal-modal-name" style={{ marginBottom: 6 }}>Request sent!</div>
+              <div className="empty-state-message" style={{ marginBottom: 20 }}>
                 Your account manager will reach out within 1 business day to discuss your needs.
               </div>
-              <button className="btn-ghost btn-sm" onClick={onClose} style={{ fontSize: 13 }}>Close</button>
+              <button className="btn-ghost btn-sm" onClick={onClose}>Close</button>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, gridColumn: '1 / -1' }}>
-                  <label style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>Role needed *</label>
+            <form onSubmit={handleSubmit} className="flex-col" style={{ gap: 16 }}>
+              <div className="form-grid-2">
+                <div className="form-group form-group-full">
+                  <label className="form-label">Role needed *</label>
                   <select
                     value={role}
                     onChange={e => setRole(e.target.value)}
                     required
-                    style={{
-                      background: 'var(--surf2)', border: '1px solid var(--border)',
-                      borderRadius: 8, padding: '10px 12px', fontSize: 13, color: 'var(--text)',
-                    }}
+                    className="form-input"
                   >
                     <option value="">Select a role…</option>
                     {ROLE_OPTIONS.map(r => <option key={r} value={r}>{r}</option>)}
                   </select>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <label style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>Hours per week</label>
+                <div className="form-group">
+                  <label className="form-label">Hours per week</label>
                   <input
                     type="number" placeholder="e.g. 40" min={1} max={60}
                     value={hours} onChange={e => setHours(e.target.value)}
-                    style={{
-                      background: 'var(--surf2)', border: '1px solid var(--border)',
-                      borderRadius: 8, padding: '10px 12px', fontSize: 13, color: 'var(--text)',
-                    }}
+                    className="form-input"
                   />
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <label style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>Ideal start date</label>
+                <div className="form-group">
+                  <label className="form-label">Ideal start date</label>
                   <input
                     type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-                    style={{
-                      background: 'var(--surf2)', border: '1px solid var(--border)',
-                      borderRadius: 8, padding: '10px 12px', fontSize: 13, color: 'var(--text)',
-                    }}
+                    className="form-input"
                   />
                 </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <label style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>Notes</label>
+              <div className="form-group">
+                <label className="form-label">Notes</label>
                 <textarea
                   placeholder="Tasks, tools, or experience needed…"
                   rows={3} value={notes} onChange={e => setNotes(e.target.value)}
-                  style={{
-                    background: 'var(--surf2)', border: '1px solid var(--border)',
-                    borderRadius: 8, padding: '10px 12px', fontSize: 13, color: 'var(--text)',
-                    resize: 'vertical', fontFamily: 'inherit',
-                  }}
+                  className="form-textarea"
                 />
               </div>
               {error && (
-                <div style={{
-                  padding: '10px 14px', borderRadius: 8, fontSize: 13,
-                  background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.25)',
-                  color: '#ef4444',
-                }}>
-                  {error}
-                </div>
+                <div className="portal-message portal-message-error">{error}</div>
               )}
-              <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
-                <button type="button" className="btn-ghost" onClick={onClose} style={{ fontSize: 13 }}>Cancel</button>
-                <button type="submit" className="btn-primary" disabled={sending || !role} style={{ fontSize: 13, flex: 1 }}>
+              <div className="flex" style={{ gap: 10, paddingTop: 4 }}>
+                <button type="button" className="btn-ghost" onClick={onClose}>Cancel</button>
+                <button type="submit" className="btn-primary" disabled={sending || !role} style={{ flex: 1 }}>
                   {sending ? 'Sending…' : 'Submit Request'}
                 </button>
               </div>
@@ -353,8 +315,9 @@ export default function PortalTeam() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40vh' }}>
-        <div style={{ color: 'var(--muted)', fontSize: 14 }}>Loading team…</div>
+      <div className="loading-screen">
+        <div className="loading-spinner" />
+        <div className="loading-text">Loading team…</div>
       </div>
     )
   }
@@ -372,52 +335,61 @@ export default function PortalTeam() {
             {activeCount > 0 && activeCount < employees.length ? ` · ${activeCount} active` : ''}
           </div>
         </div>
-        <button
-          className="btn-ghost btn-sm"
-          onClick={() => navigate(portalNav('/portal/dashboard'))}
-          style={{ fontSize: 12 }}
-        >
+        <button className="btn-ghost btn-sm" onClick={() => navigate(portalNav('/portal/dashboard'))}>
           ← Dashboard
         </button>
       </div>
 
       {/* KPI cards */}
       <div className="kpi-grid">
-        <div className="kpi-card" style={{ borderTop: '3px solid var(--gold)' }}>
-          <div className="kpi-label">Total Team</div>
-          <div className="kpi-value">{employees.length}</div>
-          <div className="kpi-sub">Assigned to your account</div>
+        <div className="kpi-card">
+          <div className="kpi-icon-wrap" style={{ color: '#8b5cf6', borderColor: 'rgba(139,92,246,.15)' }}>
+            <IconUsers size={20} />
+          </div>
+          <div className="kpi-body">
+            <div className="kpi-label">Total Team</div>
+            <div className="kpi-value">{employees.length}</div>
+            <div className="kpi-sub">Assigned to your account</div>
+          </div>
         </div>
-        <div className="kpi-card" style={{ borderTop: '3px solid #22c55e' }}>
-          <div className="kpi-label">Active</div>
-          <div className="kpi-value">{activeCount}</div>
-          <div className="kpi-sub">Currently on your account</div>
+        <div className="kpi-card">
+          <div className="kpi-icon-wrap" style={{ color: '#22c55e', borderColor: 'rgba(34,197,94,.15)' }}>
+            <IconActivity size={20} />
+          </div>
+          <div className="kpi-body">
+            <div className="kpi-label">Active</div>
+            <div className="kpi-value">{activeCount}</div>
+            <div className="kpi-sub">Currently on your account</div>
+          </div>
         </div>
-        <div className="kpi-card" style={{ borderTop: '3px solid #3b82f6' }}>
-          <div className="kpi-label">Hours — {monthName}</div>
-          <div className="kpi-value">{totalHrsMonth > 0 ? `${totalHrsMonth.toFixed(1)}h` : '—'}</div>
-          <div className="kpi-sub">Team total this month</div>
+        <div className="kpi-card">
+          <div className="kpi-icon-wrap" style={{ color: '#3b82f6', borderColor: 'rgba(59,130,246,.15)' }}>
+            <IconClock size={20} />
+          </div>
+          <div className="kpi-body">
+            <div className="kpi-label">Hours — {monthName}</div>
+            <div className="kpi-value">{totalHrsMonth > 0 ? `${totalHrsMonth.toFixed(1)}h` : '—'}</div>
+            <div className="kpi-sub">Team total this month</div>
+          </div>
         </div>
-        <div className="kpi-card" style={{ borderTop: '3px solid #a855f7' }}>
-          <div className="kpi-label">Projects</div>
-          <div className="kpi-value">{projects.length}</div>
-          <div className="kpi-sub">{projects.filter(p => p.status?.toLowerCase() === 'active').length} active</div>
+        <div className="kpi-card">
+          <div className="kpi-icon-wrap" style={{ color: '#a855f7', borderColor: 'rgba(168,85,247,.15)' }}>
+            <IconFolder size={20} />
+          </div>
+          <div className="kpi-body">
+            <div className="kpi-label">Projects</div>
+            <div className="kpi-value">{projects.length}</div>
+            <div className="kpi-sub">{projects.filter(p => p.status?.toLowerCase() === 'active').length} active</div>
+          </div>
         </div>
       </div>
 
       {/* Project filter tabs */}
       {projects.length > 1 && (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <div className="filter-tabs">
           <button
             onClick={() => setProjFilter('all')}
-            style={{
-              padding: '6px 16px', borderRadius: 999, fontSize: 13, fontWeight: 600,
-              border: '1px solid',
-              borderColor: projFilter === 'all' ? 'var(--gold)' : 'var(--border)',
-              background:  projFilter === 'all' ? 'rgba(245,181,51,.12)' : 'transparent',
-              color:       projFilter === 'all' ? 'var(--gold)' : 'var(--muted)',
-              cursor: 'pointer', transition: 'all 0.15s',
-            }}
+            className={`filter-tab${projFilter === 'all' ? ' filter-tab-active' : ''}`}
           >
             All ({employees.length})
           </button>
@@ -428,14 +400,7 @@ export default function PortalTeam() {
               <button
                 key={p.id}
                 onClick={() => setProjFilter(p.id)}
-                style={{
-                  padding: '6px 16px', borderRadius: 999, fontSize: 13, fontWeight: 600,
-                  border: '1px solid',
-                  borderColor: active ? 'var(--gold)' : 'var(--border)',
-                  background:  active ? 'rgba(245,181,51,.12)' : 'transparent',
-                  color:       active ? 'var(--gold)' : 'var(--muted)',
-                  cursor: 'pointer', transition: 'all 0.15s',
-                }}
+                className={`filter-tab${active ? ' filter-tab-active' : ''}`}
               >
                 {p.name} ({count})
               </button>
@@ -446,19 +411,15 @@ export default function PortalTeam() {
 
       {/* Team grid */}
       {filtered.length === 0 ? (
-        <div style={{
-          textAlign: 'center', padding: '48px 20px',
-          background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: 16, color: 'var(--muted)',
-        }}>
-          <div style={{ fontSize: 30, marginBottom: 10 }}>👥</div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>No team members yet</div>
-          <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4 }}>
+        <div className="empty-state">
+          <div className="empty-state-icon"><IconUsers size={28} /></div>
+          <div className="empty-state-title">No team members yet</div>
+          <div className="empty-state-message">
             Your assigned professionals will appear here once your projects are set up.
           </div>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 14 }}>
+        <div className="team-grid">
           {filtered.map(emp => {
             const hrsM     = empHrsMonth(emp)
             const empProjs = empProjects(emp)
@@ -466,77 +427,45 @@ export default function PortalTeam() {
               <div
                 key={emp.id}
                 onClick={() => setSelected(emp)}
-                style={{
-                  background: 'var(--surface)', border: '1px solid var(--border)',
-                  borderRadius: 16, padding: '20px',
-                  cursor: 'pointer', transition: 'border-color 0.15s, box-shadow 0.15s',
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.borderColor = 'var(--gold)'
-                  e.currentTarget.style.boxShadow   = '0 0 0 1px var(--gold)'
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.borderColor = 'var(--border)'
-                  e.currentTarget.style.boxShadow   = 'none'
-                }}
+                className="team-card"
               >
                 {/* Avatar + name */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
+                <div className="flex items-center" style={{ gap: 14, marginBottom: 14 }}>
                   {emp.photoUrl ? (
-                    <img src={emp.photoUrl} alt={emp.name}
-                      style={{ width: 48, height: 48, borderRadius: 13, objectFit: 'cover', objectPosition: 'center top', flexShrink: 0 }} />
+                    <img src={emp.photoUrl} alt={emp.name} className="team-card-avatar" />
                   ) : (
-                    <div style={{
-                      width: 48, height: 48, borderRadius: 13, flexShrink: 0,
-                      background: avatarColor(emp.name), display: 'grid', placeItems: 'center',
-                      fontSize: 15, fontWeight: 900, color: '#1b1e2b',
-                    }}>
+                    <div className="team-card-avatar-fallback" style={{ background: avatarColor(emp.name) }}>
                       {initials(emp.name)}
                     </div>
                   )}
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontWeight: 800, fontSize: 14, color: 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {emp.name}
-                    </div>
+                    <div className="team-card-name">{emp.name}</div>
                     {emp.role && (
-                      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{emp.role}</div>
+                      <div className="team-card-role">{emp.role}</div>
                     )}
-                    <div style={{ marginTop: 5 }}>
-                      <StatusBadge status={emp.status} />
-                    </div>
+                    <div className="mt-4"><StatusBadge status={emp.status} /></div>
                   </div>
                 </div>
 
                 {/* Hours this month */}
-                <div style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  background: 'var(--surf2)', borderRadius: 10, padding: '10px 14px',
-                  marginBottom: 12,
-                }}>
-                  <span style={{ fontSize: 12, color: 'var(--muted)' }}>{monthName}</span>
-                  <span style={{ fontSize: 14, fontWeight: 800, color: hrsM > 0 ? 'var(--gold)' : 'var(--muted)' }}>
+                <div className="team-card-hours">
+                  <span className="team-card-hours-label">{monthName}</span>
+                  <span className={`team-card-hours-value${hrsM > 0 ? ' team-card-hours-value-gold' : ''}`}>
                     {hrsM > 0 ? `${hrsM.toFixed(1)}h` : '—'}
                   </span>
                 </div>
 
                 {/* Projects */}
                 {empProjs.length > 0 && (
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <div className="flex" style={{ gap: 6, flexWrap: 'wrap' }}>
                     {empProjs.map(p => (
-                      <span key={p.id} style={{
-                        padding: '2px 9px', borderRadius: 999, fontSize: 11, fontWeight: 600,
-                        background: 'rgba(59,130,246,.1)', color: '#3b82f6',
-                      }}>
-                        {p.name}
-                      </span>
+                      <span key={p.id} className="project-chip">{p.name}</span>
                     ))}
                   </div>
                 )}
 
                 {/* Details hint */}
-                <div style={{ marginTop: 12, fontSize: 11, color: 'var(--muted)', textAlign: 'right' }}>
-                  Click to view details
-                </div>
+                <div className="team-card-hint">Click to view details</div>
               </div>
             )
           })}
@@ -544,28 +473,14 @@ export default function PortalTeam() {
       )}
 
       {/* Staff request CTA */}
-      <div style={{
-        background: 'var(--surface)', border: '1px solid var(--border)',
-        borderRadius: 16, padding: '24px 28px',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        gap: 20, flexWrap: 'wrap',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: 12, flexShrink: 0,
-            background: 'rgba(245,181,51,.12)', border: '1px solid rgba(245,181,51,.25)',
-            display: 'grid', placeItems: 'center', color: 'var(--gold)',
-          }}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
-              <circle cx="9" cy="7" r="4"/>
-              <line x1="19" x2="19" y1="8" y2="14"/>
-              <line x1="22" x2="16" y1="11" y2="11"/>
-            </svg>
+      <div className="portal-section-card staff-request-cta">
+        <div className="staff-request-cta-left">
+          <div className="staff-request-cta-icon">
+            <IconUserPlus size={20} />
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)' }}>Need more support?</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+            <div className="staff-request-cta-title">Need more support?</div>
+            <div className="staff-request-cta-sub">
               Request additional staff and your account manager will follow up within 1 business day.
             </div>
           </div>
@@ -573,7 +488,7 @@ export default function PortalTeam() {
         <button
           className="btn-primary"
           onClick={() => setShowRequest(true)}
-          style={{ fontSize: 13, whiteSpace: 'nowrap', flexShrink: 0 }}
+          style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
         >
           Request Staff
         </button>

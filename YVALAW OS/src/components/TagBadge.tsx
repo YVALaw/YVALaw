@@ -1,3 +1,5 @@
+import { IconX } from './Icon'
+
 // Predefined tag color palette
 export const TAG_COLORS = [
   '#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6',
@@ -33,7 +35,7 @@ export function TagBadge({ label, color, onRemove }: TagBadgeProps) {
           onClick={onRemove}
           style={{ cursor: 'pointer', lineHeight: 1, fontSize: 13, marginLeft: 2 }}
         >
-          ×
+          <IconX size={12} />
         </span>
       )}
     </span>

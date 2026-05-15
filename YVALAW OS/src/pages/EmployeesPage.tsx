@@ -10,6 +10,10 @@ import { useRole } from '../context/RoleContext'
 import { can } from '../lib/roles'
 import { sendEmail } from '../services/gmail'
 import { buildStatementHTML } from '../utils/statementHtml'
+import {
+  IconMail, IconPrinter, IconX, IconTrash, IconCheck,
+  IconImage, IconFile, IconMusic, IconPaperclip,
+} from '../components/Icon'
 import { employeePremiumConfig, normalizeClockInput, payrollFromInvoiceItem } from '../utils/payroll'
 
 function uid() { return crypto.randomUUID() }
@@ -231,8 +235,8 @@ function EmployeeStatementsPanel({ emp, invoices, onInvoicesChange }: {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {toast && (
-        <div style={{ position: 'fixed', bottom: 28, right: 28, zIndex: 9999, background: '#1e293b', border: '1px solid var(--border)', borderLeft: '3px solid #4ade80', color: 'var(--text)', fontSize: 13, fontWeight: 500, padding: '10px 16px', borderRadius: 8, boxShadow: '0 4px 24px rgba(0,0,0,.4)', maxWidth: 360 }}>
-          ✓ {toast}
+        <div className="profile-toast">
+          <IconCheck size={14} /> {toast}
         </div>
       )}
       {/* Date range filter + action buttons */}
@@ -265,10 +269,10 @@ function EmployeeStatementsPanel({ emp, invoices, onInvoicesChange }: {
               }
             }}
           >
-            {sending ? 'Sending…' : '✉ Email Statement'}
+            {sending ? 'Sending…' : <><span style={{ marginRight: 5, display: 'inline-flex', verticalAlign: 'middle' }}><IconMail size={13} /></span> Email Statement</>}
           </button>
           <button className="btn-ghost btn-sm" onClick={() => printPayslip(emp, empInvoices, dateFrom, dateTo)} disabled={empInvoices.length === 0}>
-            ⎙ PDF Payslip
+            <span style={{ marginRight: 5, display: 'inline-flex', verticalAlign: 'middle' }}><IconPrinter size={13} /></span> PDF Payslip
           </button>
         </div>
       </div>
@@ -345,8 +349,8 @@ function EmployeeStatementsPanel({ emp, invoices, onInvoicesChange }: {
                     <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
                       {isPaid ? (
                         <>
-                          <span style={{ fontSize: 11, color: '#22c55e', fontWeight: 600 }}>
-                            ✓ Paid {payment?.paidDate ? new Date(payment.paidDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+                          <span style={{ fontSize: 11, color: '#22c55e', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            <IconCheck size={12} /> Paid {payment?.paidDate ? new Date(payment.paidDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
                           </span>
                           <button className="btn-ghost btn-sm" style={{ fontSize: 10, padding: '2px 8px' }} onClick={() => markPending(inv)}>Undo</button>
                         </>
@@ -428,7 +432,7 @@ function EmployeeStatementsPanel({ emp, invoices, onInvoicesChange }: {
           <div className="modal-dialog" style={{ maxWidth: 360 }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title">Mark as Paid — {payModal.inv.number}</div>
-              <button className="modal-close btn-icon" onClick={() => setPayModal(null)}>✕</button>
+              <button className="modal-close btn-icon" onClick={() => setPayModal(null)}><IconX size={14} /></button>
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div className="form-group">
@@ -725,7 +729,7 @@ export default function EmployeesPage() {
           const empInvoiceCount = invoices.filter(inv => (inv.items||[]).some(it => it.employeeName?.toLowerCase() === e.name.toLowerCase())).length
           const empNum = e.employeeNumber
           return (
-            <div key={e.id} className="entity-card" style={{ borderTop: `2px solid ${statusColor(e.status)}`, cursor: 'pointer' }} onClick={() => navigate('/employees/' + e.id)}>
+            <div key={e.id} className="entity-card" onClick={() => navigate('/employees/' + e.id)}>
               <div className="card-top">
                 <div className="card-top-left">
                   <div className="avatar" style={{ background: color }}>{initials(e.name)}</div>
@@ -806,7 +810,7 @@ export default function EmployeesPage() {
                   </div>
                 </div>
               </div>
-              <button className="modal-close btn-icon" onClick={() => setModal(null)}>✕</button>
+              <button className="modal-close btn-icon" onClick={() => setModal(null)}><IconX size={14} /></button>
             </div>
             <div className="modal-body">
               <EmployeeStatementsPanel emp={selectedEmp} invoices={invoices} onInvoicesChange={setInvoices} />
@@ -824,7 +828,7 @@ export default function EmployeesPage() {
           <div className="modal modal-lg" onClick={(ev) => ev.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">{modal === 'add' ? 'Add Team Member' : 'Edit Member'}</h2>
-              <button className="modal-close btn-icon" onClick={() => setModal(null)}>✕</button>
+              <button className="modal-close btn-icon" onClick={() => setModal(null)}><IconX size={14} /></button>
             </div>
             <div className="modal-body">
               <div className="form-grid-2">
@@ -932,7 +936,9 @@ export default function EmployeesPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {attachments.map(att => (
                       <div key={att.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surf2)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px' }}>
-                        <span style={{ fontSize: 16 }}>{att.mimeType.startsWith('image/') ? '🖼' : att.mimeType === 'application/pdf' ? '📄' : att.mimeType.startsWith('audio/') ? '🎵' : '📎'}</span>
+                        <div className={`attachment-icon${att.mimeType.startsWith('image/') ? ' attachment-icon-image' : att.mimeType.startsWith('audio/') ? ' attachment-icon-audio' : att.mimeType === 'application/pdf' ? ' attachment-icon-pdf' : ''}`}>
+                          {att.mimeType.startsWith('image/') ? <IconImage size={16} /> : att.mimeType === 'application/pdf' ? <IconFile size={16} /> : att.mimeType.startsWith('audio/') ? <IconMusic size={16} /> : <IconPaperclip size={16} />}
+                        </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{att.name}</div>
                           <div style={{ fontSize: 10, color: 'var(--muted)' }}>{(att.size / 1024).toFixed(0)} KB</div>
@@ -944,7 +950,7 @@ export default function EmployeesPage() {
                           <img src={att.dataUrl} alt={att.name} style={{ height: 36, width: 36, objectFit: 'cover', borderRadius: 4 }} />
                         )}
                         <a href={att.dataUrl} download={att.name} className="btn-ghost btn-xs">↓</a>
-                        <button className="btn-icon btn-danger" style={{ fontSize: 11, padding: '2px 6px' }} onClick={() => setAttachments(prev => prev.filter(a => a.id !== att.id))}>×</button>
+                        <button className="btn-icon btn-danger" style={{ fontSize: 11, padding: '2px 6px' }} onClick={() => setAttachments(prev => prev.filter(a => a.id !== att.id))}><IconX size={12} /></button>
                       </div>
                     ))}
                   </div>

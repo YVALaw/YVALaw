@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
+import { IconZap } from './components/Icon'
 import Shell from './components/Shell'
 import ClientShell from './components/ClientShell'
 import LoginPage from './pages/LoginPage'
@@ -33,6 +34,7 @@ import RequestsPage from './pages/RequestsPage'
 import PortalSetPassword from './pages/portal/PortalSetPassword'
 import { loadSettings, saveSettings, loadInvoices, loadEmployees, saveEmployees } from './services/storage'
 import { RoleProvider, useRole } from './context/RoleContext'
+import { ToastProvider } from './context/ToastContext'
 import type { UserRole } from './lib/roles'
 import { can } from './lib/roles'
 
@@ -40,8 +42,9 @@ import { can } from './lib/roles'
 
 function LoadingScreen() {
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
-      <div style={{ color: 'var(--muted)', fontSize: 14 }}>Loading…</div>
+    <div className="loading-screen">
+      <div className="loading-spinner" />
+      <div className="loading-text">Loading YVA LawOS…</div>
     </div>
   )
 }
@@ -50,11 +53,11 @@ function LoadingScreen() {
 
 function ComingSoon({ title, sub }: { title: string; sub: string }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: 12, textAlign: 'center' }}>
-      <div style={{ fontSize: 40 }}>🚧</div>
-      <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--text)' }}>{title}</div>
-      <div style={{ fontSize: 14, color: 'var(--muted)', maxWidth: 360 }}>{sub}</div>
-      <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, background: 'rgba(250,204,21,.15)', color: '#a16207', padding: '4px 14px', borderRadius: 999, border: '1px solid rgba(250,204,21,.3)' }}>Coming Soon</div>
+    <div className="coming-soon">
+      <div className="coming-soon-icon"><IconZap size={32} /></div>
+      <div className="coming-soon-title">{title}</div>
+      <div className="coming-soon-sub">{sub}</div>
+      <div className="coming-soon-badge">Coming Soon</div>
     </div>
   )
 }
@@ -221,26 +224,28 @@ export default function App() {
   if (session === undefined) return <LoadingScreen />
 
   return (
-    <Routes>
-      {/* ── Public: no auth needed ── */}
-      {/* Old read-only invoice share view (renamed from /portal to avoid conflict) */}
-      <Route path="/invoice-view" element={<PortalPage />} />
-      <Route path="/oauth-callback" element={<OAuthCallbackPage />} />
+    <ToastProvider>
+      <Routes>
+        {/* ── Public: no auth needed ── */}
+        {/* Old read-only invoice share view (renamed from /portal to avoid conflict) */}
+        <Route path="/invoice-view" element={<PortalPage />} />
+        <Route path="/oauth-callback" element={<OAuthCallbackPage />} />
 
-      {/* ── Auth pages: redirect away if already logged in ── */}
-      <Route path="/login"          element={session ? <Navigate to="/"   replace /> : <LoginPage />} />
-      <Route path="/xDdasQwd24zaQ"  element={session ? <Navigate to="/"   replace /> : <SignupPage />} />
+        {/* ── Auth pages: redirect away if already logged in ── */}
+        <Route path="/login"          element={session ? <Navigate to="/"   replace /> : <LoginPage />} />
+        <Route path="/xDdasQwd24zaQ"  element={session ? <Navigate to="/"   replace /> : <SignupPage />} />
 
-      {/* ── Protected: all authenticated routes ── */}
-      <Route path="/*" element={
-        !session
-          ? <Navigate to="/login" replace />
-          : (
-            <RoleProvider>
-              <AuthenticatedRouter />
-            </RoleProvider>
-          )
-      } />
-    </Routes>
+        {/* ── Protected: all authenticated routes ── */}
+        <Route path="/*" element={
+          !session
+            ? <Navigate to="/login" replace />
+            : (
+              <RoleProvider>
+                <AuthenticatedRouter />
+              </RoleProvider>
+            )
+        } />
+      </Routes>
+    </ToastProvider>
   )
 }

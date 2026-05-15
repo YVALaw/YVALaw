@@ -7,6 +7,7 @@ import {
   loadInvoiceTemplates, saveInvoiceTemplates,
 } from '../services/storage'
 import { computePayrollBreakdown, computePremiumAdjustedAmount, employeePremiumConfig } from '../utils/payroll'
+import { IconTrash, IconX } from './Icon'
 
 function projectPrefix(name: string): string {
   return name.split(/\s+/).map(w => w[0] || '').join('').toUpperCase().slice(0, 5)
@@ -613,7 +614,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
                       </td>
                       <td>
                         {rows.length > 1 && (
-                          <button className="btn-icon btn-danger" style={{ fontSize: 12, padding: '3px 6px' }} onClick={() => removeRow(row._id)}>×</button>
+                          <button className="btn-icon btn-danger" style={{ fontSize: 12, padding: '3px 6px' }} onClick={() => removeRow(row._id)}><IconTrash size={12} /></button>
                         )}
                       </td>
                     </tr>
@@ -664,7 +665,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
                   </div>
                   <div style={{ alignSelf: 'flex-end', paddingBottom: 2 }}>
                     {rows.length > 1 && (
-                      <button className="btn-icon btn-danger btn-xs" onClick={() => removeRow(row._id)}>×</button>
+                      <button className="btn-icon btn-danger btn-xs" onClick={() => removeRow(row._id)}><IconTrash size={12} /></button>
                     )}
                   </div>
                   {employee && premiumConfig.enabled && (
@@ -723,7 +724,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
           <div className="modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">Save as Template</h2>
-              <button className="modal-close btn-icon" onClick={() => setSaveTemplateModal(false)}>✕</button>
+              <button className="modal-close btn-icon" onClick={() => setSaveTemplateModal(false)}><IconX size={14} /></button>
             </div>
             <div className="modal-body">
               <div className="form-group">
@@ -748,7 +749,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
           <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">Load Template</h2>
-              <button className="modal-close btn-icon" onClick={() => setLoadTemplateModal(false)}>✕</button>
+              <button className="modal-close btn-icon" onClick={() => setLoadTemplateModal(false)}><IconX size={14} /></button>
             </div>
             <div className="modal-body" style={{ padding: 0 }}>
               {templates.length === 0 ? (
@@ -762,7 +763,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
                         <div style={{ fontSize: 12, color: 'var(--muted)' }}>{t.rows.length} employee{t.rows.length !== 1 ? 's' : ''} · {new Date(t.createdAt).toLocaleDateString()}</div>
                       </div>
                       <button className="btn-ghost btn-sm" onClick={() => loadTemplate(t)}>Load</button>
-                      <button className="btn-icon btn-danger" style={{ fontSize: 12, padding: '3px 6px' }} onClick={() => deleteTemplate(t.id)}>×</button>
+                      <button className="btn-icon btn-danger" style={{ fontSize: 12, padding: '3px 6px' }} onClick={() => deleteTemplate(t.id)}><IconTrash size={12} /></button>
                     </div>
                   ))}
                 </div>

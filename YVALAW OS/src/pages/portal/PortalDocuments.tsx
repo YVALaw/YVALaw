@@ -3,15 +3,16 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useRole } from '../../context/RoleContext'
 import { auditPortalActivity, loadPortalClient, loadPortalDocuments, uploadPortalDocument } from '../../services/portalStorage'
 import type { Client, ClientDocument } from '../../data/types'
+import { IconClipboard, IconLock, IconBarChart, IconReceipt, IconFile, IconFolder, IconChevronLeft, IconDownload } from '../../components/Icon'
 
 type Category = 'all' | ClientDocument['category']
 
-const CATEGORY_META: Record<ClientDocument['category'], { label: string; color: string; bg: string; icon: string }> = {
-  contract: { label: 'Contract',  color: '#3b82f6', bg: 'rgba(59,130,246,.1)',  icon: '📋' },
-  nda:      { label: 'NDA',       color: '#a855f7', bg: 'rgba(168,85,247,.1)',  icon: '🔒' },
-  report:   { label: 'Report',    color: '#22c55e', bg: 'rgba(34,197,94,.1)',   icon: '📊' },
-  invoice:  { label: 'Invoice',   color: '#f5b533', bg: 'rgba(245,181,51,.1)',  icon: '🧾' },
-  other:    { label: 'Other',     color: '#94a3b8', bg: 'rgba(148,163,184,.1)', icon: '📄' },
+const CATEGORY_META: Record<ClientDocument['category'], { label: string; color: string; bg: string; icon: React.ReactNode }> = {
+  contract: { label: 'Contract',  color: '#3b82f6', bg: 'rgba(59,130,246,.1)',  icon: <IconClipboard size={16} /> },
+  nda:      { label: 'NDA',       color: '#a855f7', bg: 'rgba(168,85,247,.1)',  icon: <IconLock size={16} /> },
+  report:   { label: 'Report',    color: '#22c55e', bg: 'rgba(34,197,94,.1)',   icon: <IconBarChart size={16} /> },
+  invoice:  { label: 'Invoice',   color: '#f5b533', bg: 'rgba(245,181,51,.1)',  icon: <IconReceipt size={16} /> },
+  other:    { label: 'Other',     color: '#94a3b8', bg: 'rgba(148,163,184,.1)', icon: <IconFile size={16} /> },
 }
 
 function fmtDate(ts?: number) {
@@ -108,8 +109,9 @@ export default function PortalDocuments() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40vh' }}>
-        <div style={{ color: 'var(--muted)', fontSize: 14 }}>Loading documents…</div>
+      <div className="loading-screen">
+        <div className="loading-spinner" />
+        <div className="loading-text">Loading documents…</div>
       </div>
     )
   }
@@ -126,18 +128,14 @@ export default function PortalDocuments() {
             {documents.length} document{documents.length !== 1 ? 's' : ''}
           </div>
         </div>
-        <button
-          className="btn-ghost btn-sm"
-          onClick={() => navigate(portalNav('/portal/dashboard'))}
-          style={{ fontSize: 12 }}
-        >
-          ← Dashboard
+        <button className="btn-ghost btn-sm" onClick={() => navigate(portalNav('/portal/dashboard'))}>
+          <IconChevronLeft size={13} /> Dashboard
         </button>
       </div>
 
       {/* Upload card */}
       <div className="portal-panel">
-        <div className="portal-panel-title" style={{ marginBottom: 14 }}>Upload a Document</div>
+        <div className="portal-panel-title-main">Upload a Document</div>
         <input
           ref={fileInputRef}
           type="file"
@@ -146,24 +144,17 @@ export default function PortalDocuments() {
           onChange={e => setUploadFile(e.target.files?.[0] ?? null)}
         />
         <div className="portal-upload-row">
-          <button
-            className="btn-ghost btn-sm"
-            onClick={() => fileInputRef.current?.click()}
-            style={{ fontSize: 13 }}
-          >
+          <button className="btn-ghost btn-sm" onClick={() => fileInputRef.current?.click()}>
             Choose File
           </button>
-          <span className="portal-upload-name" style={{ color: uploadFile ? 'var(--text)' : 'var(--muted)' }}>
+          <span className="portal-upload-name" style={{ color: uploadFile ? 'var(--text)' : undefined, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
             {uploadFile ? uploadFile.name : 'No file selected'}
           </span>
           <select
             value={uploadCat}
             onChange={e => setUploadCat(e.target.value as ClientDocument['category'])}
-            style={{
-              fontSize: 13, padding: '7px 10px', borderRadius: 8,
-              border: '1px solid var(--border)', background: 'var(--surf2)',
-              color: 'var(--text)', cursor: 'pointer',
-            }}
+            className="form-input form-input-sm"
+            style={{ cursor: 'pointer' }}
           >
             <option value="contract">Contract</option>
             <option value="nda">NDA</option>
@@ -175,15 +166,13 @@ export default function PortalDocuments() {
             className="btn-primary"
             onClick={() => void handleUpload()}
             disabled={!uploadFile || uploading}
-            style={{ fontSize: 13, whiteSpace: 'nowrap' }}
+            style={{ whiteSpace: 'nowrap' }}
           >
             {uploading ? 'Uploading…' : 'Upload'}
           </button>
         </div>
         {uploadError && (
-          <div style={{ marginTop: 10, fontSize: 12, color: '#ef4444', padding: '8px 12px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 8 }}>
-            {uploadError}
-          </div>
+          <div className="portal-message portal-message-error mt-10">{uploadError}</div>
         )}
       </div>
 
@@ -211,16 +200,10 @@ export default function PortalDocuments() {
 
       {/* Document list */}
       {filtered.length === 0 ? (
-        <div style={{
-          textAlign: 'center', padding: '60px 20px',
-          background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: 16, color: 'var(--muted)',
-        }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>📁</div>
-          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>
-            No documents yet
-          </div>
-          <div style={{ fontSize: 13, maxWidth: 360, margin: '0 auto' }}>
+        <div className="empty-state">
+          <div className="empty-state-icon"><IconFolder size={28} /></div>
+          <div className="empty-state-title">No documents yet</div>
+          <div className="empty-state-message">
             Upload a file above, or documents shared by your account manager will appear here automatically.
           </div>
         </div>
@@ -238,24 +221,15 @@ export default function PortalDocuments() {
 
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div className="portal-document-title-row" style={{ alignItems: 'center', marginBottom: 4 }}>
-                    <span className="portal-document-name">
-                      {doc.name}
-                    </span>
-                    <span style={{
-                      padding: '2px 9px', borderRadius: 999, fontSize: 11, fontWeight: 700,
-                      color: meta.color, background: meta.bg,
-                    }}>
+                    <span className="portal-document-name">{doc.name}</span>
+                    <span className="badge" style={{ color: meta.color, background: meta.bg, borderColor: meta.color + '33' }}>
                       {meta.label}
                     </span>
                   </div>
                   <div className="portal-document-meta">
                     <span>{fmtDate(doc.uploadedAt)}</span>
-                    {doc.uploadedBy && (
-                      <span>{doc.uploadedBy}</span>
-                    )}
-                    {size && (
-                      <span>{size}</span>
-                    )}
+                    {doc.uploadedBy && <span>{doc.uploadedBy}</span>}
+                    {size && <span>{size}</span>}
                   </div>
                 </div>
 
@@ -266,14 +240,9 @@ export default function PortalDocuments() {
                   download
                   onClick={() => handleDownload(doc)}
                   className="btn-ghost btn-sm"
-                  style={{ fontSize: 12, display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, textDecoration: 'none' }}
+                  style={{ flexShrink: 0, textDecoration: 'none' }}
                 >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                    <polyline points="7 10 12 15 17 10"/>
-                    <line x1="12" x2="12" y1="15" y2="3"/>
-                  </svg>
-                  Download
+                  <IconDownload size={13} /> Download
                 </a>
               </div>
             )

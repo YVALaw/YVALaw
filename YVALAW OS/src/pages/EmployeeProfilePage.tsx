@@ -5,6 +5,10 @@ import { loadSnapshot, saveEmployees, saveInvoices, loadSettings, loadTimeEntrie
 import { uploadFile, deleteFile } from '../services/fileStorage'
 import { sendEmail } from '../services/gmail'
 import { buildStatementHTML } from '../utils/statementHtml'
+import {
+  IconImage, IconMusic, IconFile, IconX, IconTrash, IconCheck,
+  IconMail, IconPrinter, IconCamera, IconPlay,
+} from '../components/Icon'
 import { formatMoney, fmtHoursHM } from '../utils/money'
 import { employeePremiumConfig, normalizeClockInput, payrollFromInvoiceItem } from '../utils/payroll'
 
@@ -16,10 +20,10 @@ function fileExt(name: string) { return name.split('.').pop()?.toLowerCase() ?? 
 function isVideo(att: Attachment) { return att.mimeType.startsWith('video') || VIDEO_EXTS.includes(fileExt(att.name)) }
 function isAudio(att: Attachment) { return att.mimeType.startsWith('audio') || AUDIO_EXTS.includes(fileExt(att.name)) }
 function attIcon(att: Attachment) {
-  if (att.mimeType.startsWith('image')) return '🖼'
-  if (isVideo(att)) return '🎬'
-  if (isAudio(att)) return '🎵'
-  return '📄'
+  if (att.mimeType.startsWith('image')) return <IconImage size={16} />
+  if (isVideo(att)) return <IconCamera size={16} />
+  if (isAudio(att)) return <IconMusic size={16} />
+  return <IconFile size={16} />
 }
 
 function VideoPlayer({ url }: { url: string }) {
@@ -37,7 +41,7 @@ function VideoPlayer({ url }: { url: string }) {
   if (blobUrl) return <video controls autoPlay src={blobUrl} style={{ width: '100%', maxHeight: 220, borderRadius: 6, marginTop: 4 }} />
   return (
     <button onClick={load} disabled={loading} style={{ marginTop: 4, width: '100%', background: 'var(--surf2)', border: '1px solid var(--border)', borderRadius: 6, padding: '10px', color: 'var(--muted)', cursor: loading ? 'wait' : 'pointer', fontSize: 13 }}>
-      {loading ? 'Loading video…' : '▶ Click to load video'}
+      {loading ? 'Loading video…' : <><IconPlay size={14} /> Click to load video</>}
     </button>
   )
 }
@@ -394,8 +398,8 @@ export default function EmployeeProfilePage() {
   return (
     <div className="page-wrap client-profile-page">
       {toast && (
-        <div style={{ position: 'fixed', bottom: 28, right: 28, zIndex: 9999, background: '#1e293b', border: '1px solid var(--border)', borderLeft: '3px solid #4ade80', color: 'var(--text)', fontSize: 13, fontWeight: 500, padding: '10px 16px', borderRadius: 8, boxShadow: '0 4px 24px rgba(0,0,0,.4)', maxWidth: 360 }}>
-          ✓ {toast}
+        <div className="profile-toast">
+          <IconCheck size={14} /> {toast}
         </div>
       )}
       {/* Back */}
@@ -414,7 +418,7 @@ export default function EmployeeProfilePage() {
               ? <img className="avatar-photo" src={photoUrl} alt={empNN.name} />
               : <div className="avatar profile-avatar" style={{ background: color }}>{initials(empNN.name)}</div>
             }
-            <span className="avatar-cam">📷</span>
+            <span className="avatar-cam"><IconCamera size={14} /></span>
           </div>
           <div>
             {editing
@@ -598,7 +602,7 @@ export default function EmployeeProfilePage() {
                         <audio controls src={att.storageUrl || att.dataUrl} style={{ height: 28, maxWidth: 140 }} />
                       )}
                       <button className="btn-ghost btn-sm" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => downloadAttachment(att.storageUrl || att.dataUrl, att.name)}>↓</button>
-                      <button className="btn-icon btn-danger" style={{ fontSize: 11, padding: '3px 6px' }} onClick={() => removeAttachment(att.id)}>×</button>
+                      <button className="btn-icon btn-danger" style={{ fontSize: 11, padding: '3px 6px' }} onClick={() => removeAttachment(att.id)}><IconX size={12} /></button>
                     </div>
                     {isVideo(att) && <VideoPlayer url={att.storageUrl || att.dataUrl} />}
                   </div>
@@ -669,11 +673,11 @@ export default function EmployeeProfilePage() {
                 }
               }}
             >
-              {sending ? 'Sending…' : '✉ Email Statement'}
+              {sending ? 'Sending…' : <><span style={{ marginRight: 5, display: 'inline-flex', verticalAlign: 'middle' }}><IconMail size={13} /></span> Email Statement</>}
             </button>
             <button className="btn-ghost btn-sm" onClick={() => printPayslip(emp, empInvoices, dateFrom, dateTo)}
               disabled={empInvoices.length === 0}>
-              ⎙ PDF Payslip
+              <span style={{ marginRight: 5, display: 'inline-flex', verticalAlign: 'middle' }}><IconPrinter size={13} /></span> PDF Payslip
             </button>
           </div>
 
@@ -720,7 +724,7 @@ export default function EmployeeProfilePage() {
                         {isPaid ? (
                           <>
                             <span style={{ fontSize: 11, color: '#22c55e', fontWeight: 600 }}>
-                              ✓ Paid {payment?.paidDate ? new Date(payment.paidDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconCheck size={12} /> Paid {payment?.paidDate ? new Date(payment.paidDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}</span>
                             </span>
                             <button className="btn-ghost btn-sm" style={{ fontSize: 10, padding: '2px 8px' }} onClick={() => markPending(inv)}>Undo</button>
                           </>
@@ -845,7 +849,7 @@ export default function EmployeeProfilePage() {
           <div className="modal-dialog" style={{ maxWidth: 360 }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title">Mark as Paid — {payModal.inv.number}</div>
-              <button className="modal-close btn-icon" onClick={() => setPayModal(null)}>✕</button>
+              <button className="modal-close btn-icon" onClick={() => setPayModal(null)}><IconX size={14} /></button>
             </div>
             <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div className="form-group">

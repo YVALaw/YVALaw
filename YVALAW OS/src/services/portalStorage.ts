@@ -404,6 +404,23 @@ export async function markPortalInvoicePaid(invoiceId: string, totalPaid: number
   if (error) throw new Error(error.message)
 }
 
+/** Remove saved card from portal billing settings */
+export async function removePortalSavedCard(clientId: string): Promise<void> {
+  const { error } = await supabase
+    .from('client_users')
+    .update({
+      auto_pay_enabled: false,
+      default_payment_method_id: null,
+      default_card_brand: null,
+      default_card_last4: null,
+      default_card_exp_month: null,
+      default_card_exp_year: null,
+      auto_pay_authorized_at: null,
+    })
+    .eq('client_id', clientId)
+  if (error) throw new Error(error.message)
+}
+
 /** Submit a staff request from the client portal */
 export async function submitStaffRequest(params: {
   clientId: string

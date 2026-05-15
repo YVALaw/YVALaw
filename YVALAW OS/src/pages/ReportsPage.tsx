@@ -13,6 +13,12 @@ import type { AppSettings, Candidate, DataSnapshot, Expense, Invoice } from '../
 import { useRole } from '../context/RoleContext'
 import { can } from '../lib/roles'
 import { payrollFromInvoiceItem } from '../utils/payroll'
+import {
+  IconX, IconBriefcase, IconUsers, IconBuilding, IconInbox,
+  IconFileText, IconAlert, IconCheck, IconTrendUp, IconTrendDown,
+  IconDollar, IconClock, IconBarChart, IconPieChart, IconTarget,
+  IconCalendar, IconZap, IconFlag, IconShield, IconAward,
+} from '../components/Icon'
 
 function downloadCSV(filename: string, rows: string[][]): void {
   const escape = (v: string) => `"${String(v ?? '').replace(/"/g, '""')}"`
@@ -105,6 +111,59 @@ function sBadge(s?: string) {
     case 'partial': return 'badge-orange'
     default:        return 'badge-gray'
   }
+}
+
+/* ── Reusable KpiCard with icon ── */
+function KpiCard({ icon, value, label, color = 'var(--muted)', onClick }: {
+  icon: React.ReactNode
+  value: string | number
+  label: string
+  color?: string
+  onClick?: () => void
+}) {
+  return (
+    <div className={`kpi-card${onClick ? ' clickable-card' : ''}`} onClick={onClick}>
+      <div className="kpi-icon-wrap" style={{ color, borderColor: color + '25' }}>
+        {icon}
+      </div>
+      <div className="kpi-body">
+        <div className="kpi-label">{label}</div>
+        <div className="kpi-value" style={{ color }}>{value}</div>
+      </div>
+    </div>
+  )
+}
+
+/* ── Pipeline bar ── */
+function PipelineBar({ stages, counts }: { stages: string[]; counts: Record<string, number> }) {
+  const total = Object.values(counts).reduce((a, b) => a + b, 0)
+  const colors = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#22c55e', '#ef4444']
+  return (
+    <div>
+      <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 16, background: 'var(--surf3)' }}>
+        {stages.map((stage, i) => {
+          const count = counts[stage] || 0
+          const pct = total > 0 ? (count / total) * 100 : 0
+          return pct > 0 ? (
+            <div key={stage} style={{ width: `${pct}%`, background: colors[i % colors.length], transition: 'width 0.5s' }} />
+          ) : null
+        })}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {stages.map((stage, i) => (
+          <div key={stage} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 10, height: 10, borderRadius: '50%', background: colors[i % colors.length], flexShrink: 0 }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)', textTransform: 'capitalize' }}>{stage}</span>
+            </div>
+            <span style={{ fontSize: 14, fontWeight: 800, color: counts[stage] ? 'var(--text)' : 'var(--soft)' }}>
+              {counts[stage] || 0}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 export default function ReportsPage() {
@@ -218,21 +277,14 @@ export default function ReportsPage() {
         </div>
 
         <div className="kpi-grid">
-          {[
-            { label: 'Active Projects',  value: String(activeProjects),          color: '#60a5fa' },
-            { label: 'Team Members',     value: String(store.employees.length),  color: '#c084fc' },
-            { label: 'Total Clients',    value: String(store.clients.length),    color: 'var(--text)' },
-            { label: 'Open Candidates',  value: String(inPipeline.length),       color: '#a855f7' },
-            { label: 'Draft Invoices',   value: String(draftInvoices.length),    color: draftInvoices.length > 0 ? '#f5b533' : 'var(--muted)' },
-            { label: 'Overdue',          value: String(overdueInvoices.length),  color: overdueInvoices.length > 0 ? '#f87171' : 'var(--muted)' },
-            { label: 'Sent / Pending',   value: String(sentPending.length),      color: '#60a5fa' },
-            { label: 'Paid This Month',  value: String(paidThisMonth.length),    color: '#4ade80' },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="kpi-card">
-              <div className="kpi-label">{label}</div>
-              <div className="kpi-value" style={{ color, fontSize: 26 }}>{value}</div>
-            </div>
-          ))}
+          <KpiCard icon={<IconBriefcase size={20} />} value={activeProjects} label="Active Projects" color="#2563eb" />
+          <KpiCard icon={<IconUsers size={20} />} value={store.employees.length} label="Team Members" color="#7c3aed" />
+          <KpiCard icon={<IconBuilding size={20} />} value={store.clients.length} label="Total Clients" color="var(--text)" />
+          <KpiCard icon={<IconInbox size={20} />} value={inPipeline.length} label="Open Candidates" color="#9333ea" />
+          <KpiCard icon={<IconFileText size={20} />} value={draftInvoices.length} label="Draft Invoices" color={draftInvoices.length > 0 ? '#d97706' : 'var(--muted)'} />
+          <KpiCard icon={<IconAlert size={20} />} value={overdueInvoices.length} label="Overdue" color={overdueInvoices.length > 0 ? '#dc2626' : 'var(--muted)'} />
+          <KpiCard icon={<IconCalendar size={20} />} value={sentPending.length} label="Sent / Pending" color="#2563eb" />
+          <KpiCard icon={<IconCheck size={20} />} value={paidThisMonth.length} label="Paid This Month" color="#059669" />
         </div>
 
         <div className="responsive-sidebar-grid">
@@ -266,14 +318,7 @@ export default function ReportsPage() {
 
             <div className="data-card">
               <div className="data-card-title">Candidate Pipeline</div>
-              {['applied','screening','interview','offer','hired','rejected'].map(stage => (
-                <div key={stage} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
-                  <span style={{ fontSize: 13, textTransform: 'capitalize', color: 'var(--muted)' }}>{stage}</span>
-                  <span style={{ fontWeight: 700, fontSize: 14, color: stage === 'hired' ? '#4ade80' : stage === 'rejected' ? '#f87171' : 'var(--text)' }}>
-                    {stageCounts[stage] || 0}
-                  </span>
-                </div>
-              ))}
+              <PipelineBar stages={['applied','screening','interview','offer','hired','rejected']} counts={stageCounts} />
             </div>
           </div>
 
@@ -378,17 +423,10 @@ export default function ReportsPage() {
         </div>
 
         <div className="kpi-grid">
-          {[
-            { label: 'Draft (to send)',  value: String(draftInvoices.length),   color: draftInvoices.length > 0 ? '#f5b533' : 'var(--muted)' },
-            { label: 'Overdue',          value: String(overdueInvoices.length), color: overdueInvoices.length > 0 ? '#f87171' : 'var(--muted)' },
-            { label: 'Sent / Pending',   value: String(sentPending.length),     color: '#60a5fa' },
-            { label: 'Paid This Month',  value: String(paidThisMonth.length),   color: '#4ade80' },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="kpi-card">
-              <div className="kpi-label">{label}</div>
-              <div className="kpi-value" style={{ color, fontSize: 26 }}>{value}</div>
-            </div>
-          ))}
+          <KpiCard icon={<IconFileText size={20} />} value={draftInvoices.length} label="Draft (to send)" color={draftInvoices.length > 0 ? '#d97706' : 'var(--muted)'} />
+          <KpiCard icon={<IconAlert size={20} />} value={overdueInvoices.length} label="Overdue" color={overdueInvoices.length > 0 ? '#dc2626' : 'var(--muted)'} />
+          <KpiCard icon={<IconCalendar size={20} />} value={sentPending.length} label="Sent / Pending" color="#2563eb" />
+          <KpiCard icon={<IconCheck size={20} />} value={paidThisMonth.length} label="Paid This Month" color="#059669" />
         </div>
 
         <div className="responsive-sidebar-grid">
@@ -546,29 +584,15 @@ export default function ReportsPage() {
           </div>
         </div>
         <div className="kpi-grid">
-          {[
-            { label: 'Total Candidates', value: String(candidates.length), color: 'var(--text)' },
-            { label: 'In Pipeline',      value: String(inPipeline.length),  color: '#a855f7' },
-            { label: 'Hired This Month', value: String(hiredThisMonth.length), color: '#4ade80' },
-            { label: 'Hiring Projects',  value: String(hiringProjects.length), color: '#f97316' },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="kpi-card">
-              <div className="kpi-label">{label}</div>
-              <div className="kpi-value" style={{ color, fontSize: 26 }}>{value}</div>
-            </div>
-          ))}
+          <KpiCard icon={<IconUsers size={20} />} value={candidates.length} label="Total Candidates" color="var(--text)" />
+          <KpiCard icon={<IconInbox size={20} />} value={inPipeline.length} label="In Pipeline" color="#9333ea" />
+          <KpiCard icon={<IconCheck size={20} />} value={hiredThisMonth.length} label="Hired This Month" color="#059669" />
+          <KpiCard icon={<IconZap size={20} />} value={hiringProjects.length} label="Hiring Projects" color="#d97706" />
         </div>
         <div className="responsive-two-col" style={{ marginTop: 16 }}>
           <div className="data-card">
             <div className="data-card-title">Pipeline by Stage</div>
-            {['applied','screening','interview','offer','hired','rejected'].map(stage => (
-              <div key={stage} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
-                <span style={{ fontSize: 13, textTransform: 'capitalize', color: 'var(--muted)' }}>{stage}</span>
-                <span style={{ fontWeight: 700, fontSize: 14, color: stage === 'hired' ? '#4ade80' : stage === 'rejected' ? '#f87171' : 'var(--text)' }}>
-                  {stageCounts[stage] || 0}
-                </span>
-              </div>
-            ))}
+            <PipelineBar stages={['applied','screening','interview','offer','hired','rejected']} counts={stageCounts} />
           </div>
           <div className="data-card">
             <div className="data-card-title">Projects Actively Hiring</div>
@@ -622,17 +646,10 @@ export default function ReportsPage() {
           </div>
         </div>
         <div className="kpi-grid">
-          {[
-            { label: 'Total Clients',       value: String(store.clients.length),    color: 'var(--text)' },
-            { label: 'Active This Month',   value: String(activeClients),            color: '#4ade80' },
-            { label: 'Contracts Expiring',  value: String(contractsExpiring.length), color: contractsExpiring.length > 0 ? '#f5b533' : 'var(--muted)' },
-            { label: 'Retention Alerts',    value: String(retentionRisk.length),     color: retentionRisk.length > 0 ? '#f87171' : 'var(--muted)' },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="kpi-card">
-              <div className="kpi-label">{label}</div>
-              <div className="kpi-value" style={{ color, fontSize: 26 }}>{value}</div>
-            </div>
-          ))}
+          <KpiCard icon={<IconBuilding size={20} />} value={store.clients.length} label="Total Clients" color="var(--text)" />
+          <KpiCard icon={<IconCheck size={20} />} value={activeClients} label="Active This Month" color="#059669" />
+          <KpiCard icon={<IconFlag size={20} />} value={contractsExpiring.length} label="Contracts Expiring" color={contractsExpiring.length > 0 ? '#d97706' : 'var(--muted)'} />
+          <KpiCard icon={<IconAlert size={20} />} value={retentionRisk.length} label="Retention Alerts" color={retentionRisk.length > 0 ? '#dc2626' : 'var(--muted)'} />
         </div>
         <div className="responsive-two-col" style={{ marginTop: 16 }}>
           <div className="data-card">
@@ -722,67 +739,24 @@ export default function ReportsPage() {
         })
         const totalExpenses = rangeExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0)
         const netAfterExpenses = computed.totalNetEarnings - totalExpenses
-        const cardStyle: React.CSSProperties = { cursor: 'pointer' }
         return (
           <div className="kpi-grid">
             {can.viewOwnerStats(role) && (
-              <div className="kpi-card clickable-card" style={cardStyle} onClick={() => setKpiDrill('billed')}>
-                <div className="kpi-label">Total Billed</div>
-                <div className="kpi-value">{formatMoney(computed.totalBilled)}</div>
-                <div className="kpi-sub">{computed.invoiceCount} invoice{computed.invoiceCount === 1 ? '' : 's'} in range</div>
-              </div>
+              <KpiCard icon={<IconDollar size={20} />} value={formatMoney(computed.totalBilled)} label="Total Billed" color="var(--text)" onClick={() => setKpiDrill('billed')} />
             )}
-            <div className="kpi-card clickable-card" style={cardStyle} onClick={() => setKpiDrill('hours')}>
-              <div className="kpi-label">Total Hours</div>
-              <div className="kpi-value" style={{ fontSize: 22 }}>{fmtHoursHM(computed.totalHours)}</div>
-              <div className="kpi-sub">billed in range</div>
-            </div>
+            <KpiCard icon={<IconClock size={20} />} value={fmtHoursHM(computed.totalHours)} label="Total Hours" color="#2563eb" onClick={() => setKpiDrill('hours')} />
             {can.viewOwnerStats(role) && (
-              <div className="kpi-card clickable-card" style={cardStyle} onClick={() => setKpiDrill('payroll')}>
-                <div className="kpi-label">Est. Payroll</div>
-                <div className="kpi-value" style={{ color: '#f87171' }}>{formatMoney(computed.totalPayroll)}</div>
-                <div className="kpi-sub">based on employee pay rates</div>
-              </div>
+              <KpiCard icon={<IconUsers size={20} />} value={formatMoney(computed.totalPayroll)} label="Est. Payroll" color="#dc2626" onClick={() => setKpiDrill('payroll')} />
             )}
-            <div className="kpi-card clickable-card" style={cardStyle} onClick={() => setKpiDrill('expenses')}>
-              <div className="kpi-label">Business Expenses</div>
-              <div className="kpi-value" style={{ color: '#fb923c' }}>{formatMoney(totalExpenses)}</div>
-              <div className="kpi-sub">{rangeExpenses.length} expense{rangeExpenses.length !== 1 ? 's' : ''} in range</div>
-            </div>
+            <KpiCard icon={<IconPieChart size={20} />} value={formatMoney(totalExpenses)} label="Business Expenses" color="#d97706" onClick={() => setKpiDrill('expenses')} />
             {can.viewOwnerStats(role) && (
-              <div className="kpi-card clickable-card" style={cardStyle} onClick={() => setKpiDrill('net')}>
-                <div className="kpi-label">Net Earnings</div>
-                <div className="kpi-value" style={{ color: netAfterExpenses >= 0 ? '#4ade80' : '#f87171' }}>
-                  {formatMoney(netAfterExpenses)}
-                </div>
-                <div className="kpi-sub">billed − payroll − expenses</div>
-              </div>
+              <KpiCard icon={<IconTrendUp size={20} />} value={formatMoney(netAfterExpenses)} label="Net Earnings" color={netAfterExpenses >= 0 ? '#059669' : '#dc2626'} onClick={() => setKpiDrill('net')} />
             )}
-            <div className="kpi-card clickable-card" style={cardStyle} onClick={() => setKpiDrill('paid')}>
-              <div className="kpi-label">Paid</div>
-              <div className="kpi-value" style={{ color: '#4ade80' }}>{computed.paidCount}</div>
-              <div className="kpi-sub">invoices marked paid</div>
-            </div>
-            <div className="kpi-card clickable-card" style={cardStyle} onClick={() => setKpiDrill('unpaid')}>
-              <div className="kpi-label">Unpaid</div>
-              <div className="kpi-value kpi-value-warn">{computed.unpaidCount}</div>
-              <div className="kpi-sub">awaiting payment</div>
-            </div>
-            <div className="kpi-card clickable-card" style={cardStyle} onClick={() => setKpiDrill('topClient')}>
-              <div className="kpi-label">Top Client</div>
-              <div className="kpi-value kpi-value-name">{topClient?.name || '—'}</div>
-              <div className="kpi-sub">{topClient ? formatMoney(topClient.total) : 'No data'}</div>
-            </div>
-            <div className="kpi-card clickable-card" style={cardStyle} onClick={() => setKpiDrill('clients')}>
-              <div className="kpi-label">Clients</div>
-              <div className="kpi-value" style={{ color: '#60a5fa' }}>{store.clients.length}</div>
-              <div className="kpi-sub">total in system</div>
-            </div>
-            <div className="kpi-card clickable-card" style={cardStyle} onClick={() => setKpiDrill('team')}>
-              <div className="kpi-label">Team</div>
-              <div className="kpi-value" style={{ color: '#c084fc' }}>{store.employees.length}</div>
-              <div className="kpi-sub">active members</div>
-            </div>
+            <KpiCard icon={<IconCheck size={20} />} value={computed.paidCount} label="Paid" color="#059669" onClick={() => setKpiDrill('paid')} />
+            <KpiCard icon={<IconAlert size={20} />} value={computed.unpaidCount} label="Unpaid" color="#dc2626" onClick={() => setKpiDrill('unpaid')} />
+            <KpiCard icon={<IconAward size={20} />} value={topClient?.name || '—'} label="Top Client" color="var(--text)" onClick={() => setKpiDrill('topClient')} />
+            <KpiCard icon={<IconBuilding size={20} />} value={store.clients.length} label="Clients" color="#2563eb" onClick={() => setKpiDrill('clients')} />
+            <KpiCard icon={<IconUsers size={20} />} value={store.employees.length} label="Team" color="#7c3aed" onClick={() => setKpiDrill('team')} />
           </div>
         )
       })()}
@@ -1028,10 +1002,10 @@ export default function ReportsPage() {
             <div className="data-card-title">Accounts Receivable Aging</div>
             <div className="responsive-metric-grid" style={{ marginBottom: 16 }}>
               {buckets.map(b => (
-                <div key={b.label} style={{ background: 'var(--surf2)', borderRadius: 12, padding: '14px 16px', borderTop: `2px solid ${b.color}` }}>
-                  <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>{b.label}</div>
-                  <div style={{ fontSize: 22, fontWeight: 800, color: b.color }}>{formatMoney(b.invoices.reduce((s,i) => s+(Number(i.subtotal)||0),0))}</div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 3 }}>{b.invoices.length} invoice{b.invoices.length!==1?'s':''}</div>
+                <div key={b.label} className="aging-bucket">
+                  <div className="aging-bucket-label">{b.label}</div>
+                  <div className="aging-bucket-value" style={{ color: b.color }}>{formatMoney(b.invoices.reduce((s,i) => s+(Number(i.subtotal)||0),0))}</div>
+                  <div className="aging-bucket-count">{b.invoices.length} invoice{b.invoices.length!==1?'s':''}</div>
                 </div>
               ))}
             </div>
@@ -1381,7 +1355,7 @@ export default function ReportsPage() {
             <div className="modal" style={{ maxWidth: 580 }} onClick={e => e.stopPropagation()}>
               <div className="modal-header">
                 <h2 className="modal-title">{title}</h2>
-                <button className="modal-close btn-icon" onClick={() => setKpiDrill(null)}>✕</button>
+                <button className="modal-close btn-icon" onClick={() => setKpiDrill(null)}><IconX size={14} /></button>
               </div>
               {summary && (
                 <div style={{ padding: '8px 20px', fontSize: 13, color: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>{summary}</div>

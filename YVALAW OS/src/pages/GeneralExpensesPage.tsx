@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Expense } from '../data/types'
 import { loadGeneralExpenses, saveGeneralExpenses } from '../services/storage'
 import { formatMoney } from '../utils/money'
+import { IconCheck, IconTrash } from '../components/Icon'
 
 function uid() { return crypto.randomUUID() }
 
@@ -169,11 +170,11 @@ export default function GeneralExpensesPage() {
                     <td className="td-name">{ex.description}</td>
                     <td className="td-muted">{ex.category || '—'}</td>
                     <td className="td-muted">{ex.date}</td>
-                    <td className="td-muted">{ex.recurring ? <span style={{ color: '#4ade80', fontSize: 11 }}>● Yes</span> : '—'}</td>
+                    <td className="td-muted">{ex.recurring ? <span style={{ color: '#4ade80', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconCheck size={10} /> Yes</span> : '—'}</td>
                     <td style={{ textAlign: 'right', color: '#f87171', fontWeight: 700 }}>{formatMoney(ex.amount)}</td>
                     <td>
                       <button className="btn-icon btn-danger" style={{ fontSize: 11, padding: '2px 6px' }}
-                        onClick={() => setConfirmDelete(ex.id)}>×</button>
+                        onClick={() => setConfirmDelete(ex.id)}><IconTrash size={12} /></button>
                     </td>
                   </tr>
                 ))}

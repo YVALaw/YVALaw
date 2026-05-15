@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { IconCheck } from '../../components/Icon'
 
 export default function PortalSetPassword() {
   const navigate              = useNavigate()
@@ -136,7 +137,7 @@ export default function PortalSetPassword() {
                         color: ok ? '#15803d' : 'var(--muted)',
                         display: 'flex', alignItems: 'center', gap: 4,
                       }}>
-                        {ok ? '✓' : '○'} {label}
+                        {ok ? <IconCheck size={12} /> : <span style={{ width: 12, height: 12, borderRadius: '50%', border: '1.5px solid currentColor', display: 'inline-block', verticalAlign: 'middle', opacity: .4 }} />} {label}
                       </span>
                     ))}
                   </div>
@@ -159,7 +160,7 @@ export default function PortalSetPassword() {
                 <div style={{ fontSize: 11, color: '#ef4444', marginTop: 4 }}>Passwords do not match</div>
               )}
               {matches && (
-                <div style={{ fontSize: 11, color: 'var(--success)', marginTop: 4 }}>✓ Passwords match</div>
+                <div style={{ fontSize: 11, color: 'var(--success)', marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconCheck size={10} /> Passwords match</div>
               )}
             </div>
 

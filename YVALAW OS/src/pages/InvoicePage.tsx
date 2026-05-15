@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
+import {
+  IconMail, IconAlert, IconEye, IconPrinter, IconLink, IconCopy,
+  IconEdit, IconStatus, IconTrash, IconX, IconCheck, IconChevronDown,
+  IconChevronRight, IconPause, IconPlay, IconPlus,
+} from '../components/Icon'
 import type { AppSettings, Client, Invoice, Project, RecurringInvoice, RecurringFrequency } from '../data/types'
 import {
   loadInvoices, saveInvoices,
@@ -380,10 +385,10 @@ export default function InvoicePage() {
                 }
               }
               showToast(`Reminders sent to ${seen.size} client${seen.size !== 1 ? 's' : ''}`)
-            }}>✉ Remind All</button>
+            }}><IconMail size={14} /> Remind All</button>
           )}
           <button className="btn-ghost btn-sm" onClick={() => openQuickForProject(undefined)}>Quick Invoice</button>
-          <button className="btn-primary" onClick={() => openBuilder()}>+ New Invoice</button>
+          <button className="btn-primary" onClick={() => openBuilder()}><IconPlus size={14} /> New Invoice</button>
         </div>
       </div>
 
@@ -440,11 +445,13 @@ export default function InvoicePage() {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: 6 }}>
-                          <button className="btn-ghost btn-sm" onClick={() => openRecurringEdit(r)} title="Edit">✏</button>
-                          <button className="btn-ghost btn-sm" onClick={() => toggleRecActive(r)} title={r.active ? 'Pause' : 'Resume'}>
-                            {r.active ? '⏸' : '▶'}
-                          </button>
-                          <button className="btn-ghost btn-sm" style={{ color: 'var(--danger)' }} onClick={() => { if (confirm('Delete this recurring invoice?')) deleteRec(r.id) }} title="Delete">🗑</button>
+                          <div className="icon-action-toolbar">
+                            <button className="btn-icon-ghost" onClick={() => openRecurringEdit(r)} title="Edit"><IconEdit size={14} /></button>
+                            <button className="btn-icon-ghost" onClick={() => toggleRecActive(r)} title={r.active ? 'Pause' : 'Resume'}>
+                              {r.active ? <IconPause size={14} /> : <IconPlay size={14} />}
+                            </button>
+                            <button className="btn-icon-ghost danger" onClick={() => { if (confirm('Delete this recurring invoice?')) deleteRec(r.id) }} title="Delete"><IconTrash size={14} /></button>
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -461,7 +468,7 @@ export default function InvoicePage() {
               <div style={{ position: 'fixed', top: 0, right: 0, height: '100vh', width: 440, background: 'var(--surface)', boxShadow: '-4px 0 24px rgba(0,0,0,0.12)', zIndex: 300, display: 'flex', flexDirection: 'column' }}>
                 <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)' }}>{editingRec ? 'Edit Recurring' : 'New Recurring Invoice'}</span>
-                  <button className="btn-ghost btn-sm" onClick={() => setRecurringPanel(false)}>✕</button>
+                  <button className="btn-ghost btn-sm" onClick={() => setRecurringPanel(false)}><IconX size={14} /></button>
                 </div>
                 <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
                   <div className="form-group">
@@ -543,12 +550,12 @@ export default function InvoicePage() {
             return (
               <div key={key} className="invoice-group">
                 <div className="invoice-group-header" onClick={() => toggleCollapse(key)}>
-                  <span style={{ fontSize: 12, color: 'var(--muted)', width: 12 }}>{isOpen ? '▼' : '▶'}</span>
+                  <span style={{ color: 'var(--muted)', display: 'inline-flex' }}>{isOpen ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}</span>
                   <span className="invoice-group-name">{label}</span>
                   <span className="invoice-group-meta">
                     {groupInvs.length} invoice{groupInvs.length !== 1 ? 's' : ''} · {formatMoney(groupTotal)}
                     {settings.usdToDop > 0 ? ` · RD$${(groupTotal * settings.usdToDop).toLocaleString('en-US',{maximumFractionDigits:0})}` : ''}
-                    {unpaid > 0 && <span style={{ marginLeft: 8, color: '#f87171', fontSize: 11 }}>● {unpaid} unpaid</span>}
+                    {unpaid > 0 && <span className="unpaid-dot" style={{ marginLeft: 8 }}>{unpaid} unpaid</span>}
                   </span>
                   <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
                     <button className="btn-xs btn-ghost" onClick={() => openQuickForProject(pId || undefined)}>+ Quick</button>
@@ -588,18 +595,18 @@ export default function InvoicePage() {
                                 {settings.usdToDop > 0 && <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>{dopLabel(Number(inv.subtotal)||0, settings.usdToDop)}</div>}
                               </td>
                               <td>
-                                <div style={{ display: 'flex', gap: 3, justifyContent: 'flex-end', flexWrap: 'nowrap' }}>
-                                  {inv.clientEmail && <button className="btn-xs btn-ghost" title="Email invoice" onClick={() => { emailInvoice(inv, settings); showToast(`Invoice ${inv.number} emailed to ${inv.clientEmail}`); const cId = clients.find(c => c.name === inv.clientName)?.id; if (cId) void logComm(cId, `Invoice ${inv.number} emailed (${formatMoney(Number(inv.subtotal)||0)})`, 'email') }}>✉</button>}
+                                <div className="icon-action-toolbar">
+                                  {inv.clientEmail && <button className="btn-icon-ghost" title="Email invoice" onClick={() => { emailInvoice(inv, settings); showToast(`Invoice ${inv.number} emailed to ${inv.clientEmail}`); const cId = clients.find(c => c.name === inv.clientName)?.id; if (cId) void logComm(cId, `Invoice ${inv.number} emailed (${formatMoney(Number(inv.subtotal)||0)})`, 'email') }}><IconMail size={14} /></button>}
                                   {inv.clientEmail && ['overdue','sent','partial'].includes((inv.status||'').toLowerCase()) && (
-                                    <button className="btn-xs btn-ghost" title="Payment reminder" onClick={() => { reminderEmail(inv, settings); showToast(`Payment reminder sent to ${inv.clientEmail}`); const cId = clients.find(c => c.name === inv.clientName)?.id; if (cId) void logComm(cId, `Payment reminder sent for Invoice ${inv.number}`, 'email') }}>⚠</button>
+                                    <button className="btn-icon-ghost" title="Payment reminder" onClick={() => { reminderEmail(inv, settings); showToast(`Payment reminder sent to ${inv.clientEmail}`); const cId = clients.find(c => c.name === inv.clientName)?.id; if (cId) void logComm(cId, `Payment reminder sent for Invoice ${inv.number}`, 'email') }}><IconAlert size={14} /></button>
                                   )}
-                                  <button className="btn-xs btn-ghost" title="Preview" onClick={() => setPreviewInv(inv)}>👁</button>
-                                  <button className="btn-xs btn-ghost" title="PDF" onClick={() => printInvoice(inv, 0, settings)}>⎙</button>
-                                  <button className="btn-xs btn-ghost" title="Share portal" onClick={() => shareInvoice(inv, settings.usdToDop)}>🔗</button>
-                                  <button className="btn-xs btn-ghost" title="Duplicate" onClick={() => duplicateInvoice(inv)}>⧉</button>
-                                  <button className="btn-xs btn-ghost" title="Edit invoice" onClick={() => openEditInvoice(inv)}>✏</button>
-                                  <button className="btn-xs btn-ghost" title="Update status" onClick={() => openStatusEdit(inv)}>✎</button>
-                                  <button className="btn-xs btn-danger" onClick={() => setConfirmDelete(inv.id)}>×</button>
+                                  <button className="btn-icon-ghost" title="Preview" onClick={() => setPreviewInv(inv)}><IconEye size={14} /></button>
+                                  <button className="btn-icon-ghost" title="PDF" onClick={() => printInvoice(inv, 0, settings)}><IconPrinter size={14} /></button>
+                                  <button className="btn-icon-ghost" title="Share portal" onClick={() => shareInvoice(inv, settings.usdToDop)}><IconLink size={14} /></button>
+                                  <button className="btn-icon-ghost" title="Duplicate" onClick={() => duplicateInvoice(inv)}><IconCopy size={14} /></button>
+                                  <button className="btn-icon-ghost" title="Edit invoice" onClick={() => openEditInvoice(inv)}><IconEdit size={14} /></button>
+                                  <button className="btn-icon-ghost" title="Update status" onClick={() => openStatusEdit(inv)}><IconStatus size={14} /></button>
+                                  <button className="btn-icon-ghost danger" title="Delete" onClick={() => setConfirmDelete(inv.id)}><IconTrash size={14} /></button>
                                 </div>
                               </td>
                             </tr>
@@ -625,7 +632,7 @@ export default function InvoicePage() {
           <div className="builder-modal" onClick={(e) => e.stopPropagation()}>
             <div className="builder-modal-header">
               <span>{editingInvoice ? `Edit Invoice — ${editingInvoice.number}` : 'New Invoice'}</span>
-              <button className="modal-close btn-icon" onClick={() => closeBuilder()}>✕</button>
+              <button className="modal-close btn-icon" onClick={() => closeBuilder()}><IconX size={14} /></button>
             </div>
             <div className="builder-modal-body">
               <InvoiceBuilder onCreated={closeBuilder} onCancel={() => closeBuilder()} initialProjectId={builderProjectId} editInvoice={editingInvoice} />
@@ -640,7 +647,7 @@ export default function InvoicePage() {
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">Quick Invoice <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 400 }}>· auto-marked Sent + emailed</span></h2>
-              <button className="modal-close btn-icon" onClick={() => setQuickModal(false)}>✕</button>
+              <button className="modal-close btn-icon" onClick={() => setQuickModal(false)}><IconX size={14} /></button>
             </div>
             <div className="modal-body">
               <div className="form-grid-2">
@@ -683,7 +690,7 @@ export default function InvoicePage() {
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">Update Status</h2>
-              <button className="modal-close btn-icon" onClick={() => setStatusModal(false)}>✕</button>
+              <button className="modal-close btn-icon" onClick={() => setStatusModal(false)}><IconX size={14} /></button>
             </div>
             <div className="modal-body">
               <div className="form-group">
@@ -750,7 +757,7 @@ export default function InvoicePage() {
           <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">Invoice Saved</h2>
-              <button className="modal-close btn-icon" onClick={() => setSendConfirmInv(null)}>✕</button>
+              <button className="modal-close btn-icon" onClick={() => setSendConfirmInv(null)}><IconX size={14} /></button>
             </div>
             <div className="modal-body">
               <p style={{ fontSize: 14, color: 'var(--soft)', marginBottom: 8 }}>
@@ -790,16 +797,8 @@ export default function InvoicePage() {
 
       {/* Toast notification */}
       {toast && (
-        <div style={{
-          position: 'fixed', bottom: 28, right: 28, zIndex: 9999,
-          background: '#1e293b', border: '1px solid var(--border)',
-          borderLeft: '3px solid #4ade80',
-          color: 'var(--text)', fontSize: 13, fontWeight: 500,
-          padding: '10px 16px', borderRadius: 8,
-          boxShadow: '0 4px 24px rgba(0,0,0,.4)',
-          maxWidth: 360, animation: 'fadeIn .2s ease',
-        }}>
-          ✓ {toast}
+        <div className="profile-toast">
+          <IconCheck size={14} /> {toast}
         </div>
       )}
 
@@ -813,8 +812,8 @@ export default function InvoicePage() {
                 <div style={{ fontSize: 12, color: 'var(--muted)' }}>{previewInv.clientName}</div>
               </div>
               <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <button className="btn-primary btn-sm" onClick={() => printInvoice(previewInv, 0, settings)}>⎙ Print / PDF</button>
-                <button className="modal-close btn-icon" onClick={() => setPreviewInv(null)}>✕</button>
+                <button className="btn-primary btn-sm" onClick={() => printInvoice(previewInv, 0, settings)}><IconPrinter size={14} /> Print / PDF</button>
+                <button className="modal-close btn-icon" onClick={() => setPreviewInv(null)}><IconX size={14} /></button>
               </div>
             </div>
             <iframe

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useRole } from '../../context/RoleContext'
+import { IconLock, IconUser, IconClock } from '../../components/Icon'
 import {
   loadPortalClient,
   loadPortalWorkingHours,
@@ -42,13 +43,7 @@ const TIMEZONES = [
 
 function Toast({ msg, ok }: { msg: string; ok: boolean }) {
   return (
-    <div style={{
-      position: 'fixed', bottom: 80, left: '50%', transform: 'translateX(-50%)',
-      zIndex: 9999, padding: '10px 22px', borderRadius: 12, fontSize: 13, fontWeight: 700,
-      background: ok ? '#15803d' : '#b91c1c',
-      color: '#fff', boxShadow: '0 4px 20px rgba(0,0,0,0.25)',
-      pointerEvents: 'none',
-    }}>
+    <div className={`portal-toast ${ok ? 'portal-toast-success' : 'portal-toast-error'}`}>
       {msg}
     </div>
   )
@@ -200,8 +195,9 @@ export default function PortalSettings() {
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40vh' }}>
-        <div style={{ color: 'var(--muted)', fontSize: 14 }}>Loading settings…</div>
+      <div className="loading-screen">
+        <div className="loading-spinner" />
+        <div className="loading-text">Loading settings…</div>
       </div>
     )
   }
@@ -221,26 +217,26 @@ export default function PortalSettings() {
       </div>
 
       {/* ── Account Info ─────────────────────────────────────────────────── */}
-      <Section title="Account" icon="👤" sub="Your profile information">
+      <Section title="Account" icon={<IconUser size={20} />} sub="Your profile information">
         <Row label="Name"    value={client?.name ?? '—'} />
         <Row label="Company" value={client?.company ?? '—'} />
         <Row label="Email"   value={authEmail ?? client?.email ?? '—'} sub="Contact your account manager to change your email" />
 
-        <div style={{ marginTop: 16 }}>
-          <label style={labelStyle}>Phone number</label>
+        <div className="mt-16">
+          <label className="form-label">Phone number</label>
           <div className="portal-settings-phone-row">
             <input
               type="tel"
               value={phone}
               onChange={e => setPhone(e.target.value)}
               placeholder="+1 (555) 000-0000"
-              style={inputStyle}
+              className="form-input"
             />
             <button
               className="btn-primary"
               onClick={() => void saveProfile()}
               disabled={savingAcct}
-              style={{ fontSize: 13, whiteSpace: 'nowrap' }}
+              style={{ whiteSpace: 'nowrap' }}
             >
               {savingAcct ? 'Saving…' : 'Save'}
             </button>
@@ -250,15 +246,15 @@ export default function PortalSettings() {
       </Section>
 
       {/* ── Working Hours ─────────────────────────────────────────────────── */}
-      <Section title="Working Hours" icon="🕐" sub="Let us know when you're available — your team will be scheduled accordingly">
+      <Section title="Working Hours" icon={<IconClock size={20} />} sub="Let us know when you're available — your team will be scheduled accordingly">
 
         {/* Timezone */}
-        <div style={{ marginBottom: 20 }}>
-          <label style={labelStyle}>Your timezone</label>
+        <div className="mb-20">
+          <label className="form-label">Your timezone</label>
           <select
             value={timezone}
             onChange={e => setTimezone(e.target.value)}
-            style={{ ...inputStyle, maxWidth: 320 }}
+            className="form-input max-w-320"
           >
             <option value="">— Select timezone —</option>
             {TIMEZONES.map(tz => (
@@ -268,7 +264,7 @@ export default function PortalSettings() {
         </div>
 
         {/* Per-day schedule */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+        <div className="flex-col" style={{ gap: 10, marginBottom: 20 }}>
           {DAYS.map(({ key, label }) => (
             <div key={key} className="portal-hours-row">
               <span className="portal-hours-day">{label}</span>
@@ -278,7 +274,7 @@ export default function PortalSettings() {
                   type="time"
                   value={hours[`${key}Start`] ?? ''}
                   onChange={e => setHours(h => ({ ...h, [`${key}Start`]: e.target.value || undefined }))}
-                  style={{ ...inputStyle, padding: '6px 10px', width: '100%' }}
+                  className="form-input form-input-sm w-full"
                 />
               </div>
               <div>
@@ -287,7 +283,7 @@ export default function PortalSettings() {
                   type="time"
                   value={hours[`${key}End`] ?? ''}
                   onChange={e => setHours(h => ({ ...h, [`${key}End`]: e.target.value || undefined }))}
-                  style={{ ...inputStyle, padding: '6px 10px', width: '100%' }}
+                  className="form-input form-input-sm w-full"
                 />
               </div>
             </div>
@@ -295,23 +291,22 @@ export default function PortalSettings() {
         </div>
 
         {/* Notes */}
-        <div style={{ marginBottom: 20 }}>
-          <label style={labelStyle}>Notes for your team</label>
+        <div className="mb-20">
+          <label className="form-label">Notes for your team</label>
           <textarea
             value={schedNotes}
             onChange={e => setSchedNotes(e.target.value)}
             rows={3}
             placeholder="e.g. Prefer calls in the morning, no Fridays after 3pm…"
-            style={{ ...inputStyle, width: '100%', resize: 'vertical', marginTop: 6 }}
+            className="form-textarea mt-6"
           />
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div className="flex items-center" style={{ gap: 12, flexWrap: 'wrap' }}>
           <button
             className="btn-primary"
             onClick={() => void saveHours()}
             disabled={savingHrs}
-            style={{ fontSize: 13 }}
           >
             {savingHrs ? 'Saving…' : 'Save Schedule'}
           </button>
@@ -320,45 +315,40 @@ export default function PortalSettings() {
       </Section>
 
       {/* ── Security ──────────────────────────────────────────────────────── */}
-      <Section title="Security" icon="🔒" sub="Change your portal password">
+      <Section title="Security" icon={<IconLock size={16} />} sub="Change your portal password">
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 400 }}>
+        <div className="flex-col max-w-400" style={{ gap: 14 }}>
           <div>
-            <label style={labelStyle}>New password</label>
+            <label className="form-label">New password</label>
             <input
               type="password"
               value={newPw}
               onChange={e => setNewPw(e.target.value)}
               placeholder="Minimum 8 characters"
-              style={{ ...inputStyle, marginTop: 6, width: '100%' }}
+              className="form-input mt-6 w-full"
             />
           </div>
           <div>
-            <label style={labelStyle}>Confirm new password</label>
+            <label className="form-label">Confirm new password</label>
             <input
               type="password"
               value={confirmPw}
               onChange={e => setConfirmPw(e.target.value)}
               placeholder="Repeat your new password"
-              style={{
-                ...inputStyle,
-                marginTop: 6,
-                width: '100%',
-                borderColor: confirmPw && confirmPw !== newPw ? '#ef4444' : undefined,
-              }}
+              className="form-input mt-6 w-full"
+              style={{ borderColor: confirmPw && confirmPw !== newPw ? '#ef4444' : undefined }}
             />
             {confirmPw && confirmPw !== newPw && (
-              <div style={{ fontSize: 12, color: '#ef4444', marginTop: 4 }}>Passwords do not match</div>
+              <div className="mt-4 text-warn" style={{ fontSize: 12 }}>Passwords do not match</div>
             )}
           </div>
         </div>
 
-        <div style={{ marginTop: 18, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <div className="mt-18 flex items-center" style={{ gap: 12, flexWrap: 'wrap' }}>
           <button
             className="btn-primary"
             onClick={() => void changePassword()}
             disabled={savingPw || !newPw || newPw !== confirmPw}
-            style={{ fontSize: 13 }}
           >
             {savingPw ? 'Updating…' : 'Change Password'}
           </button>
@@ -376,7 +366,7 @@ export default function PortalSettings() {
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function Section({ title, icon, sub, children }: {
-  title: string; icon: string; sub: string; children: React.ReactNode
+  title: string; icon: React.ReactNode; sub: string; children: React.ReactNode
 }) {
   return (
     <div className="portal-section">
@@ -384,8 +374,8 @@ function Section({ title, icon, sub, children }: {
       <div className="portal-section-header">
         <span style={{ fontSize: 20 }}>{icon}</span>
         <div>
-          <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--text)' }}>{title}</div>
-          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{sub}</div>
+          <div className="portal-section-title">{title}</div>
+          <div className="portal-section-sub">{sub}</div>
         </div>
       </div>
       {/* Section body */}
@@ -398,47 +388,23 @@ function Section({ title, icon, sub, children }: {
 
 function Row({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div style={{
-      display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
-      padding: '10px 0', borderBottom: '1px solid var(--border)',
-    }}>
+    <div className="settings-row-item">
       <div>
-        <div style={{ fontSize: 13, color: 'var(--muted)' }}>{label}</div>
-        {sub && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, opacity: 0.7 }}>{sub}</div>}
+        <div className="settings-row-label">{label}</div>
+        {sub && <div className="settings-row-sub">{sub}</div>}
       </div>
-      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', textAlign: 'right' }}>{value}</div>
+      <div className="settings-row-value">{value}</div>
     </div>
   )
 }
 
 function Feedback({ msg, ok, inline }: { msg: string; ok: boolean; inline?: boolean }) {
-  const style: React.CSSProperties = inline
-    ? { fontSize: 12, fontWeight: 600, color: ok ? '#15803d' : '#ef4444' }
-    : {
-        marginTop: 10, fontSize: 12, padding: '8px 12px',
-        background: ok ? 'rgba(34,197,94,.08)' : 'rgba(239,68,68,.08)',
-        border: `1px solid ${ok ? 'rgba(34,197,94,.2)' : 'rgba(239,68,68,.2)'}`,
-        borderRadius: 8, color: ok ? '#15803d' : '#ef4444', fontWeight: 600,
-      }
-  return <div style={style}>{msg}</div>
-}
-
-// ── Shared styles ─────────────────────────────────────────────────────────────
-
-const inputStyle: React.CSSProperties = {
-  fontSize: 13,
-  padding: '8px 12px',
-  borderRadius: 8,
-  border: '1px solid var(--border)',
-  background: 'var(--surf2)',
-  color: 'var(--text)',
-  outline: 'none',
-  boxSizing: 'border-box',
-}
-
-const labelStyle: React.CSSProperties = {
-  fontSize: 12,
-  fontWeight: 700,
-  color: 'var(--muted)',
-  display: 'block',
+  if (inline) {
+    return <span style={{ fontSize: 12, fontWeight: 600, color: ok ? '#15803d' : '#ef4444' }}>{msg}</span>
+  }
+  return (
+    <div className={`portal-message mt-10 ${ok ? 'portal-message-success' : 'portal-message-error'}`}>
+      {msg}
+    </div>
+  )
 }

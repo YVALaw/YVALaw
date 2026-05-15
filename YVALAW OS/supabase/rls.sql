@@ -3,12 +3,18 @@
 -- Run this once in the Supabase SQL Editor (Dashboard → SQL Editor)
 -- ============================================================
 
+-- ── Step 0: Private schema for helper functions ──────────────────────────────
+-- SECURITY DEFINER helpers live in `private` so PostgREST does not
+-- expose them as RPC endpoints (eliminates security-advisor warnings).
+CREATE SCHEMA IF NOT EXISTS private;
+GRANT USAGE ON SCHEMA private TO authenticated;
+
 -- ── Step 1: Helper function ───────────────────────────────────────────────────
 -- Returns the role of the currently authenticated user.
 -- SECURITY DEFINER means it runs with elevated privileges so it can
 -- always read user_roles regardless of other RLS policies.
 
-CREATE OR REPLACE FUNCTION public.current_user_role()
+CREATE OR REPLACE FUNCTION private.current_user_role()
 RETURNS TEXT
 LANGUAGE SQL
 SECURITY DEFINER
@@ -17,6 +23,8 @@ SET search_path = public
 AS $$
   SELECT role FROM public.user_roles WHERE user_id::text = auth.uid()::text LIMIT 1
 $$;
+
+GRANT EXECUTE ON FUNCTION private.current_user_role() TO authenticated;
 
 
 -- ── Step 2: Enable RLS on every table ────────────────────────────────────────
@@ -62,8 +70,8 @@ CREATE POLICY "settings_read"  ON settings
 
 CREATE POLICY "settings_write" ON settings
   FOR ALL TO authenticated
-  USING     (public.current_user_role() IN ('ceo', 'admin'))
-  WITH CHECK (public.current_user_role() IN ('ceo', 'admin'));
+  USING     (private.current_user_role() IN ('ceo', 'admin'))
+  WITH CHECK (private.current_user_role() IN ('ceo', 'admin'));
 
 
 -- ── Step 5: User roles table ──────────────────────────────────────────────────
@@ -80,12 +88,12 @@ CREATE POLICY "user_roles_self_insert" ON user_roles
 
 CREATE POLICY "user_roles_ceo_update" ON user_roles
   FOR UPDATE TO authenticated
-  USING     (public.current_user_role() = 'ceo')
-  WITH CHECK (public.current_user_role() = 'ceo');
+  USING     (private.current_user_role() = 'ceo')
+  WITH CHECK (private.current_user_role() = 'ceo');
 
 CREATE POLICY "user_roles_ceo_delete" ON user_roles
   FOR DELETE TO authenticated
-  USING (public.current_user_role() = 'ceo');
+  USING (private.current_user_role() = 'ceo');
 
 
 -- ── Step 6: Disable sign-ups (IMPORTANT) ─────────────────────────────────────
@@ -97,7 +105,10 @@ CREATE POLICY "user_roles_ceo_delete" ON user_roles
 -- This is strongly recommended before storing payment information.
 
 
--- ── Step 7: Verify ───────────────────────────────────────────────────────────
+-- ── Step 7: Clean up old public function (if migrating) ──────────────────────
+DROP FUNCTION IF EXISTS public.current_user_role();
+
+-- ── Step 8: Verify ───────────────────────────────────────────────────────────
 -- After running, verify in the Table Editor that each table shows
 -- "RLS enabled" in the top bar, and check the Policies tab to confirm
 -- each policy was created. You can test by logging in as a non-CEO user

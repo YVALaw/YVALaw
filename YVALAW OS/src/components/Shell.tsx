@@ -70,7 +70,7 @@ function GlobalSearch() {
   }
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div className="search-wrap">
       <input
         ref={inputRef}
         className="form-input"
@@ -83,28 +83,20 @@ function GlobalSearch() {
         onKeyDown={e => { if (e.key === 'Escape') { setQuery(''); setOpen(false) } }}
       />
       {open && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 6,
-          background: '#ffffff', border: '1px solid #e2e8f0',
-          borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,.12)', zIndex: 1000, overflow: 'hidden',
-        }}>
+        <div className="search-dropdown">
           {results.map((r, i) => (
             <div
               key={i}
               onMouseDown={() => pick(r)}
-              style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', cursor: 'pointer', borderBottom: i < results.length - 1 ? '1px solid #f0f2f7' : 'none' }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#f4f6fa')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              className="search-result-item"
             >
-              <span style={{
-                fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em',
+              <span className="search-result-type" style={{
                 color: TYPE_COLORS[r.type] || '#666',
                 background: TYPE_BG[r.type] || '#f4f6fa',
-                padding: '2px 7px', borderRadius: 999, minWidth: 60, textAlign: 'center',
               }}>{r.type}</span>
               <div style={{ flex: 1, overflow: 'hidden' }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: '#1e2330', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.label}</div>
-                {r.sub && <div style={{ fontSize: 11, color: '#7c8db5', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.sub}</div>}
+                <div className="search-result-label">{r.label}</div>
+                {r.sub && <div className="search-result-sub">{r.sub}</div>}
               </div>
             </div>
           ))}
@@ -245,6 +237,7 @@ export default function Shell({ children }: Props) {
 
   return (
     <div className="shell">
+      <a href="#main-content" className="skip-link">Skip to content</a>
       {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
 
       <aside className={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`}>
@@ -275,18 +268,9 @@ export default function Shell({ children }: Props) {
                   <span className="sidebar-nav-icon">{item.icon}</span>
                   <span>{item.label}</span>
                   {item.to === '/requests' && pendingRequests > 0 ? (
-                    <span style={{
-                      fontSize: 10, fontWeight: 800,
-                      background: '#ef4444', color: '#fff',
-                      padding: '1px 6px', borderRadius: 999, marginLeft: 'auto',
-                      minWidth: 18, textAlign: 'center',
-                    }}>
-                      {pendingRequests}
-                    </span>
+                    <span className="nav-badge nav-badge-red">{pendingRequests}</span>
                   ) : !builtRoutes.includes(item.to) ? (
-                    <span style={{ fontSize: 9, fontWeight: 700, background: 'rgba(250,204,21,.2)', color: '#facc15', padding: '1px 6px', borderRadius: 999, marginLeft: 'auto' }}>
-                      SOON
-                    </span>
+                    <span className="nav-badge nav-badge-soon">SOON</span>
                   ) : null}
                 </NavLink>
               ))}
@@ -306,7 +290,7 @@ export default function Shell({ children }: Props) {
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
             </span>
             <span>My Profile</span>
-            <span style={{ fontSize: 9, fontWeight: 700, background: 'rgba(250,204,21,.2)', color: '#facc15', padding: '1px 6px', borderRadius: 999, marginLeft: 'auto' }}>ME</span>
+            <span className="nav-badge nav-badge-soon">ME</span>
           </NavLink>
         )}
 
@@ -340,30 +324,20 @@ export default function Shell({ children }: Props) {
         <div className="topbar-actions">
           {/* Running timer pill */}
           {timer && (
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              background: 'rgba(250,204,21,.12)', border: '1px solid rgba(250,204,21,.3)',
-              borderRadius: 20, padding: '4px 12px 4px 10px', cursor: 'default',
-            }}>
-              <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#facc15', boxShadow: '0 0 0 3px rgba(250,204,21,.25)', animation: 'pulse 1.4s infinite' }} />
-              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)', fontVariantNumeric: 'tabular-nums' }}>
-                {formatElapsed(elapsed)}
-              </span>
+            <div className="timer-pill">
+              <span className="timer-dot" />
+              <span className="timer-text">{formatElapsed(elapsed)}</span>
               {timer.projectName && (
-                <span style={{ fontSize: 12, color: 'var(--muted)' }}>· {timer.projectName}</span>
+                <span className="timer-project">· {timer.projectName}</span>
               )}
               <button
+                className="timer-stop-btn"
                 onClick={() => {
                   const finished = stop()
                   if (finished) {
                     const hours = Math.round((elapsedSeconds(finished.startedAt) / 3600) * 100) / 100
                     if (hours > 0) navigate('/time')
                   }
-                }}
-                style={{
-                  marginLeft: 4, padding: '2px 8px', fontSize: 11, fontWeight: 700,
-                  background: '#ef4444', color: '#fff', border: 'none',
-                  borderRadius: 999, cursor: 'pointer',
                 }}
               >
                 Stop
@@ -375,7 +349,7 @@ export default function Shell({ children }: Props) {
         </div>
       </header>
 
-      <main className="main-content">
+      <main className="main-content" id="main-content">
         {children}
       </main>
     </div>

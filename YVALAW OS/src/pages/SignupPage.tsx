@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { IconCheck } from '../components/Icon'
 
 function passwordStrength(pw: string): { score: number; label: string; color: string } {
   let score = 0
@@ -56,7 +57,7 @@ export default function SignupPage() {
             border: '1px solid rgba(34,197,94,.25)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             margin: '0 auto 20px', fontSize: 24,
-          }}>✓</div>
+          }}><IconCheck size={14} /></div>
           <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)', marginBottom: 10 }}>Account created</div>
           <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 28, lineHeight: 1.6 }}>
             Your account is ready. An administrator will assign your role before you can access all features.

@@ -17,3 +17,27 @@ collections:
       - { label: "Description", name: "description", widget: "string", hint: "Short summary shown in the blog listing" }
       - { label: "Featured Image", name: "image", widget: "image", required: false }
       - { label: "Body", name: "body", widget: "markdown" }
+  - name: "jobs"
+    label: "Job Posts"
+    folder: "jobs"
+    create: true
+    slug: "{{slug}}"
+    fields:
+      - { label: "Job Title", name: "title", widget: "string" }
+      - { label: "Publish Date", name: "date", widget: "datetime" }
+      - { label: "Status", name: "status", widget: "select", default: "Open", options: ["Open", "Closed"] }
+      - { label: "Featured In Hero", name: "featured", widget: "boolean", default: false, required: false }
+      - { label: "Location", name: "location", widget: "string", default: "Remote" }
+      - { label: "Schedule", name: "schedule", widget: "string", default: "Full / Part-time" }
+      - { label: "Icon", name: "icon", widget: "string", required: false, hint: "Lucide icon name like phone, scale, file-text, users, share-2, layout, megaphone" }
+      - { label: "Short Description", name: "description", widget: "text", hint: "Shown on the careers page card" }
+      - label: "Key Skills"
+        name: "skills"
+        widget: "list"
+        min: 1
+        summary: "{{fields.skill}}"
+        field:
+          label: "Skill"
+          name: "skill"
+          widget: "string"
+      - { label: "Full Notes", name: "body", widget: "markdown", required: false, hint: "Optional internal notes or a fuller job description for later use" }

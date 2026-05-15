@@ -3,6 +3,7 @@ import type { Client, Employee, Project, TimeEntry } from '../data/types'
 import { loadTimeEntries, saveTimeEntries, loadEmployees, loadProjects, loadClients } from '../services/storage'
 import { supabase } from '../lib/supabase'
 import { useActiveTimer, formatElapsed, elapsedSeconds } from '../hooks/useActiveTimer'
+import { IconPlay, IconCheck, IconEdit, IconTrash } from '../components/Icon'
 
 function uid() { return crypto.randomUUID() }
 function getToday() { return new Date().toISOString().slice(0, 10) }
@@ -252,7 +253,7 @@ export default function TimeTrackingPage() {
             </div>
           ) : (
             <button className="btn-primary" onClick={handleStartTimer} disabled={!currentName}>
-              ▶ Start Timer
+              <IconPlay size={14} /> Start Timer
             </button>
           )}
           <button className="btn-ghost btn-sm" onClick={openCreate}>+ Log Manual</button>
@@ -381,13 +382,13 @@ export default function TimeTrackingPage() {
                     </td>
                     <td>
                       {entry.billable
-                        ? <span className="badge-green" style={{ fontSize: 11 }}>✓ Billable</span>
+                        ? <span className="badge-green" style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 3 }}><IconCheck size={10} /> Billable</span>
                         : <span style={{ fontSize: 11, color: 'var(--muted)' }}>Unbillable</span>}
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                        <button className="btn-ghost btn-sm" onClick={() => openEdit(entry)} style={{ padding: '3px 7px', fontSize: 13 }}>✏️</button>
-                        <button className="btn-ghost btn-sm" onClick={() => setConfirmDelete(entry.id)} style={{ padding: '3px 7px', fontSize: 13, color: '#ef4444' }}>🗑</button>
+                        <button className="btn-ghost btn-sm" onClick={() => openEdit(entry)} style={{ padding: '3px 7px', fontSize: 13 }}><IconEdit size={13} /></button>
+                        <button className="btn-ghost btn-sm" onClick={() => setConfirmDelete(entry.id)} style={{ padding: '3px 7px', fontSize: 13, color: '#ef4444' }}><IconTrash size={13} /></button>
                       </div>
                     </td>
                   </tr>

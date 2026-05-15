@@ -5,6 +5,7 @@ import { loadSnapshot, saveProjects, loadTasks, saveTasks, loadExpenses, saveExp
 import { formatMoney } from '../utils/money'
 import { uploadFile, deleteFile } from '../services/fileStorage'
 import MentionInput from '../components/MentionInput'
+import { IconX, IconTrash, IconDollar, IconWallet, IconReceipt, IconUsers } from '../components/Icon'
 
 function uid() { return crypto.randomUUID() }
 
@@ -386,16 +387,21 @@ export default function ProjectProfilePage() {
 
       {/* KPIs */}
       {!editing && (
-        <div className="profile-kpi-grid">
+        <div className="kpi-grid">
           {[
-            { label: 'Total Billed', value: formatMoney(totalBilled), color: 'var(--gold)' },
-            { label: 'Budget', value: projectNN.budget ? formatMoney(projectNN.budget) : '—', color: 'var(--text)' },
-            { label: 'Expenses', value: totalExpenses > 0 ? formatMoney(totalExpenses) : '$0', color: '#f87171' },
-            { label: 'Team Size', value: String(assignedEmps.length), color: '#c084fc' },
-          ].map(({ label, value, color }) => (
-            <div key={label} className="settings-stat-card">
-              <div className="settings-stat-count" style={{ color, fontSize: 18 }}>{value}</div>
-              <div className="settings-stat-label">{label}</div>
+            { label: 'Total Billed', value: formatMoney(totalBilled), icon: <IconDollar size={18} />, color: 'var(--gold)' },
+            { label: 'Budget', value: projectNN.budget ? formatMoney(projectNN.budget) : '—', icon: <IconWallet size={18} />, color: 'var(--text)' },
+            { label: 'Expenses', value: totalExpenses > 0 ? formatMoney(totalExpenses) : '$0', icon: <IconReceipt size={18} />, color: '#f87171' },
+            { label: 'Team Size', value: String(assignedEmps.length), icon: <IconUsers size={18} />, color: '#c084fc' },
+          ].map(({ label, value, icon, color }) => (
+            <div key={label} className="kpi-card-sm">
+              <div className="kpi-icon-wrap" style={{ color, borderColor: color + '25' }}>
+                {icon}
+              </div>
+              <div className="kpi-body">
+                <div className="kpi-label">{label}</div>
+                <div className="kpi-value" style={{ color }}>{value}</div>
+              </div>
             </div>
           ))}
         </div>
@@ -463,7 +469,7 @@ export default function ProjectProfilePage() {
                       {form.links.map((lk, i) => (
                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <a href={lk.url} target="_blank" rel="noopener noreferrer" style={{ flex: 1, fontSize: 12, color: 'var(--gold)' }}>{lk.label}</a>
-                          <button className="btn-icon btn-danger" style={{ padding: '2px 6px', fontSize: 11 }} onClick={() => removeLink(i)}>×</button>
+                          <button className="btn-icon btn-danger" style={{ padding: '2px 6px', fontSize: 11 }} onClick={() => removeLink(i)}><IconX size={12} /></button>
                         </div>
                       ))}
                       <div style={{ display: 'flex', gap: 6 }}>
@@ -601,7 +607,7 @@ export default function ProjectProfilePage() {
                         )}
                         {t.assigneeName && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{t.assigneeName}</div>}
                         {t.dueDate && <div style={{ fontSize: 11, color: '#f5b533', marginTop: 2 }}>Due: {t.dueDate}</div>}
-                        <button className="btn-icon btn-danger" style={{ fontSize: 10, padding: '1px 5px', marginTop: 4, opacity: .6 }} onClick={() => deleteTask(t.id)}>×</button>
+                        <button className="btn-icon btn-danger" style={{ fontSize: 10, padding: '1px 5px', marginTop: 4, opacity: .6 }} onClick={() => deleteTask(t.id)}><IconTrash size={10} /></button>
                       </div>
                     ))}
                   </div>
@@ -664,7 +670,7 @@ export default function ProjectProfilePage() {
                         <td className="td-muted">{exp.category || '—'}</td>
                         <td className="td-muted">{exp.date}</td>
                         <td style={{ color: '#f87171', fontWeight: 700 }}>{formatMoney(exp.amount)}</td>
-                        <td><button className="btn-icon btn-danger" style={{ fontSize: 11, padding: '2px 5px' }} onClick={() => deleteExpense(exp.id)}>×</button></td>
+                        <td><button className="btn-icon btn-danger" style={{ fontSize: 11, padding: '2px 5px' }} onClick={() => deleteExpense(exp.id)}><IconTrash size={12} /></button></td>
                       </tr>
                     ))}
                   </tbody>
@@ -728,7 +734,7 @@ export default function ProjectProfilePage() {
                     <td>
                       <div style={{ display: 'flex', gap: 4 }}>
                         <button className="btn-ghost btn-sm" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => openEditContractPanel(c)}>Edit</button>
-                        <button className="btn-icon btn-danger" style={{ fontSize: 11, padding: '2px 6px' }} onClick={() => { if (window.confirm(`Delete contract "${c.title}"?`)) deleteContract(c) }}>×</button>
+                        <button className="btn-icon btn-danger" style={{ fontSize: 11, padding: '2px 6px' }} onClick={() => { if (window.confirm(`Delete contract "${c.title}"?`)) deleteContract(c) }}><IconTrash size={12} /></button>
                       </div>
                     </td>
                   </tr>
@@ -755,7 +761,7 @@ export default function ProjectProfilePage() {
               <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text)' }}>
                 {contractEditId ? 'Edit Contract' : 'Add Contract'}
               </div>
-              <button className="btn-icon" style={{ fontSize: 18, color: 'var(--muted)' }} onClick={() => setContractPanelOpen(false)}>×</button>
+              <button className="btn-icon" style={{ fontSize: 18, color: 'var(--muted)' }} onClick={() => setContractPanelOpen(false)}><IconX size={16} /></button>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>

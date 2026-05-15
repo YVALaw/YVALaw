@@ -8,6 +8,7 @@ import {
   loadInvoices, loadUserRoles, upsertUserRole, type UserRoleRow,
 } from '../services/storage'
 import { supabase } from '../lib/supabase'
+import { IconCheck } from '../components/Icon'
 import { initiateGmailAuth, disconnectGmail, isGmailConnected, sendEmail } from '../services/gmail'
 import { useRole } from '../context/RoleContext'
 import { can, ROLE_LABELS, ROLE_OPTIONS } from '../lib/roles'
@@ -574,7 +575,7 @@ export default function SettingsPage() {
               <div className="settings-row-info">
                 <div className="settings-row-label">Connected Account</div>
                 <div className="settings-row-sub" style={{ color: '#22c55e' }}>
-                  ✓ Emails sent via Gmail as <strong>{gmailEmail}</strong>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconCheck size={12} /> Emails sent via Gmail as <strong>{gmailEmail}</strong></span>
                 </div>
               </div>
               <button className="btn-ghost btn-sm" style={{ color: '#f87171' }}

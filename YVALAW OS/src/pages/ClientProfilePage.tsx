@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { ActivityLogEntry, Client, ClientDocument, CommEntryType, Contract, ContractStatus, Invoice, Project, PaymentAttempt } from '../data/types'
 import { loadSnapshot, saveClients, loadActivityLog, saveActivityLog, loadSettings, loadClientDocuments, addClientDocument, removeClientDocument, loadClientBillingSummary, type ClientBillingSummary } from '../services/storage'
 import { sendEmail } from '../services/gmail'
 import { uploadFile, deleteFile } from '../services/fileStorage'
 import { supabase } from '../lib/supabase'
+import { IconMail, IconLink, IconEye, IconX, IconTrash, IconLock, IconMessage, IconPhone, IconHandshake, IconZap, IconCamera } from '../components/Icon'
 
 function uid() { return crypto.randomUUID() }
 
@@ -509,7 +510,7 @@ export default function ClientProfilePage() {
               ? <img className="avatar-photo" src={photoUrl} alt={clientNN.name} />
               : <div className="avatar profile-avatar" style={{ background: color }}>{initials(clientNN.name)}</div>
             }
-            <span className="avatar-cam">📷</span>
+            <span className="avatar-cam"><IconCamera size={14} /></span>
           </div>
           <div>
             {editing
@@ -533,6 +534,7 @@ export default function ClientProfilePage() {
             <>
               <span className={`badge ${statusBadge(clientNN.status || 'lead')}`} style={{ fontSize: 13 }}>{clientNN.status || 'Lead'}</span>
               <span
+                className={`portal-status-badge ${portalBilling.autoPayEnabled ? 'portal-status-green' : portalBilling.hasSavedPaymentMethod ? 'portal-status-yellow' : 'portal-status-gray'}`}
                 title={
                   portalBilling.autoPayEnabled
                     ? `AutoPay authorized${fmtDateTime(portalBilling.autoPayAuthorizedAt) ? ` on ${fmtDateTime(portalBilling.autoPayAuthorizedAt)}` : ''}`
@@ -542,41 +544,19 @@ export default function ClientProfilePage() {
                         ? 'Client portal account exists, but no AutoPay authorization yet'
                         : 'No client portal account yet'
                 }
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 5,
-                  padding: '5px 10px',
-                  borderRadius: 999,
-                  fontSize: 12,
-                  fontWeight: 800,
-                  background: portalBilling.autoPayEnabled ? 'rgba(34,197,94,.1)' : portalBilling.hasSavedPaymentMethod ? 'rgba(245,181,51,.12)' : 'var(--surf2)',
-                  color: portalBilling.autoPayEnabled ? '#15803d' : portalBilling.hasSavedPaymentMethod ? '#a16207' : 'var(--muted)',
-                  border: `1px solid ${portalBilling.autoPayEnabled ? 'rgba(34,197,94,.22)' : portalBilling.hasSavedPaymentMethod ? 'rgba(245,181,51,.26)' : 'var(--border)'}`,
-                }}
               >
                 {portalBilling.autoPayEnabled ? 'AutoPay On' : portalBilling.hasSavedPaymentMethod ? 'Card Saved' : portalBilling.hasPortalAccount ? 'AutoPay Off' : 'No Portal'}
               </span>
               {portalBilling.lastAttempt?.status === 'failed' && (
                 <span
+                  className="portal-status-badge portal-status-red"
                   title={portalBilling.lastAttempt.failureReason || 'Latest payment attempt failed'}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    padding: '5px 10px',
-                    borderRadius: 999,
-                    fontSize: 12,
-                    fontWeight: 800,
-                    background: 'rgba(239,68,68,.1)',
-                    color: '#dc2626',
-                    border: '1px solid rgba(239,68,68,.22)',
-                  }}
                 >
                   Payment Failed
                 </span>
               )}
               {outstanding > 0 && clientNN.email && (
-                <button className="btn-ghost btn-sm" style={{ color: '#fb923c' }} onClick={sendReminder}>✉ Remind</button>
+                <button className="btn-ghost btn-sm" style={{ color: '#fb923c' }} onClick={sendReminder}><IconMail size={12} /> Remind</button>
               )}
               <button
                 className="btn-ghost btn-sm"
@@ -585,7 +565,7 @@ export default function ClientProfilePage() {
                 title="Send client portal invitation email"
                 style={{ color: 'var(--gold)', borderColor: 'rgba(250,204,21,0.3)' }}
               >
-                {inviteLoading === 'email' ? 'Sending…' : '🔑 Email Invite'}
+                {inviteLoading === 'email' ? 'Sending…' : <><IconLock size={12} /> Email Invite</>}
               </button>
               <button
                 className="btn-ghost btn-sm"
@@ -594,7 +574,7 @@ export default function ClientProfilePage() {
                 title="Create and copy a portal invite link to send manually"
                 style={{ color: '#16a34a', borderColor: 'rgba(22,163,74,0.25)' }}
               >
-                {inviteLoading === 'link' ? 'Creating…' : '🔗 Copy Invite Link'}
+                {inviteLoading === 'link' ? 'Creating…' : <><IconLink size={12} /> Copy Invite Link</>}
               </button>
               <button
                 className="btn-ghost btn-sm"
@@ -602,7 +582,7 @@ export default function ClientProfilePage() {
                 title="Preview this client's portal view"
                 style={{ color: '#60a5fa', borderColor: 'rgba(96,165,250,0.3)' }}
               >
-                👁 Preview Portal
+                <><IconEye size={12} /> Preview Portal</>
               </button>
               <button className="btn-ghost btn-sm" onClick={() => setEditing(true)}>Edit Profile</button>
               <button className="btn-danger btn-sm" onClick={() => setConfirmDelete(true)}>Delete</button>
@@ -703,7 +683,7 @@ export default function ClientProfilePage() {
                       {form.links.map((lk, i) => (
                         <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           <a href={lk.url} target="_blank" rel="noopener noreferrer" style={{ flex: 1, fontSize: 12, color: 'var(--gold)' }}>{lk.label}</a>
-                          <button className="btn-icon btn-danger" style={{ padding: '2px 6px', fontSize: 11 }} onClick={() => removeLink(i)}>×</button>
+                          <button className="btn-icon btn-danger" style={{ padding: '2px 6px', fontSize: 11 }} onClick={() => removeLink(i)}><IconX size={12} /></button>
                         </div>
                       ))}
                       <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
@@ -883,7 +863,7 @@ export default function ClientProfilePage() {
           {/* Type selector + input */}
           <div className="profile-comm-type-row">
             {(['note','call','email','meeting'] as CommEntryType[]).map(t => {
-              const icons: Record<string, string> = { note: '💬', call: '📞', email: '📧', meeting: '🤝' }
+              const icons: Record<string, React.ReactNode> = { note: <IconMessage size={12} />, call: <IconPhone size={12} />, email: <IconMail size={12} />, meeting: <IconHandshake size={12} /> }
               const active = activityType === t
               return (
                 <button key={t} onClick={() => setActivityType(t)} style={{
@@ -922,12 +902,12 @@ export default function ClientProfilePage() {
             <div className="profile-timeline">
               {activityLog.map((entry, idx) => {
                 const type = entry.type || 'note'
-                const cfg: Record<string, { icon: string; color: string; bg: string }> = {
-                  note:    { icon: '💬', color: '#64748b', bg: '#f8fafc' },
-                  call:    { icon: '📞', color: '#3b82f6', bg: '#eff6ff' },
-                  email:   { icon: '📧', color: '#a16207', bg: '#fefce8' },
-                  meeting: { icon: '🤝', color: '#7e22ce', bg: '#faf5ff' },
-                  system:  { icon: '⚡', color: '#15803d', bg: '#f0fdf4' },
+                const cfg: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
+                  note:    { icon: <IconMessage size={12} />, color: '#64748b', bg: '#f8fafc' },
+                  call:    { icon: <IconPhone size={12} />, color: '#3b82f6', bg: '#eff6ff' },
+                  email:   { icon: <IconMail size={12} />, color: '#a16207', bg: '#fefce8' },
+                  meeting: { icon: <IconHandshake size={12} />, color: '#7e22ce', bg: '#faf5ff' },
+                  system:  { icon: <IconZap size={12} />, color: '#15803d', bg: '#f0fdf4' },
                 }
                 const c = cfg[type] || cfg.note
                 return (
@@ -943,7 +923,7 @@ export default function ClientProfilePage() {
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: 8, flexShrink: 0,
                     }}>
-                      {c.icon.slice(0, 2)}
+                      {c.icon}
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5 }}>{entry.note}</div>
@@ -956,7 +936,7 @@ export default function ClientProfilePage() {
                     </div>
                     {!entry.auto && (
                       <button className="btn-icon" style={{ fontSize: 12, color: 'var(--muted)', padding: '2px 5px', alignSelf: 'flex-start' }}
-                        onClick={() => deleteActivity(entry.id)}>×</button>
+                        onClick={() => deleteActivity(entry.id)}><IconX size={12} /></button>
                     )}
                   </div>
                 )
@@ -1019,7 +999,7 @@ export default function ClientProfilePage() {
                     <td>
                       <div style={{ display: 'flex', gap: 4 }}>
                         <button className="btn-ghost btn-sm" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => openEditContractPanel(c)}>Edit</button>
-                        <button className="btn-icon btn-danger" style={{ fontSize: 11, padding: '2px 6px' }} onClick={() => { if (window.confirm(`Delete contract "${c.title}"?`)) deleteContract(c) }}>×</button>
+                        <button className="btn-icon btn-danger" style={{ fontSize: 11, padding: '2px 6px' }} onClick={() => { if (window.confirm(`Delete contract "${c.title}"?`)) deleteContract(c) }}><IconTrash size={12} /></button>
                       </div>
                     </td>
                   </tr>
@@ -1103,7 +1083,7 @@ export default function ClientProfilePage() {
                   className="btn-icon btn-danger"
                   style={{ fontSize: 11, padding: '2px 6px', flexShrink: 0 }}
                   onClick={() => { if (window.confirm(`Remove "${doc.name}"?`)) void deleteClientDoc(doc) }}
-                >×</button>
+                ><IconX size={12} /></button>
               </div>
             ))}
           </div>
@@ -1122,7 +1102,7 @@ export default function ClientProfilePage() {
               <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text)' }}>
                 {contractEditId ? 'Edit Contract' : 'Add Contract'}
               </div>
-              <button className="btn-icon" style={{ fontSize: 18, color: 'var(--muted)' }} onClick={() => setContractPanelOpen(false)}>×</button>
+              <button className="btn-icon" style={{ fontSize: 18, color: 'var(--muted)' }} onClick={() => setContractPanelOpen(false)}><IconX size={16} /></button>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>

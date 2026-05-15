@@ -130,7 +130,6 @@
                 <a href="index.html#service-pillars" class="hover:text-yellow-500 transition-colors">Services</a>
                 <a href="index.html#how-it-works" class="hover:text-yellow-500 transition-colors">How It Works</a>
                 <a href="index.html#about" class="hover:text-yellow-500 transition-colors">About</a>
-                <a href="careers.html" class="text-yellow-500 border-b-2 border-yellow-400 pb-0.5">Careers</a>
                 <a href="blog.html" class="hover:text-yellow-500 transition-colors">Blog</a>
                 <button onclick="openApplyModal()" class="bg-[#1b1e2b] text-white px-8 py-3.5 rounded-full hover:bg-yellow-500 hover:text-[#1b1e2b] transition-all flex items-center gap-2 shadow-lg hover:shadow-yellow-100">
                     Apply Now <i data-lucide="send" class="w-4 h-4"></i>
@@ -174,9 +173,6 @@
             <a href="index.html#about" class="mobile-nav-link flex items-center gap-3 px-4 py-4 rounded-2xl text-white font-black text-sm uppercase tracking-widest hover:bg-white/10 hover:text-yellow-400 transition-all">
                 <i data-lucide="info" class="w-4 h-4 text-yellow-400"></i> About
             </a>
-            <a href="careers.html" class="flex items-center gap-3 px-4 py-4 rounded-2xl bg-white/10 text-yellow-400 font-black text-sm uppercase tracking-widest">
-                <i data-lucide="user-plus" class="w-4 h-4 text-yellow-400"></i> Careers
-            </a>
             <a href="blog.html" class="mobile-nav-link flex items-center gap-3 px-4 py-4 rounded-2xl text-white font-black text-sm uppercase tracking-widest hover:bg-white/10 hover:text-yellow-400 transition-all">
                 <i data-lucide="book-open" class="w-4 h-4 text-yellow-400"></i> Blog
             </a>
@@ -210,10 +206,10 @@
                         <i data-lucide="user-plus" class="w-4 h-4"></i> Now Hiring Worldwide
                     </div>
                     <h1 class="text-5xl lg:text-[4.5rem] font-black text-white leading-[0.95] tracking-tight">
-                        Build Your Career <span class="text-yellow-400">Remotely.</span>
+                        Build Your Next <span class="text-yellow-400">Remote Role.</span>
                     </h1>
                     <p class="text-xl text-slate-300 font-medium leading-relaxed max-w-xl">
-                        Join a growing team of bilingual professionals making a real impact for U.S. law firms — from anywhere in the world. Remote-first, growth-focused, and people-first.
+                        Join a bilingual team supporting U.S. law firms with real responsibility, consistent work, and room to grow. We keep the hiring process simple and the opportunities current.
                     </p>
                     <div class="flex flex-col sm:flex-row gap-4 pt-2">
                         <button onclick="openApplyModal()" class="bg-yellow-400 text-[#1b1e2b] px-10 py-5 rounded-2xl font-black text-lg flex items-center justify-center gap-3 hover:bg-yellow-300 hover:translate-y-[-4px] transition-all shadow-2xl shadow-yellow-400/20">
@@ -230,8 +226,8 @@
                             <p class="text-slate-400 text-sm font-medium">Active Team Members</p>
                         </div>
                         <div>
-                            <p class="text-3xl font-black text-yellow-400">7</p>
-                            <p class="text-slate-400 text-sm font-medium">Open Roles</p>
+                            <p id="open-roles-count" class="text-3xl font-black text-yellow-400">0</p>
+                            <p class="text-slate-400 text-sm font-medium">Open Roles Right Now</p>
                         </div>
                         <div>
                             <p class="text-3xl font-black text-yellow-400">100%</p>
@@ -250,29 +246,18 @@
                                         <i data-lucide="globe" class="w-7 h-7 text-[#1b1e2b]"></i>
                                     </div>
                                     <div>
-                                        <p class="font-black text-[#1b1e2b] text-lg leading-tight">Work From Anywhere</p>
-                                        <p class="text-slate-500 text-sm">Global team, remote-first</p>
+                                        <p class="font-black text-[#1b1e2b] text-lg leading-tight">Fresh Openings</p>
+                                        <p class="text-slate-500 text-sm">Published live from our CMS</p>
                                     </div>
                                 </div>
-                                <div class="space-y-3">
+                                <div id="featured-roles-preview" class="space-y-3">
                                     <div class="flex items-center gap-3 bg-slate-50 rounded-xl p-3">
-                                        <div class="w-2 h-2 bg-emerald-400 rounded-full flex-shrink-0"></div>
-                                        <span class="text-sm font-bold text-slate-700">Legal Intake Specialist</span>
-                                        <span class="ml-auto text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">Open</span>
-                                    </div>
-                                    <div class="flex items-center gap-3 bg-slate-50 rounded-xl p-3">
-                                        <div class="w-2 h-2 bg-emerald-400 rounded-full flex-shrink-0"></div>
-                                        <span class="text-sm font-bold text-slate-700">Demand Writer</span>
-                                        <span class="ml-auto text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">Open</span>
-                                    </div>
-                                    <div class="flex items-center gap-3 bg-slate-50 rounded-xl p-3">
-                                        <div class="w-2 h-2 bg-emerald-400 rounded-full flex-shrink-0"></div>
-                                        <span class="text-sm font-bold text-slate-700">Social Media Manager</span>
-                                        <span class="ml-auto text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">Open</span>
+                                        <div class="w-2 h-2 bg-yellow-400 rounded-full flex-shrink-0"></div>
+                                        <span class="text-sm font-bold text-slate-700">Loading current roles...</span>
                                     </div>
                                 </div>
                             </div>
-                            <div class="absolute -top-4 -right-4 bg-yellow-400 text-[#1b1e2b] px-4 py-2 rounded-2xl font-black text-sm shadow-lg">
+                            <div id="featured-roles-badge" class="absolute -top-4 -right-4 bg-yellow-400 text-[#1b1e2b] px-4 py-2 rounded-2xl font-black text-sm shadow-lg">
                                 Now Hiring
                             </div>
                         </div>
@@ -334,202 +319,23 @@
                 <div class="inline-flex items-center gap-2 bg-yellow-400 text-[#1b1e2b] px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider mb-4">
                     <i data-lucide="briefcase" class="w-4 h-4"></i> Open Positions
                 </div>
-                <h2 class="text-4xl lg:text-5xl font-black text-[#1b1e2b] leading-tight">Find Your Role</h2>
-                <p class="text-slate-500 text-lg font-medium mt-4 max-w-2xl mx-auto">We're growing fast and looking for dedicated professionals across multiple disciplines.</p>
+                <h2 class="text-4xl lg:text-5xl font-black text-[#1b1e2b] leading-tight">Current Openings</h2>
+                <p class="text-slate-500 text-lg font-medium mt-4 max-w-2xl mx-auto">Every role below is managed from Netlify CMS, so this page stays current without code edits whenever you publish a new opening.</p>
+            </div>
+            <div id="jobs-loading" class="flex flex-col items-center justify-center py-16">
+                <div class="w-12 h-12 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin mb-4"></div>
+                <p class="text-slate-500 font-bold text-sm uppercase tracking-widest">Loading current openings...</p>
             </div>
 
-            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-
-                <!-- Legal Intake Specialist -->
-                <div class="role-card bg-white border-2 border-slate-100 rounded-3xl p-8 flex flex-col">
-                    <div class="flex items-start justify-between mb-6">
-                        <div class="bg-[#1b1e2b] w-14 h-14 rounded-2xl flex items-center justify-center">
-                            <i data-lucide="phone" class="w-7 h-7 text-yellow-400"></i>
-                        </div>
-                        <span class="bg-emerald-50 text-emerald-700 text-xs font-black uppercase tracking-wider px-3 py-1.5 rounded-full border border-emerald-200">Open</span>
-                    </div>
-                    <h3 class="font-black text-[#1b1e2b] text-xl mb-2">Legal Intake Specialist</h3>
-                    <div class="flex items-center gap-4 mb-4">
-                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i> Remote</span>
-                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> Full / Part-time</span>
-                    </div>
-                    <p class="text-slate-500 text-sm font-medium leading-relaxed mb-6 flex-1">Handle first contact with potential clients. Screen inquiries, capture intake forms, schedule consultations, and follow up on leads for U.S. law firms.</p>
-                    <div class="space-y-2 mb-6">
-                        <p class="text-xs font-black text-slate-400 uppercase tracking-widest">Key Skills</p>
-                        <div class="flex flex-wrap gap-2">
-                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">English/Spanish</span>
-                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">CRM</span>
-                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Communication</span>
-                        </div>
-                    </div>
-                    <button onclick="openApplyModal('Legal Intake Specialist')" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all flex items-center justify-center gap-2">
-                        Apply Now <i data-lucide="arrow-right" class="w-4 h-4"></i>
-                    </button>
+            <div id="jobs-empty" class="hidden bg-slate-50 border border-slate-200 rounded-3xl px-8 py-12 text-center">
+                <div class="w-16 h-16 bg-white border border-slate-200 rounded-3xl flex items-center justify-center mx-auto mb-5">
+                    <i data-lucide="briefcase-business" class="w-7 h-7 text-slate-400"></i>
                 </div>
-
-                <!-- Legal Assistant -->
-                <div class="role-card bg-white border-2 border-slate-100 rounded-3xl p-8 flex flex-col">
-                    <div class="flex items-start justify-between mb-6">
-                        <div class="bg-[#1b1e2b] w-14 h-14 rounded-2xl flex items-center justify-center">
-                            <i data-lucide="scale" class="w-7 h-7 text-yellow-400"></i>
-                        </div>
-                        <span class="bg-emerald-50 text-emerald-700 text-xs font-black uppercase tracking-wider px-3 py-1.5 rounded-full border border-emerald-200">Open</span>
-                    </div>
-                    <h3 class="font-black text-[#1b1e2b] text-xl mb-2">Legal Assistant</h3>
-                    <div class="flex items-center gap-4 mb-4">
-                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i> Remote</span>
-                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> Full / Part-time</span>
-                    </div>
-                    <p class="text-slate-500 text-sm font-medium leading-relaxed mb-6 flex-1">Support attorneys with calendar management, client correspondence, case file organization, deadline tracking, and document drafting.</p>
-                    <div class="space-y-2 mb-6">
-                        <p class="text-xs font-black text-slate-400 uppercase tracking-widest">Key Skills</p>
-                        <div class="flex flex-wrap gap-2">
-                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Legal Knowledge</span>
-                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Organization</span>
-                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Drafting</span>
-                        </div>
-                    </div>
-                    <button onclick="openApplyModal('Legal Assistant')" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all flex items-center justify-center gap-2">
-                        Apply Now <i data-lucide="arrow-right" class="w-4 h-4"></i>
-                    </button>
-                </div>
-
-                <!-- Demand Writer -->
-                <div class="role-card bg-white border-2 border-slate-100 rounded-3xl p-8 flex flex-col">
-                    <div class="flex items-start justify-between mb-6">
-                        <div class="bg-[#1b1e2b] w-14 h-14 rounded-2xl flex items-center justify-center">
-                            <i data-lucide="file-text" class="w-7 h-7 text-yellow-400"></i>
-                        </div>
-                        <span class="bg-emerald-50 text-emerald-700 text-xs font-black uppercase tracking-wider px-3 py-1.5 rounded-full border border-emerald-200">Open</span>
-                    </div>
-                    <h3 class="font-black text-[#1b1e2b] text-xl mb-2">Demand Writer</h3>
-                    <div class="flex items-center gap-4 mb-4">
-                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i> Remote</span>
-                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> Full / Part-time</span>
-                    </div>
-                    <p class="text-slate-500 text-sm font-medium leading-relaxed mb-6 flex-1">Review medical records, calculate damages, and draft professional demand letters and settlement packages for personal injury and employment law firms.</p>
-                    <div class="space-y-2 mb-6">
-                        <p class="text-xs font-black text-slate-400 uppercase tracking-widest">Key Skills</p>
-                        <div class="flex flex-wrap gap-2">
-                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Legal Writing</span>
-                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Medical Records</span>
-                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Detail-Oriented</span>
-                        </div>
-                    </div>
-                    <button onclick="openApplyModal('Demand Writer')" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all flex items-center justify-center gap-2">
-                        Apply Now <i data-lucide="arrow-right" class="w-4 h-4"></i>
-                    </button>
-                </div>
-
-                <!-- Case Manager -->
-                <div class="role-card bg-white border-2 border-slate-100 rounded-3xl p-8 flex flex-col">
-                    <div class="flex items-start justify-between mb-6">
-                        <div class="bg-[#1b1e2b] w-14 h-14 rounded-2xl flex items-center justify-center">
-                            <i data-lucide="users" class="w-7 h-7 text-yellow-400"></i>
-                        </div>
-                        <span class="bg-emerald-50 text-emerald-700 text-xs font-black uppercase tracking-wider px-3 py-1.5 rounded-full border border-emerald-200">Open</span>
-                    </div>
-                    <h3 class="font-black text-[#1b1e2b] text-xl mb-2">Case Manager</h3>
-                    <div class="flex items-center gap-4 mb-4">
-                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i> Remote</span>
-                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> Full / Part-time</span>
-                    </div>
-                    <p class="text-slate-500 text-sm font-medium leading-relaxed mb-6 flex-1">Own the full case lifecycle. Coordinate between clients, attorneys, medical providers, and insurance adjusters from case open through settlement.</p>
-                    <div class="space-y-2 mb-6">
-                        <p class="text-xs font-black text-slate-400 uppercase tracking-widest">Key Skills</p>
-                        <div class="flex flex-wrap gap-2">
-                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Coordination</span>
-                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Bilingual</span>
-                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Case Management</span>
-                        </div>
-                    </div>
-                    <button onclick="openApplyModal('Case Manager')" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all flex items-center justify-center gap-2">
-                        Apply Now <i data-lucide="arrow-right" class="w-4 h-4"></i>
-                    </button>
-                </div>
-
-                <!-- Social Media Manager -->
-                <div class="role-card bg-white border-2 border-slate-100 rounded-3xl p-8 flex flex-col">
-                    <div class="flex items-start justify-between mb-6">
-                        <div class="bg-[#1b1e2b] w-14 h-14 rounded-2xl flex items-center justify-center">
-                            <i data-lucide="share-2" class="w-7 h-7 text-yellow-400"></i>
-                        </div>
-                        <span class="bg-emerald-50 text-emerald-700 text-xs font-black uppercase tracking-wider px-3 py-1.5 rounded-full border border-emerald-200">Open</span>
-                    </div>
-                    <h3 class="font-black text-[#1b1e2b] text-xl mb-2">Social Media Manager</h3>
-                    <div class="flex items-center gap-4 mb-4">
-                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i> Remote</span>
-                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> Full / Part-time</span>
-                    </div>
-                    <p class="text-slate-500 text-sm font-medium leading-relaxed mb-6 flex-1">Manage social media presence for U.S. law firms and professional clients. Create content, schedule posts, engage audiences, and report on performance.</p>
-                    <div class="space-y-2 mb-6">
-                        <p class="text-xs font-black text-slate-400 uppercase tracking-widest">Key Skills</p>
-                        <div class="flex flex-wrap gap-2">
-                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Content Creation</span>
-                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Instagram/LinkedIn</span>
-                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Analytics</span>
-                        </div>
-                    </div>
-                    <button onclick="openApplyModal('Social Media Manager')" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all flex items-center justify-center gap-2">
-                        Apply Now <i data-lucide="arrow-right" class="w-4 h-4"></i>
-                    </button>
-                </div>
-
-                <!-- Web Designer -->
-                <div class="role-card bg-white border-2 border-slate-100 rounded-3xl p-8 flex flex-col">
-                    <div class="flex items-start justify-between mb-6">
-                        <div class="bg-[#1b1e2b] w-14 h-14 rounded-2xl flex items-center justify-center">
-                            <i data-lucide="layout" class="w-7 h-7 text-yellow-400"></i>
-                        </div>
-                        <span class="bg-emerald-50 text-emerald-700 text-xs font-black uppercase tracking-wider px-3 py-1.5 rounded-full border border-emerald-200">Open</span>
-                    </div>
-                    <h3 class="font-black text-[#1b1e2b] text-xl mb-2">Web Designer</h3>
-                    <div class="flex items-center gap-4 mb-4">
-                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i> Remote</span>
-                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> Full / Part-time</span>
-                    </div>
-                    <p class="text-slate-500 text-sm font-medium leading-relaxed mb-6 flex-1">Design and build modern, high-converting websites for law firms and professional clients. From landing pages to full firm websites — clean, fast, and effective.</p>
-                    <div class="space-y-2 mb-6">
-                        <p class="text-xs font-black text-slate-400 uppercase tracking-widest">Key Skills</p>
-                        <div class="flex flex-wrap gap-2">
-                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">HTML/CSS</span>
-                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Figma</span>
-                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Responsive Design</span>
-                        </div>
-                    </div>
-                    <button onclick="openApplyModal('Web Designer')" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all flex items-center justify-center gap-2">
-                        Apply Now <i data-lucide="arrow-right" class="w-4 h-4"></i>
-                    </button>
-                </div>
-
-                <!-- Marketing Specialist — centered on last row -->
-                <div class="role-card bg-white border-2 border-slate-100 rounded-3xl p-8 flex flex-col md:col-start-1 lg:col-start-2">
-                    <div class="flex items-start justify-between mb-6">
-                        <div class="bg-[#1b1e2b] w-14 h-14 rounded-2xl flex items-center justify-center">
-                            <i data-lucide="megaphone" class="w-7 h-7 text-yellow-400"></i>
-                        </div>
-                        <span class="bg-emerald-50 text-emerald-700 text-xs font-black uppercase tracking-wider px-3 py-1.5 rounded-full border border-emerald-200">Open</span>
-                    </div>
-                    <h3 class="font-black text-[#1b1e2b] text-xl mb-2">Marketing Specialist</h3>
-                    <div class="flex items-center gap-4 mb-4">
-                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i> Remote</span>
-                        <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> Full / Part-time</span>
-                    </div>
-                    <p class="text-slate-500 text-sm font-medium leading-relaxed mb-6 flex-1">Execute digital marketing strategies for law firm clients. Manage ad campaigns (Google/Meta), email marketing, SEO content, and lead generation funnels.</p>
-                    <div class="space-y-2 mb-6">
-                        <p class="text-xs font-black text-slate-400 uppercase tracking-widest">Key Skills</p>
-                        <div class="flex flex-wrap gap-2">
-                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Google Ads</span>
-                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">Meta Ads</span>
-                            <span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">SEO</span>
-                        </div>
-                    </div>
-                    <button onclick="openApplyModal('Marketing Specialist')" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all flex items-center justify-center gap-2">
-                        Apply Now <i data-lucide="arrow-right" class="w-4 h-4"></i>
-                    </button>
-                </div>
-
+                <h3 class="text-2xl font-black text-[#1b1e2b] mb-3">No roles posted yet</h3>
+                <p class="text-slate-500 font-medium max-w-xl mx-auto">Publish a job in Netlify CMS and it will appear here automatically.</p>
             </div>
+
+            <div id="jobs-grid" class="hidden grid md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
         </div>
     </section>
 
@@ -625,14 +431,8 @@
                 <!-- Col 3: Open Roles -->
                 <div>
                     <p class="text-white font-black text-xs uppercase tracking-widest mb-6">Open Roles</p>
-                    <ul class="space-y-3">
-                        <li><button onclick="openApplyModal('Legal Intake Specialist')" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Legal Intake</button></li>
-                        <li><button onclick="openApplyModal('Legal Assistant')" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Legal Assistant</button></li>
-                        <li><button onclick="openApplyModal('Demand Writer')" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Demand Writing</button></li>
-                        <li><button onclick="openApplyModal('Case Manager')" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Case Manager</button></li>
-                        <li><button onclick="openApplyModal('Social Media Manager')" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Social Media</button></li>
-                        <li><button onclick="openApplyModal('Web Designer')" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Web Design</button></li>
-                        <li><button onclick="openApplyModal('Marketing Specialist')" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Marketing</button></li>
+                    <ul id="footer-roles-list" class="space-y-3">
+                        <li class="text-slate-500 text-sm font-medium">Loading roles...</li>
                     </ul>
                 </div>
 
@@ -700,13 +500,6 @@
                     </div>
                     <select id="role-dropdown" class="w-full border-2 border-slate-200 rounded-2xl px-4 py-3.5 text-sm font-bold text-slate-700 focus:outline-none focus:border-yellow-400 transition-colors appearance-none bg-white">
                         <option value="">Select a position...</option>
-                        <option value="Legal Intake Specialist">Legal Intake Specialist</option>
-                        <option value="Legal Assistant">Legal Assistant</option>
-                        <option value="Demand Writer">Demand Writer</option>
-                        <option value="Case Manager">Case Manager</option>
-                        <option value="Social Media Manager">Social Media Manager</option>
-                        <option value="Web Designer">Web Designer</option>
-                        <option value="Marketing Specialist">Marketing Specialist</option>
                     </select>
                 </div>
 
@@ -823,21 +616,191 @@
 
         // Application Modal
         const applyModal = document.getElementById('apply-modal');
+        const roleDropdown = document.getElementById('role-dropdown');
+
+        function escapeHtml(value = '') {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function normalizeStatus(status = '') {
+            return String(status).trim().toLowerCase();
+        }
+
+        function isOpenStatus(status = '') {
+            return normalizeStatus(status) === 'open';
+        }
+
+        function bindApplyTriggers() {
+            document.querySelectorAll('[data-apply-role]').forEach(button => {
+                if (button.dataset.bound === 'true' || button.disabled) return;
+                button.dataset.bound = 'true';
+                button.addEventListener('click', () => openApplyModal(button.dataset.applyRole || ''));
+            });
+        }
+
+        function updateRoleDropdown(openJobs) {
+            const currentValue = roleDropdown.value;
+            roleDropdown.innerHTML = '<option value="">Select a position...</option>';
+
+            openJobs.forEach(job => {
+                const option = document.createElement('option');
+                option.value = job.title;
+                option.textContent = job.title;
+                roleDropdown.appendChild(option);
+            });
+
+            if (openJobs.some(job => job.title === currentValue)) {
+                roleDropdown.value = currentValue;
+            }
+        }
+
+        function renderFeaturedRoles(jobs, openJobs) {
+            const preview = document.getElementById('featured-roles-preview');
+            const badge = document.getElementById('featured-roles-badge');
+            const featuredOpenJobs = openJobs.filter(job => job.featured);
+            const previewJobs = (featuredOpenJobs.length ? featuredOpenJobs : (openJobs.length ? openJobs : jobs)).slice(0, 3);
+
+            if (!previewJobs.length) {
+                preview.innerHTML = `
+                    <div class="flex items-center gap-3 bg-slate-50 rounded-xl p-3">
+                        <div class="w-2 h-2 bg-slate-300 rounded-full flex-shrink-0"></div>
+                        <span class="text-sm font-bold text-slate-500">No openings published yet</span>
+                    </div>
+                `;
+                badge.textContent = 'Check Back Soon';
+                return;
+            }
+
+            preview.innerHTML = previewJobs.map(job => {
+                const isOpen = isOpenStatus(job.status);
+                const statusClasses = isOpen
+                    ? 'text-emerald-600 bg-emerald-50 border-emerald-200'
+                    : 'text-slate-500 bg-slate-100 border-slate-200';
+
+                return `
+                    <div class="flex items-center gap-3 bg-slate-50 rounded-xl p-3">
+                        <div class="w-2 h-2 ${isOpen ? 'bg-emerald-400' : 'bg-slate-300'} rounded-full flex-shrink-0"></div>
+                        <span class="text-sm font-bold text-slate-700">${escapeHtml(job.title)}</span>
+                        <span class="ml-auto text-xs font-black px-2 py-0.5 rounded-full border ${statusClasses}">${escapeHtml(job.status || 'Open')}</span>
+                    </div>
+                `;
+            }).join('');
+
+            badge.textContent = openJobs.length ? `${openJobs.length} Roles Live` : 'Hiring Updates';
+        }
+
+        function renderFooterRoles(openJobs) {
+            const footerList = document.getElementById('footer-roles-list');
+
+            if (!openJobs.length) {
+                footerList.innerHTML = '<li class="text-slate-500 text-sm font-medium">No open roles right now.</li>';
+                return;
+            }
+
+            footerList.innerHTML = openJobs.map(job => `
+                <li>
+                    <button data-apply-role="${escapeHtml(job.title)}" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2">
+                        <i data-lucide="chevron-right" class="w-3 h-3"></i> ${escapeHtml(job.title)}
+                    </button>
+                </li>
+            `).join('');
+        }
+
+        function renderJobs(jobs) {
+            const loading = document.getElementById('jobs-loading');
+            const empty = document.getElementById('jobs-empty');
+            const grid = document.getElementById('jobs-grid');
+            const openJobs = jobs.filter(job => isOpenStatus(job.status));
+
+            document.getElementById('open-roles-count').textContent = String(openJobs.length);
+            updateRoleDropdown(openJobs);
+            renderFeaturedRoles(jobs, openJobs);
+            renderFooterRoles(openJobs);
+
+            loading.classList.add('hidden');
+
+            if (!jobs.length) {
+                empty.classList.remove('hidden');
+                grid.classList.add('hidden');
+                bindApplyTriggers();
+                lucide.createIcons();
+                return;
+            }
+
+            empty.classList.add('hidden');
+            grid.classList.remove('hidden');
+
+            grid.innerHTML = jobs.map(job => {
+                const isOpen = isOpenStatus(job.status);
+                const statusClasses = isOpen
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-slate-100 text-slate-600 border-slate-200';
+                const buttonClasses = isOpen
+                    ? 'bg-[#1b1e2b] text-white hover:bg-yellow-400 hover:text-[#1b1e2b]'
+                    : 'bg-slate-200 text-slate-500 cursor-not-allowed';
+                const skills = Array.isArray(job.skills) && job.skills.length
+                    ? job.skills.map(skill => `<span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full">${escapeHtml(skill)}</span>`).join('')
+                    : '<span class="bg-slate-100 text-slate-500 text-xs font-bold px-3 py-1 rounded-full">Generalist</span>';
+
+                return `
+                    <div class="role-card relative overflow-hidden ${isOpen ? 'bg-white' : 'bg-slate-50'} border-2 border-slate-100 rounded-3xl p-8 flex flex-col">
+                        <div class="absolute inset-x-0 top-0 h-1 ${isOpen ? 'bg-gradient-to-r from-yellow-400 via-amber-300 to-yellow-400' : 'bg-slate-200'}"></div>
+                        <div class="flex items-start justify-between mb-6">
+                            <div class="bg-[#1b1e2b] w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg">
+                                <i data-lucide="${escapeHtml(job.icon || 'briefcase')}" class="w-7 h-7 text-yellow-400"></i>
+                            </div>
+                            <span class="${statusClasses} text-xs font-black uppercase tracking-wider px-3 py-1.5 rounded-full border">${escapeHtml(job.status || 'Open')}</span>
+                        </div>
+                        <h3 class="font-black text-[#1b1e2b] text-xl mb-2">${escapeHtml(job.title)}</h3>
+                        <div class="flex flex-wrap items-center gap-4 mb-4">
+                            <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i> ${escapeHtml(job.location || 'Remote')}</span>
+                            <span class="text-xs font-bold text-slate-500 flex items-center gap-1"><i data-lucide="clock" class="w-3 h-3"></i> ${escapeHtml(job.schedule || 'Full / Part-time')}</span>
+                        </div>
+                        <p class="text-slate-500 text-sm font-medium leading-relaxed mb-6 flex-1">${escapeHtml(job.description || 'New opportunity now available.')}</p>
+                        <div class="space-y-2 mb-6">
+                            <p class="text-xs font-black text-slate-400 uppercase tracking-widest">Key Skills</p>
+                            <div class="flex flex-wrap gap-2">${skills}</div>
+                        </div>
+                        <button ${isOpen ? `data-apply-role="${escapeHtml(job.title)}"` : 'disabled'} class="w-full ${buttonClasses} py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all flex items-center justify-center gap-2">
+                            ${isOpen ? 'Apply Now' : 'Applications Closed'} <i data-lucide="${isOpen ? 'arrow-right' : 'lock'}" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+
+            bindApplyTriggers();
+            lucide.createIcons();
+        }
+
+        async function loadJobs() {
+            try {
+                const response = await fetch('/jobs/index.json');
+                if (!response.ok) throw new Error('Unable to load jobs');
+                const jobs = await response.json();
+                renderJobs(Array.isArray(jobs) ? jobs : []);
+            } catch (error) {
+                renderJobs([]);
+            }
+        }
 
         function openApplyModal(role = '') {
             const prefilled = document.getElementById('role-prefilled');
-            const dropdown = document.getElementById('role-dropdown');
             if (role) {
                 document.getElementById('role-prefilled-label').textContent = role;
                 prefilled.classList.remove('hidden');
                 prefilled.classList.add('flex');
-                dropdown.classList.add('hidden');
-                dropdown.value = role;
+                roleDropdown.classList.add('hidden');
+                roleDropdown.value = role;
             } else {
                 prefilled.classList.add('hidden');
                 prefilled.classList.remove('flex');
-                dropdown.classList.remove('hidden');
-                dropdown.value = '';
+                roleDropdown.classList.remove('hidden');
+                roleDropdown.value = '';
             }
             document.getElementById('apply-form-step').classList.remove('hidden');
             document.getElementById('apply-success-step').classList.add('hidden');
@@ -854,7 +817,11 @@
                 document.getElementById(id).value = '';
             });
             document.getElementById('apply-experience').value = '';
-            document.getElementById('role-dropdown').value = '';
+            roleDropdown.classList.remove('hidden');
+            roleDropdown.value = '';
+            document.getElementById('role-prefilled').classList.add('hidden');
+            document.getElementById('role-prefilled').classList.remove('flex');
+            document.getElementById('role-prefilled-label').textContent = '';
         }
 
         document.getElementById('apply-close').addEventListener('click', closeApplyModal);
@@ -905,6 +872,9 @@
                 submitBtn.disabled = false;
             }
         });
+
+        bindApplyTriggers();
+        loadJobs();
     </script>
 
 </body>

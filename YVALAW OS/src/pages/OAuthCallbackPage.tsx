@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { exchangeCode } from '../services/gmail'
 import { loadSettings } from '../services/storage'
+import { IconCheck, IconX } from '../components/Icon'
 
 export default function OAuthCallbackPage() {
   const navigate = useNavigate()
@@ -58,8 +59,8 @@ export default function OAuthCallbackPage() {
       {ok === null && (
         <div style={{ width: 32, height: 32, border: '3px solid #f5b533', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
       )}
-      {ok === true  && <div style={{ fontSize: 36 }}>✓</div>}
-      {ok === false && <div style={{ fontSize: 36 }}>✕</div>}
+      {ok === true  && <div style={{ fontSize: 36, color: '#22c55e' }}><IconCheck size={36} /></div>}
+      {ok === false && <div style={{ fontSize: 36, color: '#ef4444' }}><IconX size={36} /></div>}
       <div style={{ fontSize: 16, color: ok === false ? '#f87171' : ok === true ? '#22c55e' : '#fff' }}>{msg}</div>
       <div style={{ fontSize: 12, color: '#475569' }}>Redirecting to Settings…</div>
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>

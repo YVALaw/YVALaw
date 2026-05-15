@@ -11,11 +11,13 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import { IconRefresh } from '../components/Icon'
 import { loadStripe } from '@stripe/stripe-js'
 import type { Stripe, StripeCardElement, StripeElements } from '@stripe/stripe-js'
 import { supabase } from '../lib/supabase'
 import type { Invoice } from '../data/types'
 import { savePortalAutoPaySettings } from '../services/portalStorage'
+import { IconX, IconAlert, IconCheck } from './Icon'
 
 // Initialise Stripe once at module level — not inside component
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string)
@@ -51,11 +53,11 @@ function fmtUSD(n: number) {
 
 function brandIcon(brand: string) {
   switch (brand.toLowerCase()) {
-    case 'visa':       return '💳 Visa'
-    case 'mastercard': return '💳 Mastercard'
-    case 'amex':       return '💳 Amex'
-    case 'discover':   return '💳 Discover'
-    default:           return '💳 Card'
+    case 'visa':       return 'Visa'
+    case 'mastercard': return 'Mastercard'
+    case 'amex':       return 'Amex'
+    case 'discover':   return 'Discover'
+    default:           return 'Card'
   }
 }
 
@@ -296,7 +298,7 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
               onClick={onClose}
               className="modal-close btn-icon"
               style={{ flexShrink: 0 }}
-            >✕</button>
+            ><IconX size={14} /></button>
           )}
         </div>
 
@@ -332,7 +334,7 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
           {/* Loading */}
           {step === 'loading' && (
             <div style={{ textAlign: 'center', padding: '28px 0', color: 'var(--muted)', fontSize: 14 }}>
-              <div style={{ marginBottom: 10, opacity: 0.5 }}>🔄</div>
+              <div style={{ marginBottom: 10, opacity: 0.5 }}><IconRefresh size={20} /></div>
               Preparing secure checkout…
             </div>
           )}
@@ -340,7 +342,7 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
           {/* Error (init failed) */}
           {step === 'error' && (
             <div style={{ textAlign: 'center', padding: '20px 0' }}>
-              <div style={{ fontSize: 32, marginBottom: 12 }}>⚠️</div>
+              <div style={{ fontSize: 32, marginBottom: 12, color: '#f5b533' }}><IconAlert size={32} /></div>
               <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', marginBottom: 8 }}>
                 Could not load payment form
               </div>
@@ -363,7 +365,7 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
                 display: 'grid', placeItems: 'center', margin: '0 auto 16px',
                 fontSize: 28,
               }}>
-                ✓
+                <IconCheck size={14} />
               </div>
               <div style={{ fontWeight: 800, fontSize: 18, color: 'var(--text)', marginBottom: 6 }}>
                 Payment Successful

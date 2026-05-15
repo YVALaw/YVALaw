@@ -6,6 +6,7 @@ import { sendEmail } from '../services/gmail'
 import { loadTags, saveTags } from '../services/tagStorage'
 import { TagBadge } from '../components/TagBadge'
 import { TagInput } from '../components/TagInput'
+import { IconMail, IconX, IconTrash } from '../components/Icon'
 function uid() { return crypto.randomUUID() }
 
 type ClientStage = 'lead' | 'prospect' | 'active' | 'paused' | 'churned'
@@ -255,7 +256,7 @@ export default function ClientsPage() {
             const outstanding = clientOutstanding(c.id)
             const color = avatarColor(c.name)
             return (
-              <div key={c.id} className="entity-card" style={{ borderTop: `2px solid ${stageColor(c.status)}`, cursor: 'pointer' }} onClick={() => navigate('/clients/' + c.id)}>
+              <div key={c.id} className="entity-card" onClick={() => navigate('/clients/' + c.id)}>
                 <div className="card-top">
                   <div className="card-top-left">
                     <div className="avatar" style={{ background: color }}>{initials(c.name)}</div>
@@ -321,7 +322,7 @@ export default function ClientsPage() {
                 <div className="card-footer">
                   <button className="btn-xs btn-ghost" onClick={ev => { ev.stopPropagation(); navigate('/clients/' + c.id) }}>View Profile</button>
                   {outstanding > 0 && c.email && (
-                    <button className="btn-xs btn-ghost" style={{ color: '#fb923c' }} onClick={ev => { ev.stopPropagation(); sendClientReminder(c) }}>✉ Remind</button>
+                    <button className="btn-xs btn-ghost" style={{ color: '#fb923c' }} onClick={ev => { ev.stopPropagation(); sendClientReminder(c) }}><IconMail size={12} /> Remind</button>
                   )}
                   <button className="btn-xs btn-ghost" onClick={ev => { ev.stopPropagation(); openEdit(c) }}>Edit</button>
                   <button className="btn-xs btn-danger" onClick={ev => { ev.stopPropagation(); setConfirmDelete(c.id) }}>Remove</button>
@@ -369,7 +370,7 @@ export default function ClientsPage() {
                     <div className="kanban-card-actions">
                       <button className="btn-xs btn-ghost" onClick={e => { e.stopPropagation(); openActivity(c) }}>Activity</button>
                       <button className="btn-xs btn-ghost" onClick={e => { e.stopPropagation(); openEdit(c) }}>Edit</button>
-                      <button className="btn-xs btn-danger" onClick={e => { e.stopPropagation(); setConfirmDelete(c.id) }}>×</button>
+                      <button className="btn-xs btn-danger" onClick={e => { e.stopPropagation(); setConfirmDelete(c.id) }}><IconTrash size={12} /></button>
                     </div>
                   </div>
                 ))}
@@ -386,7 +387,7 @@ export default function ClientsPage() {
           <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">{modal === 'add' ? 'Add Client' : 'Edit Client'}</h2>
-              <button className="modal-close btn-icon" onClick={() => setModal(null)}>✕</button>
+              <button className="modal-close btn-icon" onClick={() => setModal(null)}><IconX size={14} /></button>
             </div>
             <div className="modal-body">
               <div className="form-grid-2">
@@ -461,7 +462,7 @@ export default function ClientsPage() {
                         <div key={i} className="link-item">
                           <a href={lk.url} target="_blank" rel="noopener noreferrer" className="link-item-label">{lk.label}</a>
                           <span className="link-item-url">{lk.url}</span>
-                          <button className="btn-icon btn-danger" style={{ padding: '2px 6px', fontSize: 11 }} onClick={() => removeLink(i)}>×</button>
+                          <button className="btn-icon btn-danger" style={{ padding: '2px 6px', fontSize: 11 }} onClick={() => removeLink(i)}><IconX size={12} /></button>
                         </div>
                       ))}
                     </div>
@@ -490,7 +491,7 @@ export default function ClientsPage() {
           <div className="modal modal-lg" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">Activity — {activityClient.name}</h2>
-              <button className="modal-close btn-icon" onClick={() => setActivityClient(null)}>✕</button>
+              <button className="modal-close btn-icon" onClick={() => setActivityClient(null)}><IconX size={14} /></button>
             </div>
             <div className="modal-body" style={{ maxHeight: 420, overflowY: 'auto' }}>
               {/* Add note */}
@@ -521,7 +522,7 @@ export default function ClientsPage() {
                         <div className="activity-note">{entry.note}</div>
                         <div className="activity-time">{fmtTimestamp(entry.createdAt)}</div>
                       </div>
-                      <button className="btn-icon btn-danger" style={{ fontSize: 11, padding: '2px 5px', opacity: .5 }} onClick={() => deleteActivity(entry.id)}>×</button>
+                      <button className="btn-icon btn-danger" style={{ fontSize: 11, padding: '2px 5px', opacity: .5 }} onClick={() => deleteActivity(entry.id)}><IconX size={12} /></button>
                     </div>
                   ))}
                 </div>

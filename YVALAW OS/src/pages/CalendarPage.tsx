@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Invoice, Project, Task, Estimate } from '../data/types'
 import { loadSnapshot, loadTasks, loadEstimates } from '../services/storage'
+import { IconReceipt, IconFolder, IconClipboard, IconCheck, IconCalendar, IconSparkles } from '../components/Icon'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,11 +36,11 @@ const TYPE_LABELS: Record<EventType, string> = {
   task:     'Task Due',
 }
 
-const TYPE_ICONS: Record<EventType, string> = {
-  invoice:  '💳',
-  project:  '📁',
-  estimate: '📋',
-  task:     '✅',
+const TYPE_ICONS: Record<EventType, React.ReactNode> = {
+  invoice:  <IconReceipt size={14} />,
+  project:  <IconFolder size={14} />,
+  estimate: <IconClipboard size={14} />,
+  task:     <IconCheck size={14} />,
 }
 
 const MONTH_NAMES = [
@@ -547,12 +548,12 @@ export default function CalendarPage() {
           <div style={{ flex: 1, overflowY: 'auto', padding: '12px 0' }}>
             {!selectedDay ? (
               <div style={{ padding: '32px 18px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-                <div style={{ fontSize: 28, marginBottom: 10 }}>📅</div>
+                <div style={{ fontSize: 28, marginBottom: 10 }}><IconCalendar size={28} /></div>
                 Select a day on the calendar to view events
               </div>
             ) : selectedEvents.length === 0 ? (
               <div style={{ padding: '32px 18px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-                <div style={{ fontSize: 28, marginBottom: 10 }}>✨</div>
+                <div style={{ fontSize: 28, marginBottom: 10 }}><IconSparkles size={28} /></div>
                 No events on this day
               </div>
             ) : (

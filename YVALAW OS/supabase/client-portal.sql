@@ -34,7 +34,7 @@ ALTER TABLE client_users ENABLE ROW LEVEL SECURITY;
 -- Internal staff can read portal billing status for client profiles.
 DROP POLICY IF EXISTS "client_users_internal_read" ON client_users;
 CREATE POLICY "client_users_internal_read" ON client_users
-  FOR SELECT TO authenticated USING (public.is_internal());
+  FOR SELECT TO authenticated USING (private.is_internal());
 
 -- Clients can only read their own row (no delete, no insert — managed by invite function).
 -- Updates go through Netlify functions so only explicitly allowed fields change.
@@ -49,8 +49,12 @@ DROP POLICY IF EXISTS "client_users_own_update" ON client_users;
 
 -- ── Step 2: Add helper functions ─────────────────────────────────────────────
 -- SECURITY DEFINER: runs with elevated privileges so it can always query these tables.
+-- These live in `private` so PostgREST does not expose them as RPC endpoints.
 
-CREATE OR REPLACE FUNCTION public.is_internal()
+CREATE SCHEMA IF NOT EXISTS private;
+GRANT USAGE ON SCHEMA private TO authenticated;
+
+CREATE OR REPLACE FUNCTION private.is_internal()
 RETURNS BOOLEAN
 LANGUAGE SQL
 SECURITY DEFINER
@@ -64,7 +68,7 @@ AS $$
   )
 $$;
 
-CREATE OR REPLACE FUNCTION public.is_portal_client()
+CREATE OR REPLACE FUNCTION private.is_portal_client()
 RETURNS BOOLEAN
 LANGUAGE SQL
 SECURITY DEFINER
@@ -76,7 +80,7 @@ AS $$
   )
 $$;
 
-CREATE OR REPLACE FUNCTION public.portal_client_id()
+CREATE OR REPLACE FUNCTION private.portal_client_id()
 RETURNS UUID
 LANGUAGE SQL
 SECURITY DEFINER
@@ -85,6 +89,10 @@ SET search_path = public
 AS $$
   SELECT client_id FROM public.client_users WHERE auth_id = auth.uid() LIMIT 1
 $$;
+
+GRANT EXECUTE ON FUNCTION private.is_internal() TO authenticated;
+GRANT EXECUTE ON FUNCTION private.is_portal_client() TO authenticated;
+GRANT EXECUTE ON FUNCTION private.portal_client_id() TO authenticated;
 
 
 -- ── Step 3: Tighten existing team_all policies ────────────────────────────────
@@ -114,24 +122,24 @@ BEGIN
 END $$;
 
 -- Recreate: internal users only
-CREATE POLICY "team_all" ON employees         FOR ALL TO authenticated USING (public.is_internal()) WITH CHECK (public.is_internal());
-CREATE POLICY "team_all" ON clients           FOR ALL TO authenticated USING (public.is_internal()) WITH CHECK (public.is_internal());
-CREATE POLICY "team_all" ON projects          FOR ALL TO authenticated USING (public.is_internal()) WITH CHECK (public.is_internal());
-CREATE POLICY "team_all" ON invoices          FOR ALL TO authenticated USING (public.is_internal()) WITH CHECK (public.is_internal());
-CREATE POLICY "team_all" ON expenses          FOR ALL TO authenticated USING (public.is_internal()) WITH CHECK (public.is_internal());
-CREATE POLICY "team_all" ON tasks              FOR ALL TO authenticated USING (public.is_internal()) WITH CHECK (public.is_internal());
-CREATE POLICY "team_all" ON activity_log      FOR ALL TO authenticated USING (public.is_internal()) WITH CHECK (public.is_internal());
-CREATE POLICY "team_all" ON candidates        FOR ALL TO authenticated USING (public.is_internal()) WITH CHECK (public.is_internal());
-CREATE POLICY "team_all" ON invoice_templates FOR ALL TO authenticated USING (public.is_internal()) WITH CHECK (public.is_internal());
-CREATE POLICY "team_all" ON counters          FOR ALL TO authenticated USING (public.is_internal()) WITH CHECK (public.is_internal());
+CREATE POLICY "team_all" ON employees         FOR ALL TO authenticated USING (private.is_internal()) WITH CHECK (private.is_internal());
+CREATE POLICY "team_all" ON clients           FOR ALL TO authenticated USING (private.is_internal()) WITH CHECK (private.is_internal());
+CREATE POLICY "team_all" ON projects          FOR ALL TO authenticated USING (private.is_internal()) WITH CHECK (private.is_internal());
+CREATE POLICY "team_all" ON invoices          FOR ALL TO authenticated USING (private.is_internal()) WITH CHECK (private.is_internal());
+CREATE POLICY "team_all" ON expenses          FOR ALL TO authenticated USING (private.is_internal()) WITH CHECK (private.is_internal());
+CREATE POLICY "team_all" ON tasks              FOR ALL TO authenticated USING (private.is_internal()) WITH CHECK (private.is_internal());
+CREATE POLICY "team_all" ON activity_log      FOR ALL TO authenticated USING (private.is_internal()) WITH CHECK (private.is_internal());
+CREATE POLICY "team_all" ON candidates        FOR ALL TO authenticated USING (private.is_internal()) WITH CHECK (private.is_internal());
+CREATE POLICY "team_all" ON invoice_templates FOR ALL TO authenticated USING (private.is_internal()) WITH CHECK (private.is_internal());
+CREATE POLICY "team_all" ON counters          FOR ALL TO authenticated USING (private.is_internal()) WITH CHECK (private.is_internal());
 
 DO $$
 BEGIN
   IF to_regclass('public.general_expenses') IS NOT NULL THEN
     CREATE POLICY "team_all" ON public.general_expenses
       FOR ALL TO authenticated
-      USING (public.is_internal())
-      WITH CHECK (public.is_internal());
+      USING (private.is_internal())
+      WITH CHECK (private.is_internal());
   END IF;
 END $$;
 
@@ -144,8 +152,8 @@ DROP POLICY IF EXISTS "portal_own_client" ON clients;
 CREATE POLICY "portal_own_client" ON clients
   FOR SELECT TO authenticated
   USING (
-    public.is_portal_client()
-    AND id = public.portal_client_id()
+    private.is_portal_client()
+    AND id = private.portal_client_id()
   );
 
 -- Portal profile updates go through netlify/functions/update-portal-profile.cjs.
@@ -158,8 +166,8 @@ DROP POLICY IF EXISTS "portal_client_projects" ON projects;
 CREATE POLICY "portal_client_projects" ON projects
   FOR SELECT TO authenticated
   USING (
-    public.is_portal_client()
-    AND client_id::uuid = public.portal_client_id()
+    private.is_portal_client()
+    AND client_id::uuid = private.portal_client_id()
   );
 
 -- Invoices matched by client name (invoices table uses client_name text, not a FK)
@@ -167,10 +175,10 @@ DROP POLICY IF EXISTS "portal_client_invoices" ON invoices;
 CREATE POLICY "portal_client_invoices" ON invoices
   FOR SELECT TO authenticated
   USING (
-    public.is_portal_client()
+    private.is_portal_client()
     AND client_name = (
       SELECT name FROM public.clients
-      WHERE id = public.portal_client_id()
+      WHERE id = private.portal_client_id()
       LIMIT 1
     )
     AND status != 'draft'  -- clients never see draft invoices
@@ -181,11 +189,11 @@ DROP POLICY IF EXISTS "portal_client_employees" ON employees;
 CREATE POLICY "portal_client_employees" ON employees
   FOR SELECT TO authenticated
   USING (
-    public.is_portal_client()
+    private.is_portal_client()
     AND id::text IN (
       SELECT jsonb_array_elements_text(COALESCE(employee_ids, '[]'::jsonb))
       FROM   public.projects
-      WHERE  client_id::uuid = public.portal_client_id()
+      WHERE  client_id::uuid = private.portal_client_id()
     )
   );
 
@@ -200,16 +208,16 @@ DROP POLICY IF EXISTS "portal_client_time_entries_read" ON time_entries;
 
 CREATE POLICY "internal_all" ON time_entries
   FOR ALL TO authenticated
-  USING (public.is_internal())
-  WITH CHECK (public.is_internal());
+  USING (private.is_internal())
+  WITH CHECK (private.is_internal());
 
 CREATE POLICY "portal_client_time_entries_read" ON time_entries
   FOR SELECT TO authenticated
   USING (
-    public.is_portal_client()
+    private.is_portal_client()
     AND project_id IN (
       SELECT id FROM public.projects
-      WHERE client_id::uuid = public.portal_client_id()
+      WHERE client_id::uuid = private.portal_client_id()
     )
   );
 
@@ -240,11 +248,11 @@ ALTER TABLE staff_requests ADD COLUMN IF NOT EXISTS start_date date;
 ALTER TABLE staff_requests ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "internal_all" ON staff_requests;
-CREATE POLICY "internal_all"   ON staff_requests FOR ALL    TO authenticated USING (public.is_internal()) WITH CHECK (public.is_internal());
+CREATE POLICY "internal_all"   ON staff_requests FOR ALL    TO authenticated USING (private.is_internal()) WITH CHECK (private.is_internal());
 DROP POLICY IF EXISTS "portal_insert" ON staff_requests;
-CREATE POLICY "portal_insert"  ON staff_requests FOR INSERT TO authenticated WITH CHECK (public.is_portal_client() AND client_id = public.portal_client_id());
+CREATE POLICY "portal_insert"  ON staff_requests FOR INSERT TO authenticated WITH CHECK (private.is_portal_client() AND client_id = private.portal_client_id());
 DROP POLICY IF EXISTS "portal_read" ON staff_requests;
-CREATE POLICY "portal_read"    ON staff_requests FOR SELECT TO authenticated USING (public.is_portal_client() AND client_id = public.portal_client_id());
+CREATE POLICY "portal_read"    ON staff_requests FOR SELECT TO authenticated USING (private.is_portal_client() AND client_id = private.portal_client_id());
 
 
 -- Team reviews (client ratings of employees)
@@ -262,11 +270,11 @@ CREATE TABLE IF NOT EXISTS team_reviews (
 ALTER TABLE team_reviews ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "internal_all" ON team_reviews;
-CREATE POLICY "internal_all"  ON team_reviews FOR ALL    TO authenticated USING (public.is_internal()) WITH CHECK (public.is_internal());
+CREATE POLICY "internal_all"  ON team_reviews FOR ALL    TO authenticated USING (private.is_internal()) WITH CHECK (private.is_internal());
 DROP POLICY IF EXISTS "portal_insert" ON team_reviews;
-CREATE POLICY "portal_insert" ON team_reviews FOR INSERT TO authenticated WITH CHECK (public.is_portal_client() AND client_id = public.portal_client_id());
+CREATE POLICY "portal_insert" ON team_reviews FOR INSERT TO authenticated WITH CHECK (private.is_portal_client() AND client_id = private.portal_client_id());
 DROP POLICY IF EXISTS "portal_read" ON team_reviews;
-CREATE POLICY "portal_read"   ON team_reviews FOR SELECT TO authenticated USING (public.is_portal_client() AND client_id = public.portal_client_id());
+CREATE POLICY "portal_read"   ON team_reviews FOR SELECT TO authenticated USING (private.is_portal_client() AND client_id = private.portal_client_id());
 
 
 -- Bonus requests (client-initiated performance bonuses)
@@ -284,11 +292,11 @@ CREATE TABLE IF NOT EXISTS bonus_requests (
 ALTER TABLE bonus_requests ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "internal_all" ON bonus_requests;
-CREATE POLICY "internal_all"  ON bonus_requests FOR ALL    TO authenticated USING (public.is_internal()) WITH CHECK (public.is_internal());
+CREATE POLICY "internal_all"  ON bonus_requests FOR ALL    TO authenticated USING (private.is_internal()) WITH CHECK (private.is_internal());
 DROP POLICY IF EXISTS "portal_insert" ON bonus_requests;
-CREATE POLICY "portal_insert" ON bonus_requests FOR INSERT TO authenticated WITH CHECK (public.is_portal_client() AND client_id = public.portal_client_id());
+CREATE POLICY "portal_insert" ON bonus_requests FOR INSERT TO authenticated WITH CHECK (private.is_portal_client() AND client_id = private.portal_client_id());
 DROP POLICY IF EXISTS "portal_read" ON bonus_requests;
-CREATE POLICY "portal_read"   ON bonus_requests FOR SELECT TO authenticated USING (public.is_portal_client() AND client_id = public.portal_client_id());
+CREATE POLICY "portal_read"   ON bonus_requests FOR SELECT TO authenticated USING (private.is_portal_client() AND client_id = private.portal_client_id());
 
 
 -- Client documents (files stored in Supabase Storage, linked to client)
@@ -307,11 +315,11 @@ CREATE TABLE IF NOT EXISTS client_documents (
 ALTER TABLE client_documents ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "internal_all" ON client_documents;
-CREATE POLICY "internal_all" ON client_documents FOR ALL    TO authenticated USING (public.is_internal()) WITH CHECK (public.is_internal());
+CREATE POLICY "internal_all" ON client_documents FOR ALL    TO authenticated USING (private.is_internal()) WITH CHECK (private.is_internal());
 DROP POLICY IF EXISTS "portal_read" ON client_documents;
-CREATE POLICY "portal_read"  ON client_documents FOR SELECT TO authenticated USING (public.is_portal_client() AND client_id = public.portal_client_id());
+CREATE POLICY "portal_read"  ON client_documents FOR SELECT TO authenticated USING (private.is_portal_client() AND client_id = private.portal_client_id());
 DROP POLICY IF EXISTS "portal_insert" ON client_documents;
-CREATE POLICY "portal_insert" ON client_documents FOR INSERT TO authenticated WITH CHECK (public.is_portal_client() AND client_id = public.portal_client_id());
+CREATE POLICY "portal_insert" ON client_documents FOR INSERT TO authenticated WITH CHECK (private.is_portal_client() AND client_id = private.portal_client_id());
 
 
 -- Payment attempts (portal payments + scheduled AutoPay audit trail)
@@ -349,15 +357,15 @@ CREATE INDEX IF NOT EXISTS payment_attempts_invoice_id_idx
 DROP POLICY IF EXISTS "internal_all" ON payment_attempts;
 CREATE POLICY "internal_all" ON payment_attempts
   FOR ALL TO authenticated
-  USING (public.is_internal())
-  WITH CHECK (public.is_internal());
+  USING (private.is_internal())
+  WITH CHECK (private.is_internal());
 
 DROP POLICY IF EXISTS "portal_read" ON payment_attempts;
 CREATE POLICY "portal_read" ON payment_attempts
   FOR SELECT TO authenticated
   USING (
-    public.is_portal_client()
-    AND client_id = public.portal_client_id()
+    private.is_portal_client()
+    AND client_id = private.portal_client_id()
   );
 
 
@@ -378,13 +386,13 @@ CREATE TABLE IF NOT EXISTS working_hour_prefs (
 ALTER TABLE working_hour_prefs ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "internal_all" ON working_hour_prefs;
-CREATE POLICY "internal_all"  ON working_hour_prefs FOR ALL    TO authenticated USING (public.is_internal()) WITH CHECK (public.is_internal());
+CREATE POLICY "internal_all"  ON working_hour_prefs FOR ALL    TO authenticated USING (private.is_internal()) WITH CHECK (private.is_internal());
 DROP POLICY IF EXISTS "portal_read" ON working_hour_prefs;
-CREATE POLICY "portal_read"   ON working_hour_prefs FOR SELECT TO authenticated USING (public.is_portal_client() AND client_id = public.portal_client_id());
+CREATE POLICY "portal_read"   ON working_hour_prefs FOR SELECT TO authenticated USING (private.is_portal_client() AND client_id = private.portal_client_id());
 DROP POLICY IF EXISTS "portal_upsert" ON working_hour_prefs;
-CREATE POLICY "portal_upsert" ON working_hour_prefs FOR INSERT TO authenticated WITH CHECK (public.is_portal_client() AND client_id = public.portal_client_id());
+CREATE POLICY "portal_upsert" ON working_hour_prefs FOR INSERT TO authenticated WITH CHECK (private.is_portal_client() AND client_id = private.portal_client_id());
 DROP POLICY IF EXISTS "portal_update" ON working_hour_prefs;
-CREATE POLICY "portal_update" ON working_hour_prefs FOR UPDATE TO authenticated USING (public.is_portal_client() AND client_id = public.portal_client_id());
+CREATE POLICY "portal_update" ON working_hour_prefs FOR UPDATE TO authenticated USING (private.is_portal_client() AND client_id = private.portal_client_id());
 
 
 -- ── Step 5B: Storage policy hardening for portal documents ───────────────────
@@ -396,21 +404,27 @@ DROP POLICY IF EXISTS "auth_read" ON storage.objects;
 DROP POLICY IF EXISTS "attachments_internal_read" ON storage.objects;
 CREATE POLICY "attachments_internal_read" ON storage.objects
   FOR SELECT TO authenticated
-  USING (bucket_id = 'attachments' AND public.is_internal());
+  USING (bucket_id = 'attachments' AND private.is_internal());
 
 DROP POLICY IF EXISTS "attachments_client_docs_read" ON storage.objects;
 CREATE POLICY "attachments_client_docs_read" ON storage.objects
   FOR SELECT TO authenticated
   USING (
     bucket_id = 'attachments'
-    AND public.is_portal_client()
-    AND name LIKE ('client-docs/' || public.portal_client_id()::text || '/%')
+    AND private.is_portal_client()
+    AND name LIKE ('client-docs/' || private.portal_client_id()::text || '/%')
   );
 
 
 -- ── Step 6: Reload PostgREST schema ──────────────────────────────────────────
 -- Run this after all tables are created:
 -- NOTIFY pgrst, 'reload schema';
+
+-- ── Step 6B: Drop old public helper functions ─────────────────────────────────
+-- Safe because all policies now reference private.*
+DROP FUNCTION IF EXISTS public.is_internal();
+DROP FUNCTION IF EXISTS public.is_portal_client();
+DROP FUNCTION IF EXISTS public.portal_client_id();
 
 
 -- ── Step 7: Netlify environment variables needed ──────────────────────────────

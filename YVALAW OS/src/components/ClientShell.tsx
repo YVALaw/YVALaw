@@ -2,6 +2,7 @@ import { type ReactNode } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useRole } from '../context/RoleContext'
+import { IconEye } from './Icon'
 
 type Props = { children: ReactNode; previewClientId?: string }
 
@@ -54,34 +55,21 @@ export default function ClientShell({ children, previewClientId }: Props) {
   return (
     <div className="portal-shell">
 
-      {/* ── Preview mode banner (internal users only) ───────────────────── */}
+      {/* Preview mode banner */}
       {isPreview && (
-        <div style={{
-          position: 'fixed', top: 0, left: 0, right: 0, zIndex: 999,
-          background: 'var(--gold)', color: '#1b1e2b',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '0 20px', height: 40, fontSize: 13, fontWeight: 700,
-          boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-        }}>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="preview-banner">
+          <span className="flex items-center gap-8">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
             Preview Mode — you are viewing as this client
           </span>
-          <button
-            onClick={handleExitPreview}
-            style={{
-              background: 'rgba(0,0,0,0.15)', border: 'none', borderRadius: 8,
-              padding: '4px 14px', fontSize: 12, fontWeight: 800,
-              color: '#1b1e2b', cursor: 'pointer',
-            }}
-          >
+          <button className="preview-banner-btn" onClick={handleExitPreview}>
             ← Exit Preview
           </button>
         </div>
       )}
 
-      {/* ── Desktop Sidebar ─────────────────────────────────────────────── */}
-      <aside className="portal-sidebar" style={isPreview ? { marginTop: 40 } : undefined}>
+      {/* Desktop Sidebar */}
+      <aside className={`portal-sidebar${isPreview ? ' preview-offset' : ''}`}>
         {/* Brand */}
         <div className="sidebar-brand">
           <div className="sidebar-brand-icon">Y</div>
@@ -92,7 +80,7 @@ export default function ClientShell({ children, previewClientId }: Props) {
         </div>
 
         {/* Navigation */}
-        <nav className="sidebar-nav" style={{ marginTop: 8 }}>
+        <nav className="sidebar-nav portal-nav">
           <div className="sidebar-section-label">Navigation</div>
           {NAV_ITEMS.map(item => (
             <NavLink
@@ -101,6 +89,7 @@ export default function ClientShell({ children, previewClientId }: Props) {
               className={({ isActive }) =>
                 `sidebar-nav-item${isActive ? ' active' : ''}`
               }
+              aria-current={undefined}
             >
               <span className="sidebar-nav-icon">{item.icon}</span>
               {item.label}
@@ -111,11 +100,9 @@ export default function ClientShell({ children, previewClientId }: Props) {
         {/* Footer */}
         <div className="sidebar-footer">
           {isPreview ? (
-            // Preview mode footer — exit button instead of sign out
             <button
               onClick={handleExitPreview}
-              className="sidebar-nav-item"
-              style={{ width: '100%', border: 'none', cursor: 'pointer', color: 'var(--gold)' }}
+              className="sidebar-nav-item portal-exit-preview-btn"
             >
               <span className="sidebar-nav-icon">
                 <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -128,25 +115,16 @@ export default function ClientShell({ children, previewClientId }: Props) {
             </button>
           ) : (
             <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 8px' }}>
-                <div style={{
-                  width: 32, height: 32, borderRadius: 10,
-                  background: 'var(--gold)', display: 'grid', placeItems: 'center',
-                  fontSize: 12, fontWeight: 900, color: '#1b1e2b', flexShrink: 0,
-                }}>
-                  {initials}
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {email}
-                  </div>
-                  <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 1 }}>Client</div>
+              <div className="portal-user-row">
+                <div className="portal-user-avatar">{initials}</div>
+                <div className="portal-user-info">
+                  <div className="portal-user-email">{email}</div>
+                  <div className="portal-user-role">Client</div>
                 </div>
               </div>
               <button
                 onClick={handleSignOut}
-                className="sidebar-nav-item"
-                style={{ width: '100%', border: 'none', cursor: 'pointer', marginTop: 2 }}
+                className="sidebar-nav-item portal-signout-btn"
               >
                 <span className="sidebar-nav-icon">
                   <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -162,46 +140,34 @@ export default function ClientShell({ children, previewClientId }: Props) {
         </div>
       </aside>
 
-      {/* ── Main area ───────────────────────────────────────────────────── */}
-      <div className="portal-main" style={isPreview ? { marginTop: 40 } : undefined}>
+      {/* Main area */}
+      <div className={`portal-main${isPreview ? ' preview-offset' : ''}`}>
 
         {/* Topbar */}
         <header className="portal-topbar">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="flex items-center gap-10">
             <div className="portal-topbar-heading">
               <div className="portal-topbar-title">{isPreview ? 'Portal Preview' : 'Client Portal'}</div>
               <div className="portal-topbar-sub">{isPreview ? 'Internal view only' : 'YVA Staffing account workspace'}</div>
             </div>
             <div className="portal-mobile-brand">
-              <div style={{
-                width: 32, height: 32, borderRadius: 10,
-                background: 'var(--gold)', display: 'grid', placeItems: 'center',
-                fontWeight: 900, fontSize: 14, color: '#1b1e2b',
-              }}>Y</div>
-              <span style={{ fontWeight: 800, fontSize: 14, color: 'var(--text)' }}>
+              <div className="sidebar-brand-icon portal-mobile-brand-icon">Y</div>
+              <span className="portal-mobile-brand-text">
                 {isPreview ? 'Portal Preview' : 'YVA Portal'}
               </span>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="flex items-center gap-10">
             {isPreview && (
               <button
                 onClick={handleExitPreview}
-                className="btn-ghost btn-sm"
-                style={{ fontSize: 12 }}
+                className="btn-ghost btn-sm portal-topbar-exit"
               >
                 ← Exit Preview
               </button>
             )}
-            <div style={{
-              width: 34, height: 34, borderRadius: 10,
-              background: isPreview ? '#1b1e2b' : 'var(--gold)',
-              border: isPreview ? '2px solid var(--gold)' : 'none',
-              display: 'grid', placeItems: 'center',
-              fontSize: 12, fontWeight: 900,
-              color: isPreview ? 'var(--gold)' : '#1b1e2b',
-            }}>
-              {isPreview ? '👁' : initials}
+            <div className={`topbar-avatar ${isPreview ? 'topbar-avatar-preview' : 'topbar-avatar-gold'}`}>
+              {isPreview ? <IconEye size={14} /> : initials}
             </div>
           </div>
         </header>
@@ -212,8 +178,8 @@ export default function ClientShell({ children, previewClientId }: Props) {
         </main>
       </div>
 
-      {/* ── Mobile Bottom Navigation ─────────────────────────────────────── */}
-      <nav className="portal-bottom-nav" style={isPreview ? { bottom: 0 } : undefined}>
+      {/* Mobile Bottom Navigation */}
+      <nav className={`portal-bottom-nav${isPreview ? ' preview-offset' : ''}`}>
         <div className="portal-bottom-nav-items">
           {NAV_ITEMS.map(item => (
             <NavLink
@@ -223,7 +189,7 @@ export default function ClientShell({ children, previewClientId }: Props) {
                 `portal-bottom-nav-item${isActive ? ' active' : ''}`
               }
             >
-              <span style={{ width: 20, height: 20 }}>{item.icon}</span>
+              <span className="portal-bottom-nav-icon">{item.icon}</span>
               {item.shortLabel}
             </NavLink>
           ))}

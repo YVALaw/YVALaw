@@ -1,0 +1,121 @@
+[
+  {
+    "slug": "legal-intake-specialist",
+    "title": "Legal Intake Specialist",
+    "date": "2026-03-20T09:00:00.000Z",
+    "status": "Open",
+    "featured": true,
+    "location": "Remote",
+    "schedule": "Full / Part-time",
+    "icon": "phone",
+    "description": "Handle first contact with potential clients. Screen inquiries, capture intake forms, schedule consultations, and follow up on leads for U.S. law firms.",
+    "skills": [
+      "English/Spanish",
+      "CRM",
+      "Communication"
+    ],
+    "body": "Support growing U.S. law firms by owning the intake experience from first contact through consultation booking."
+  },
+  {
+    "slug": "demand-writer",
+    "title": "Demand Writer",
+    "date": "2026-03-18T09:00:00.000Z",
+    "status": "Open",
+    "featured": true,
+    "location": "Remote",
+    "schedule": "Full / Part-time",
+    "icon": "file-text",
+    "description": "Review medical records, calculate damages, and draft professional demand letters and settlement packages for personal injury and employment law firms.",
+    "skills": [
+      "Legal Writing",
+      "Medical Records",
+      "Detail-Oriented"
+    ],
+    "body": "Translate medical and case records into clear, persuasive demand packages for plaintiff-side law firms."
+  },
+  {
+    "slug": "social-media-manager",
+    "title": "Social Media Manager",
+    "date": "2026-03-16T09:00:00.000Z",
+    "status": "Open",
+    "featured": true,
+    "location": "Remote",
+    "schedule": "Full / Part-time",
+    "icon": "share-2",
+    "description": "Manage social media presence for U.S. law firms and professional clients. Create content, schedule posts, engage audiences, and report on performance.",
+    "skills": [
+      "Content Creation",
+      "Instagram/LinkedIn",
+      "Analytics"
+    ],
+    "body": "Help client brands stay visible and credible online with consistent content and channel management."
+  },
+  {
+    "slug": "legal-assistant",
+    "title": "Legal Assistant",
+    "date": "2026-03-19T09:00:00.000Z",
+    "status": "Open",
+    "featured": false,
+    "location": "Remote",
+    "schedule": "Full / Part-time",
+    "icon": "scale",
+    "description": "Support attorneys with calendar management, client correspondence, case file organization, deadline tracking, and document drafting.",
+    "skills": [
+      "Legal Knowledge",
+      "Organization",
+      "Drafting"
+    ],
+    "body": "Keep legal workflows moving by handling administrative and case support tasks with consistency and accuracy."
+  },
+  {
+    "slug": "case-manager",
+    "title": "Case Manager",
+    "date": "2026-03-17T09:00:00.000Z",
+    "status": "Open",
+    "featured": false,
+    "location": "Remote",
+    "schedule": "Full / Part-time",
+    "icon": "users",
+    "description": "Own the full case lifecycle. Coordinate between clients, attorneys, medical providers, and insurance adjusters from case open through settlement.",
+    "skills": [
+      "Coordination",
+      "Bilingual",
+      "Case Management"
+    ],
+    "body": "Drive case progress from intake to resolution by keeping communication, records, and follow-up tightly organized."
+  },
+  {
+    "slug": "web-designer",
+    "title": "Web Designer",
+    "date": "2026-03-15T09:00:00.000Z",
+    "status": "Open",
+    "featured": false,
+    "location": "Remote",
+    "schedule": "Full / Part-time",
+    "icon": "layout",
+    "description": "Design and build modern, high-converting websites for law firms and professional clients. From landing pages to full firm websites, clean, fast, and effective.",
+    "skills": [
+      "HTML/CSS",
+      "Figma",
+      "Responsive Design"
+    ],
+    "body": "Create polished websites that balance credibility, speed, and conversion for professional-service businesses."
+  },
+  {
+    "slug": "marketing-specialist",
+    "title": "Marketing Specialist",
+    "date": "2026-03-14T09:00:00.000Z",
+    "status": "Open",
+    "featured": false,
+    "location": "Remote",
+    "schedule": "Full / Part-time",
+    "icon": "megaphone",
+    "description": "Execute digital marketing strategies for law firm clients. Manage ad campaigns, email marketing, SEO content, and lead generation funnels.",
+    "skills": [
+      "Google Ads",
+      "Meta Ads",
+      "SEO"
+    ],
+    "body": "Support growth campaigns across paid, organic, and lifecycle channels for law firm clients."
+  }
+]

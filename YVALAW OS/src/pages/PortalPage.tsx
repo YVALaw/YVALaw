@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Invoice } from '../data/types'
+import { IconAlert } from '../components/Icon'
 
 type Payload = { inv: Invoice; dopRate?: number }
 
@@ -28,7 +29,7 @@ export default function PortalPage() {
     return (
       <div style={{ minHeight: '100vh', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Arial, sans-serif' }}>
         <div style={{ textAlign: 'center', color: '#888' }}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>⚠️</div>
+          <div style={{ fontSize: 48, marginBottom: 16, color: '#f5b533' }}><IconAlert size={48} /></div>
           <div style={{ fontSize: 20, fontWeight: 700, color: '#333' }}>Invalid invoice link</div>
           <div style={{ fontSize: 14, marginTop: 8 }}>This link may be expired or malformed.</div>
         </div>

@@ -12,6 +12,7 @@ import {
   fmtUSD,
 } from '../../services/portalStorage'
 import type { Client, Employee, Invoice, Project, TimeEntry } from '../../data/types'
+import { IconWave, IconX, IconCreditCard, IconClock, IconFolder, IconUsers, IconDollar, IconAlert } from '../../components/Icon'
 
 const AVATAR_COLORS = ['#f5b533','#3b82f6','#22c55e','#a855f7','#14b8a6','#f97316','#ec4899']
 function avatarColor(name: string) {
@@ -94,8 +95,9 @@ export default function PortalDashboard() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40vh' }}>
-        <div style={{ color: 'var(--muted)', fontSize: 14 }}>Loading your dashboard…</div>
+      <div className="loading-screen">
+        <div className="loading-spinner" />
+        <div className="loading-text">Loading your dashboard…</div>
       </div>
     )
   }
@@ -136,7 +138,7 @@ export default function PortalDashboard() {
             Welcome back{client?.name ? `, ${client.name.split(' ')[0]}` : ''}
           </div>
           <div className="page-sub">
-            {client?.company ? client.company + ' · ' : ''}Here's your account overview
+            {client?.company ? client.company + ' · ' : ''}Here&apos;s your account overview
           </div>
         </div>
       </div>
@@ -144,99 +146,100 @@ export default function PortalDashboard() {
       {/* ── KPI Cards ─────────────────────────────────────────────────────── */}
       <div className="kpi-grid">
         {/* Outstanding Balance */}
-        <div className="kpi-card" style={{ borderTop: `3px solid ${outstanding > 0 ? '#ef4444' : 'var(--gold)'}` }}>
-          <div className="kpi-label">Outstanding Balance</div>
-          <div className={`kpi-value${outstanding > 0 ? ' kpi-value-warn' : ''}`}>
-            {fmtUSD(outstanding)}
+        <div className="kpi-card">
+          <div className="kpi-icon-wrap" style={{ color: outstanding > 0 ? '#ef4444' : 'var(--success)', borderColor: outstanding > 0 ? '#ef444425' : 'rgba(5,150,105,.15)' }}>
+            {outstanding > 0 ? <IconAlert size={20} /> : <IconDollar size={20} />}
           </div>
-          <div className="kpi-sub">
-            {outstanding > 0 ? 'Payment due' : 'All paid up'}
+          <div className="kpi-body">
+            <div className="kpi-label">Outstanding Balance</div>
+            <div className={`kpi-value${outstanding > 0 ? ' kpi-value-warn' : ''}`}>
+              {fmtUSD(outstanding)}
+            </div>
+            <div className="kpi-sub">
+              {outstanding > 0 ? 'Payment due' : 'All paid up'}
+            </div>
           </div>
         </div>
 
         {/* Active Projects */}
-        <div className="kpi-card" style={{ borderTop: '3px solid var(--gold)' }}>
-          <div className="kpi-label">Active Projects</div>
-          <div className="kpi-value">{activeProjs}</div>
-          <div className="kpi-sub">
-            {projects.length} total project{projects.length !== 1 ? 's' : ''}
+        <div className="kpi-card">
+          <div className="kpi-icon-wrap" style={{ color: '#3b82f6', borderColor: 'rgba(59,130,246,.15)' }}>
+            <IconFolder size={20} />
+          </div>
+          <div className="kpi-body">
+            <div className="kpi-label">Active Projects</div>
+            <div className="kpi-value">{activeProjs}</div>
+            <div className="kpi-sub">
+              {projects.length} total project{projects.length !== 1 ? 's' : ''}
+            </div>
           </div>
         </div>
 
         {/* Team Size */}
-        <div className="kpi-card" style={{ borderTop: '3px solid #3b82f6' }}>
-          <div className="kpi-label">Team Members</div>
-          <div className="kpi-value">{employees.length}</div>
-          <div className="kpi-sub">Assigned to your account</div>
+        <div className="kpi-card">
+          <div className="kpi-icon-wrap" style={{ color: '#8b5cf6', borderColor: 'rgba(139,92,246,.15)' }}>
+            <IconUsers size={20} />
+          </div>
+          <div className="kpi-body">
+            <div className="kpi-label">Team Members</div>
+            <div className="kpi-value">{employees.length}</div>
+            <div className="kpi-sub">Assigned to your account</div>
+          </div>
         </div>
 
         {/* Hours This Month */}
-        <div className="kpi-card" style={{ borderTop: '3px solid #22c55e' }}>
-          <div className="kpi-label">Hours — {monthName}</div>
-          <div className="kpi-value">
-            {monthHours > 0 ? `${monthHours.toFixed(1)}h` : '—'}
+        <div className="kpi-card">
+          <div className="kpi-icon-wrap" style={{ color: '#22c55e', borderColor: 'rgba(34,197,94,.15)' }}>
+            <IconClock size={20} />
           </div>
-          <div className="kpi-sub">Billed this billing period</div>
+          <div className="kpi-body">
+            <div className="kpi-label">Hours — {monthName}</div>
+            <div className="kpi-value">
+              {monthHours > 0 ? `${monthHours.toFixed(1)}h` : '—'}
+            </div>
+            <div className="kpi-sub">Billed this billing period</div>
+          </div>
         </div>
       </div>
 
       {/* ── My Team ───────────────────────────────────────────────────────── */}
       {employees.length > 0 && (
-        <div style={{
-          background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+        <div className="portal-section-card">
+          <div className="portal-section-header">
             <div>
-              <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--text)' }}>My Team</div>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>Your assigned YVA professionals</div>
+              <div className="portal-section-title">My Team</div>
+              <div className="portal-section-sub">Your assigned YVA professionals</div>
             </div>
             <button
               className="btn-ghost btn-sm"
               onClick={() => navigate(portalNav('/portal/team'))}
-              style={{ fontSize: 12 }}
             >
               View all →
             </button>
           </div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+          <div className="portal-inline-list">
             {employees.slice(0, 6).map(emp => (
-              <div key={emp.id} onClick={() => setSelectedEmployee(emp)} style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                padding: '10px 14px',
-                background: 'var(--surf2)', borderRadius: 12,
-                border: '1px solid var(--border)',
-                minWidth: 0, cursor: 'pointer',
-                transition: 'border-color 0.15s',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.borderColor = 'var(--gold)')}
-              onMouseLeave={e => (e.currentTarget.style.borderColor = 'var(--border)')}
+              <div
+                key={emp.id}
+                onClick={() => setSelectedEmployee(emp)}
+                className="portal-team-chip"
               >
                 {emp.photoUrl ? (
-                  <img src={emp.photoUrl} alt={emp.name}
-                    style={{ width: 36, height: 36, borderRadius: 10, objectFit: 'cover', objectPosition: 'center top', flexShrink: 0 }} />
+                  <img src={emp.photoUrl} alt={emp.name} className="avatar-sm" style={{ borderRadius: 10 }} />
                 ) : (
-                  <div style={{
-                    width: 36, height: 36, borderRadius: 10,
-                    background: avatarColor(emp.name), display: 'grid', placeItems: 'center',
-                    fontSize: 12, fontWeight: 900, color: '#1b1e2b', flexShrink: 0,
-                  }}>
+                  <div className="avatar-sm" style={{ background: avatarColor(emp.name) }}>
                     {initials(emp.name)}
                   </div>
                 )}
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)', whiteSpace: 'nowrap' }}>{emp.name}</div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)', overflowWrap: 'anywhere', lineHeight: 1.3 }}>{emp.name}</div>
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>{emp.role ?? 'Team Member'}</div>
                 </div>
               </div>
             ))}
             {employees.length > 6 && (
-              <div style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                padding: '10px 14px', background: 'var(--surf2)', borderRadius: 12,
-                border: '1px solid var(--border)', fontSize: 12, color: 'var(--muted)', fontWeight: 600,
-              }}>
-                +{employees.length - 6} more
+              <div className="portal-team-chip" style={{ justifyContent: 'center', cursor: 'default' }}>
+                <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>+{employees.length - 6} more</span>
               </div>
             )}
           </div>
@@ -245,27 +248,23 @@ export default function PortalDashboard() {
 
       {/* ── Latest Invoice ─────────────────────────────────────────────────── */}
       {latestInv && (
-        <div style={{
-          background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+        <div className="portal-section-card">
+          <div className="portal-section-header">
             <div>
-              <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--text)' }}>Latest Invoice</div>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>Most recent billing activity</div>
+              <div className="portal-section-title">Latest Invoice</div>
+              <div className="portal-section-sub">Most recent billing activity</div>
             </div>
             <button
               className="btn-ghost btn-sm"
               onClick={() => navigate(portalNav('/portal/billing'))}
-              style={{ fontSize: 12 }}
             >
               All invoices →
             </button>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--text)' }}>{latestInv.number}</div>
+          <div className="flex items-center justify-between" style={{ flexWrap: 'wrap', gap: 16 }}>
+            <div className="flex-col" style={{ gap: 4 }}>
+              <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--text)', overflowWrap: 'anywhere', lineHeight: 1.3 }}>{latestInv.number}</div>
               <div style={{ fontSize: 13, color: 'var(--muted)' }}>
                 {latestInv.projectName ?? 'No project'} · Issued {fmtDate(latestInv.date)}
               </div>
@@ -273,22 +272,19 @@ export default function PortalDashboard() {
                 <div style={{ fontSize: 12, color: 'var(--muted)' }}>Due {fmtDate(latestInv.dueDate)}</div>
               )}
             </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--text)' }}>
-                  {fmtUSD(Number(latestInv.subtotal) || 0)}
-                </div>
+            <div className="flex items-center" style={{ gap: 12, flexWrap: 'wrap' }}>
+              <div className="text-right">
+                <div className="stat-value-lg">{fmtUSD(Number(latestInv.subtotal) || 0)}</div>
                 {latestInv.amountPaid && Number(latestInv.amountPaid) > 0 && (
                   <div style={{ fontSize: 11, color: 'var(--muted)' }}>
                     {fmtUSD(Number(latestInv.amountPaid))} paid
                   </div>
                 )}
               </div>
-              <span style={{
-                padding: '5px 12px', borderRadius: 999, fontSize: 12, fontWeight: 700,
-                color: statusColor(latestInv.status),
-                background: statusBg(latestInv.status),
-              }}>
+              <span
+                className="badge"
+                style={{ color: statusColor(latestInv.status), background: statusBg(latestInv.status), borderColor: statusColor(latestInv.status) + '33' }}
+              >
                 {(latestInv.status ?? 'Draft').charAt(0).toUpperCase() + (latestInv.status ?? 'draft').slice(1)}
               </span>
             </div>
@@ -299,11 +295,10 @@ export default function PortalDashboard() {
             <div style={{ marginTop: 18, paddingTop: 18, borderTop: '1px solid var(--border)' }}>
               <button
                 className="btn-primary"
-                style={{ gap: 6 }}
                 onClick={() => navigate(portalNav('/portal/billing'))}
                 title="Open billing to pay this invoice"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+                <IconCreditCard size={14} />
                 Pay in Billing
               </button>
             </div>
@@ -313,45 +308,29 @@ export default function PortalDashboard() {
 
       {/* ── Active Projects ─────────────────────────────────────────────────── */}
       {projects.length > 0 && (
-        <div style={{
-          background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+        <div className="portal-section-card">
+          <div className="portal-section-header">
             <div>
-              <div style={{ fontWeight: 800, fontSize: 15, color: 'var(--text)' }}>My Projects</div>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>Active engagements</div>
+              <div className="portal-section-title">My Projects</div>
+              <div className="portal-section-sub">Active engagements</div>
             </div>
             <button
               className="btn-ghost btn-sm"
               onClick={() => navigate(portalNav('/portal/projects'))}
-              style={{ fontSize: 12 }}
             >
               Details →
             </button>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div className="portal-card-list">
             {projects.slice(0, 3).map(proj => (
-              <div key={proj.id} style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '12px 16px', background: 'var(--surf2)',
-                borderRadius: 12, border: '1px solid var(--border)',
-                flexWrap: 'wrap', gap: 10,
-              }}>
+              <div key={proj.id} className="portal-panel" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
                 <div>
                   <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{proj.name}</div>
                   {proj.description && (
-                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, maxWidth: 320,
-                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {proj.description}
-                    </div>
+                    <div className="card-sub" style={{ maxWidth: 320 }}>{proj.description}</div>
                   )}
                 </div>
-                <span style={{
-                  padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700,
-                  background: (proj.status ?? '').toLowerCase() === 'active' ? 'rgba(34,197,94,.1)' : 'var(--surf3)',
-                  color: (proj.status ?? '').toLowerCase() === 'active' ? '#15803d' : 'var(--muted)',
-                }}>
+                <span className={`badge ${(proj.status ?? '').toLowerCase() === 'active' ? 'badge-green' : 'badge-gray'}`}>
                   {proj.status ?? 'Active'}
                 </span>
               </div>
@@ -362,17 +341,11 @@ export default function PortalDashboard() {
 
       {/* ── Empty state ─────────────────────────────────────────────────────── */}
       {projects.length === 0 && invoices.length === 0 && !loading && (
-        <div style={{
-          textAlign: 'center', padding: '60px 20px',
-          background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: 16, color: 'var(--muted)',
-        }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>👋</div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>
-            Your portal is ready
-          </div>
-          <div style={{ fontSize: 13, maxWidth: 360, margin: '0 auto' }}>
-            Once your account manager sets up your projects and assignments, you'll see everything here.
+        <div className="empty-state">
+          <div className="empty-state-icon"><IconWave size={28} /></div>
+          <div className="empty-state-title">Your portal is ready</div>
+          <div className="empty-state-message">
+            Once your account manager sets up your projects and assignments, you&apos;ll see everything here.
           </div>
         </div>
       )}
@@ -389,9 +362,9 @@ export default function PortalDashboard() {
         function Row({ label, value }: { label: string; value?: string | null }) {
           if (!value) return null
           return (
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
-              <span style={{ fontSize: 13, color: 'var(--muted)' }}>{label}</span>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>{value}</span>
+            <div className="portal-detail-row">
+              <span className="portal-detail-row-label">{label}</span>
+              <span className="portal-detail-row-value">{value}</span>
             </div>
           )
         }
@@ -402,74 +375,46 @@ export default function PortalDashboard() {
           : null
 
         return (
-          <div
-            className="modal-overlay"
-            onClick={() => setSelectedEmployee(null)}
-            style={{ zIndex: 200 }}
-          >
-            <div
-              className="modal"
-              onClick={e => e.stopPropagation()}
-              style={{ maxWidth: 420, width: '100%' }}
-            >
+          <div className="modal-overlay" onClick={() => setSelectedEmployee(null)} style={{ zIndex: 200 }}>
+            <div className="modal modal-sm" onClick={e => e.stopPropagation()}>
               {/* Modal header */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px', borderBottom: '1px solid var(--border)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div className="portal-modal-header">
+                <div className="flex items-center" style={{ gap: 14 }}>
                   {emp.photoUrl ? (
-                    <img src={emp.photoUrl} alt={emp.name}
-                      style={{ width: 52, height: 52, borderRadius: 14, objectFit: 'cover', objectPosition: 'center top', flexShrink: 0 }} />
+                    <img src={emp.photoUrl} alt={emp.name} className="portal-modal-avatar" />
                   ) : (
-                    <div style={{
-                      width: 52, height: 52, borderRadius: 14, flexShrink: 0,
-                      background: avatarColor(emp.name), display: 'grid', placeItems: 'center',
-                      fontSize: 18, fontWeight: 900, color: '#1b1e2b',
-                    }}>
+                    <div className="portal-modal-avatar-fallback" style={{ background: avatarColor(emp.name) }}>
                       {initials(emp.name)}
                     </div>
                   )}
                   <div>
-                    <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--text)' }}>{emp.name}</div>
-                    {emp.role && <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 2 }}>{emp.role}</div>}
+                    <div className="portal-modal-name">{emp.name}</div>
+                    {emp.role && <div className="portal-modal-role">{emp.role}</div>}
                     {emp.status && (
-                      <span style={{
-                        display: 'inline-block', marginTop: 4,
-                        padding: '2px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700,
-                        background: emp.status.toLowerCase() === 'active' ? 'rgba(34,197,94,.1)' : 'var(--surf2)',
-                        color: emp.status.toLowerCase() === 'active' ? '#15803d' : 'var(--muted)',
-                      }}>
+                      <span className={`status-badge ${emp.status.toLowerCase() === 'active' ? 'status-badge-active' : 'status-badge-default'} portal-modal-status`}>
                         {emp.status.charAt(0).toUpperCase() + emp.status.slice(1)}
                       </span>
                     )}
                   </div>
                 </div>
-                <button
-                  className="modal-close btn-icon"
-                  onClick={() => setSelectedEmployee(null)}
-                >✕</button>
+                <button className="modal-close btn-icon" onClick={() => setSelectedEmployee(null)}><IconX size={14} /></button>
               </div>
 
               {/* Modal body */}
-              <div style={{ padding: '8px 24px 24px' }}>
-
+              <div className="portal-modal-body">
                 {/* Hours this month */}
-                <div style={{ display: 'flex', gap: 12, margin: '16px 0' }}>
-                  <div style={{
-                    flex: 1, background: 'var(--surf2)', borderRadius: 12,
-                    padding: '12px 16px', border: '1px solid var(--border)', textAlign: 'center',
-                  }}>
-                    <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--gold)' }}>
+                <div className="portal-hours-kpi-grid">
+                  <div className="portal-hours-kpi">
+                    <div className={`portal-hours-kpi-value${hrsMonth > 0 ? ' portal-hours-kpi-value-gold' : ''}`}>
                       {hrsMonth > 0 ? `${hrsMonth.toFixed(1)}h` : '—'}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>{monthName2}</div>
+                    <div className="portal-hours-kpi-label">{monthName2}</div>
                   </div>
-                  <div style={{
-                    flex: 1, background: 'var(--surf2)', borderRadius: 12,
-                    padding: '12px 16px', border: '1px solid var(--border)', textAlign: 'center',
-                  }}>
-                    <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--text)' }}>
+                  <div className="portal-hours-kpi">
+                    <div className="portal-hours-kpi-value">
                       {hrsTotal > 0 ? `${hrsTotal.toFixed(1)}h` : '—'}
                     </div>
-                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>All time</div>
+                    <div className="portal-hours-kpi-label">All time</div>
                   </div>
                 </div>
 
@@ -483,13 +428,8 @@ export default function PortalDashboard() {
 
                 {/* Schedule placeholder if not set */}
                 {!hasSchedule && (
-                  <div style={{
-                    marginTop: 16, padding: '12px 16px',
-                    background: 'rgba(245,181,51,.07)', border: '1px solid rgba(245,181,51,.2)',
-                    borderRadius: 10, fontSize: 12, color: 'rgba(245,181,51,.9)',
-                    display: 'flex', alignItems: 'center', gap: 8,
-                  }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                  <div className="portal-info-banner">
+                    <IconClock size={14} />
                     Schedule details will appear here once configured.
                   </div>
                 )}

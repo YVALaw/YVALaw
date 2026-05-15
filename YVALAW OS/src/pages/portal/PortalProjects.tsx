@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useRole } from '../../context/RoleContext'
+import { IconClipboard, IconFolder, IconActivity, IconDollar } from '../../components/Icon'
 import {
   loadPortalClient,
   loadPortalProjects,
@@ -97,8 +98,9 @@ export default function PortalProjects() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '40vh' }}>
-        <div style={{ color: 'var(--muted)', fontSize: 14 }}>Loading projects…</div>
+      <div className="loading-screen">
+        <div className="loading-spinner" />
+        <div className="loading-text">Loading projects…</div>
       </div>
     )
   }
@@ -116,53 +118,58 @@ export default function PortalProjects() {
             {completed > 0 ? ` · ${completed} completed` : ''}
           </div>
         </div>
-        <button
-          className="btn-ghost btn-sm"
-          onClick={() => navigate(portalNav('/portal/dashboard'))}
-          style={{ fontSize: 12 }}
-        >
+        <button className="btn-ghost btn-sm" onClick={() => navigate(portalNav('/portal/dashboard'))}>
           ← Dashboard
         </button>
       </div>
 
       {/* Summary KPIs */}
-      <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
-        <div className="kpi-card" style={{ borderTop: '3px solid var(--gold)' }}>
-          <div className="kpi-label">Total Projects</div>
-          <div className="kpi-value">{projects.length}</div>
-          <div className="kpi-sub">All engagements</div>
-        </div>
-        <div className="kpi-card" style={{ borderTop: '3px solid #22c55e' }}>
-          <div className="kpi-label">Active</div>
-          <div className="kpi-value">{active}</div>
-          <div className="kpi-sub">Currently running</div>
-        </div>
-        <div className="kpi-card" style={{ borderTop: '3px solid #3b82f6' }}>
-          <div className="kpi-label">Total Billed</div>
-          <div className="kpi-value" style={{ fontSize: 20 }}>
-            {fmtUSD(invoices.reduce((s, inv) => s + (Number(inv.subtotal) || 0), 0))}
+      <div className="kpi-grid portal-kpi-3">
+        <div className="kpi-card">
+          <div className="kpi-icon-wrap" style={{ color: '#3b82f6', borderColor: 'rgba(59,130,246,.15)' }}>
+            <IconFolder size={20} />
           </div>
-          <div className="kpi-sub">Across all projects</div>
+          <div className="kpi-body">
+            <div className="kpi-label">Total Projects</div>
+            <div className="kpi-value">{projects.length}</div>
+            <div className="kpi-sub">All engagements</div>
+          </div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-icon-wrap" style={{ color: '#22c55e', borderColor: 'rgba(34,197,94,.15)' }}>
+            <IconActivity size={20} />
+          </div>
+          <div className="kpi-body">
+            <div className="kpi-label">Active</div>
+            <div className="kpi-value">{active}</div>
+            <div className="kpi-sub">Currently running</div>
+          </div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-icon-wrap" style={{ color: 'var(--gold)', borderColor: 'rgba(212,168,67,.15)' }}>
+            <IconDollar size={20} />
+          </div>
+          <div className="kpi-body">
+            <div className="kpi-label">Total Billed</div>
+            <div className="kpi-value" style={{ fontSize: 20 }}>
+              {fmtUSD(invoices.reduce((s, inv) => s + (Number(inv.subtotal) || 0), 0))}
+            </div>
+            <div className="kpi-sub">Across all projects</div>
+          </div>
         </div>
       </div>
 
       {/* Project cards */}
       {projects.length === 0 ? (
-        <div style={{
-          textAlign: 'center', padding: '60px 20px',
-          background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: 16, color: 'var(--muted)',
-        }}>
-          <div style={{ fontSize: 36, marginBottom: 12 }}>📋</div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', marginBottom: 6 }}>
-            No projects yet
-          </div>
-          <div style={{ fontSize: 13, maxWidth: 360, margin: '0 auto' }}>
+        <div className="empty-state">
+          <div className="empty-state-icon"><IconClipboard size={28} /></div>
+          <div className="empty-state-title">No projects yet</div>
+          <div className="empty-state-message">
             Your account manager will set up your first project soon.
           </div>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        <div className="portal-card-list">
           {projects.map(proj => {
             const stats       = projectInvoiceStats(invoices, proj.id)
             const projEmps    = (proj.employeeIds ?? []).map(id => empById[id]).filter(Boolean)
@@ -170,67 +177,45 @@ export default function PortalProjects() {
             const endLabel    = fmtDate(proj.endDate)
 
             return (
-              <div key={proj.id} style={{
-                background: 'var(--surface)', border: '1px solid var(--border)',
-                borderRadius: 16, padding: 24, boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
-              }}>
-
+              <div key={proj.id} className="portal-section-card">
                 {/* Project header */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
+                <div className="flex items-center justify-between" style={{ gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
                   <div>
-                    <div style={{ fontWeight: 800, fontSize: 17, color: 'var(--text)' }}>{proj.name}</div>
+                    <div style={{ fontWeight: 800, fontSize: 17, color: 'var(--text)', overflowWrap: 'anywhere', lineHeight: 1.3 }}>{proj.name}</div>
                     {proj.description && (
-                      <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 4, maxWidth: 560 }}>
-                        {proj.description}
-                      </div>
+                      <div className="card-sub mt-4" style={{ maxWidth: 560 }}>{proj.description}</div>
                     )}
                     {(startLabel || endLabel) && (
-                      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6, display: 'flex', gap: 12 }}>
+                      <div className="mt-6 flex" style={{ gap: 12, fontSize: 12, color: 'var(--muted)' }}>
                         {startLabel && <span>Started {startLabel}</span>}
                         {endLabel   && <span>· Ends {endLabel}</span>}
                       </div>
                     )}
                   </div>
-                  <span style={{
-                    padding: '5px 14px', borderRadius: 999, fontSize: 12, fontWeight: 700,
-                    color: statusColor(proj.status),
-                    background: statusBg(proj.status),
-                    flexShrink: 0,
-                  }}>
+                  <span className="badge" style={{ color: statusColor(proj.status), background: statusBg(proj.status), borderColor: statusColor(proj.status) + '33', flexShrink: 0 }}>
                     {(proj.status ?? 'Active').charAt(0).toUpperCase() + (proj.status ?? 'active').slice(1)}
                   </span>
                 </div>
 
-                <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                <div className="flex" style={{ gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
 
                   {/* Team members */}
                   {projEmps.length > 0 && (
-                    <div style={{
-                      flex: 1, minWidth: 220,
-                      background: 'var(--surf2)', borderRadius: 12,
-                      padding: '14px 16px', border: '1px solid var(--border)',
-                    }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
-                        Assigned Team
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div className="project-sub-card">
+                      <div className="project-sub-card-title">Assigned Team</div>
+                      <div className="flex-col" style={{ gap: 8 }}>
                         {projEmps.map(emp => (
-                          <div key={emp.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div key={emp.id} className="project-emp-row">
                             {emp.photoUrl ? (
-                              <img src={emp.photoUrl} alt={emp.name}
-                                style={{ width: 30, height: 30, borderRadius: 8, objectFit: 'cover', objectPosition: 'center top', flexShrink: 0 }} />
+                              <img src={emp.photoUrl} alt={emp.name} className="project-emp-avatar" />
                             ) : (
-                              <div style={{
-                                width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-                                background: avatarColor(emp.name), display: 'grid', placeItems: 'center',
-                                fontSize: 11, fontWeight: 900, color: '#1b1e2b',
-                              }}>
+                              <div className="project-emp-avatar-fallback" style={{ background: avatarColor(emp.name) }}>
                                 {initials(emp.name)}
                               </div>
                             )}
                             <div>
-                              <div style={{ fontWeight: 700, fontSize: 12, color: 'var(--text)' }}>{emp.name}</div>
-                              {emp.role && <div style={{ fontSize: 11, color: 'var(--muted)' }}>{emp.role}</div>}
+                              <div className="project-emp-name">{emp.name}</div>
+                              {emp.role && <div className="project-emp-role">{emp.role}</div>}
                             </div>
                           </div>
                         ))}
@@ -240,41 +225,30 @@ export default function PortalProjects() {
 
                   {/* Billing summary */}
                   {stats.count > 0 ? (
-                    <div style={{
-                      flex: 1, minWidth: 220,
-                      background: 'var(--surf2)', borderRadius: 12,
-                      padding: '14px 16px', border: '1px solid var(--border)',
-                    }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 10 }}>
-                        Billing Summary
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                          <span style={{ color: 'var(--muted)' }}>Total billed</span>
-                          <span style={{ fontWeight: 700, color: 'var(--text)' }}>{fmtUSD(stats.totalBilled)}</span>
+                    <div className="project-sub-card">
+                      <div className="project-sub-card-title">Billing Summary</div>
+                      <div className="flex-col" style={{ gap: 8 }}>
+                        <div className="labeled-row">
+                          <span className="labeled-row-label">Total billed</span>
+                          <span className="labeled-row-value">{fmtUSD(stats.totalBilled)}</span>
                         </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                          <span style={{ color: 'var(--muted)' }}>Paid</span>
-                          <span style={{ fontWeight: 700, color: '#22c55e' }}>{fmtUSD(stats.totalPaid)}</span>
+                        <div className="labeled-row">
+                          <span className="labeled-row-label">Paid</span>
+                          <span className="labeled-row-value text-green">{fmtUSD(stats.totalPaid)}</span>
                         </div>
                         {stats.outstanding > 0 && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
-                            <span style={{ color: 'var(--muted)' }}>Outstanding</span>
-                            <span style={{ fontWeight: 700, color: '#ef4444' }}>{fmtUSD(stats.outstanding)}</span>
+                          <div className="labeled-row">
+                            <span className="labeled-row-label">Outstanding</span>
+                            <span className="labeled-row-value text-warn">{fmtUSD(stats.outstanding)}</span>
                           </div>
                         )}
-                        <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
+                        <div className="mt-2" style={{ fontSize: 11, color: 'var(--muted)' }}>
                           {stats.count} invoice{stats.count !== 1 ? 's' : ''}
                         </div>
                       </div>
                     </div>
                   ) : (
-                    <div style={{
-                      flex: 1, minWidth: 220,
-                      background: 'var(--surf2)', borderRadius: 12,
-                      padding: '14px 16px', border: '1px solid var(--border)',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }}>
+                    <div className="project-sub-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <span style={{ fontSize: 12, color: 'var(--muted)' }}>No invoices yet</span>
                     </div>
                   )}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { loadStaffRequests, updateStaffRequestStatus } from '../services/storage'
 import type { StaffRequest } from '../data/types'
+import { IconClipboard, IconAlert, IconSearch, IconCheck, IconX } from '../components/Icon'
 
 type Filter = 'all' | StaffRequest['status']
 
@@ -80,23 +81,33 @@ export default function RequestsPage() {
 
       {/* KPI strip */}
       <div className="kpi-grid">
-        {(['pending', 'in_review', 'fulfilled', 'declined'] as StaffRequest['status'][]).map(s => (
+        {([
+          { s: 'pending' as const, icon: <IconAlert size={20} /> },
+          { s: 'in_review' as const, icon: <IconSearch size={20} /> },
+          { s: 'fulfilled' as const, icon: <IconCheck size={20} /> },
+          { s: 'declined' as const, icon: <IconX size={20} /> },
+        ]).map(({ s, icon }) => (
           <div
             key={s}
             className="kpi-card"
-            style={{ borderTop: `3px solid ${STATUS_META[s].color}`, cursor: 'pointer' }}
+            style={{ cursor: 'pointer' }}
             onClick={() => setFilter(filter === s ? 'all' : s)}
           >
-            <div className="kpi-label">{STATUS_META[s].label}</div>
-            <div className="kpi-value" style={{ color: counts[s] > 0 && s === 'pending' ? STATUS_META[s].color : undefined }}>
-              {counts[s]}
+            <div className="kpi-icon-wrap" style={{ color: STATUS_META[s].color, borderColor: STATUS_META[s].color + '25' }}>
+              {icon}
+            </div>
+            <div className="kpi-body">
+              <div className="kpi-label">{STATUS_META[s].label}</div>
+              <div className="kpi-value" style={{ color: counts[s] > 0 && s === 'pending' ? STATUS_META[s].color : undefined }}>
+                {counts[s]}
+              </div>
             </div>
           </div>
         ))}
       </div>
 
       {/* Filter tabs */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <div className="filter-tabs">
         {(['all', 'pending', 'in_review', 'fulfilled', 'declined'] as Filter[]).map(f => {
           const label = f === 'all' ? `All (${counts.all})` : f === 'in_review' ? `In Review (${counts.in_review})` : `${STATUS_META[f as StaffRequest['status']].label} (${counts[f as keyof typeof counts]})`
           const active = filter === f
@@ -104,14 +115,7 @@ export default function RequestsPage() {
             <button
               key={f}
               onClick={() => setFilter(f)}
-              style={{
-                padding: '6px 16px', borderRadius: 999, fontSize: 13, fontWeight: 600,
-                border: '1px solid',
-                borderColor: active ? 'var(--gold)' : 'var(--border)',
-                background:  active ? 'rgba(245,181,51,.12)' : 'transparent',
-                color:       active ? 'var(--gold)' : 'var(--muted)',
-                cursor: 'pointer', transition: 'all 0.15s',
-              }}
+              className={`filter-tab${active ? ' active' : ''}`}
             >
               {label}
             </button>
@@ -121,104 +125,83 @@ export default function RequestsPage() {
 
       {/* List */}
       {loading ? (
-        <div style={{ color: 'var(--muted)', fontSize: 14, padding: '40px 0', textAlign: 'center' }}>
-          Loading requests…
+        <div className="loading-screen">
+          <div className="loading-spinner" />
+          <div className="loading-text">Loading requests…</div>
         </div>
       ) : filtered.length === 0 ? (
-        <div style={{
-          textAlign: 'center', padding: '56px 20px',
-          background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: 16, color: 'var(--muted)',
-        }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>📋</div>
-          <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
+        <div className="empty-state">
+          <div className="empty-state-icon"><IconClipboard size={28} /></div>
+          <div className="empty-state-title">
             {filter === 'all' ? 'No requests yet' : `No ${STATUS_META[filter as StaffRequest['status']]?.label.toLowerCase()} requests`}
           </div>
-          <div style={{ fontSize: 13, marginTop: 4 }}>
+          <div className="empty-state-message">
             Staff requests submitted from the client portal will appear here.
           </div>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {filtered.map(req => {
             const meta    = STATUS_META[req.status]
             const nexts   = NEXT_STATUSES[req.status]
             const busy    = updating === req.id
             return (
-              <div key={req.id} style={{
-                background: 'var(--surface)', border: '1px solid var(--border)',
-                borderRadius: 14, padding: '18px 20px',
-                borderLeft: `3px solid ${meta.color}`,
-              }}>
+              <div key={req.id} className="request-card">
                 {/* Top row */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                <div className="request-card-top">
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                      <span style={{ fontWeight: 800, fontSize: 15, color: 'var(--text)' }}>
+                      <span className="request-card-name">
                         {req.clientName ?? 'Unknown client'}
                       </span>
-                      <span style={{
-                        padding: '2px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700,
-                        color: meta.color, background: meta.bg,
-                      }}>
+                      <span className="badge" style={{ color: meta.color, background: meta.bg, borderColor: meta.color + '20' }}>
                         {meta.label}
                       </span>
                     </div>
                     {req.role && (
-                      <div style={{ fontSize: 13, color: 'var(--text)', fontWeight: 600 }}>
+                      <div className="request-card-role">
                         {req.role}
                       </div>
                     )}
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--muted)', flexShrink: 0, textAlign: 'right' }}>
+                  <div className="request-card-date">
                     Submitted {fmtDate(req.createdAt)}
                   </div>
                 </div>
 
                 {/* Details row */}
-                <div style={{ display: 'flex', gap: 20, marginTop: 10, flexWrap: 'wrap' }}>
+                <div className="request-card-details">
                   {req.hoursPerWeek && (
-                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                      <span style={{ fontWeight: 600, color: 'var(--text)' }}>Hours/week:</span>{' '}
-                      {req.hoursPerWeek}h
+                    <div className="request-card-detail">
+                      <strong>Hours/week:</strong> {req.hoursPerWeek}h
                     </div>
                   )}
                   {req.startDate && (
-                    <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                      <span style={{ fontWeight: 600, color: 'var(--text)' }}>Start:</span>{' '}
-                      {fmtDate(req.startDate)}
+                    <div className="request-card-detail">
+                      <strong>Start:</strong> {fmtDate(req.startDate)}
                     </div>
                   )}
                 </div>
 
                 {req.notes && (
-                  <div style={{
-                    marginTop: 12, padding: '10px 14px',
-                    background: 'var(--surf2)', borderRadius: 8,
-                    fontSize: 13, color: 'var(--muted)',
-                    borderLeft: '2px solid var(--border)',
-                  }}>
+                  <div className="request-card-note">
                     {req.notes}
                   </div>
                 )}
 
                 {/* Status actions */}
                 {nexts.length > 0 && (
-                  <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>Move to:</span>
+                  <div className="request-card-actions">
+                    <span className="request-card-actions-label">Move to:</span>
                     {nexts.map(s => (
                       <button
                         key={s}
                         disabled={busy}
                         onClick={() => void changeStatus(req, s)}
+                        className="status-chip-btn"
                         style={{
-                          padding: '5px 14px', borderRadius: 999, fontSize: 12, fontWeight: 700,
-                          border: `1px solid ${STATUS_META[s].color}`,
+                          borderColor: STATUS_META[s].color,
                           color: STATUS_META[s].color,
-                          background: 'transparent',
-                          cursor: busy ? 'not-allowed' : 'pointer',
-                          opacity: busy ? 0.5 : 1,
-                          transition: 'all 0.15s',
                         }}
                         onMouseEnter={e => { if (!busy) e.currentTarget.style.background = STATUS_META[s].bg }}
                         onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
@@ -236,13 +219,7 @@ export default function RequestsPage() {
 
       {/* Toast */}
       {toast && (
-        <div style={{
-          position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)',
-          background: '#1e293b', color: '#fff', padding: '10px 20px',
-          borderRadius: 999, fontSize: 13, fontWeight: 600,
-          boxShadow: '0 4px 20px rgba(0,0,0,.3)', zIndex: 9999,
-          pointerEvents: 'none',
-        }}>
+        <div className="toast-fixed">
           {toast}
         </div>
       )}

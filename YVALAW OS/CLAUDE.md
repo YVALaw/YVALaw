@@ -75,9 +75,9 @@ CREATE TABLE IF NOT EXISTS working_hour_prefs (
   UNIQUE(client_id)
 );
 ALTER TABLE working_hour_prefs ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "client_read_prefs"   ON working_hour_prefs FOR SELECT TO authenticated USING (client_id = portal_client_id() OR is_internal());
-CREATE POLICY "client_insert_prefs" ON working_hour_prefs FOR INSERT TO authenticated WITH CHECK (client_id = portal_client_id() OR is_internal());
-CREATE POLICY "client_update_prefs" ON working_hour_prefs FOR UPDATE TO authenticated USING (client_id = portal_client_id() OR is_internal());
+CREATE POLICY "client_read_prefs"   ON working_hour_prefs FOR SELECT TO authenticated USING (client_id = private.portal_client_id() OR private.is_internal());
+CREATE POLICY "client_insert_prefs" ON working_hour_prefs FOR INSERT TO authenticated WITH CHECK (client_id = private.portal_client_id() OR private.is_internal());
+CREATE POLICY "client_update_prefs" ON working_hour_prefs FOR UPDATE TO authenticated USING (client_id = private.portal_client_id() OR private.is_internal());
 ```
 
 ### Staff Requests (OS side)
@@ -93,7 +93,7 @@ CREATE POLICY "client_update_prefs" ON working_hour_prefs FOR UPDATE TO authenti
 
 ### Security
 - `client_users` table RLS: client can only read/update own row
-- `is_internal()` helper gates all OS data from client users at DB level
+- `private.is_internal()` helper gates all OS data from client users at DB level
 - Separate portal-scoped read policies per table (clients, projects, invoices, employees, time_entries, client_documents, staff_requests)
 - Invite function validates caller is internal staff before creating accounts
 - Service role key lives in Netlify env only — never in frontend
@@ -125,6 +125,8 @@ CREATE POLICY "client_update_prefs" ON working_hour_prefs FOR UPDATE TO authenti
 - **LawOS profile UI consistency sweep**: Client, employee, and project profiles now use shared profile layout classes for headers, KPI grids, field groups, document rows, communication panels, and responsive profile grids. Team project employee cards now show pointer/hover/focus states, card subtitles and stats handle long text, and profile/report/calendar fixed grids were converted to responsive classes where they were most likely to overflow.
 - **Reports and Calendar UI cleanup**: Reports KPI drill-down cards now use the `clickable-card` hover/focus treatment, report two-column sections collapse on mobile, aging buckets use responsive metric grids, and Calendar uses responsive wrapper classes so the detail panel stacks below the calendar on smaller screens.
 - **Latest pushed commits**:
+  - `e45aa21` — Polish LawOS portal and profile UI
+  - `9fbcf3f` — Harden client portal security
   - `e248901` — Add LawOS client portal payments
   - `b1af500` — Add manual client portal invite links
   - `38ba3de` — Deploy LawOS Netlify functions
@@ -171,28 +173,26 @@ NOTIFY pgrst, 'reload schema';
 
 ---
 
-### 1B. Supabase Security / Performance Advisor Cleanup — 2026-04-16
+### 1B. Supabase Security / Performance Advisor Cleanup — 2026-05-04
 
-Security Advisor items handled:
-- Critical `rls_disabled_in_public` on these public tables:
-  - `timesheet_batch_invoices`
-  - `timesheet_import_batches`
-  - `timesheet_import_rows`
-  - `timesheet_mappings`
-- Function Search Path Mutable warnings fixed for:
-  - `current_user_role`
-  - `is_internal`
-  - `is_portal_client`
-  - `portal_client_id`
-- Broad authenticated `USING (true)` / `WITH CHECK (true)` policies were replaced with scoped policies for internal staff and portal clients.
-- User confirmed the Security Advisor looked good after these changes.
+**Security Advisor — DONE**
 
-Performance Advisor items addressed by the cleanup SQL copied on 2026-04-16:
-- `auth_rls_initplan` warnings by wrapping auth calls as `(select auth.uid())`.
-- Duplicate permissive policies on portal/internal tables by consolidating same-role/same-action policy sets.
+SQL warnings fixed by moving SECURITY DEFINER helpers to `private` schema:
+- `anon_security_definer_function_executable` (`current_user_role`, `is_internal`)
+- `authenticated_security_definer_function_executable` (`current_user_role`, `is_internal`)
 
-Validation still needed after running the Performance Advisor cleanup:
+Run `supabase/migrate-security-advisor.sql` on existing databases, or use the updated `rls.sql` + `client-portal.sql` for new deployments.
 
+Previous session items (2026-04-16):
+- Critical `rls_disabled_in_public` on timesheet import tables — fixed
+- Function Search Path Mutable warnings fixed for all 4 helpers
+- Broad authenticated `USING (true)` / `WITH CHECK (true)` policies replaced with scoped policies
+
+**Performance Advisor — 2026-04-16 cleanup applied**
+- `auth_rls_initplan` warnings addressed
+- Duplicate permissive policies consolidated
+
+Validation query (run after any policy changes):
 ```sql
 SELECT
   schemaname,
@@ -211,10 +211,7 @@ WHERE schemaname = 'public'
   )
 ORDER BY tablename, policyname;
 ```
-
 Expected result: `0 rows` for non-SELECT policies with unrestricted `true` checks.
-
-Then rerun Supabase Dashboard → Database → Advisors → Performance and paste any remaining warnings before changing more SQL.
 
 Post-RLS regression checklist:
 - Internal LawOS login: dashboard, clients, invoices, projects, employees, tasks, settings.
@@ -225,8 +222,8 @@ Post-RLS regression checklist:
 - Documents: upload/view/download internally and from portal if enabled.
 - Internal CRUD: create/edit client, invoice, project/task, and delete a document if internal deletion is needed.
 
-Remaining advisor item that is not SQL:
-- Enable Supabase Auth leaked password protection in the Supabase dashboard if it still appears in Security Advisor.
+**Remaining dashboard-only item:**
+- Enable Supabase Auth leaked password protection in the Supabase dashboard (Authentication → Policies → Leaked Password Protection).
 
 ---
 

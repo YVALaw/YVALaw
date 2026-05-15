@@ -6,6 +6,7 @@ import { formatMoney } from '../utils/money'
 import { loadTags, saveTags } from '../services/tagStorage'
 import { TagBadge } from '../components/TagBadge'
 import { TagInput } from '../components/TagInput'
+import { IconX, IconTrash, IconCheck } from '../components/Icon'
 function uid() { return crypto.randomUUID() }
 
 type ProjectStage = 'planning' | 'active' | 'hiring' | 'review' | 'completed' | 'on-hold'
@@ -263,7 +264,7 @@ export default function ProjectsPage() {
             const expTotal = projectExpenseTotal(p)
             const budgetPct = p.budget && p.budget > 0 ? Math.min(100, Math.round((billed / p.budget) * 100)) : null
             return (
-              <div key={p.id} className="entity-card project-card" style={{ borderTop: `2px solid ${stageColor(p.status)}`, cursor: 'pointer' }} onClick={() => navigate('/projects/' + p.id)}>
+              <div key={p.id} className="entity-card project-card" onClick={() => navigate('/projects/' + p.id)}>
                 <div className="card-top">
                   <div>
                     <div className="card-name">{p.name}</div>
@@ -390,7 +391,7 @@ export default function ProjectsPage() {
                       <button className="btn-xs btn-ghost" onClick={() => openTaskBoard(p)}>Tasks</button>
                       <button className="btn-xs btn-ghost" onClick={() => openExpenses(p)}>Expenses</button>
                       <button className="btn-xs btn-ghost" onClick={() => openEdit(p)}>Edit</button>
-                      <button className="btn-xs btn-danger" onClick={() => setConfirmDelete(p.id)}>×</button>
+                      <button className="btn-xs btn-danger" onClick={() => setConfirmDelete(p.id)}><IconTrash size={12} /></button>
                     </div>
                   </div>
                 ))}
@@ -407,7 +408,7 @@ export default function ProjectsPage() {
           <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2 className="modal-title">{modal === 'add' ? 'Add Project' : 'Edit Project'}</h2>
-              <button className="modal-close btn-icon" onClick={() => setModal(null)}>✕</button>
+              <button className="modal-close btn-icon" onClick={() => setModal(null)}><IconX size={14} /></button>
             </div>
             <div className="modal-body">
               <div className="form-grid-2">
@@ -487,7 +488,7 @@ export default function ProjectsPage() {
                                 type="button"
                                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--muted)', padding: 0, fontSize: 13, lineHeight: 1 }}
                                 onClick={() => setForm(f => ({ ...f, employeeIds: f.employeeIds.filter(id => id !== eid) }))}
-                              >×</button>
+                              ><IconX size={12} /></button>
                             </span>
                           ) : null
                         })}
@@ -554,7 +555,7 @@ export default function ProjectsPage() {
                         <div key={i} className="link-item">
                           <a href={lk.url} target="_blank" rel="noopener noreferrer" className="link-item-label">{lk.label}</a>
                           <span className="link-item-url">{lk.url}</span>
-                          <button className="btn-icon btn-danger" style={{ padding: '2px 6px', fontSize: 11 }} onClick={() => removeLink(i)}>×</button>
+                          <button className="btn-icon btn-danger" style={{ padding: '2px 6px', fontSize: 11 }} onClick={() => removeLink(i)}><IconX size={12} /></button>
                         </div>
                       ))}
                     </div>
@@ -590,7 +591,7 @@ export default function ProjectsPage() {
                   </div>
                 )}
               </div>
-              <button className="modal-close btn-icon" onClick={() => setExpenseProject(null)}>✕</button>
+              <button className="modal-close btn-icon" onClick={() => setExpenseProject(null)}><IconX size={14} /></button>
             </div>
             <div className="modal-body">
               {/* Add expense form */}
@@ -635,9 +636,9 @@ export default function ProjectsPage() {
                           <td>{ex.description}</td>
                           <td className="td-muted">{ex.category || '—'}</td>
                           <td className="td-muted">{ex.date}</td>
-                          <td className="td-muted">{ex.recurring ? <span style={{color:'#4ade80',fontSize:11}}>● Yes</span> : '—'}</td>
+                          <td className="td-muted">{ex.recurring ? <span style={{color:'#4ade80',fontSize:11,display:'inline-flex',alignItems:'center',gap:4}}><IconCheck size={10} /> Yes</span> : '—'}</td>
                           <td style={{textAlign:'right',color:'#f87171',fontWeight:700}}>{formatMoney(ex.amount)}</td>
-                          <td><button className="btn-icon btn-danger" style={{fontSize:11,padding:'2px 6px'}} onClick={()=>deleteExpense(ex.id)}>×</button></td>
+                          <td><button className="btn-icon btn-danger" style={{fontSize:11,padding:'2px 6px'}} onClick={()=>deleteExpense(ex.id)}><IconTrash size={12} /></button></td>
                         </tr>
                       ))}
                       <tr>
@@ -665,7 +666,7 @@ export default function ProjectsPage() {
               <div>
                 <h2 className="modal-title">Tasks — {taskProject.name}</h2>
               </div>
-              <button className="modal-close btn-icon" onClick={closeTaskBoard}>✕</button>
+              <button className="modal-close btn-icon" onClick={closeTaskBoard}><IconX size={14} /></button>
             </div>
             <div className="modal-body" style={{ padding: '16px 20px' }}>
               <div className="task-board">
@@ -689,7 +690,7 @@ export default function ProjectsPage() {
                           {t.dueDate     && <div className="kanban-card-meta" style={{ color: 'var(--gold)', fontSize: 10 }}>Due {t.dueDate}</div>}
                           {t.description && <div className="kanban-card-meta" style={{ marginTop: 4, fontSize: 11, opacity: .8 }}>{t.description}</div>}
                           <div className="kanban-card-actions">
-                            <button className="btn-xs btn-danger" onClick={() => deleteTask(t.id)}>×</button>
+                            <button className="btn-xs btn-danger" onClick={() => deleteTask(t.id)}><IconTrash size={12} /></button>
                           </div>
                         </div>
                       ))}

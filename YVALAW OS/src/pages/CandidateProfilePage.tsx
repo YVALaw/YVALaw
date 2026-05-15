@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import type { Attachment, Candidate, CandidateStage } from '../data/types'
 import { loadCandidates, saveCandidates } from '../services/storage'
 import { uploadFile, deleteFile } from '../services/fileStorage'
+import { IconImage, IconMusic, IconFile, IconPlay, IconX, IconTrash, IconCamera } from '../components/Icon'
 
 function uid() { return crypto.randomUUID() }
 
@@ -12,10 +13,10 @@ function fileExt(name: string) { return name.split('.').pop()?.toLowerCase() ?? 
 function isVideo(att: Attachment) { return att.mimeType.startsWith('video') || VIDEO_EXTS.includes(fileExt(att.name)) }
 function isAudio(att: Attachment) { return att.mimeType.startsWith('audio') || AUDIO_EXTS.includes(fileExt(att.name)) }
 function attIcon(att: Attachment) {
-  if (att.mimeType.startsWith('image')) return '🖼'
-  if (isVideo(att)) return '🎬'
-  if (isAudio(att)) return '🎵'
-  return '📄'
+  if (att.mimeType.startsWith('image')) return <IconImage size={16} />
+  if (isVideo(att)) return <IconCamera size={16} />
+  if (isAudio(att)) return <IconMusic size={16} />
+  return <IconFile size={16} />
 }
 
 function VideoPlayer({ url }: { url: string }) {
@@ -33,7 +34,7 @@ function VideoPlayer({ url }: { url: string }) {
   if (blobUrl) return <video controls autoPlay src={blobUrl} style={{ width: '100%', maxHeight: 220, borderRadius: 6, marginTop: 4 }} />
   return (
     <button onClick={load} disabled={loading} style={{ marginTop: 4, width: '100%', background: 'var(--surf2)', border: '1px solid var(--border)', borderRadius: 6, padding: '10px', color: 'var(--muted)', cursor: loading ? 'wait' : 'pointer', fontSize: 13 }}>
-      {loading ? 'Loading video…' : '▶ Click to load video'}
+      {loading ? 'Loading video…' : <><IconPlay size={14} /> Click to load video</>}
     </button>
   )
 }
@@ -390,7 +391,7 @@ export default function CandidateProfilePage() {
                       </div>
                       {isAudio(att) && <audio controls src={att.storageUrl || att.dataUrl} style={{ height: 28, maxWidth: 140 }} />}
                       <button className="btn-ghost btn-sm" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => downloadAttachment(att.storageUrl || att.dataUrl, att.name)}>↓</button>
-                      <button className="btn-icon btn-danger" style={{ fontSize: 11, padding: '3px 6px' }} onClick={() => removeAttachment(att.id)}>×</button>
+                      <button className="btn-icon btn-danger" style={{ fontSize: 11, padding: '3px 6px' }} onClick={() => removeAttachment(att.id)}><IconTrash size={12} /></button>
                     </div>
                     {isVideo(att) && <VideoPlayer url={att.storageUrl || att.dataUrl} />}
                   </div>
