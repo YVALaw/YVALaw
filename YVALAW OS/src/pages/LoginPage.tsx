@@ -94,15 +94,17 @@ export default function LoginPage() {
       <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420 }}>
         {/* Logo / brand */}
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
-          <div style={{
-            width: 56, height: 56, borderRadius: 16,
-            background: 'var(--gold)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 16px',
-            boxShadow: '0 8px 32px rgba(250,204,21,0.3)',
-          }}>
-            <span style={{ fontSize: 22, fontWeight: 900, color: '#1b1e2b' }}>Y</span>
-          </div>
+          <img
+            src="/yva-logo.png"
+            alt="YVA Staffing"
+            style={{
+              width: 64, height: 64, borderRadius: 16,
+              objectFit: 'contain',
+              margin: '0 auto 16px',
+              display: 'block',
+            }}
+            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+          />
           <div style={{ fontSize: 26, fontWeight: 900, color: 'var(--text)', letterSpacing: '-.02em' }}>
             YVA Staffing
           </div>

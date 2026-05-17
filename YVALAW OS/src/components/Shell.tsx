@@ -243,7 +243,7 @@ export default function Shell({ children }: Props) {
       <aside className={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`}>
         {/* Brand */}
         <div className="sidebar-brand">
-          <div className="sidebar-brand-icon">Y</div>
+          <img src="/yva-logo.png" alt="YVA" className="sidebar-brand-logo" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
           <div>
             <div className="sidebar-brand-name">YVA LawOS</div>
             <div className="sidebar-brand-sub">Law Operations</div>

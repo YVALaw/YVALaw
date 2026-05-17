@@ -154,6 +154,21 @@ input, select, textarea { font-family: inherit; }
   color: var(--sidebar-bg); flex-shrink: 0;
   box-shadow: 0 4px 12px rgba(212,168,67,0.25);
 }
+.sidebar-brand-logo {
+  width: 40px; height: 40px; border-radius: 12px;
+  object-fit: contain;
+  background: #fff;
+  padding: 3px;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(212,168,67,0.25);
+}
+.portal-topbar-brand-logo {
+  width: 32px; height: 32px; border-radius: 10px;
+  object-fit: contain;
+  background: #fff;
+  padding: 2px;
+  flex-shrink: 0;
+}
 .sidebar-brand-name { font-weight: 800; font-size: 15px; color: #f8fafc; letter-spacing: -.01em; }
 .sidebar-brand-sub  { font-size: 10px; color: rgba(255,255,255,0.3); text-transform: uppercase; letter-spacing: .1em; margin-top: 2px; }
 
