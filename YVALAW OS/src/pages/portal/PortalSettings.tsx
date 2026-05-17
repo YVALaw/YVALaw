@@ -218,11 +218,13 @@ export default function PortalSettings() {
 
       {/* ── Account Info ─────────────────────────────────────────────────── */}
       <Section title="Account" icon={<IconUser size={20} />} sub="Your profile information">
-        <Row label="Name"    value={client?.name ?? '—'} />
-        <Row label="Company" value={client?.company ?? '—'} />
-        <Row label="Email"   value={authEmail ?? client?.email ?? '—'} sub="Contact your account manager to change your email" />
+        <div className="portal-settings-fields">
+          <Row label="Name"    value={client?.name ?? '—'} />
+          <Row label="Company" value={client?.company ?? '—'} />
+          <Row label="Email"   value={authEmail ?? client?.email ?? '—'} sub="Contact your account manager to change your email" />
+        </div>
 
-        <div className="mt-16">
+        <div className="portal-settings-phone-wrap">
           <label className="form-label">Phone number</label>
           <div className="portal-settings-phone-row">
             <input
@@ -264,27 +266,29 @@ export default function PortalSettings() {
         </div>
 
         {/* Per-day schedule */}
-        <div className="flex-col" style={{ gap: 10, marginBottom: 20 }}>
+        <div className="portal-hours-grid">
           {DAYS.map(({ key, label }) => (
-            <div key={key} className="portal-hours-row">
+            <div key={key} className="portal-hours-card">
               <span className="portal-hours-day">{label}</span>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--muted)', display: 'block', marginBottom: 3 }}>Start</label>
-                <input
-                  type="time"
-                  value={hours[`${key}Start`] ?? ''}
-                  onChange={e => setHours(h => ({ ...h, [`${key}Start`]: e.target.value || undefined }))}
-                  className="form-input form-input-sm w-full"
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 10, color: 'var(--muted)', display: 'block', marginBottom: 3 }}>End</label>
-                <input
-                  type="time"
-                  value={hours[`${key}End`] ?? ''}
-                  onChange={e => setHours(h => ({ ...h, [`${key}End`]: e.target.value || undefined }))}
-                  className="form-input form-input-sm w-full"
-                />
+              <div className="portal-hours-inputs">
+                <div className="portal-hours-field">
+                  <label>Start</label>
+                  <input
+                    type="time"
+                    value={hours[`${key}Start`] ?? ''}
+                    onChange={e => setHours(h => ({ ...h, [`${key}Start`]: e.target.value || undefined }))}
+                    className="form-input form-input-sm"
+                  />
+                </div>
+                <div className="portal-hours-field">
+                  <label>End</label>
+                  <input
+                    type="time"
+                    value={hours[`${key}End`] ?? ''}
+                    onChange={e => setHours(h => ({ ...h, [`${key}End`]: e.target.value || undefined }))}
+                    className="form-input form-input-sm"
+                  />
+                </div>
               </div>
             </div>
           ))}
@@ -389,11 +393,9 @@ function Section({ title, icon, sub, children }: {
 function Row({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="settings-row-item">
-      <div>
-        <div className="settings-row-label">{label}</div>
-        {sub && <div className="settings-row-sub">{sub}</div>}
-      </div>
+      <div className="settings-row-label">{label}</div>
       <div className="settings-row-value">{value}</div>
+      {sub && <div className="settings-row-sub">{sub}</div>}
     </div>
   )
 }

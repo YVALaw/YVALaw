@@ -145,17 +145,16 @@ export default function ClientShell({ children, previewClientId }: Props) {
 
         {/* Topbar */}
         <header className="portal-topbar">
-          <div className="flex items-center gap-10">
-            <div className="portal-topbar-heading">
-              <div className="portal-topbar-title">{isPreview ? 'Portal Preview' : 'Client Portal'}</div>
-              <div className="portal-topbar-sub">{isPreview ? 'Internal view only' : 'YVA Staffing account workspace'}</div>
-            </div>
-            <div className="portal-mobile-brand">
-              <div className="sidebar-brand-icon portal-mobile-brand-icon">Y</div>
-              <span className="portal-mobile-brand-text">
-                {isPreview ? 'Portal Preview' : 'YVA Portal'}
-              </span>
-            </div>
+          {/* Desktop title */}
+          <div className="portal-topbar-title-desktop">
+            {isPreview ? 'Portal Preview' : 'Client Portal'}
+          </div>
+          {/* Mobile brand */}
+          <div className="portal-topbar-brand-mobile">
+            <div className="portal-topbar-brand-icon">Y</div>
+            <span className="portal-topbar-brand-text">
+              {isPreview ? 'Portal Preview' : 'YVA Portal'}
+            </span>
           </div>
           <div className="flex items-center gap-10">
             {isPreview && (

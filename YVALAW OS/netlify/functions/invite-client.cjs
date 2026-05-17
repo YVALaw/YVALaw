@@ -1,8 +1,8 @@
 /**
  * invite-client — Netlify Function
- * Creates a Supabase Auth account for a client and generates an invitation link
- * with a custom redirect. The frontend sends the email (via Gmail/mailto) for
- * mode='email', or copies the link for mode='link'.
+ * Creates a Supabase Auth account for a client and either:
+ *  - mode='email': sends a Supabase invitation email with a custom redirect URL
+ *  - mode='link': returns a one-time invite link for manual delivery
  *
  * POST /.netlify/functions/invite-client
  * Headers: Authorization: Bearer <caller_access_token>
@@ -136,47 +136,95 @@ exports.handler = async function handler(event) {
     }
   }
 
-  // ── Generate invite link (creates user if needed, always returns action_link) ─
-  const linkRes = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${serviceRoleKey}`,
-      apikey: serviceRoleKey,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      type: 'invite',
-      email,
-      data: {
-        must_change_password: true,
-        client_id:            clientId,
-        role:                 'client',
+  // ── Create the Supabase auth user + get invite link ───────────────────────
+  let newUserId
+  let actionLink
+  let emailSent = false
+
+  if (mode === 'email') {
+    // Use the admin invite endpoint — Supabase sends the email automatically.
+    // redirect_to is passed as a query parameter so the invite link lands on
+    // /portal/set-password instead of the default Site URL.
+    const inviteUrl = new URL(`${supabaseUrl}/auth/v1/invite`)
+    if (redirectTo) inviteUrl.searchParams.set('redirect_to', redirectTo)
+
+    const inviteRes = await fetch(inviteUrl.toString(), {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${serviceRoleKey}`,
+        apikey: serviceRoleKey,
+        'Content-Type': 'application/json',
       },
-      ...(redirectTo ? { redirect_to: redirectTo } : {}),
-    }),
-  })
-
-  if (!linkRes.ok) {
-    const linkErr = await linkRes.json().catch(() => ({}))
-    const errMsg = linkErr?.msg || linkErr?.message || ''
-    const errCode = linkErr?.code || ''
-    if (errMsg.includes('already registered') || errCode === 'email_exists' || errCode === 'user_already_exists') {
-      return json(409, { error: 'A user with this email already exists in the system' })
-    }
-    return json(500, {
-      error: errMsg || 'Failed to generate invitation link',
+      body: JSON.stringify({
+        email,
+        data: {
+          must_change_password: true,
+          client_id:            clientId,
+          role:                 'client',
+        },
+      }),
     })
-  }
 
-  const linkData = await linkRes.json()
-  const newUserId = linkData?.user?.id || linkData?.id
-  const actionLink = linkData?.action_link || linkData?.actionLink
+    if (!inviteRes.ok) {
+      const inviteErr = await inviteRes.json().catch(() => ({}))
+      const errMsg = inviteErr?.msg || inviteErr?.message || ''
+      const errCode = inviteErr?.code || ''
+
+      if (errMsg.includes('already registered') || errCode === 'email_exists' || errCode === 'user_already_exists') {
+        return json(409, { error: 'A user with this email already exists in the system' })
+      }
+
+      return json(500, {
+        error: errMsg || 'Failed to send invitation email',
+      })
+    }
+
+    const inviteData = await inviteRes.json()
+    newUserId = inviteData?.user?.id || inviteData?.id
+    emailSent = true
+  } else {
+    // Link mode: generate the link but do not send email from Supabase.
+    // The admin copies the link and sends it manually.
+    const linkRes = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${serviceRoleKey}`,
+        apikey: serviceRoleKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        type: 'invite',
+        email,
+        data: {
+          must_change_password: true,
+          client_id:            clientId,
+          role:                 'client',
+        },
+        ...(redirectTo ? { redirect_to: redirectTo } : {}),
+      }),
+    })
+
+    if (!linkRes.ok) {
+      const linkErr = await linkRes.json().catch(() => ({}))
+      const errMsg = linkErr?.msg || linkErr?.message || ''
+      const errCode = linkErr?.code || ''
+      if (errMsg.includes('already registered') || errCode === 'email_exists' || errCode === 'user_already_exists') {
+        return json(409, { error: 'A user with this email already exists in the system' })
+      }
+      return json(500, {
+        error: errMsg || 'Failed to generate invitation link',
+      })
+    }
+
+    const linkData = await linkRes.json()
+    newUserId = linkData?.user?.id || linkData?.id
+    actionLink = linkData?.action_link || linkData?.actionLink
+  }
 
   if (!newUserId) {
     return json(500, { error: 'User created but ID not returned' })
   }
-  if (!actionLink) {
-    // Rollback: delete the auth user we just created
+  if (mode === 'link' && !actionLink) {
     await fetch(`${supabaseUrl}/auth/v1/admin/users/${newUserId}`, {
       method: 'DELETE',
       headers: {
@@ -244,8 +292,9 @@ exports.handler = async function handler(event) {
     mode,
     message: mode === 'link'
       ? `Invitation link created for ${email}`
-      : `Invitation link generated for ${email}`,
+      : `Invitation email sent to ${email}`,
     userId:     newUserId,
     inviteLink: actionLink,
+    emailSent,
   })
 }

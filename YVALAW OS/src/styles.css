@@ -1142,6 +1142,25 @@ input, select, textarea { font-family: inherit; }
 .portal-content { padding: 32px; flex: 1; }
 .portal-bottom-nav { display: none; }
 
+/* Topbar brand */
+.portal-topbar-title-desktop {
+  font-size: 18px; font-weight: 800; color: var(--text);
+  letter-spacing: -0.01em;
+}
+.portal-topbar-brand-mobile {
+  display: none;
+  align-items: center; gap: 10px;
+}
+.portal-topbar-brand-icon {
+  width: 32px; height: 32px; border-radius: 10px;
+  background: var(--gold);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 900; color: #1b1e2b;
+}
+.portal-topbar-brand-text {
+  font-size: 16px; font-weight: 800; color: var(--text);
+}
+
 .portal-nav { display: flex; flex-direction: column; gap: 3px; }
 .portal-nav-item {
   display: flex; align-items: center; gap: 12px;
@@ -1346,10 +1365,6 @@ input, select, textarea { font-family: inherit; }
 .labeled-row { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
 .labeled-row-label { font-size: 12px; font-weight: 700; color: var(--soft); min-width: 80px; text-transform: uppercase; letter-spacing: 0.04em; }
 .labeled-row-value { font-size: 14px; color: var(--text); font-weight: 600; }
-
-.portal-hours-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
-.portal-hours-row label { font-size: 13px; color: var(--text2); min-width: 40px; font-weight: 600; }
-.portal-hours-row input { flex: 1; max-width: 120px; }
 
 .filter-tabs { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
 .filter-tab {
@@ -1980,8 +1995,32 @@ input, select, textarea { font-family: inherit; }
 }
 
 /* ── Settings row helpers (portal settings) ── */
-.settings-row-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.settings-row-value { font-size: 14px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+.portal-settings-fields { display: flex; flex-direction: column; gap: 16px; }
+.portal-settings-phone-wrap { margin-top: 28px; }
+.settings-row-item { display: flex; flex-direction: column; gap: 4px; }
+.settings-row-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.settings-row-value { font-size: 15px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; line-height: 1.4; }
+.settings-row-sub  { font-size: 12px; color: var(--muted2); margin-top: 2px; }
+
+/* ── Working hours grid (portal settings) ── */
+.portal-hours-grid { display: flex; flex-direction: column; gap: 10px; margin: 20px 0; }
+.portal-hours-card {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 14px 16px;
+  background: var(--surf2); border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.portal-hours-day {
+  font-size: 14px; font-weight: 700; color: var(--text);
+  min-width: 90px; flex-shrink: 0;
+}
+.portal-hours-inputs { display: flex; align-items: center; gap: 12px; }
+.portal-hours-field { display: flex; flex-direction: column; gap: 4px; }
+.portal-hours-field label {
+  font-size: 11px; font-weight: 600; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.03em;
+}
+.portal-hours-field input { width: 110px; }
 
 @media (max-width: 768px) {
   .portal-kpi-3 { grid-template-columns: repeat(2, 1fr); }
@@ -1991,6 +2030,10 @@ input, select, textarea { font-family: inherit; }
   .portal-upload-row > select { width: 100%; justify-content: center; }
   .portal-settings-phone-row { grid-template-columns: 1fr; }
   .portal-settings-phone-row .btn-primary { width: 100%; justify-content: center; }
+  .portal-hours-card { flex-direction: column; align-items: flex-start; gap: 12px; }
+  .portal-hours-inputs { width: 100%; }
+  .portal-hours-field input { width: 100%; }
+  .portal-hours-field { flex: 1; }
 }
 @media (max-width: 480px) {
   .portal-kpi-3 { grid-template-columns: 1fr; }
@@ -2011,6 +2054,8 @@ input, select, textarea { font-family: inherit; }
   .form-grid-2 { grid-template-columns: 1fr; }
   .portal-sidebar { display: none; }
   .portal-main { margin-left: 0; }
+  .portal-topbar-title-desktop { display: none; }
+  .portal-topbar-brand-mobile { display: flex; }
   .portal-bottom-nav {
     display: flex; position: fixed; bottom: 0; left: 0; right: 0;
     background: var(--sidebar-bg); padding: 8px 16px;
