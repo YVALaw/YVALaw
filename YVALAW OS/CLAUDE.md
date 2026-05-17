@@ -138,6 +138,31 @@ CREATE POLICY "client_update_prefs" ON working_hour_prefs FOR UPDATE TO authenti
   - `38b42df` — Add payment attempt tracking
   - `4284a67` — Add payment operations notifications
 
+### 2026-05-17 — Client Portal Invite Bug Fix
+**Problem**: Client invites were broken in two ways:
+1. **Email invite** used `POST /auth/v1/admin/users` with `invite: true`, which does **not** accept a custom `redirect_to`. The invite email linked to the OS login page (Supabase Site URL) instead of `/portal/set-password`.
+2. **RoleContext fallback** auto-inserted any unrecognized user as `recruiter` in `user_roles`. If a client logged in but their `client_users` row was missing (failed invite, existing auth account, race condition), they were permanently assigned `recruiter` and could access the internal OS.
+
+**Fixes applied**:
+- `netlify/functions/invite-client.cjs` now uses `generate_link` for **both** `email` and `link` modes. Both modes get the correct `redirect_to` pointing at `/portal/set-password`.
+- `ClientProfilePage.tsx` now sends the invite email from the frontend using the existing `sendEmail()` utility (Gmail API if connected, mailto fallback otherwise) for `mode='email'`.
+- `RoleContext.tsx` now checks `user.user_metadata.role === 'client'` before the recruiter fallback. Invited clients without a `client_users` row are kept as `role='client'` in memory (no DB write to `user_roles`), preventing OS access.
+- Added `auth_id` duplicate check in `invite-client.cjs` to prevent linking one email to multiple clients.
+
+**Cleanup required for contaminated client**:
+If a client was incorrectly assigned `recruiter`, run this in Supabase SQL Editor (replace with their actual `auth_id` or email):
+```sql
+-- 1. Find the contaminated user
+SELECT id, email FROM auth.users WHERE email = 'client@example.com';
+
+-- 2. Delete their erroneous user_roles row
+DELETE FROM user_roles WHERE user_id = '<their-auth-uuid>';
+
+-- 3. Verify they still have a client_users row (re-invite if missing)
+SELECT * FROM client_users WHERE auth_id = '<their-auth-uuid>';
+```
+Then ask the client to log out and log back in. They will now be detected as `client` via their `client_users` row (or via metadata as a fallback).
+
 ### UI QA Notes — Next Session
 - Retest LawOS desktop and mobile widths for: Clients, Client Profile, Team project view, Employee Profile, Project Profile, Reports, Calendar, Invoices, Estimates, and portal Documents/Settings.
 - Known recent focus areas: long names/emails/notes should stay inside cards; clickable cards should show hand cursor or hover state; fixed side panels/grids should stack cleanly on mobile; portal bottom nav should remain usable when all tabs are visible.

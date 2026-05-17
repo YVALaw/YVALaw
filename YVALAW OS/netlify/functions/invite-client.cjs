@@ -1,7 +1,8 @@
 /**
  * invite-client — Netlify Function
- * Creates a Supabase Auth account for a client and either sends Supabase's
- * invitation email or returns a one-time invite link for manual delivery.
+ * Creates a Supabase Auth account for a client and generates an invitation link
+ * with a custom redirect. The frontend sends the email (via Gmail/mailto) for
+ * mode='email', or copies the link for mode='link'.
  *
  * POST /.netlify/functions/invite-client
  * Headers: Authorization: Bearer <caller_access_token>
@@ -14,7 +15,7 @@
  * Security:
  *   - Caller must provide a valid Supabase session token (Authorization header)
  *   - Caller must be an internal user (in user_roles with a non-client role)
- *   - client account is created with must_change_password: true in user_metadata
+ *   - Client account is created with must_change_password: true in user_metadata
  *   - client_users row is inserted linking the new auth user to the client record
  */
 
@@ -116,7 +117,7 @@ exports.handler = async function handler(event) {
     return json(403, { error: 'Only internal staff can invite clients' })
   }
 
-  // ── Check if client user already exists ──────────────────────────────────
+  // ── Check if this client already has a portal account ────────────────────
   const existCheckRes = await fetch(
     `${supabaseUrl}/rest/v1/client_users?client_id=eq.${clientId}&select=id,auth_id`,
     {
@@ -135,47 +136,8 @@ exports.handler = async function handler(event) {
     }
   }
 
-  // ── Create the Supabase auth user ─────────────────────────────────────────
-  let newUserId
-  let actionLink
-
-  if (mode === 'link') {
-    // generate_link creates the invite user but does not send email.
-    const linkRes = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${serviceRoleKey}`,
-        apikey: serviceRoleKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        type: 'invite',
-        email,
-        data: {
-          must_change_password: true,
-          client_id:            clientId,
-          role:                 'client',
-        },
-        ...(redirectTo ? { redirect_to: redirectTo } : {}),
-      }),
-    })
-
-    if (!linkRes.ok) {
-      const linkErr = await linkRes.json().catch(() => ({}))
-      if (linkErr?.msg?.includes('already registered') || linkErr?.code === 'email_exists') {
-        return json(409, { error: 'A user with this email already exists in the system' })
-      }
-      return json(500, {
-        error: linkErr?.msg || linkErr?.message || 'Failed to generate invitation link',
-      })
-    }
-
-    const linkData = await linkRes.json()
-    newUserId = linkData?.user?.id || linkData?.id
-    actionLink = linkData?.action_link || linkData?.actionLink
-  } else {
-    // Admin user creation with invite=true sends Supabase's invitation email.
-    const inviteRes = await fetch(`${supabaseUrl}/auth/v1/admin/users`, {
+  // ── Generate invite link (creates user if needed, always returns action_link) ─
+  const linkRes = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${serviceRoleKey}`,
@@ -183,38 +145,38 @@ exports.handler = async function handler(event) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
+      type: 'invite',
       email,
-      email_confirm: false,          // triggers invitation email from Supabase
-      invite: true,
-      user_metadata: {
-        must_change_password: true,  // force password change on first login
+      data: {
+        must_change_password: true,
         client_id:            clientId,
         role:                 'client',
       },
+      ...(redirectTo ? { redirect_to: redirectTo } : {}),
     }),
-    })
+  })
 
-    if (!inviteRes.ok) {
-      const inviteErr = await inviteRes.json().catch(() => ({}))
-
-      // Handle "user already registered" gracefully
-      if (inviteErr?.msg?.includes('already registered') || inviteErr?.code === 'email_exists') {
-        return json(409, { error: 'A user with this email already exists in the system' })
-      }
-
-      return json(500, {
-        error: inviteErr?.msg || inviteErr?.message || 'Failed to create client account',
-      })
+  if (!linkRes.ok) {
+    const linkErr = await linkRes.json().catch(() => ({}))
+    const errMsg = linkErr?.msg || linkErr?.message || ''
+    const errCode = linkErr?.code || ''
+    if (errMsg.includes('already registered') || errCode === 'email_exists' || errCode === 'user_already_exists') {
+      return json(409, { error: 'A user with this email already exists in the system' })
     }
-
-    const newUser = await inviteRes.json()
-    newUserId = newUser?.id
+    return json(500, {
+      error: errMsg || 'Failed to generate invitation link',
+    })
   }
+
+  const linkData = await linkRes.json()
+  const newUserId = linkData?.user?.id || linkData?.id
+  const actionLink = linkData?.action_link || linkData?.actionLink
 
   if (!newUserId) {
     return json(500, { error: 'User created but ID not returned' })
   }
-  if (mode === 'link' && !actionLink) {
+  if (!actionLink) {
+    // Rollback: delete the auth user we just created
     await fetch(`${supabaseUrl}/auth/v1/admin/users/${newUserId}`, {
       method: 'DELETE',
       headers: {
@@ -223,6 +185,30 @@ exports.handler = async function handler(event) {
       },
     })
     return json(500, { error: 'Invite link was not returned — invite rolled back' })
+  }
+
+  // ── Check if this auth user is already linked to a different client ───────
+  const authIdCheckRes = await fetch(
+    `${supabaseUrl}/rest/v1/client_users?auth_id=eq.${newUserId}&select=id,client_id`,
+    {
+      headers: {
+        Authorization: `Bearer ${serviceRoleKey}`,
+        apikey: serviceRoleKey,
+        Accept: 'application/json',
+      },
+    }
+  )
+
+  if (authIdCheckRes.ok) {
+    const authIdRows = await authIdCheckRes.json()
+    if (authIdRows?.length > 0) {
+      const existingClientId = authIdRows[0].client_id
+      if (existingClientId !== clientId) {
+        return json(409, { error: 'This email is already linked to a different client portal account' })
+      }
+      // Same client — already invited
+      return json(409, { error: 'This client already has a portal account' })
+    }
   }
 
   // ── Insert into client_users table ────────────────────────────────────────
@@ -256,8 +242,10 @@ exports.handler = async function handler(event) {
   return json(200, {
     success: true,
     mode,
-    message: mode === 'link' ? `Invitation link created for ${email}` : `Invitation sent to ${email}`,
-    userId:  newUserId,
+    message: mode === 'link'
+      ? `Invitation link created for ${email}`
+      : `Invitation link generated for ${email}`,
+    userId:     newUserId,
     inviteLink: actionLink,
   })
 }

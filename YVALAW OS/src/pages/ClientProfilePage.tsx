@@ -445,12 +445,16 @@ export default function ClientProfilePage() {
       const data = await res.json()
       if (!res.ok) {
         setInviteMsg({ ok: false, text: data.error || 'Failed to send invitation.' })
-      } else if (mode === 'link') {
-        const inviteLink = data.inviteLink as string | undefined
-        if (!inviteLink) {
-          setInviteMsg({ ok: false, text: 'Invite was created but no link was returned.' })
-          return
-        }
+        return
+      }
+
+      const inviteLink = data.inviteLink as string | undefined
+      if (!inviteLink) {
+        setInviteMsg({ ok: false, text: 'Invite was created but no link was returned.' })
+        return
+      }
+
+      if (mode === 'link') {
         try {
           await navigator.clipboard.writeText(inviteLink)
           setInviteMsg({ ok: true, text: `Invite link copied for ${clientNN.email}. You can paste it into your own email or message.` })
@@ -459,7 +463,21 @@ export default function ClientProfilePage() {
           setInviteMsg({ ok: true, text: `Invite link created for ${clientNN.email}.` })
         }
       } else {
-        setInviteMsg({ ok: true, text: `Invitation sent to ${clientNN.email}` })
+        // Email mode: send the invite link via Gmail/mailto
+        const subject = 'Invitation to YVA Staffing Client Portal'
+        const body = `Hello ${clientNN.name || ''},\n\nYou have been invited to access the YVA Staffing client portal.\n\nClick the link below to set up your password and access your account:\n\n${inviteLink}\n\nThis link will expire. If you have any issues, please contact us.\n\nBest regards,\nYVA Staffing Team`
+        try {
+          const result = await sendEmail(clientNN.email || '', subject, body)
+          if (result.mode === 'gmail') {
+            setInviteMsg({ ok: true, text: `Invitation sent to ${clientNN.email} via Gmail.` })
+          } else {
+            setInviteMsg({ ok: true, text: `Invitation link generated for ${clientNN.email}. Your email client should open with the message ready to send.` })
+          }
+        } catch (err) {
+          // If sendEmail throws, still give the admin the link so they can copy/send manually
+          window.prompt('Email send failed. Copy this portal invite link to send manually:', inviteLink)
+          setInviteMsg({ ok: false, text: `Could not send email automatically. The invite link has been shown so you can send it manually.` })
+        }
       }
     } catch {
       setInviteMsg({ ok: false, text: 'Network error — could not create invitation.' })

@@ -95,6 +95,18 @@ export function RoleProvider({ children }: { children: ReactNode }) {
       }
 
       // ── Step 3: Unknown user — auto-assign recruiter (internal signup path) ──
+      // IMPORTANT: never auto-assign recruiter to users who were invited as clients.
+      // If client_users is missing for an invited client, keep them as client in
+      // memory (no DB write) so they don't accidentally gain OS access.
+      if (meta.role === 'client' || meta.client_id) {
+        setRole('client')
+        setIsClient(true)
+        setClientId(meta.client_id ?? null)
+        sessionStorage.setItem(ROLE_CACHE_KEY, 'client')
+        setLoading(false)
+        return
+      }
+
       await supabase
         .from('user_roles')
         .insert({ user_id: user.id, email: user.email, role: 'recruiter' })
