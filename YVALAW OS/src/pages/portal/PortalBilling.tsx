@@ -9,7 +9,6 @@ import {
   loadPortalPaymentAttempts,
   computeOutstanding,
   fmtUSD,
-  markPortalInvoicePaid,
   savePortalAutoPaySettings,
   removePortalSavedCard,
   type PortalBillingSettings,
@@ -442,12 +441,14 @@ export default function PortalBilling() {
           invoice={payingInvoice}
           clientId={clientId}
           onClose={() => setPayingInvoice(null)}
-          onSuccess={async (paidAmount, options) => {
+          onSuccess={(paidAmount, options) => {
             const previousPaid = Number(payingInvoice.amountPaid) || 0
             const totalDue     = Number(payingInvoice.subtotal) || 0
             const paidTotal    = Math.min(totalDue, previousPaid + paidAmount)
 
-            // Optimistic update — mark as paid in local state immediately
+            // Optimistic local update — the Stripe webhook handles the real DB write.
+            // A direct supabase.update() here was blocked by RLS and failed silently,
+            // so we rely purely on the webhook + a UI refresh message.
             setInvoices(prev => prev.map(inv =>
               inv.id === payingInvoice.id
                 ? { ...inv, status: 'paid', amountPaid: paidTotal }
@@ -465,8 +466,9 @@ export default function PortalBilling() {
                 autoPayAuthorizedAt: new Date().toISOString(),
               }))
             }
-            // Best-effort DB update (webhook also does this, this is the safety net)
-            await markPortalInvoicePaid(payingInvoice.id, paidTotal).catch(console.error)
+            // No redundant DB call here — the stripe-webhook function marks the invoice
+            // paid when payment_intent.succeeded fires. Refresh the page if the status
+            // doesn't update within a few seconds.
           }}
         />
       )}

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 
+type ResetState = 'idle' | 'sending' | 'sent' | 'error'
+
 const LAST_EMAIL_KEY   = 'yva_last_email'
 const ATTEMPTS_KEY     = 'yva_login_attempts'
 const MAX_ATTEMPTS     = 5
@@ -27,6 +29,8 @@ export default function LoginPage() {
   const [loading, setLoading]     = useState(false)
   const [error, setError]         = useState<string | null>(null)
   const [lockRemaining, setLockRemaining] = useState(getLockoutRemaining())
+  const [resetState, setResetState]       = useState<ResetState>('idle')
+  const [resetMsg, setResetMsg]           = useState<string | null>(null)
 
   useEffect(() => {
     if (lockRemaining <= 0) return
@@ -66,6 +70,27 @@ export default function LoginPage() {
     localStorage.setItem(LAST_EMAIL_KEY, email)
     if (!rememberMe) {
       window.addEventListener('beforeunload', () => { void supabase.auth.signOut() }, { once: true })
+    }
+  }
+
+  async function handleForgotPassword() {
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail) {
+      setResetMsg('Enter your email address above, then click Forgot password.')
+      setResetState('error')
+      return
+    }
+    setResetState('sending')
+    setResetMsg(null)
+    const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    })
+    if (error) {
+      setResetState('error')
+      setResetMsg(error.message)
+    } else {
+      setResetState('sent')
+      setResetMsg(`Password reset email sent to ${trimmedEmail}. Check your inbox.`)
     }
   }
 
@@ -151,10 +176,35 @@ export default function LoginPage() {
               />
             </div>
 
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--muted)', cursor: 'pointer' }}>
-              <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} />
-              Keep me signed in
-            </label>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--muted)', cursor: 'pointer' }}>
+                <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} />
+                Keep me signed in
+              </label>
+              <button
+                type="button"
+                disabled={resetState === 'sending'}
+                onClick={() => void handleForgotPassword()}
+                style={{
+                  background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                  fontSize: 12, color: 'var(--gold)', textDecoration: 'underline',
+                  opacity: resetState === 'sending' ? 0.5 : 1,
+                }}
+              >
+                {resetState === 'sending' ? 'Sending…' : 'Forgot password?'}
+              </button>
+            </div>
+
+            {resetMsg && (
+              <div style={{
+                background: resetState === 'sent' ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)',
+                border: `1px solid ${resetState === 'sent' ? 'rgba(34,197,94,.2)' : 'rgba(239,68,68,.2)'}`,
+                borderRadius: 12, padding: '10px 14px', fontSize: 13,
+                color: resetState === 'sent' ? '#4ade80' : '#f87171',
+              }}>
+                {resetMsg}
+              </div>
+            )}
 
             {lockRemaining > 0 && (
               <div style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 12, padding: '10px 14px', fontSize: 13, color: '#f87171' }}>

@@ -180,23 +180,22 @@ export async function saveActivityLog(entries: ActivityLogEntry[]): Promise<void
   return syncAll('activity_log', entries)
 }
 
-/** Append a single comm entry without loading/saving the full list */
+/** Append a single comm entry using a single INSERT (no read-modify-write). */
 export async function logComm(
   clientId: string,
   note: string,
   type: CommEntryType = 'system',
   auto = true,
 ): Promise<void> {
-  const entry: ActivityLogEntry = {
-    id: crypto.randomUUID(),
-    clientId,
+  const { error } = await supabase.from('activity_log').insert({
+    id:         crypto.randomUUID(),
+    client_id:  clientId,
     note,
-    createdAt: Date.now(),
+    created_at: Date.now(),
     type,
     auto,
-  }
-  const all = await loadActivityLog()
-  await saveActivityLog([entry, ...all])
+  })
+  if (error) console.error('logComm', error)
 }
 
 // ─── Invoice Templates ────────────────────────────────────────────────────────
@@ -255,7 +254,8 @@ export async function loadSettings(): Promise<AppSettings> {
     statementEmailTemplate: (row.statement_email_template as string | undefined),
     reminderEmailTemplate:  (row.reminder_email_template as string | undefined),
     gmailClientId:          (row.gmail_client_id as string | undefined),
-    gmailClientSecret:      (row.gmail_client_secret as string | undefined),
+    // gmailClientSecret is intentionally omitted — it must only live in the
+    // GMAIL_CLIENT_SECRET Netlify env var and must never be loaded from the DB.
     gmailAccessToken:       (row.gmail_access_token as string | undefined),
     gmailRefreshToken:      (row.gmail_refresh_token as string | undefined),
     gmailTokenExpiry:       row.gmail_token_expiry != null ? (row.gmail_token_expiry as number) : undefined,
@@ -278,7 +278,8 @@ export async function saveSettings(s: AppSettings): Promise<void> {
     statement_email_template: s.statementEmailTemplate ?? null,
     reminder_email_template:  s.reminderEmailTemplate ?? null,
     gmail_client_id:          s.gmailClientId ?? null,
-    gmail_client_secret:      s.gmailClientSecret ?? null,
+    // gmail_client_secret is intentionally excluded — it must only live in
+    // the GMAIL_CLIENT_SECRET Netlify env var, never in the database.
     gmail_access_token:       s.gmailAccessToken ?? null,
     gmail_refresh_token:      s.gmailRefreshToken ?? null,
     gmail_token_expiry:       s.gmailTokenExpiry ?? null,

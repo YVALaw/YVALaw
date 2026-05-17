@@ -208,8 +208,9 @@ export type AppSettings = {
   statementEmailTemplate?: string
   reminderEmailTemplate?: string
   // Gmail OAuth integration
+  // NOTE: gmailClientSecret must only live in Netlify env vars (GMAIL_CLIENT_SECRET).
+  // It must never be stored in the settings table or sent to the browser.
   gmailClientId?: string
-  gmailClientSecret?: string
   gmailAccessToken?: string
   gmailRefreshToken?: string
   gmailTokenExpiry?: number  // unix ms

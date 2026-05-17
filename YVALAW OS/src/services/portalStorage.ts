@@ -392,33 +392,28 @@ export async function savePortalProfilePhone(params: {
   if (!res.ok) throw new Error(data.error || 'Could not update profile.')
 }
 
-/**
- * Mark an invoice as paid after a successful Stripe payment.
- * The webhook also updates this, but this call gives instant UI feedback.
- */
-export async function markPortalInvoicePaid(invoiceId: string, totalPaid: number): Promise<void> {
-  const { error } = await supabase
-    .from('invoices')
-    .update({ status: 'paid', amount_paid: totalPaid })
-    .eq('id', invoiceId)
-  if (error) throw new Error(error.message)
-}
+// markPortalInvoicePaid() was removed. The stripe-webhook Netlify function
+// handles invoice status updates when payment_intent.succeeded fires. A direct
+// client-side UPDATE was blocked by RLS and failed silently — the webhook is
+// the single source of truth for invoice paid status.
 
-/** Remove saved card from portal billing settings */
+/**
+ * Remove saved card from portal billing settings.
+ * Calls the portal-remove-card Netlify function instead of a direct Supabase
+ * UPDATE because the client_users RLS policy blocks client-scoped UPDATE here.
+ */
 export async function removePortalSavedCard(clientId: string): Promise<void> {
-  const { error } = await supabase
-    .from('client_users')
-    .update({
-      auto_pay_enabled: false,
-      default_payment_method_id: null,
-      default_card_brand: null,
-      default_card_last4: null,
-      default_card_exp_month: null,
-      default_card_exp_year: null,
-      auto_pay_authorized_at: null,
-    })
-    .eq('client_id', clientId)
-  if (error) throw new Error(error.message)
+  const token = await getSessionToken()
+  const res = await fetch('/.netlify/functions/portal-remove-card', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ clientId }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) throw new Error(data.error || 'Could not remove saved card.')
 }
 
 /** Submit a staff request from the client portal */

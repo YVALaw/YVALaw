@@ -1,8 +1,17 @@
 /**
- * update-portal-profile — Netlify Function
+ * portal-remove-card — Netlify Function
  *
- * Narrow client-portal profile update endpoint. Portal clients can update only
- * their own allowed profile fields; raw table UPDATE access stays closed by RLS.
+ * Removes a client's saved card and disables AutoPay using the Supabase
+ * service role key, bypassing the RLS policy that blocks direct client
+ * UPDATE access on the client_users table.
+ *
+ * POST /.netlify/functions/portal-remove-card
+ * Headers: Authorization: Bearer <user_access_token>
+ * Body:    { clientId: string }
+ *
+ * Required Netlify env vars:
+ *   SUPABASE_URL              — Supabase project URL
+ *   SUPABASE_SERVICE_ROLE_KEY — service role key (server-only, bypasses RLS)
  */
 
 function json(statusCode, body) {
@@ -72,33 +81,40 @@ exports.handler = async function handler(event) {
     return json(500, { error: 'Missing required env vars' })
   }
 
+  // ── Auth ──────────────────────────────────────────────────────────────────
   const authHeader = event.headers.authorization || event.headers.Authorization || ''
   if (!authHeader.startsWith('Bearer ')) return json(401, { error: 'Authorization token required' })
 
-  let clientId, phone
+  const user = await getUserFromToken(authHeader.slice(7))
+  if (!user?.id) return json(401, { error: 'Invalid or expired token' })
+
+  // ── Parse body ────────────────────────────────────────────────────────────
+  let clientId
   try {
     const body = JSON.parse(event.body || '{}')
     clientId = body.clientId
-    phone = typeof body.phone === 'string' ? body.phone.trim() : ''
   } catch {
     return json(400, { error: 'Invalid JSON body' })
   }
 
   if (!clientId) return json(400, { error: 'clientId is required' })
-  if (phone.length > 40) return json(400, { error: 'Phone number is too long' })
 
-  const user = await getUserFromToken(authHeader.slice(7))
-  if (!user?.id) return json(401, { error: 'Invalid or expired token' })
-
+  // ── Confirm caller has the portal_client role (owns this client row) ──────
   const rows = await supabaseGet(
     `client_users?client_id=eq.${enc(clientId)}&auth_id=eq.${enc(user.id)}&select=id`
   )
-  if (!Array.isArray(rows) || rows.length === 0) {
-    return json(403, { error: 'Access denied' })
-  }
+  const portalUser = Array.isArray(rows) ? rows[0] : null
+  if (!portalUser) return json(403, { error: 'Access denied' })
 
-  await supabasePatch('clients', `id=eq.${enc(clientId)}`, {
-    phone: phone || null,
+  // ── Clear card data using service role key (bypasses RLS) ─────────────────
+  await supabasePatch('client_users', `id=eq.${enc(portalUser.id)}`, {
+    auto_pay_enabled:           false,
+    default_payment_method_id:  null,
+    default_card_brand:         null,
+    default_card_last4:         null,
+    default_card_exp_month:     null,
+    default_card_exp_year:      null,
+    auto_pay_authorized_at:     null,
   })
 
   return json(200, { ok: true })
