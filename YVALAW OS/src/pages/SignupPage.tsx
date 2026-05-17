@@ -79,7 +79,7 @@ export default function SignupPage() {
       <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420 }}>
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <img
-            src="/yva-logo.png"
+            src={`${import.meta.env.BASE_URL}yva-logo.png`}
             alt="YVA Staffing"
             style={{
               width: 64, height: 64, borderRadius: 16,

@@ -139,7 +139,7 @@ export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): s
     </head><body>
     <div class="header">
       <div>
-        <img src="${window.location.origin}/os/yva-logo.png" class="logo" onerror="this.style.display='none'" />
+        <img src="${window.location.origin}${import.meta.env.BASE_URL}yva-logo.png" class="logo" onerror="this.style.display='none'" />
         <div class="from-info">
           <div><strong>${companyName}</strong></div>
           <div>${companyAddress}</div>

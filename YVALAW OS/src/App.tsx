@@ -191,7 +191,7 @@ async function maybeFireReminder() {
   if (unpaid.length > 0) {
     new Notification('YVA LawOS — Invoice Reminder', {
       body: `${unpaid.length} unpaid invoice${unpaid.length > 1 ? 's' : ''} waiting. Check the Invoices pipeline.`,
-      icon: '/yva-logo.png',
+      icon: `${window.location.origin}${import.meta.env.BASE_URL}yva-logo.png`,
     })
   }
   void saveSettings({ ...settings, reminderLastFired: todayStr })

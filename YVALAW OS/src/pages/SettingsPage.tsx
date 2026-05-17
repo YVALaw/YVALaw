@@ -296,17 +296,17 @@ export default function SettingsPage() {
       if (overdue.length > 0) {
         new Notification('YVA OS — Overdue Invoices', {
           body: `${overdue.length} invoice${overdue.length > 1 ? 's are' : ' is'} overdue. Open the Invoices pipeline to review.`,
-          icon: '/yva-logo.png',
+          icon: `${window.location.origin}${import.meta.env.BASE_URL}yva-logo.png`,
         })
       }
       if (drafts.length > 0) {
         new Notification('YVA OS — Draft Invoices', {
           body: `${drafts.length} draft invoice${drafts.length > 1 ? 's are' : ' is'} ready to send to clients.`,
-          icon: '/yva-logo.png',
+          icon: `${window.location.origin}${import.meta.env.BASE_URL}yva-logo.png`,
         })
       }
       if (overdue.length === 0 && drafts.length === 0) {
-        new Notification('YVA OS', { body: 'All clear — no pending actions.', icon: '/yva-logo.png' })
+        new Notification('YVA OS', { body: 'All clear — no pending actions.', icon: `${window.location.origin}${import.meta.env.BASE_URL}yva-logo.png` })
       }
     })
   }

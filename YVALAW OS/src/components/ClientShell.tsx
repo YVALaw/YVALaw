@@ -72,7 +72,7 @@ export default function ClientShell({ children, previewClientId }: Props) {
       <aside className={`portal-sidebar${isPreview ? ' preview-offset' : ''}`}>
         {/* Brand */}
         <div className="sidebar-brand">
-          <img src="/yva-logo.png" alt="YVA" className="sidebar-brand-logo" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+          <img src={`${import.meta.env.BASE_URL}yva-logo.png`} alt="YVA" className="sidebar-brand-logo" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
           <div>
             <div className="sidebar-brand-name">YVA Staffing</div>
             <div className="sidebar-brand-sub">{isPreview ? 'Preview Mode' : 'Client Portal'}</div>
@@ -151,7 +151,7 @@ export default function ClientShell({ children, previewClientId }: Props) {
           </div>
           {/* Mobile brand */}
           <div className="portal-topbar-brand-mobile">
-            <img src="/yva-logo.png" alt="YVA" className="portal-topbar-brand-logo" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+            <img src={`${import.meta.env.BASE_URL}yva-logo.png`} alt="YVA" className="portal-topbar-brand-logo" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
             <span className="portal-topbar-brand-text">
               {isPreview ? 'Portal Preview' : 'YVA Portal'}
             </span>

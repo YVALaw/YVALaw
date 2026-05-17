@@ -48,7 +48,7 @@ export default function PortalPage() {
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 40 }}>
           <img
-            src="/yva-logo.png"
+            src={`${import.meta.env.BASE_URL}yva-logo.png`}
             alt="YVA Staffing"
             style={{ height: 52 }}
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}

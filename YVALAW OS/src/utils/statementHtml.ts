@@ -101,7 +101,7 @@ export function buildStatementHTML(
     @media print{body{margin:16px}}
   </style></head><body>
   <div class="header">
-    <img src="${window.location.origin}/yva-logo.png" class="logo" onerror="this.style.display='none'" />
+    <img src="${window.location.origin}${import.meta.env.BASE_URL}yva-logo.png" class="logo" onerror="this.style.display='none'" />
     <div style="text-align:right">
       <h2>EARNINGS STATEMENT</h2>
       <div class="meta">${emp.name}${emp.employeeNumber ? ` · ${emp.employeeNumber}` : ''}</div>

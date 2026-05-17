@@ -95,7 +95,7 @@ export default function LoginPage() {
         {/* Logo / brand */}
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <img
-            src="/yva-logo.png"
+            src={`${import.meta.env.BASE_URL}yva-logo.png`}
             alt="YVA Staffing"
             style={{
               width: 64, height: 64, borderRadius: 16,
