@@ -6,6 +6,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Blog | YVA Law Staffing</title>
+  <link rel="canonical" href="https://yvastaffing.agency/blog-post.html">
   <meta name="robots" content="index, follow">
 
   <!-- Google Analytics -->
@@ -20,6 +21,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.5/purify.min.js"></script>
 
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
@@ -78,7 +80,7 @@
   <nav id="navbar" class="fixed md:sticky w-full z-50 transition-all duration-300 top-0 bg-white py-6">
     <div class="max-w-7xl mx-auto px-6 flex justify-between items-center">
       <a href="index.html" class="flex items-center gap-3 cursor-pointer group">
-        <img src="images/logo.png" alt="YVA Staffing" class="h-12 w-auto rounded-xl shadow-lg transition-transform group-hover:rotate-6" />
+        <img src="logo/img2.png" alt="YVA Staffing" class="h-12 w-auto rounded-xl shadow-lg transition-transform group-hover:rotate-6" />
         <div class="flex flex-col">
           <span class="text-2xl font-black tracking-tighter leading-none text-[#1b1e2b]">Law</span>
           <span class="text-[10px] uppercase tracking-[0.3em] font-bold text-slate-400">Staffing</span>
@@ -214,7 +216,7 @@
         </div>
       </div>
       <div class="border-t border-white/10 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <p class="text-slate-500 text-xs font-medium">© 2025 YVA Law Staffing. All rights reserved.</p>
+        <p class="text-slate-500 text-xs font-medium">© 2026 YVA Law Staffing. All rights reserved.</p>
         <p class="text-slate-600 text-xs font-medium">Proudly serving U.S. law firms from the Dominican Republic</p>
       </div>
     </div>
@@ -293,7 +295,7 @@
           document.getElementById('post-image').alt = frontmatter.title || '';
           document.getElementById('post-image-wrap').classList.remove('hidden');
         }
-        document.getElementById('post-body').innerHTML = marked.parse(body);
+        document.getElementById('post-body').innerHTML = DOMPurify.sanitize(marked.parse(body));
 
         document.getElementById('post-loading').classList.add('hidden');
         document.getElementById('post-content').classList.remove('hidden');
@@ -305,11 +307,4 @@
 
     function showError() {
       document.getElementById('post-loading').classList.add('hidden');
-      document.getElementById('post-error').classList.remove('hidden');
-    }
-
-    loadPost();
-  </script>
-
-</body>
-</html>
+      document.g
