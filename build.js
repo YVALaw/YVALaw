@@ -141,9 +141,18 @@ const BASE_URL = 'https://yvastaffing.agency';
 const today = new Date().toISOString().split('T')[0];
 
 const staticPages = [
-  { url: '/',             changefreq: 'weekly',  priority: '1.0', lastmod: today },
-  { url: '/blog.html',    changefreq: 'weekly',  priority: '0.9', lastmod: today },
-  { url: '/careers.html', changefreq: 'monthly', priority: '0.8', lastmod: today },
+  { url: '/',                    changefreq: 'weekly',  priority: '1.0', lastmod: today },
+  { url: '/blog.html',           changefreq: 'weekly',  priority: '0.9', lastmod: today },
+  { url: '/careers.html',        changefreq: 'monthly', priority: '0.8', lastmod: today },
+  { url: '/landing-pi.html',     changefreq: 'monthly', priority: '0.8', lastmod: today },
+  { url: '/landing-employment.html', changefreq: 'monthly', priority: '0.8', lastmod: today },
+  { url: '/landing-workers-comp.html', changefreq: 'monthly', priority: '0.8', lastmod: today },
+  { url: '/landing-intake.html', changefreq: 'monthly', priority: '0.8', lastmod: today },
+  { url: '/landing-assistants.html', changefreq: 'monthly', priority: '0.8', lastmod: today },
+  { url: '/landing-demand.html', changefreq: 'monthly', priority: '0.8', lastmod: today },
+  { url: '/landing-case-managers.html', changefreq: 'monthly', priority: '0.8', lastmod: today },
+  { url: '/checklist.html',      changefreq: 'monthly', priority: '0.7', lastmod: today },
+  { url: '/privacy-policy.html', changefreq: 'yearly',  priority: '0.5', lastmod: today },
 ];
 
 const postPages = posts.map(post => ({
