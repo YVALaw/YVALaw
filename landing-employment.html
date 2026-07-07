@@ -40,7 +40,7 @@
     </script>
 
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@0.469.0"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; }
@@ -327,7 +327,7 @@
 
 <footer class="bg-[#1b1e2b] border-t border-white/10 py-6">
     <div class="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-        <p class="text-slate-500 text-xs font-medium">© 2026 YVA Law Staffing · <a href="privacy-policy.html" class="hover:text-yellow-400 transition-colors">Privacy Policy</a></p>
+        <p class="text-slate-500 text-xs font-medium">© 2026 YVA Law Staffing · <a href="/privacy-policy" class="hover:text-yellow-400 transition-colors">Privacy Policy</a> · <a href="/sms-terms" class="hover:text-yellow-400 transition-colors">SMS Terms &amp; Conditions</a></p>
         <a href="/" class="text-slate-400 text-xs font-bold hover:text-yellow-400 transition-colors">← Back to Main Site</a>
     </div>
 </footer>
@@ -348,6 +348,7 @@
                 <div><label class="block text-xs font-black text-[#1b1e2b] uppercase tracking-widest mb-2">Full Name <span class="text-yellow-500">*</span></label><input id="lp-name" type="text" placeholder="Jane Smith" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 transition"></div>
                 <div><label class="block text-xs font-black text-[#1b1e2b] uppercase tracking-widest mb-2">Email <span class="text-yellow-500">*</span></label><input id="lp-email" type="email" placeholder="jane@firm.com" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 transition"></div>
             </div>
+            <div><label class="block text-xs font-black text-[#1b1e2b] uppercase tracking-widest mb-2">Phone Number <span class="text-slate-400 font-medium normal-case tracking-normal">(optional)</span></label><input id="lp-phone" type="tel" placeholder="+1 555 000 0000" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 transition"></div>
             <div><label class="block text-xs font-black text-[#1b1e2b] uppercase tracking-widest mb-2">Firm Name <span class="text-yellow-500">*</span></label><input id="lp-company" type="text" placeholder="Smith Employment Law" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 transition"></div>
             <div><label class="block text-xs font-black text-[#1b1e2b] uppercase tracking-widest mb-2">Service Needed <span class="text-yellow-500">*</span></label>
                 <select id="lp-service" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 transition bg-white">
@@ -361,9 +362,10 @@
             <div><label class="block text-xs font-black text-[#1b1e2b] uppercase tracking-widest mb-2">Tell Us More <span class="text-yellow-500">*</span></label><textarea id="lp-message" rows="3" placeholder="What's your biggest staffing challenge right now?" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 transition resize-none"></textarea></div>
             <p id="lp-error" class="hidden text-red-500 text-xs font-bold">Please fill in all required fields.</p>
             <button id="lp-submit" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all shadow-lg">Continue to Schedule <i data-lucide="arrow-right" class="w-4 h-4"></i></button>
-            <p class="text-center text-[11px] text-slate-400 font-medium leading-relaxed">
-                By submitting this form, you agree to receive SMS messages from YVA Law Staffing if you provided a phone number. Message frequency varies. Reply STOP to opt out, HELP for help. Message and data rates may apply. See our <a href="privacy-policy.html" class="font-bold text-[#1b1e2b] hover:text-yellow-500 transition-colors">Privacy Policy</a>.
-            </p>
+            <label class="flex items-start gap-3 text-[11px] text-slate-500 font-medium leading-relaxed">
+                <input id="lp-sms-consent" type="checkbox" class="mt-1 h-4 w-4 rounded border-slate-300 text-yellow-500 focus:ring-yellow-400">
+                <span>I agree to receive SMS messages from YVA Law Staffing about my inquiry, appointment reminders, service updates, and related business communications. Message frequency varies. Message and data rates may apply. Reply STOP to opt out and HELP for help. Consent is not a condition of purchase. View our <a href="/privacy-policy" class="font-bold text-[#1b1e2b] hover:text-yellow-500 transition-colors">Privacy Policy</a> and <a href="/sms-terms" class="font-bold text-[#1b1e2b] hover:text-yellow-500 transition-colors">SMS Terms &amp; Conditions</a>.</span>
+            </label>
         </div>
         <div id="lp-calendly-step" class="hidden flex-col flex-1">
             <div class="bg-slate-50 px-8 py-3 border-b border-slate-100 flex-shrink-0"><p class="text-xs font-black text-[#1b1e2b] uppercase tracking-widest">Step 2 of 2 — Pick a time that works</p></div>
@@ -381,6 +383,7 @@
     function openModal(service = '') {
         document.getElementById('lp-form-step').classList.remove('hidden');
         document.getElementById('lp-calendly-step').classList.add('hidden');
+        document.getElementById('lp-sms-consent').checked = false;
         if (service) document.getElementById('lp-service').value = service;
         document.getElementById('lp-modal').classList.add('open');
         document.body.style.overflow = 'hidden';
@@ -391,11 +394,11 @@
     document.getElementById('lp-backdrop').addEventListener('click', closeModal);
     document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
     document.getElementById('lp-submit').addEventListener('click', async () => {
-        const name = document.getElementById('lp-name').value.trim(), email = document.getElementById('lp-email').value.trim(), company = document.getElementById('lp-company').value.trim(), service = document.getElementById('lp-service').value, message = document.getElementById('lp-message').value.trim();
+        const name = document.getElementById('lp-name').value.trim(), email = document.getElementById('lp-email').value.trim(), phone = document.getElementById('lp-phone').value.trim(), company = document.getElementById('lp-company').value.trim(), service = document.getElementById('lp-service').value, message = document.getElementById('lp-message').value.trim(), smsConsent = document.getElementById('lp-sms-consent').checked;
         const errEl = document.getElementById('lp-error'), btn = document.getElementById('lp-submit');
         if (!name || !email || !company || !service || !message) { errEl.classList.remove('hidden'); return; }
         errEl.classList.add('hidden'); btn.textContent = 'Sending...'; btn.disabled = true;
-        try { await emailjs.send('service_d485bxr', 'template_8gftonr', { name, email, company, service, message, website: 'Employment Landing Page', time: new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' }) }); await emailjs.send('service_d485bxr', 'template_9r6xtuw', { name, email, company, service, message, website: '', time: new Date().toLocaleString() }); } catch(e) { console.error(e); }
+        try { await emailjs.send('service_d485bxr', 'template_8gftonr', { name, email, phone: phone || 'Not provided', company, service, message, website: 'Employment Landing Page', sms_consent: smsConsent ? 'Yes' : 'No', time: new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' }) }); await emailjs.send('service_d485bxr', 'template_9r6xtuw', { name, email, phone: phone || 'Not provided', company, service, message, website: '', sms_consent: smsConsent ? 'Yes' : 'No', time: new Date().toLocaleString() }); } catch(e) { console.error(e); }
         btn.innerHTML = 'Continue to Schedule <i data-lucide="arrow-right" class="w-4 h-4 inline"></i>'; btn.disabled = false;
         document.getElementById('lp-form-step').classList.add('hidden');
         const cal = document.getElementById('lp-calendly-step'); cal.classList.remove('hidden'); cal.classList.add('flex');

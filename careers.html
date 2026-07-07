@@ -33,7 +33,7 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@0.469.0"></script>
     <!-- EmailJS -->
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 
@@ -465,7 +465,7 @@
 
             </div>
             <div class="border-t border-white/10 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <p class="text-slate-500 text-xs font-medium">© 2026 YVA Law Staffing. All rights reserved. · <a href="privacy-policy.html" class="hover:text-yellow-400 transition-colors">Privacy Policy</a></p>
+                <p class="text-slate-500 text-xs font-medium">© 2026 YVA Law Staffing. All rights reserved. · <a href="/privacy-policy" class="hover:text-yellow-400 transition-colors">Privacy Policy</a> · <a href="/sms-terms" class="hover:text-yellow-400 transition-colors">SMS Terms &amp; Conditions</a></p>
                 <p class="text-slate-600 text-xs font-medium">Proudly serving U.S. law firms from the Dominican Republic</p>
             </div>
         </div>
@@ -517,7 +517,7 @@
                 <!-- Phone + Country -->
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Phone</label>
+                        <label class="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">Phone Number</label>
                         <input id="apply-phone" type="tel" placeholder="+1 555 000 0000" class="w-full border-2 border-slate-200 rounded-2xl px-4 py-3.5 text-sm font-bold text-slate-700 focus:outline-none focus:border-yellow-400 transition-colors placeholder:font-medium placeholder:text-slate-400">
                     </div>
                     <div>
@@ -565,9 +565,10 @@
                 <button id="apply-submit" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all">
                     Submit Application <i data-lucide="send" class="w-4 h-4"></i>
                 </button>
-                <p class="text-center text-[11px] text-slate-400 font-medium leading-relaxed">
-                    By submitting this form, you agree to receive SMS messages from YVA Law Staffing if you provided a phone number. Message frequency varies. Reply STOP to opt out, HELP for help. Message and data rates may apply. See our <a href="privacy-policy.html" class="font-bold text-[#1b1e2b] hover:text-yellow-500 transition-colors">Privacy Policy</a>.
-                </p>
+                <label class="flex items-start gap-3 text-[11px] text-slate-500 font-medium leading-relaxed">
+                    <input id="apply-sms-consent" type="checkbox" class="mt-1 h-4 w-4 rounded border-slate-300 text-yellow-500 focus:ring-yellow-400">
+                    <span>I agree to receive SMS messages from YVA Law Staffing about my inquiry, appointment reminders, service updates, and related business communications. Message frequency varies. Message and data rates may apply. Reply STOP to opt out and HELP for help. Consent is not a condition of purchase. View our <a href="/privacy-policy" class="font-bold text-[#1b1e2b] hover:text-yellow-500 transition-colors">Privacy Policy</a> and <a href="/sms-terms" class="font-bold text-[#1b1e2b] hover:text-yellow-500 transition-colors">SMS Terms &amp; Conditions</a>.</span>
+                </label>
                 <p class="text-center text-xs text-slate-400 font-medium">We review every application and respond within 3-5 business days.</p>
             </div>
 
@@ -818,6 +819,7 @@
             ['apply-name','apply-email','apply-phone','apply-country','apply-languages','apply-linkedin','apply-message'].forEach(id => {
                 document.getElementById(id).value = '';
             });
+            document.getElementById('apply-sms-consent').checked = false;
             document.getElementById('apply-experience').value = '';
             roleDropdown.classList.remove('hidden');
             roleDropdown.value = '';
@@ -840,6 +842,7 @@
             const role     = document.getElementById('role-dropdown').value || document.getElementById('role-prefilled-label').textContent;
             const phone    = document.getElementById('apply-phone').value.trim();
             const linkedin = document.getElementById('apply-linkedin').value.trim();
+            const smsConsent = document.getElementById('apply-sms-consent').checked;
             const errorEl  = document.getElementById('apply-error');
             const errorText = document.getElementById('apply-error-text');
             const submitBtn = document.getElementById('apply-submit');
@@ -860,6 +863,7 @@
                     country, role, languages, experience,
                     linkedin: linkedin || 'Not provided',
                     message,
+                    sms_consent: smsConsent ? 'Yes' : 'No',
                     time: new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })
                 });
                 await emailjs.send('service_e0rf9ot', 'template_2mbtvvn', { name, email, role });

@@ -152,7 +152,8 @@ const staticPages = [
   { url: '/landing-demand.html', changefreq: 'monthly', priority: '0.8', lastmod: today },
   { url: '/landing-case-managers.html', changefreq: 'monthly', priority: '0.8', lastmod: today },
   { url: '/checklist.html',      changefreq: 'monthly', priority: '0.7', lastmod: today },
-  { url: '/privacy-policy.html', changefreq: 'yearly',  priority: '0.5', lastmod: today },
+  { url: '/privacy-policy', changefreq: 'yearly',  priority: '0.5', lastmod: today },
+  { url: '/sms-terms',      changefreq: 'yearly',  priority: '0.5', lastmod: today },
 ];
 
 const postPages = posts.map(post => ({

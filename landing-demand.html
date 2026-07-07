@@ -43,7 +43,7 @@
     </script>
 
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@0.469.0"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
@@ -538,7 +538,9 @@
         <div class="flex items-center gap-5">
             <a href="/" class="text-slate-500 text-xs font-medium hover:text-yellow-400 transition-colors">Main Website</a>
             <span class="text-slate-700 text-xs">·</span>
-            <a href="privacy-policy.html" class="text-slate-500 text-xs font-medium hover:text-yellow-400 transition-colors">Privacy Policy</a>
+            <a href="/privacy-policy" class="text-slate-500 text-xs font-medium hover:text-yellow-400 transition-colors">Privacy Policy</a>
+            <span class="text-slate-600 text-xs">·</span>
+            <a href="/sms-terms" class="text-slate-500 text-xs font-medium hover:text-yellow-400 transition-colors">SMS Terms &amp; Conditions</a>
             <span class="text-slate-700 text-xs">·</span>
             <a href="mailto:contact@yvastaffing.agency" class="text-slate-500 text-xs font-medium hover:text-yellow-400 transition-colors">contact@yvastaffing.agency</a>
         </div>
@@ -583,9 +585,13 @@
                     <input id="lp-company" type="text" placeholder="Smith & Associates" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20 transition">
                 </div>
                 <div>
+                    <label class="block text-xs font-black text-[#1b1e2b] uppercase tracking-widest mb-2">Phone Number <span class="text-slate-400 font-medium normal-case tracking-normal">(optional)</span></label>
+                    <input id="lp-phone" type="tel" placeholder="+1 555 000 0000" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20 transition">
+                </div>
+            </div>
+            <div>
                     <label class="block text-xs font-black text-[#1b1e2b] uppercase tracking-widest mb-2">Website <span class="text-slate-400 font-medium normal-case tracking-normal">(optional)</span></label>
                     <input id="lp-website" type="url" placeholder="https://yourfirm.com" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20 transition">
-                </div>
             </div>
             <div class="flex items-center gap-3 bg-yellow-400/10 border border-yellow-400/30 rounded-xl px-4 py-3">
                 <i data-lucide="check-circle-2" class="w-4 h-4 text-yellow-600 flex-shrink-0"></i>
@@ -599,9 +605,10 @@
             <button id="lp-form-submit" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all shadow-lg">
                 Continue to Schedule <i data-lucide="arrow-right" class="w-4 h-4"></i>
             </button>
-            <p class="text-center text-[11px] text-slate-400 font-medium leading-relaxed">
-                By submitting this form, you agree to receive SMS messages from YVA Law Staffing if you provided a phone number. Message frequency varies. Reply STOP to opt out, HELP for help. Message and data rates may apply. See our <a href="privacy-policy.html" class="font-bold text-[#1b1e2b] hover:text-yellow-500 transition-colors">Privacy Policy</a>.
-            </p>
+            <label class="flex items-start gap-3 text-[11px] text-slate-500 font-medium leading-relaxed">
+                <input id="lp-sms-consent" type="checkbox" class="mt-1 h-4 w-4 rounded border-slate-300 text-yellow-500 focus:ring-yellow-400">
+                <span>I agree to receive SMS messages from YVA Law Staffing about my inquiry, appointment reminders, service updates, and related business communications. Message frequency varies. Message and data rates may apply. Reply STOP to opt out and HELP for help. Consent is not a condition of purchase. View our <a href="/privacy-policy" class="font-bold text-[#1b1e2b] hover:text-yellow-500 transition-colors">Privacy Policy</a> and <a href="/sms-terms" class="font-bold text-[#1b1e2b] hover:text-yellow-500 transition-colors">SMS Terms &amp; Conditions</a>.</span>
+            </label>
             <p class="text-center text-slate-400 text-xs font-medium">No commitment required — just a conversation.</p>
         </div>
 
@@ -646,9 +653,10 @@
         calendlyStep.classList.add('hidden');
         calendlyStep.classList.remove('flex');
         document.getElementById('lp-modal-subtitle').textContent = 'Step 1 of 2 — Tell us about your firm';
-        ['lp-name','lp-email','lp-company','lp-website','lp-message'].forEach(id => {
+        ['lp-name','lp-email','lp-company','lp-phone','lp-website','lp-message'].forEach(id => {
             document.getElementById(id).value = '';
         });
+        document.getElementById('lp-sms-consent').checked = false;
         document.getElementById('lp-form-error').classList.add('hidden');
     }
 
@@ -660,8 +668,10 @@
         const name = document.getElementById('lp-name').value.trim();
         const email = document.getElementById('lp-email').value.trim();
         const company = document.getElementById('lp-company').value.trim();
+        const phone = document.getElementById('lp-phone').value.trim();
         const website = document.getElementById('lp-website').value.trim();
         const message = document.getElementById('lp-message').value.trim();
+        const smsConsent = document.getElementById('lp-sms-consent').checked;
         const error = document.getElementById('lp-form-error');
         const btn = document.getElementById('lp-form-submit');
 
@@ -675,9 +685,11 @@
 
         const params = {
             name, email, company,
+            phone: phone || 'Not provided',
             website: website || 'Not provided',
             service: 'Demand Writing',
             message,
+            sms_consent: smsConsent ? 'Yes' : 'No',
             time: new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })
         };
 

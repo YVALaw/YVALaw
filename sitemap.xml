@@ -19,7 +19,13 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://yvastaffing.agency/privacy-policy.html</loc>
+    <loc>https://yvastaffing.agency/privacy-policy</loc>
+    <lastmod>2026-07-06</lastmod>
+    <changefreq>yearly</changefreq>
+    <priority>0.5</priority>
+  </url>
+  <url>
+    <loc>https://yvastaffing.agency/sms-terms</loc>
     <lastmod>2026-07-06</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.5</priority>

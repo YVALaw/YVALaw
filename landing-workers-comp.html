@@ -22,10 +22,13 @@
     <link rel="apple-touch-icon" href="/favicon.png" />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="robots" content="noindex, nofollow" />
+  <meta name="robots" content="index, follow" />
   <title>Virtual Staff for Workers' Comp Firms | YVA Law Staffing</title>
   <link rel="canonical" href="https://yvastaffing.agency/landing-workers-comp.html">
   <meta name="description" content="Workers' comp firms: stop losing cases to missed deadlines and delayed medical records. YVA provides bilingual virtual staff from $7.50/hr — intake, case management, and more." />
+  <meta property="og:title" content="Virtual Staff for Workers' Comp Firms | YVA Law Staffing" />
+  <meta property="og:description" content="Intake, case management & legal assistants for workers' comp firms. Bilingual. Starting at $7.50/hr." />
+  <meta property="og:image" content="https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=1200" />
 
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -36,7 +39,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
 
   <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <script src="https://unpkg.com/lucide@0.469.0"></script>
 
   <!-- EmailJS -->
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
@@ -48,11 +51,16 @@
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
     gtag('config', 'G-V2Q6V4HE4F');
+    gtag('event', 'page_view', { event_category: 'landing_workers_comp' });
   </script>
 
   <style>
     body { font-family: 'Inter', sans-serif; }
-    html { scroll-behavior: smooth; }
+    html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+
+    /* Fixed nav (matches landing-pi / landing-employment) */
+    #lp-nav { transition: box-shadow 0.3s ease; }
+    #lp-nav.scrolled { box-shadow: 0 4px 24px -4px rgba(27,30,43,0.12); }
 
     /* Booking modal */
     #booking-modal {
@@ -371,7 +379,7 @@
 
   <!-- ===== FOOTER ===== -->
   <footer class="bg-gray-900 text-gray-400 py-8 px-4 text-center text-sm">
-    <p class="mb-1">&copy; 2026 YVA Law Staffing &mdash; <a href="/" class="text-yellow-400 hover:underline">yvastaffing.agency</a> &mdash; <a href="privacy-policy.html" class="text-yellow-400 hover:underline">Privacy Policy</a></p>
+    <p class="mb-1">&copy; 2026 YVA Law Staffing &mdash; <a href="/" class="text-yellow-400 hover:underline">yvastaffing.agency</a> &mdash; <a href="/privacy-policy" class="text-yellow-400 hover:underline">Privacy Policy</a> &mdash; <a href="/sms-terms" class="text-yellow-400 hover:underline">SMS Terms &amp; Conditions</a></p>
     <p>Virtual legal staff for workers' comp firms across the U.S.</p>
   </footer>
 
@@ -410,8 +418,8 @@
             <input type="email" name="email" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none" placeholder="maria@yourfirm.com" />
           </div>
           <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
-            <input type="tel" name="phone" required class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none" placeholder="+1 (305) 000-0000" />
+            <label class="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+            <input type="tel" name="phone" class="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 outline-none" placeholder="+1 (305) 000-0000" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">Firm Name *</label>
@@ -436,9 +444,10 @@
           <button type="submit" id="submit-btn" class="w-full bg-yellow-400 hover:bg-yellow-300 text-[#1b1e2b] font-bold py-3 rounded-lg transition text-sm">
             Book My Free Call →
           </button>
-          <p class="text-xs text-gray-400 text-center leading-relaxed">
-            By submitting this form, you agree to receive SMS messages from YVA Law Staffing. Message frequency varies. Reply STOP to opt out, HELP for help. Message and data rates may apply. See our <a href="privacy-policy.html" class="font-semibold text-yellow-600 hover:underline">Privacy Policy</a>.
-          </p>
+          <label class="flex items-start gap-3 text-xs text-gray-500 leading-relaxed">
+            <input type="checkbox" name="sms_consent" class="mt-1 h-4 w-4 rounded border-gray-300 text-yellow-500 focus:ring-yellow-400">
+            <span>I agree to receive SMS messages from YVA Law Staffing about my inquiry, appointment reminders, service updates, and related business communications. Message frequency varies. Message and data rates may apply. Reply STOP to opt out and HELP for help. Consent is not a condition of purchase. View our <a href="/privacy-policy" class="font-semibold text-yellow-600 hover:underline">Privacy Policy</a> and <a href="/sms-terms" class="font-semibold text-yellow-600 hover:underline">SMS Terms &amp; Conditions</a>.</span>
+          </label>
           <p class="text-xs text-gray-400 text-center">No spam. No sales pressure. Just a real conversation.</p>
         </form>
       </div>
@@ -474,6 +483,7 @@
     function openBooking(service) {
       const modal = document.getElementById('booking-modal');
       const select = document.getElementById('service-select');
+      document.querySelector('input[name="sms_consent"]').checked = false;
       if (service && select) {
         for (let opt of select.options) {
           if (opt.value === service) { opt.selected = true; break; }
@@ -513,6 +523,7 @@
         firm_name: form.firm_name.value,
         service: form.service.value,
         message: form.message.value || 'N/A',
+        sms_consent: form.sms_consent.checked ? 'Yes' : 'No',
         source: 'Workers\' Comp Landing Page'
       };
 

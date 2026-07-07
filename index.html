@@ -153,9 +153,9 @@
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@0.469.0"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
 
         html {
             scroll-behavior: smooth;
@@ -1771,17 +1771,8 @@
                         </div>
                     </a>
                     <p class="text-slate-400 text-sm font-medium leading-relaxed mb-6" data-i18n="footerDesc">Elite bilingual virtual staffing for law firms and professional services. Starting at <span class="text-yellow-400 font-bold">$7.50/hr</span>.</p>
-                    <!-- Social Links -->
+                    <!-- Social Links (Instagram/LinkedIn/X removed until real profile URLs exist) -->
                     <div class="flex gap-3">
-                        <a href="#" target="_blank" aria-label="Instagram" class="w-9 h-9 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-yellow-400 hover:text-[#1b1e2b] hover:border-yellow-400 transition-all">
-                            <i data-lucide="instagram" class="w-4 h-4"></i>
-                        </a>
-                        <a href="#" target="_blank" aria-label="LinkedIn" class="w-9 h-9 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-yellow-400 hover:text-[#1b1e2b] hover:border-yellow-400 transition-all">
-                            <i data-lucide="linkedin" class="w-4 h-4"></i>
-                        </a>
-                        <a href="#" target="_blank" aria-label="X / Twitter" class="w-9 h-9 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-yellow-400 hover:text-[#1b1e2b] hover:border-yellow-400 transition-all">
-                            <i data-lucide="twitter" class="w-4 h-4"></i>
-                        </a>
                         <a href="#" onclick="openEmailPicker(event)" aria-label="Email" class="w-9 h-9 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-yellow-400 hover:text-[#1b1e2b] hover:border-yellow-400 transition-all">
                             <i data-lucide="mail" class="w-4 h-4"></i>
                         </a>
@@ -1807,10 +1798,10 @@
                 <div>
                     <p class="text-white font-black text-xs uppercase tracking-widest mb-6" data-i18n="footerOurServices">Our Services</p>
                     <ul class="space-y-3">
-                        <li><a href="#service-pillars" onclick="setTimeout(()=>goToService(0),100)" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Legal Intake</a></li>
-                        <li><a href="#service-pillars" onclick="setTimeout(()=>goToService(1),100)" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Legal Assistants</a></li>
-                        <li><a href="#service-pillars" onclick="setTimeout(()=>goToService(2),100)" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Demand Writing</a></li>
-                        <li><a href="#service-pillars" onclick="setTimeout(()=>goToService(3),100)" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Case Managers</a></li>
+                        <li><a href="#service-pillars" onclick="setTimeout(()=>showService(0),100)" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Legal Intake</a></li>
+                        <li><a href="#service-pillars" onclick="setTimeout(()=>showService(1),100)" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Legal Assistants</a></li>
+                        <li><a href="#service-pillars" onclick="setTimeout(()=>showService(2),100)" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Demand Writing</a></li>
+                        <li><a href="#service-pillars" onclick="setTimeout(()=>showService(3),100)" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> Case Managers</a></li>
                     </ul>
                 </div>
 
@@ -1852,7 +1843,7 @@
 
             <!-- Bottom Bar -->
             <div class="border-t border-white/10 py-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <p class="text-slate-500 text-xs font-medium"><span data-i18n="footerCopyright">© 2026 YVA Law Staffing. All rights reserved.</span> · <a href="privacy-policy.html" class="hover:text-yellow-400 transition-colors" data-i18n="privacyPolicy">Privacy Policy</a></p>
+                <p class="text-slate-500 text-xs font-medium"><span data-i18n="footerCopyright">© 2026 YVA Law Staffing. All rights reserved.</span> · <a href="/privacy-policy" class="hover:text-yellow-400 transition-colors" data-i18n="privacyPolicy">Privacy Policy</a> · <a href="/sms-terms" class="hover:text-yellow-400 transition-colors">SMS Terms &amp; Conditions</a></p>
                 <p class="text-slate-600 text-xs font-medium" data-i18n="footerTagline">Proudly serving U.S. law firms from the Dominican Republic 🇩🇴</p>
             </div>
 
@@ -2079,6 +2070,10 @@
                         <input id="field-email" type="email" placeholder="jane@lawfirm.com" required class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20 transition">
                     </div>
                 </div>
+                <div>
+                    <label class="block text-xs font-black text-[#1b1e2b] uppercase tracking-widest mb-2">Phone Number <span class="text-slate-400 font-medium normal-case tracking-normal">(optional)</span></label>
+                    <input id="field-phone" type="tel" placeholder="+1 555 000 0000" class="w-full border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-400/20 transition">
+                </div>
                 <div class="grid sm:grid-cols-2 gap-5">
                     <div>
                         <label class="block text-xs font-black text-[#1b1e2b] uppercase tracking-widest mb-2">Company / Firm Name <span class="text-yellow-500">*</span></label>
@@ -2120,9 +2115,10 @@
                 <button id="form-submit" class="w-full bg-[#1b1e2b] text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all shadow-lg">
                     Continue to Schedule <i data-lucide="arrow-right" class="w-4 h-4"></i>
                 </button>
-                <p class="text-center text-[11px] text-slate-400 font-medium leading-relaxed">
-                    By submitting this form, you agree to receive SMS messages from YVA Law Staffing if you provided a phone number. Message frequency varies. Reply STOP to opt out, HELP for help. Message and data rates may apply. See our <a href="privacy-policy.html" class="font-bold text-[#1b1e2b] hover:text-yellow-500 transition-colors">Privacy Policy</a>.
-                </p>
+                <label class="flex items-start gap-3 text-[11px] text-slate-500 font-medium leading-relaxed">
+                    <input id="field-sms-consent" type="checkbox" class="mt-1 h-4 w-4 rounded border-slate-300 text-yellow-500 focus:ring-yellow-400">
+                    <span>I agree to receive SMS messages from YVA Law Staffing about my inquiry, appointment reminders, service updates, and related business communications. Message frequency varies. Message and data rates may apply. Reply STOP to opt out and HELP for help. Consent is not a condition of purchase. View our <a href="/privacy-policy" class="font-bold text-[#1b1e2b] hover:text-yellow-500 transition-colors">Privacy Policy</a> and <a href="/sms-terms" class="font-bold text-[#1b1e2b] hover:text-yellow-500 transition-colors">SMS Terms &amp; Conditions</a>.</span>
+                </label>
                 <p class="text-center text-slate-400 text-xs font-medium">No commitment required — just a conversation.</p>
             </div>
 
@@ -2299,9 +2295,10 @@
             calendlyModal.classList.remove('open');
             document.body.style.overflow = '';
             // Reset form fields
-            ['field-name','field-email','field-company','field-website','field-message'].forEach(id => {
+            ['field-name','field-email','field-phone','field-company','field-website','field-message'].forEach(id => {
                 document.getElementById(id).value = '';
             });
+            document.getElementById('field-sms-consent').checked = false;
             document.getElementById('form-error').classList.add('hidden');
         }
 
@@ -2309,10 +2306,12 @@
         document.getElementById('form-submit').addEventListener('click', async () => {
             const name = document.getElementById('field-name').value.trim();
             const email = document.getElementById('field-email').value.trim();
+            const phone = document.getElementById('field-phone').value.trim();
             const company = document.getElementById('field-company').value.trim();
             const website = document.getElementById('field-website').value.trim();
             const message = document.getElementById('field-message').value.trim();
             const service = document.getElementById('service-dropdown').value;
+            const smsConsent = document.getElementById('field-sms-consent').checked;
             const error = document.getElementById('form-error');
             const submitBtn = document.getElementById('form-submit');
 
@@ -2329,10 +2328,12 @@
             const templateParams = {
                 name,
                 email,
+                phone: phone || 'Not provided',
                 company,
                 website: website || 'Not provided',
                 service,
                 message,
+                sms_consent: smsConsent ? 'Yes' : 'No',
                 time: new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })
             };
 
@@ -2357,9 +2358,7 @@
 
         document.getElementById('calendly-close').addEventListener('click', closeCalendly);
         document.getElementById('calendly-backdrop').addEventListener('click', closeCalendly);
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') { closeCalendly(); closeFaq(); }
-        });
+        // Escape handling lives in the single shared keydown listener above (closes all modals)
 
         // Mobile Service Modal Data
         const mobileServiceData = [
@@ -2533,6 +2532,17 @@
                     }, 720);
                 });
             }
+        }
+
+        // Open a service without toggling — used by footer links so the panel
+        // expands when collapsed but never collapses if already showing it
+        function showService(index) {
+            if (window.innerWidth < 768) { openMobileServiceModal(index); return; }
+            if (servicesSection.classList.contains('expanded') && activeServiceIndex === index) {
+                servicesSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                return;
+            }
+            expandServices(index);
         }
 
         pillarCards.forEach(card => {
@@ -2756,14 +2766,14 @@
 
                 <div>
                     <h3 class="font-black text-[#1b1e2b] text-base mb-2">4. SMS Messaging</h3>
-                    <p>If you provide your mobile phone number and opt in, you consent to receive recurring SMS messages from YVA Law Staffing about inquiries, appointments, service updates, applications, and related business communications.</p>
+                    <p>If you provide your mobile phone number and opt in, you are consenting to receive SMS messages from YVA Law Staffing. Messages may include inquiry responses, appointment reminders, service updates, staffing consultation follow-ups, and related business communications. SMS consent is not a condition of purchase.</p>
                     <ul class="list-disc list-inside mt-2 space-y-1">
-                        <li>Message frequency varies based on your request, relationship with us, and active communications.</li>
-                        <li>You may reply <span class="font-bold text-[#1b1e2b]">STOP</span> to opt out of future SMS messages.</li>
-                        <li>You may reply <span class="font-bold text-[#1b1e2b]">HELP</span> for more information.</li>
+                        <li>Message frequency varies.</li>
                         <li>Message and data rates may apply.</li>
+                        <li>You may reply <span class="font-bold text-[#1b1e2b]">STOP</span> to opt out of future SMS messages.</li>
+                        <li>You may reply <span class="font-bold text-[#1b1e2b]">HELP</span> for help.</li>
                     </ul>
-                    <p class="mt-2">We do <span class="font-black text-[#1b1e2b]">not</span> share SMS opt-in data, consent, or personal information with third parties for marketing purposes.</p>
+                    <p class="mt-2">YVA Law Staffing does not sell, rent, or share SMS opt-in data, phone numbers, or consent information with third parties or affiliates for marketing or promotional purposes. SMS opt-in data and consent will not be shared with any third parties.</p>
                 </div>
 
                 <div>
