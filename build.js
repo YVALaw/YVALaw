@@ -247,17 +247,14 @@ ${marked.parse(postBodies[post.slug] || '')}
 console.log(`Built blog/ — ${posts.length} static post page(s)`);
 
 // Generate sitemap.xml
-// The four service ad landing pages (intake, assistants, demand, case
-// managers) are intentionally noindex and are therefore left out.
+// All landing-*.html pages are paid-ad landing pages, intentionally noindex,
+// and therefore left out.
 // Static pages carry no <lastmod>: stamping them with the build date on every
 // deploy is misleading and Google ignores unreliable lastmod values.
 const staticPages = [
   { url: '/',                          changefreq: 'weekly',  priority: '1.0' },
   { url: '/blog.html',                 changefreq: 'weekly',  priority: '0.9' },
   { url: '/careers.html',              changefreq: 'monthly', priority: '0.8' },
-  { url: '/landing-pi.html',           changefreq: 'monthly', priority: '0.8' },
-  { url: '/landing-employment.html',   changefreq: 'monthly', priority: '0.8' },
-  { url: '/landing-workers-comp.html', changefreq: 'monthly', priority: '0.8' },
   { url: '/checklist.html',            changefreq: 'monthly', priority: '0.7' },
   { url: '/privacy-policy',            changefreq: 'yearly',  priority: '0.5' },
   { url: '/sms-terms',                 changefreq: 'yearly',  priority: '0.5' },
