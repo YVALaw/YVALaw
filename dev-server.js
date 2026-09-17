@@ -21,7 +21,11 @@ http.createServer((req, res) => {
     urlPath = '/os/index.html'
   }
 
-  const filePath = path.join(ROOT, urlPath === '/' ? 'index.html' : urlPath)
+  let filePath = path.join(ROOT, urlPath === '/' ? 'index.html' : urlPath)
+  // Directory request (e.g. /blog/<slug>/) → its index.html
+  if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
+    filePath = path.join(filePath, 'index.html')
+  }
   const ext = path.extname(filePath)
 
   fs.readFile(filePath, (err, data) => {

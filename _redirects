@@ -1,3 +1,4 @@
 /privacy-policy  /privacy-policy.html  200
 /sms-terms  /sms-terms.html  200
+/blog-post.html  slug=:slug  /blog/:slug/  301
 /os/*  /os/index.html  200

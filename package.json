@@ -1,0 +1,13 @@
+{
+  "name": "yva-law-staffing-site",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Marketing site for YVA Law Staffing. `node build.js` generates posts/index.json, jobs/index.json, static blog pages and sitemap.xml.",
+  "scripts": {
+    "build": "node build.js",
+    "dev": "node dev-server.js"
+  },
+  "dependencies": {
+    "marked": "^18.0.0"
+  }
+}

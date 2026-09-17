@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { marked } = require('marked');
 
 const postsDir = path.join(__dirname, 'posts');
 const jobsDir = path.join(__dirname, 'jobs');
@@ -80,15 +81,21 @@ function readCollection(dir, mapper, sorter) {
     .sort(sorter);
 }
 
+const postBodies = {};
+
 const posts = readCollection(
   postsDir,
-  (frontmatter, file) => ({
-    slug: file.replace('.md', ''),
-    title: frontmatter.title || 'Untitled',
-    date: frontmatter.date || '',
-    description: frontmatter.description || '',
-    image: frontmatter.image || ''
-  }),
+  (frontmatter, file, content) => {
+    const slug = file.replace('.md', '');
+    postBodies[slug] = (content.split(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/)[1] || '').trim();
+    return {
+      slug,
+      title: frontmatter.title || 'Untitled',
+      date: frontmatter.date || '',
+      description: frontmatter.description || '',
+      image: frontmatter.image || ''
+    };
+  },
   (a, b) => new Date(b.date) - new Date(a.date)
 );
 
@@ -136,31 +143,131 @@ fs.writeFileSync(
 
 console.log(`Built jobs/index.json — ${jobs.length} job post(s)`);
 
-// Generate sitemap.xml
+// Generate static blog post pages (/blog/<slug>/index.html)
+// Uses blog-post.html as the template so the design stays in one place.
+// Each page ships with its own <title>, description, canonical, Open Graph
+// tags, BlogPosting JSON-LD and the fully rendered article so Google can
+// index it without running JavaScript.
 const BASE_URL = 'https://yvastaffing.agency';
-const today = new Date().toISOString().split('T')[0];
+const blogOutDir = path.join(__dirname, 'blog');
 
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatDate(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+}
+
+function replaceBetween(source, startMarker, endMarker, replacement) {
+  const start = source.indexOf(startMarker);
+  const end = source.indexOf(endMarker);
+  if (start === -1 || end === -1 || end < start) {
+    throw new Error(`Template markers ${startMarker} / ${endMarker} not found in blog-post.html`);
+  }
+  return source.slice(0, start) + replacement + source.slice(end + endMarker.length);
+}
+
+const template = fs.readFileSync(path.join(__dirname, 'blog-post.html'), 'utf8');
+fs.rmSync(blogOutDir, { recursive: true, force: true });
+fs.mkdirSync(blogOutDir, { recursive: true });
+
+posts.forEach(post => {
+  const url = `${BASE_URL}/blog/${post.slug}/`;
+  const title = `${post.title} | YVA Law Staffing`;
+  const isoDate = post.date ? new Date(post.date).toISOString() : '';
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    headline: post.title,
+    description: post.description,
+    datePublished: isoDate,
+    dateModified: isoDate,
+    image: post.image || undefined,
+    mainEntityOfPage: url,
+    author: { '@type': 'Organization', name: 'YVA Law Staffing', url: BASE_URL },
+    publisher: { '@type': 'Organization', name: 'YVA Law Staffing', url: BASE_URL }
+  };
+
+  const meta = `  <title>${escapeHtml(title)}</title>
+  <meta name="description" content="${escapeHtml(post.description)}">
+  <link rel="canonical" href="${url}">
+  <meta name="robots" content="index, follow">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="${escapeHtml(post.title)}">
+  <meta property="og:description" content="${escapeHtml(post.description)}">
+  <meta property="og:url" content="${url}">
+  <meta property="og:site_name" content="YVA Law Staffing">
+${post.image ? `  <meta property="og:image" content="${escapeHtml(post.image)}">\n` : ''}${isoDate ? `  <meta property="article:published_time" content="${isoDate}">\n` : ''}  <meta name="twitter:card" content="${post.image ? 'summary_large_image' : 'summary'}">
+  <meta name="twitter:title" content="${escapeHtml(post.title)}">
+  <meta name="twitter:description" content="${escapeHtml(post.description)}">
+${post.image ? `  <meta name="twitter:image" content="${escapeHtml(post.image)}">\n` : ''}  <script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>`;
+
+  const body = `    <div id="post-content">
+${post.image ? `      <div id="post-image-wrap" class="mb-10 rounded-3xl overflow-hidden shadow-xl">
+        <img id="post-image" src="${escapeHtml(post.image)}" alt="${escapeHtml(post.title)}" class="w-full max-h-96 object-cover">
+      </div>
+` : ''}${post.date ? `      <p id="post-date" class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4"><time datetime="${isoDate}">${formatDate(post.date)}</time></p>
+` : ''}      <h1 id="post-title" class="text-4xl lg:text-5xl font-black text-[#1b1e2b] leading-tight tracking-tight mb-6">${escapeHtml(post.title)}</h1>
+${post.description ? `      <p id="post-description" class="text-xl text-slate-500 font-medium leading-relaxed mb-10 pb-10 border-b border-slate-100">${escapeHtml(post.description)}</p>
+` : ''}      <div id="post-body" class="prose">
+${marked.parse(postBodies[post.slug] || '')}
+      </div>
+    </div>`;
+
+  let html = template;
+  html = replaceBetween(html, '<!-- POST_META_START -->', '<!-- POST_META_END -->', meta);
+  html = replaceBetween(html, '<!-- POST_BODY_START -->', '<!-- POST_BODY_END -->', body);
+  html = replaceBetween(html, '// POST_SCRIPT_START', '// POST_SCRIPT_END', '');
+  // Static pages live one level deeper than the template; make relative links absolute.
+  html = html
+    .replace(/href="index\.html/g, 'href="/index.html')
+    .replace(/href="blog\.html"/g, 'href="/blog.html"')
+    .replace(/href="careers\.html"/g, 'href="/careers.html"')
+    .replace(/src="logo\//g, 'src="/logo/');
+  // marked and DOMPurify are only needed by the client-side loader.
+  html = html
+    .replace(/\s*<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/marked\/marked\.min\.js"><\/script>/, '')
+    .replace(/\s*<script src="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/dompurify\/[^"]+"><\/script>/, '');
+
+  const dir = path.join(blogOutDir, post.slug);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'index.html'), html);
+});
+
+console.log(`Built blog/ — ${posts.length} static post page(s)`);
+
+// Generate sitemap.xml
+// The four service ad landing pages (intake, assistants, demand, case
+// managers) are intentionally noindex and are therefore left out.
+// Static pages carry no <lastmod>: stamping them with the build date on every
+// deploy is misleading and Google ignores unreliable lastmod values.
 const staticPages = [
-  { url: '/',                    changefreq: 'weekly',  priority: '1.0', lastmod: today },
-  { url: '/blog.html',           changefreq: 'weekly',  priority: '0.9', lastmod: today },
-  { url: '/careers.html',        changefreq: 'monthly', priority: '0.8', lastmod: today },
-  { url: '/landing-pi.html',     changefreq: 'monthly', priority: '0.8', lastmod: today },
-  { url: '/landing-employment.html', changefreq: 'monthly', priority: '0.8', lastmod: today },
-  { url: '/landing-workers-comp.html', changefreq: 'monthly', priority: '0.8', lastmod: today },
-  { url: '/landing-intake.html', changefreq: 'monthly', priority: '0.8', lastmod: today },
-  { url: '/landing-assistants.html', changefreq: 'monthly', priority: '0.8', lastmod: today },
-  { url: '/landing-demand.html', changefreq: 'monthly', priority: '0.8', lastmod: today },
-  { url: '/landing-case-managers.html', changefreq: 'monthly', priority: '0.8', lastmod: today },
-  { url: '/checklist.html',      changefreq: 'monthly', priority: '0.7', lastmod: today },
-  { url: '/privacy-policy', changefreq: 'yearly',  priority: '0.5', lastmod: today },
-  { url: '/sms-terms',      changefreq: 'yearly',  priority: '0.5', lastmod: today },
+  { url: '/',                          changefreq: 'weekly',  priority: '1.0' },
+  { url: '/blog.html',                 changefreq: 'weekly',  priority: '0.9' },
+  { url: '/careers.html',              changefreq: 'monthly', priority: '0.8' },
+  { url: '/landing-pi.html',           changefreq: 'monthly', priority: '0.8' },
+  { url: '/landing-employment.html',   changefreq: 'monthly', priority: '0.8' },
+  { url: '/landing-workers-comp.html', changefreq: 'monthly', priority: '0.8' },
+  { url: '/checklist.html',            changefreq: 'monthly', priority: '0.7' },
+  { url: '/privacy-policy',            changefreq: 'yearly',  priority: '0.5' },
+  { url: '/sms-terms',                 changefreq: 'yearly',  priority: '0.5' },
 ];
 
 const postPages = posts.map(post => ({
-  url: `/blog-post.html?slug=${post.slug}`,
+  url: `/blog/${post.slug}/`,
   changefreq: 'monthly',
   priority: '0.7',
-  lastmod: post.date ? post.date.split('T')[0] : today
+  lastmod: post.date ? new Date(post.date).toISOString().split('T')[0] : undefined
 }));
 
 const allPages = [...staticPages, ...postPages];
@@ -169,8 +276,7 @@ const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${allPages.map(p => `  <url>
     <loc>${BASE_URL}${p.url}</loc>
-    <lastmod>${p.lastmod}</lastmod>
-    <changefreq>${p.changefreq}</changefreq>
+${p.lastmod ? `    <lastmod>${p.lastmod}</lastmod>\n` : ''}    <changefreq>${p.changefreq}</changefreq>
     <priority>${p.priority}</priority>
   </url>`).join('\n')}
 </urlset>`;

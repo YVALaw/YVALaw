@@ -270,7 +270,7 @@
             : `<div class="w-full h-48 bg-[#1b1e2b] flex items-center justify-center"><i data-lucide="book-open" class="w-12 h-12 text-yellow-400"></i></div>`;
 
           return `
-            <a href="blog-post.html?slug=${encodeURIComponent(post.slug)}" class="post-card bg-white rounded-3xl overflow-hidden border-2 border-slate-100 flex flex-col group">
+            <a href="/blog/${encodeURIComponent(post.slug)}/" class="post-card bg-white rounded-3xl overflow-hidden border-2 border-slate-100 flex flex-col group">
               ${imageHtml}
               <div class="p-8 flex flex-col flex-1">
                 ${date ? `<p class="text-xs font-black text-slate-400 uppercase tracking-widest mb-3">${date}</p>` : ''}

@@ -1,5 +1,5 @@
 [build]
-  command = "node build.js && cd 'YVALAW OS' && npm install && npm run build && mkdir -p ../os && cp -r dist/. ../os/"
+  command = "npm install && node build.js && rm -rf node_modules && cd 'YVALAW OS' && npm install && npm run build && mkdir -p ../os && cp -r dist/. ../os/"
   publish = "."
   functions = "YVALAW OS/netlify/functions"
 
