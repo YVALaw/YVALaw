@@ -114,7 +114,8 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 ### Header / Navigation
 - `#navbar` is `sticky` at every width with a fixed height (64px phones, 80px desktop). On scroll it only gains a shadow (`.nav-scrolled`) — changing its height caused layout jumps.
 - Brand lockup everywhere: `logo/img2.png` + the text **YVA Law Staffing** (header, drawer, footer, all pages).
-- Full desktop nav from `lg` (1024px); below that the hamburger + `#mobile-menu` drawer (hidden with `visibility` when closed, scrolls on short screens). At `lg`, "Home" and the "Login" label hide to make room; they return at `xl`.
+- Full desktop nav from `lg` (1024px); below that the hamburger + `#mobile-menu` drawer (hidden with `visibility` when closed, scrolls on short screens).
+- **Staff Login is hidden for now** (YVA LawOS is a work in progress): the `/os/login` links in the desktop nav and the mobile drawer are wrapped in HTML comments. To bring them back, remove the comment wrappers — then check the nav still fits at 1024px (hide "Home" at `lg` with `hidden xl:inline` if it doesn't).
 - The active-section highlight uses `#desktop-nav a[href^="#"]`.
 
 ### Mobile layout notes
@@ -160,6 +161,7 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 - `/os/*` (internal YVA LawOS app) is `noindex` (meta tag + `X-Robots-Tag` header in `netlify.toml`).
 - Performance: Tailwind compiled at build time; Lucide subset served from the site; fonts via `<link>` + preconnect.
 - Mobile: see "Mobile layout notes" above. All pages checked for horizontal overflow at 320/360/390/768/1024px.
+- About stat "100x Assistants Placed" → "100+"; Staff Login links hidden until YVA LawOS is ready.
 
 ### Session 9 (SEO / indexing fixes)
 - Fixed `blog-post.html`, which had been truncated mid-script since the logo update commit (posts never loaded)
