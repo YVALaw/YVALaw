@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="/favicon.ico" sizes="48x48">
+    <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <!-- Meta Pixel Code -->
     <script>
     !function(f,b,e,v,n,t,s)
@@ -14,14 +19,7 @@
     fbq('init', '1539862044149292');
     fbq('track', 'PageView');
     </script>
-    <noscript><img height="1" width="1" style="display:none"
-    src="https://www.facebook.com/tr?id=1539862044149292&ev=PageView&noscript=1"
-    /></noscript>
     <!-- End Meta Pixel Code -->
-    <link rel="icon" type="image/png" href="/favicon.png" />
-    <link rel="apple-touch-icon" href="/favicon.png" />
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bilingual Legal Assistants for Law Firms | YVA Law Staffing</title>
   <link rel="canonical" href="https://yvastaffing.agency/landing-assistants.html">
 
@@ -42,11 +40,13 @@
         gtag('config', 'G-V2Q6V4HE4F');
     </script>
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@0.469.0"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+    <link rel="stylesheet" href="/assets/css/tailwind.css">
+    <script src="/assets/js/lucide.js"></script>
 
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; }
 
         html { scroll-behavior: smooth; scroll-padding-top: 80px; }
@@ -75,6 +75,15 @@
         #lp-modal.open .modal-panel {
             transform: translateY(0) scale(1);
         }
+        @media (max-width: 639px) {
+            #lp-modal .modal-panel {
+                max-height: 92dvh;
+                padding-bottom: env(safe-area-inset-bottom);
+                transform: translateY(100%);
+                transition: transform 0.4s cubic-bezier(0.32, 0.72, 0, 1);
+            }
+            #lp-modal.open .modal-panel { transform: translateY(0); }
+        }
 
         .faq-answer {
             max-height: 0;
@@ -100,19 +109,17 @@
     </style>
 </head>
 <body class="bg-white text-slate-900 overflow-x-hidden">
+    <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=1539862044149292&ev=PageView&noscript=1"></noscript>
 
 <!-- STICKY NAV -->
 <nav id="lp-nav" class="fixed top-0 w-full z-50 bg-white py-4">
-    <div class="max-w-5xl mx-auto px-6 flex items-center justify-between">
-        <a href="/" class="flex items-center gap-3">
-            <img src="logo/img2.png" alt="YVA Staffing" class="h-10 w-auto rounded-xl shadow-md transition-transform group-hover:rotate-6" />
-            <div class="flex flex-col">
-                <span class="text-lg font-black tracking-tighter leading-none text-[#1b1e2b]">Law</span>
-                <span class="text-[9px] uppercase tracking-[0.3em] font-bold text-slate-400">Staffing</span>
-            </div>
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 flex items-center justify-between gap-3">
+        <a href="/" class="flex items-center gap-2 sm:gap-3 min-w-0" aria-label="YVA Law Staffing home">
+            <img src="logo/img2.png" alt="" width="40" height="40" class="h-9 w-9 sm:h-10 sm:w-10 rounded-xl shadow-md flex-shrink-0">
+            <span class="text-[15px] sm:text-lg font-black tracking-tight leading-none text-[#1b1e2b] whitespace-nowrap">YVA Law Staffing</span>
         </a>
-        <button onclick="openModal()" class="bg-[#1b1e2b] text-white px-6 py-3 rounded-full font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all shadow-lg">
-            Book a Free Call <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+        <button onclick="openModal()" class="flex-shrink-0 bg-[#1b1e2b] text-white px-4 sm:px-6 py-3 rounded-full font-black text-xs uppercase tracking-wider sm:tracking-widest flex items-center gap-2 hover:bg-yellow-400 hover:text-[#1b1e2b] transition-all shadow-lg whitespace-nowrap">
+            Book a <span class="hidden sm:inline">Free </span>Call <i data-lucide="calendar" class="w-3.5 h-3.5 hidden sm:block"></i>
         </button>
     </div>
 </nav>
@@ -533,9 +540,9 @@
 
 <!-- MINIMAL FOOTER -->
 <footer class="bg-[#1b1e2b] border-t border-white/10 py-6">
-    <div class="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+    <div class="max-w-5xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
         <p class="text-slate-500 text-xs font-medium">© 2026 YVA Law Staffing. All rights reserved.</p>
-        <div class="flex items-center gap-5">
+        <div class="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
             <a href="/" class="text-slate-500 text-xs font-medium hover:text-yellow-400 transition-colors">Main Website</a>
             <span class="text-slate-700 text-xs">·</span>
             <a href="/privacy-policy" class="text-slate-500 text-xs font-medium hover:text-yellow-400 transition-colors">Privacy Policy</a>
@@ -549,9 +556,9 @@
 
 
 <!-- BOOKING MODAL -->
-<div id="lp-modal" class="fixed inset-0 z-[100] items-center justify-center p-4 md:p-8" role="dialog" aria-modal="true">
+<div id="lp-modal" class="fixed inset-0 z-[100] items-end sm:items-center justify-center p-0 sm:p-4 md:p-8" role="dialog" aria-modal="true">
     <div id="lp-backdrop" class="absolute inset-0 bg-[#1b1e2b]/80 backdrop-blur-sm"></div>
-    <div class="modal-panel relative w-full max-w-2xl bg-white rounded-[2rem] overflow-hidden shadow-[0_40px_80px_-20px_rgba(27,30,43,0.5)] border-4 border-white max-h-[95vh] flex flex-col">
+    <div class="modal-panel relative w-full max-w-2xl bg-white rounded-t-[1.75rem] sm:rounded-[2rem] overflow-hidden shadow-[0_40px_80px_-20px_rgba(27,30,43,0.5)] sm:border-4 border-white max-h-[92vh] sm:max-h-[95vh] flex flex-col">
 
         <div class="bg-[#1b1e2b] px-8 py-5 flex items-center justify-between flex-shrink-0">
             <div class="flex items-center gap-3">
@@ -625,7 +632,7 @@
 <!-- SCRIPTS -->
 <script src="https://assets.calendly.com/assets/external/widget.js" async></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-<script>emailjs.init('Vsnmntfk0c8ChKXVL');</script>
+<script>if (window.emailjs) emailjs.init('Vsnmntfk0c8ChKXVL');</script>
 
 <script>
     lucide.createIcons();

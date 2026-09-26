@@ -17,23 +17,6 @@
     "body": "Support growing U.S. law firms by owning the intake experience from first contact through consultation booking."
   },
   {
-    "slug": "demand-writer",
-    "title": "Demand Writer",
-    "date": "2026-03-18T09:00:00.000Z",
-    "status": "Open",
-    "featured": true,
-    "location": "Remote",
-    "schedule": "Full / Part-time",
-    "icon": "file-text",
-    "description": "Review medical records, calculate damages, and draft professional demand letters and settlement packages for personal injury and employment law firms.",
-    "skills": [
-      "Legal Writing",
-      "Medical Records",
-      "Detail-Oriented"
-    ],
-    "body": "Translate medical and case records into clear, persuasive demand packages for plaintiff-side law firms."
-  },
-  {
     "slug": "social-media-manager",
     "title": "Social Media Manager",
     "date": "2026-03-16T09:00:00.000Z",
@@ -51,10 +34,44 @@
     "body": "Help client brands stay visible and credible online with consistent content and channel management."
   },
   {
+    "slug": "marketing-specialist",
+    "title": "Marketing Specialist",
+    "date": "2026-03-14T09:00:00.000Z",
+    "status": "Open",
+    "featured": false,
+    "location": "Remote",
+    "schedule": "Full / Part-time",
+    "icon": "megaphone",
+    "description": "Execute digital marketing strategies for law firm clients. Manage ad campaigns, email marketing, SEO content, and lead generation funnels.",
+    "skills": [
+      "Google Ads",
+      "Meta Ads",
+      "SEO"
+    ],
+    "body": "Support growth campaigns across paid, organic, and lifecycle channels for law firm clients."
+  },
+  {
+    "slug": "demand-writer",
+    "title": "Demand Writer",
+    "date": "2026-03-18T09:00:00.000Z",
+    "status": "Closed",
+    "featured": true,
+    "location": "Remote",
+    "schedule": "Full / Part-time",
+    "icon": "file-text",
+    "description": "Review medical records, calculate damages, and draft professional demand letters and settlement packages for personal injury and employment law firms.",
+    "skills": [
+      "Legal Writing",
+      "Medical Records",
+      "Detail-Oriented"
+    ],
+    "body": "Translate medical and case records into clear, persuasive demand packages for plaintiff-side law firms."
+  },
+  {
     "slug": "legal-assistant",
     "title": "Legal Assistant",
     "date": "2026-03-19T09:00:00.000Z",
-    "status": "Open",
+    "status": "Closed",
     "featured": false,
     "location": "Remote",
     "schedule": "Full / Part-time",
@@ -71,7 +88,7 @@
     "slug": "case-manager",
     "title": "Case Manager",
     "date": "2026-03-17T09:00:00.000Z",
-    "status": "Open",
+    "status": "Closed",
     "featured": false,
     "location": "Remote",
     "schedule": "Full / Part-time",
@@ -88,7 +105,7 @@
     "slug": "web-designer",
     "title": "Web Designer",
     "date": "2026-03-15T09:00:00.000Z",
-    "status": "Open",
+    "status": "Closed",
     "featured": false,
     "location": "Remote",
     "schedule": "Full / Part-time",
@@ -100,22 +117,5 @@
       "Responsive Design"
     ],
     "body": "Create polished websites that balance credibility, speed, and conversion for professional-service businesses."
-  },
-  {
-    "slug": "marketing-specialist",
-    "title": "Marketing Specialist",
-    "date": "2026-03-14T09:00:00.000Z",
-    "status": "Open",
-    "featured": false,
-    "location": "Remote",
-    "schedule": "Full / Part-time",
-    "icon": "megaphone",
-    "description": "Execute digital marketing strategies for law firm clients. Manage ad campaigns, email marketing, SEO content, and lead generation funnels.",
-    "skills": [
-      "Google Ads",
-      "Meta Ads",
-      "SEO"
-    ],
-    "body": "Support growth campaigns across paid, organic, and lifecycle channels for law firm clients."
   }
 ]

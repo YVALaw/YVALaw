@@ -1,0 +1,40 @@
+/*
+ * Source for assets/css/tailwind.css (generated — do not edit the output file).
+ * Rebuild with `npm run build:css` (or `node build.js`, which Netlify runs on deploy).
+ */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* Lucide swaps each <i data-lucide> for a block-level <svg> once its script runs.
+     Give the placeholder the same box so icons don't shift the layout when they appear. */
+  :where(i[data-lucide]) {
+    display: block;
+  }
+
+  a,
+  button,
+  summary {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* iOS Safari zooms the whole page when a field under 16px gets focus. */
+  @media (max-width: 767px) {
+    input:not([type='checkbox']):not([type='radio']):not([type='range']),
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
+}
+
+@layer utilities {
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+}

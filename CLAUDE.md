@@ -2,7 +2,14 @@
 
 ## Project Overview
 Single-page website for **YVA Law Staffing** (yvastaffing.agency).
-Single file: `index.html` (~3100 lines). No build system — pure HTML, Tailwind CDN, Lucide icons, EmailJS, Calendly.
+Single file: `index.html` (~3200 lines). Plain HTML pages + a small build step (`node build.js`): Tailwind CSS, Lucide icons, EmailJS, Calendly.
+
+**Build step (runs on every Netlify deploy, and via `npm run dev` / `npm run build` locally):**
+- `assets/css/tailwind.css` — compiled from `assets/css/tailwind.src.css` using the classes found in `*.html` + `build.js` (`tailwind.config.js`). Pages link this file; the Tailwind Play CDN is no longer used (it was ~400 KB of render-blocking JS). **After adding new Tailwind classes, run `npm run build` (or `npm run build:css`) before previewing locally** — Netlify rebuilds it on deploy anyway. Never build class names from string pieces in JS (`'bg-' + color`); the compiler only sees full class names.
+- `assets/js/lucide.js` — generated subset of Lucide v0.469.0 with only the icons the site uses (found as `data-lucide="…"`, any quoted icon name in the pages, and job-post `icon` fields). Same API as the library: `lucide.createIcons()`.
+- `tailwind.config.js` sets `future.hoverOnlyWhenSupported`, so `hover:` styles only apply on devices with a mouse (no "stuck" hover colors after a tap on phones).
+- Shared base CSS in `tailwind.src.css`: icon placeholders keep their size before Lucide runs (no layout shift), and form fields are 16px on phones (prevents iOS zoom-on-focus).
+- Generated files (`tailwind.css`, `lucide.js`, `posts/index.json`, `jobs/index.json`, `sitemap.xml`) are committed so the site still works if previewed without building.
 
 **Standalone pages:**
 - `landing-intake.html` — Legal Intake ad landing page ($7.50/hr)
@@ -16,7 +23,7 @@ Single file: `index.html` (~3100 lines). No build system — pure HTML, Tailwind
 - `careers.html` — Careers page (7 open roles, application modal, separate EmailJS account)
 - `blog.html` — Blog listing page (fetches posts/index.json dynamically)
 - `blog-post.html` — Template for blog posts (also a client-side fallback renderer). `build.js` generates one static page per post at `blog/<slug>/index.html` (gitignored, built on every Netlify deploy) with its own title, description, canonical, OG tags and BlogPosting JSON-LD. Old `blog-post.html?slug=` URLs 301 to `/blog/<slug>/` via `_redirects`.
-- `package.json` — root deps for `build.js` (`marked`). Netlify runs `npm install && node build.js`.
+- `package.json` — root deps for `build.js` (`marked`, `tailwindcss`, `lucide`). Netlify runs `npm install && node build.js`.
 
 All service landing pages: Hero → Problem → Solution + cost comparison → Testimonials → How It Works → FAQ → Final CTA → Booking modal (EmailJS → Calendly). GA events use page-specific `event_category`.
 Practice area landing pages: Hero → Problem → Services (role cards) → Cost comparison → Testimonials → How It Works → FAQ → Final CTA → Booking modal.
@@ -68,7 +75,8 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 - Tabs inside `#services` slide between panels via `services-track` translateX.
 
 ### Services — Mobile
-- Clicking a pillar card opens `#mobile-service-modal` (fixed overlay).
+- Below 768px, pillar cards render as a tappable list (icon · title · chevron); above that they are cards.
+- Clicking a pillar card opens `#mobile-service-modal` (bottom sheet on phones).
 - Backdrop tap closes it. Esc key also closes.
 - Content rendered dynamically from `mobileServiceData[]` array in JS.
 - **To update mobile modal content**, edit the `mobileServiceData` array (order must match pillar card `data-service` indices).
@@ -103,8 +111,20 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 - GA event: `download_checklist` / `event_category: lead_magnet`.
 - **Note:** verify `template_9r6xtuw` uses `{{email}}` as To address and `{{name}}` for personalization in EmailJS dashboard.
 
+### Header / Navigation
+- `#navbar` is `sticky` at every width with a fixed height (64px phones, 80px desktop). On scroll it only gains a shadow (`.nav-scrolled`) — changing its height caused layout jumps.
+- Brand lockup everywhere: `logo/img2.png` + the text **YVA Law Staffing** (header, drawer, footer, all pages).
+- Full desktop nav from `lg` (1024px); below that the hamburger + `#mobile-menu` drawer (hidden with `visibility` when closed, scrolls on short screens). At `lg`, "Home" and the "Login" label hide to make room; they return at `xl`.
+- The active-section highlight uses `#desktop-nav a[href^="#"]`.
+
+### Mobile layout notes
+- Pricing cards (`#pricing`) are a horizontal swipe row (scroll-snap) below 640px, a grid above.
+- Testimonials: swipe on touch screens; arrows only from `md`.
+- Modals (`#calendly-modal`, `#faq-modal`, `#privacy-modal`, `#mobile-service-modal`, landing `#lp-modal`) open as bottom sheets below 640px, sized with `dvh` so iOS Safari's toolbar can't hide their bottom.
+- Decorative absolutely-positioned glows must stay inside an `overflow-hidden` parent — one poking out of the hero made every phone page 16px too wide (sideways wobble, clipped modals).
+
 ### Sticky CTA Bar (`#sticky-cta`)
-- Fixed bottom bar, appears after scrolling 600px.
+- Fixed bottom bar, appears after scrolling 600px. On phones it's a single full-width "Book a Free Call" button + dismiss; the body gets matching bottom padding while it shows.
 - Dismissed per session via `sessionStorage('yva_sticky_closed')`.
 - z-index: 80 (cookie banner at 90 takes priority when both visible).
 
@@ -129,6 +149,17 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 ---
 
 ## Things Completed
+
+### Session 10 (SEO, branding, mobile)
+- Title/brand: header, drawer and footer now read **YVA Law Staffing** (the logo image only says "YV"). Home `<title>`: "YVA Law Staffing | Bilingual Virtual Legal Staff for Law Firms".
+- `<head>` fixes on every page: `<meta charset>`/viewport first; the Meta Pixel `<noscript><img>` moved to `<body>` (an `<img>` in `<head>` makes Google stop reading the head, so canonical/robots/description after it were ignored).
+- Square favicons generated from the logo (`favicon.ico`, `favicon-192.png`, `apple-touch-icon.png`); the old `favicon.png` (61×52, not square) is kept only for the OS app.
+- Structured data on the home page: Organization (logo, founders, contact point), Service + offer catalog, WebSite. Blog posts: BlogPosting with publisher logo + BreadcrumbList.
+- Branded share image `assets/img/og-image.jpg` (1200×630) for home, blog, checklist and blog posts without a photo; `og:site_name` added.
+- `build.js` frontmatter parser handles the multi-line values Decap CMS writes (descriptions were cut mid-sentence).
+- `/os/*` (internal YVA LawOS app) is `noindex` (meta tag + `X-Robots-Tag` header in `netlify.toml`).
+- Performance: Tailwind compiled at build time; Lucide subset served from the site; fonts via `<link>` + preconnect.
+- Mobile: see "Mobile layout notes" above. All pages checked for horizontal overflow at 320/360/390/768/1024px.
 
 ### Session 9 (SEO / indexing fixes)
 - Fixed `blog-post.html`, which had been truncated mid-script since the logo update commit (posts never loaded)

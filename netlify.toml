@@ -5,3 +5,9 @@
 
 [functions."run-autopay"]
   schedule = "0 13 * * *"
+
+# Internal staff app (YVA LawOS) — keep it out of search results
+[[headers]]
+  for = "/os/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"

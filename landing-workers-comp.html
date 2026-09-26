@@ -1,6 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="/favicon.ico" sizes="48x48">
+  <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
     <!-- Meta Pixel Code -->
     <script>
     !function(f,b,e,v,n,t,s)
@@ -14,14 +19,7 @@
     fbq('init', '1539862044149292');
     fbq('track', 'PageView');
     </script>
-    <noscript><img height="1" width="1" style="display:none"
-    src="https://www.facebook.com/tr?id=1539862044149292&ev=PageView&noscript=1"
-    /></noscript>
     <!-- End Meta Pixel Code -->
-    <link rel="icon" type="image/png" href="/favicon.png" />
-    <link rel="apple-touch-icon" href="/favicon.png" />
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow" />
   <title>Virtual Staff for Workers' Comp Firms | YVA Law Staffing</title>
   <link rel="canonical" href="https://yvastaffing.agency/landing-workers-comp.html">
@@ -30,16 +28,12 @@
   <meta property="og:description" content="Intake, case management & legal assistants for workers' comp firms. Bilingual. Starting at $7.50/hr." />
   <meta property="og:image" content="https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&q=80&w=1200" />
 
-  <!-- Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+  <link rel="stylesheet" href="/assets/css/tailwind.css">
 
-  <!-- Tailwind CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@0.469.0"></script>
+  <script src="/assets/js/lucide.js"></script>
 
   <!-- EmailJS -->
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
@@ -86,6 +80,7 @@
   </style>
 </head>
 <body class="bg-white text-gray-900">
+  <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=1539862044149292&ev=PageView&noscript=1"></noscript>
 
   <!-- ===== HERO ===== -->
   <section class="bg-[#1b1e2b] text-white py-20 px-4">
@@ -94,7 +89,7 @@
         Workers' Compensation Firms
       </div>
       <h1 class="text-4xl sm:text-5xl font-extrabold leading-tight mb-5">
-        Stop Losing Cases to<br />Missed Deadlines &amp; Delayed Records
+        Stop Losing Cases to<br class="hidden sm:inline" /> Missed Deadlines &amp; Delayed Records
       </h1>
       <p class="text-lg text-gray-300 max-w-2xl mx-auto mb-8">
         Your clients are injured and waiting. Every day without a signed medical authorization or missed treatment follow-up costs your firm money — and costs your client their case. YVA places bilingual virtual staff directly into your workflow so nothing falls through the cracks.
@@ -477,7 +472,7 @@
     lucide.createIcons();
 
     // EmailJS init
-    emailjs.init('Vsnmntfk0c8ChKXVL');
+    if (window.emailjs) emailjs.init('Vsnmntfk0c8ChKXVL');
 
     // ---- Booking Modal ----
     function openBooking(service) {
