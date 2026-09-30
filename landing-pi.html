@@ -445,6 +445,7 @@
 
 <script src="https://assets.calendly.com/assets/external/widget.js" async></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="/assets/js/lead-send.js"></script>
 <script>
     if (window.emailjs) emailjs.init('Vsnmntfk0c8ChKXVL');
     lucide.createIcons();
@@ -486,10 +487,10 @@
         if (!name || !email || !company || !service || !message) { errEl.classList.remove('hidden'); return; }
         errEl.classList.add('hidden');
         btn.textContent = 'Sending...'; btn.disabled = true;
-        try {
-            await emailjs.send('service_d485bxr', 'template_8gftonr', { name, email, phone: phone || 'Not provided', company, service, message, website: 'PI Landing Page', sms_consent: smsConsent ? 'Yes' : 'No', time: new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' }) });
-            await emailjs.send('service_d485bxr', 'template_9r6xtuw', { name, email, phone: phone || 'Not provided', company, service, message, website: '', sms_consent: smsConsent ? 'Yes' : 'No', time: new Date().toLocaleString() });
-        } catch(e) { console.error(e); }
+        await yvaSendLead(
+            { name, email, phone: phone || 'Not provided', company, service, message, website: 'PI Landing Page', sms_consent: smsConsent ? 'Yes' : 'No', time: new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' }) },
+            { source: 'PI landing page', replyParams: { name, email, phone: phone || 'Not provided', company, service, message, website: '', sms_consent: smsConsent ? 'Yes' : 'No', time: new Date().toLocaleString() } }
+        );
         btn.innerHTML = 'Continue to Schedule <i data-lucide="arrow-right" class="w-4 h-4 inline"></i>'; btn.disabled = false;
         document.getElementById('lp-form-step').classList.add('hidden');
         const cal = document.getElementById('lp-calendly-step');

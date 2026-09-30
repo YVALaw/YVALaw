@@ -37,6 +37,7 @@
 
   <!-- EmailJS -->
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+  <script src="/assets/js/lead-send.js"></script>
 
   <!-- Google Analytics -->
   <script async src="https://www.googletagmanager.com/gtag/js?id=G-V2Q6V4HE4F"></script>
@@ -523,8 +524,8 @@
       };
 
       try {
-        await emailjs.send('service_d485bxr', 'template_8gftonr', data);
-        await emailjs.send('service_d485bxr', 'template_9r6xtuw', data);
+        // Emails YVA + auto-reply; falls back to Netlify Forms if EmailJS is blocked
+        if (!(await yvaSendLead(data, { source: data.source }))) throw new Error('Lead not delivered');
 
         gtag('event', 'booking_submitted', { event_category: 'landing_workers_comp', event_label: data.service });
 
