@@ -94,6 +94,7 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 - Two-step: form (EmailJS) → Calendly embed.
 - `openCalendly(serviceName)` pre-fills the service field.
 - EmailJS: service `service_d485bxr`, templates `template_8gftonr` (to YVA) and `template_9r6xtuw` (auto-reply to client).
+- All booking forms (home + 7 landing pages) send through `yvaSendLead()` in `assets/js/lead-send.js`. If EmailJS fails (ad/privacy blockers can block it), the lead is posted to **Netlify Forms** (`lead-backup`, declared by a hidden form at the top of `index.html` — keep its field names in sync with the script). GA events: `lead_backup_used` / `lead_lost` (`event_category: lead_delivery`). Requires form detection + an email notification enabled in Netlify → Forms.
 - Calendly URL: `https://calendly.com/contact-yvastaffing-vuu8/new-meeting`
 
 ### Language Toggle (EN/ES)

@@ -476,6 +476,13 @@
     </style>
 </head>
 <body class="bg-white text-slate-900 overflow-x-hidden">
+    <!-- Netlify Forms: declares the "lead-backup" form so Netlify accepts it. Never shown;
+         assets/js/lead-send.js posts here when EmailJS is blocked in the visitor's browser. -->
+    <form name="lead-backup" data-netlify="true" hidden>
+        <input name="name"><input name="email"><input name="phone"><input name="company">
+        <input name="website"><input name="service"><textarea name="message"></textarea>
+        <input name="sms_consent"><input name="source"><input name="error">
+    </form>
     <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=1539862044149292&ev=PageView&noscript=1"></noscript>
 
 
@@ -2243,6 +2250,7 @@
     <script src="https://assets.calendly.com/assets/external/widget.js" async></script>
     <!-- EmailJS -->
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    <script src="/assets/js/lead-send.js"></script>
     <script>if (window.emailjs) emailjs.init('Vsnmntfk0c8ChKXVL');</script>
 
     <script>
@@ -2447,14 +2455,8 @@
                 time: new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })
             };
 
-            try {
-                // Send contact us email to YVA
-                await emailjs.send('service_d485bxr', 'template_8gftonr', templateParams);
-                // Send auto-reply to client
-                await emailjs.send('service_d485bxr', 'template_9r6xtuw', templateParams);
-            } catch (err) {
-                console.error('EmailJS error:', err);
-            }
+            // Emails YVA + auto-reply; falls back to Netlify Forms if EmailJS is blocked
+            await yvaSendLead(templateParams, { source: 'Home page' });
 
             // Reset button and go to step 2 regardless
             submitBtn.innerHTML = 'Continue to Schedule <i data-lucide="arrow-right" class="w-4 h-4 inline"></i>';

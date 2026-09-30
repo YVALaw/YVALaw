@@ -632,6 +632,7 @@
 <!-- SCRIPTS -->
 <script src="https://assets.calendly.com/assets/external/widget.js" async></script>
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script src="/assets/js/lead-send.js"></script>
 <script>if (window.emailjs) emailjs.init('Vsnmntfk0c8ChKXVL');</script>
 
 <script>
@@ -700,12 +701,7 @@
             time: new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })
         };
 
-        try {
-            await emailjs.send('service_d485bxr', 'template_8gftonr', params);
-            await emailjs.send('service_d485bxr', 'template_9r6xtuw', params);
-        } catch (err) {
-            console.error('EmailJS error:', err);
-        }
+        await yvaSendLead(params, { source: 'Legal Assistants landing page' });
 
         if (typeof gtag !== 'undefined') {
             gtag('event', 'form_submit', { event_category: 'landing_assistants', event_label: 'lead_captured' });
