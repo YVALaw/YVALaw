@@ -34,23 +34,6 @@
     "body": "Help client brands stay visible and credible online with consistent content and channel management."
   },
   {
-    "slug": "marketing-specialist",
-    "title": "Marketing Specialist",
-    "date": "2026-03-14T09:00:00.000Z",
-    "status": "Open",
-    "featured": false,
-    "location": "Remote",
-    "schedule": "Full / Part-time",
-    "icon": "megaphone",
-    "description": "Execute digital marketing strategies for law firm clients. Manage ad campaigns, email marketing, SEO content, and lead generation funnels.",
-    "skills": [
-      "Google Ads",
-      "Meta Ads",
-      "SEO"
-    ],
-    "body": "Support growth campaigns across paid, organic, and lifecycle channels for law firm clients."
-  },
-  {
     "slug": "demand-writer",
     "title": "Demand Writer",
     "date": "2026-03-18T09:00:00.000Z",
@@ -117,5 +100,22 @@
       "Responsive Design"
     ],
     "body": "Create polished websites that balance credibility, speed, and conversion for professional-service businesses."
+  },
+  {
+    "slug": "marketing-specialist",
+    "title": "Marketing Specialist",
+    "date": "2026-03-14T09:00:00.000Z",
+    "status": "Closed",
+    "featured": false,
+    "location": "Remote",
+    "schedule": "Full / Part-time",
+    "icon": "megaphone",
+    "description": "Execute digital marketing strategies for law firm clients. Manage ad campaigns, email marketing, SEO content, and lead generation funnels.",
+    "skills": [
+      "Google Ads",
+      "Meta Ads",
+      "SEO"
+    ],
+    "body": "Support growth campaigns across paid, organic, and lifecycle channels for law firm clients."
   }
 ]
