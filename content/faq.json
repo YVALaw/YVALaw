@@ -2,35 +2,51 @@
   "questions": [
     {
       "question": "How quickly can we get started?",
-      "answer": "Once we've had our consultation call and confirmed the match, your VA will be fully onboarded and ready to work within **72 business hours**. We handle all the briefing and setup so you don't have to."
+      "answer": "Once we've had our consultation call and confirmed the match, your VA will be fully onboarded and ready to work within **72 business hours**. We handle all the briefing and setup so you don't have to.",
+      "question_es": "¿Qué tan rápido podemos empezar?",
+      "answer_es": "Una vez que tengamos nuestra llamada de consulta y confirmemos la selección, tu asistente estará completamente incorporado y listo para trabajar en **72 horas hábiles**. Nosotros nos encargamos de toda la preparación y configuración para que tú no tengas que hacerlo."
     },
     {
       "question": "Are your VAs bilingual?",
-      "answer": "Yes — all YVA professionals are fully bilingual in **English and Spanish**. This is a core part of who we are, allowing your firm to serve a broader client base without any language barriers."
+      "answer": "Yes — all YVA professionals are fully bilingual in **English and Spanish**. This is a core part of who we are, allowing your firm to serve a broader client base without any language barriers.",
+      "question_es": "¿Sus asistentes virtuales son bilingües?",
+      "answer_es": "Sí — todos los profesionales de YVA son completamente bilingües en **inglés y español**. Es parte esencial de quienes somos y permite que tu firma atienda a más clientes sin barreras de idioma."
     },
     {
       "question": "Is there a minimum hours commitment or contract?",
-      "answer": "We do have a service agreement, but there are **no long-term lock-ins**. You can exit at any time with no penalties or attachments. We believe our results should be the reason you stay — not a contract."
+      "answer": "We do have a service agreement, but there are **no long-term lock-ins**. You can exit at any time with no penalties or attachments. We believe our results should be the reason you stay — not a contract.",
+      "question_es": "¿Hay un mínimo de horas o un contrato obligatorio?",
+      "answer_es": "Tenemos un acuerdo de servicio, pero **sin compromisos a largo plazo**. Puedes terminar en cualquier momento sin penalidades ni ataduras. Creemos que nuestros resultados deben ser la razón por la que te quedas — no un contrato."
     },
     {
       "question": "What hours do your VAs work?",
-      "answer": "Our VAs are available **24/7 across U.S. time zones**, giving your firm around-the-clock coverage. YVA Law Staffing's administrative team operates **Monday–Friday, 8:00am–5:00pm Eastern Time**."
+      "answer": "Our VAs are available **24/7 across U.S. time zones**, giving your firm around-the-clock coverage. YVA Law Staffing's administrative team operates **Monday–Friday, 8:00am–5:00pm Eastern Time**.",
+      "question_es": "¿En qué horario trabajan sus asistentes?",
+      "answer_es": "Nuestros asistentes están disponibles **24/7 en los husos horarios de EE.UU.**, para que tu firma tenga cobertura a toda hora. El equipo administrativo de YVA Law Staffing trabaja de **lunes a viernes, de 8:00am a 5:00pm, hora del Este**."
     },
     {
       "question": "What tools and software do your VAs use?",
-      "answer": "Our VAs adapt to **whatever tools your firm already uses** — including Clio, MyCase, HubSpot, Salesforce, Slack, Google Workspace, and more. No switching, no disruption to your existing workflow."
+      "answer": "Our VAs adapt to **whatever tools your firm already uses** — including Clio, MyCase, HubSpot, Salesforce, Slack, Google Workspace, and more. No switching, no disruption to your existing workflow.",
+      "question_es": "¿Qué herramientas y programas usan sus asistentes?",
+      "answer_es": "Nuestros asistentes se adaptan a **las herramientas que tu firma ya usa** — como Clio, MyCase, HubSpot, Salesforce, Slack, Google Workspace y más. Sin cambios ni interrupciones en tu forma de trabajar."
     },
     {
       "question": "How is billing handled?",
-      "answer": "Services are billed hourly, starting at **$7.50/hr**. Payments are processed through **Zelle, Remitly, PayPal, or Payoneer** — whichever works best for you."
+      "answer": "Services are billed hourly, starting at **{price}/hr**. Payments are processed through **Zelle, Remitly, PayPal, or Payoneer** — whichever works best for you.",
+      "question_es": "¿Cómo funciona la facturación?",
+      "answer_es": "Los servicios se facturan por hora, desde **{price}/hr**. Los pagos se procesan por **Zelle, Remitly, PayPal o Payoneer** — lo que te resulte más cómodo."
     },
     {
       "question": "What if the VA isn't a good fit?",
-      "answer": "No problem at all. Just let us know and we'll **match you with someone else** at no extra cost. We're committed to finding the right fit for your firm, not just filling a seat."
+      "answer": "No problem at all. Just let us know and we'll **match you with someone else** at no extra cost. We're committed to finding the right fit for your firm, not just filling a seat.",
+      "question_es": "¿Y si el asistente no es el indicado?",
+      "answer_es": "No hay problema. Solo avísanos y te **asignaremos a otra persona** sin costo adicional. Nuestro compromiso es encontrar a la persona correcta para tu firma, no solo llenar un puesto."
     },
     {
       "question": "Do you only work with law firms?",
-      "answer": "Law firms are our primary focus, but we also work with **professional services businesses and startups** that need bilingual virtual support. If you're unsure whether we're the right fit, just book a free call and we'll let you know honestly."
+      "answer": "Law firms are our primary focus, but we also work with **professional services businesses and startups** that need bilingual virtual support. If you're unsure whether we're the right fit, just book a free call and we'll let you know honestly.",
+      "question_es": "¿Solo trabajan con firmas de abogados?",
+      "answer_es": "Las firmas de abogados son nuestro enfoque principal, pero también trabajamos con **empresas de servicios profesionales y startups** que necesitan apoyo virtual bilingüe. Si no estás seguro de si somos la opción correcta, reserva una llamada gratuita y te lo diremos con total honestidad."
     }
   ]
 }

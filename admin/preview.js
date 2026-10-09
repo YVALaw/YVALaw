@@ -136,6 +136,17 @@
 
   // ---- Website Content (content/*.json, written into the pages by build.js) ----
 
+  // Starting price for {price} in previews: the lowest rate in the published
+  // content/prices.json (the Prices form's own preview uses its live values).
+  var startingPrice = '{price}';
+  function money(value) {
+    var n = Number(value);
+    return '$' + (Number.isInteger(n) ? n.toLocaleString('en-US') : n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+  }
+  fetch('/content/prices.json').then(function (res) { return res.json(); }).then(function (p) {
+    startingPrice = money(Math.min(p.intake, p.assistants, p.demand, p.case));
+  }).catch(function () {});
+
   function list(props, key) {
     var value = props.entry.getIn(['data', key]);
     return value && value.toJS ? value.toJS() : [];
@@ -153,6 +164,8 @@
             return h('span', { key: n, className: 'contents' }, icon('star', 'w-5 h-5 text-yellow-400 fill-yellow-400'));
           })),
           h('p', { className: 'text-white text-lg sm:text-xl font-bold leading-relaxed italic mb-6 sm:mb-8' }, '"' + quote + '"'),
+          t.quote_es ? h('p', { className: 'text-slate-400 text-sm font-medium leading-relaxed italic -mt-3 mb-6' },
+            'Español: "' + String(t.quote_es).trim().replace(/^["“”]+|["“”]+$/g, '') + '"') : null,
           h('div', { className: 'flex items-center gap-4' },
             h('div', { className: 'w-12 h-12 rounded-2xl bg-yellow-400 flex items-center justify-center font-black text-[#1b1e2b] text-lg' }, name.charAt(0).toUpperCase()),
             h('div', null,
@@ -165,7 +178,8 @@
 
   // Same formatting as faqAnswerHtml in build.js.
   function faqAnswerHtml(answer) {
-    var html = window.marked ? window.marked.parseInline(String(answer || '').trim()) : String(answer || '');
+    var text = String(answer || '').replace(/\{price\}/g, startingPrice).trim();
+    var html = window.marked ? window.marked.parseInline(text) : text;
     return html
       .replace(/\n{2,}/g, '<br><br>')
       .replace(/<strong>/g, '<span class="font-black text-[#1b1e2b]">').replace(/<\/strong>/g, '</span>')
@@ -173,19 +187,52 @@
   }
 
   function FaqPreview(props) {
-    return h('div', { className: 'max-w-2xl mx-auto px-6 py-10' },
-      label('FAQ window (answers open when a question is clicked)'),
-      h('div', { className: 'bg-white rounded-[2rem] px-6 py-6 space-y-3 border-2 border-slate-100' },
-        list(props, 'questions').map(function (f, i) {
+    var questions = list(props, 'questions');
+    var panel = function (lang) {
+      return h('div', { className: 'bg-white rounded-[2rem] px-6 py-6 space-y-3 border-2 border-slate-100 mb-10' },
+        questions.map(function (f, i) {
+          var question = lang === 'es' ? (f.question_es || f.question) : f.question;
+          var answer = lang === 'es' ? (f.answer_es || f.answer) : f.answer;
           return h('div', { key: i, className: 'border border-slate-200 rounded-2xl overflow-hidden' },
             h('div', { className: 'w-full flex items-center justify-between px-6 py-4' },
-              h('span', { className: 'font-black text-[#1b1e2b] text-sm pr-4' }, f.question || ''),
+              h('span', { className: 'font-black text-[#1b1e2b] text-sm pr-4' }, question || ''),
               icon('chevron-up', 'w-4 h-4 text-yellow-500 flex-shrink-0')),
-            h('p', { className: 'px-6 pb-5 text-slate-600 text-sm font-medium leading-relaxed', dangerouslySetInnerHTML: { __html: faqAnswerHtml(f.answer) } })
+            h('p', { className: 'px-6 pb-5 text-slate-600 text-sm font-medium leading-relaxed', dangerouslySetInnerHTML: { __html: faqAnswerHtml(answer) } })
           );
-        })
-      )
-    );
+        }));
+    };
+    return h('div', { className: 'max-w-2xl mx-auto px-6 py-10' },
+      label('FAQ window (answers open when a question is clicked)'), panel('en'),
+      label('Español'), panel('es'));
+  }
+
+  // Top of the home page: mirrors heroText() in build.js and the hero in index.html.
+  function HeroPreview(props) {
+    var get = function (key) { return props.entry.getIn(['data', key]); };
+    var block = function (lang) {
+      var pick = function (key) { return get(key + '_' + lang) || get(key + '_en') || ''; };
+      var headline = String(pick('headline'));
+      var mark = String(pick('highlight') || '');
+      var at = mark ? headline.indexOf(mark) : -1;
+      return h('div', { className: 'bg-white rounded-[2rem] border-2 border-slate-100 p-8 sm:p-10 space-y-6 mb-10' },
+        h('div', { className: 'inline-flex items-center gap-2 bg-yellow-400 text-[#1b1e2b] px-4 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider' },
+          icon('scale', 'w-4 h-4'), pick('badge')),
+        h('h1', { className: 'text-5xl font-black text-[#1b1e2b] leading-[0.95] tracking-tight' },
+          at === -1 ? headline : [headline.slice(0, at), h('span', { key: 'm', className: 'text-yellow-500' }, mark), headline.slice(at + mark.length)]),
+        h('p', { className: 'text-lg text-slate-600 font-medium leading-relaxed' }, pick('text'),
+          get('show_price') === false ? null : [lang === 'es' ? ' Desde ' : ' Starting at ',
+            h('span', { key: 'p', className: 'text-[#1b1e2b] font-black underline decoration-yellow-400 decoration-8 underline-offset-4' }, startingPrice + (lang === 'es' ? '/hora' : '/hour')), '.']),
+        h('div', { className: 'flex flex-wrap items-center gap-6' },
+          h('span', { className: 'bg-[#1b1e2b] text-white px-8 py-4 rounded-2xl font-black text-lg inline-flex items-center gap-3' }, pick('button'), icon('arrow-right', 'w-5 h-5 text-yellow-400')),
+          h('div', { className: 'text-sm leading-tight' },
+            h('p', { className: 'font-black text-[#1b1e2b]' }, pick('count')),
+            h('p', { className: 'text-slate-500 font-bold' }, pick('count_sub')))),
+        h('div', { className: 'bg-slate-50 rounded-2xl p-5 max-w-sm' },
+          h('p', { className: 'text-sm font-bold text-[#1b1e2b] leading-snug italic' }, '"' + String(pick('review_quote')).replace(/^["“”]+|["“”]+$/g, '') + '"'),
+          h('p', { className: 'text-xs font-black text-[#1b1e2b] mt-3' }, get('review_name') || ''),
+          h('p', { className: 'text-[10px] text-slate-400 font-bold uppercase' }, pick('review_role'))));
+    };
+    return h('div', { className: 'max-w-3xl mx-auto px-6 py-10' }, label('English'), block('en'), label('Español'), block('es'));
   }
 
   // Card colours by position: mirrors STAT_STYLES / STAT_ORDER in build.js.
@@ -234,7 +281,7 @@
           })),
         h('p', { className: 'text-white font-black text-xs uppercase tracking-widest mb-6' }, 'Get In Touch'),
         h('ul', { className: 'space-y-4' },
-          row('mail', 'contact@yvastaffing.agency', 'mail'),
+          row('mail', get('email'), 'mail'),
           get('phone') ? row('phone', get('phone'), 'phone') : null,
           get('whatsapp') ? row('message-circle', 'WhatsApp', 'whatsapp') : null,
           row('clock', get('hours_en'), 'hours'),
@@ -304,6 +351,7 @@
 
   CMS.registerPreviewTemplate('blog', BlogPreview);
   CMS.registerPreviewTemplate('jobs', JobPreview);
+  CMS.registerPreviewTemplate('hero', HeroPreview);
   CMS.registerPreviewTemplate('testimonials', TestimonialsPreview);
   CMS.registerPreviewTemplate('faq', FaqPreview);
   CMS.registerPreviewTemplate('stats', StatsPreview);

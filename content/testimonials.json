@@ -2,21 +2,25 @@
   "testimonials": [
     {
       "quote": "YVA team has been exceptional with our bookkeeping needs. They are accurate, organized, and dependable, ensuring our records are always up to date and handled with the utmost professionalism.",
+      "quote_es": "El equipo de YVA ha sido excepcional con nuestras necesidades de contabilidad. Son precisos, organizados y confiables, y se aseguran de que nuestros registros estén siempre al día y se manejen con el máximo profesionalismo.",
       "name": "Junior Corrido",
       "company": "SkyTalk"
     },
     {
       "quote": "YVA's Team has been outstanding—organized, reliable, and proactive. They handle intake with professionalism, communicate promptly, and bring integrity and dedication to every task.",
+      "quote_es": "El equipo de YVA ha sido sobresaliente: organizado, confiable y proactivo. Manejan el intake con profesionalismo, se comunican con rapidez y aportan integridad y dedicación a cada tarea.",
       "name": "Naveed Halavi",
       "company": "Halavi Law"
     },
     {
       "quote": "Hiring YVA was the best decision for my business. My bilingual assistant handles everything efficiently and frees up my time to focus on growth.",
+      "quote_es": "Contratar a YVA fue la mejor decisión para mi negocio. Mi asistente bilingüe se encarga de todo con eficiencia y me libera tiempo para enfocarme en crecer.",
       "name": "Joshua Klugman",
       "company": "Employees Work Right"
     },
     {
       "quote": "Working with YVA team has been a game changer. They are efficient, detail oriented, and always take initiative, delivering quality work with professionalism and a positive attitude.",
+      "quote_es": "Trabajar con el equipo de YVA ha cambiado las reglas del juego. Son eficientes, detallistas y siempre toman la iniciativa, entregando trabajo de calidad con profesionalismo y una actitud positiva.",
       "name": "Thomas Holmes",
       "company": "Holmes Law"
     }

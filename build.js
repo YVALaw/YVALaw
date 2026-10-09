@@ -237,6 +237,27 @@ const htmlToText = html => html
   .replace(/\s+/g, ' ').trim();
 const filledBlocks = new Set();
 
+// Prices (content/prices.json, hourly rates). Whole dollars show without cents ($10),
+// others with two decimals ($7.50); {price} in hero/FAQ text is the lowest rate.
+const prices = readContent('prices');
+const money = value => {
+  const n = Number(value);
+  return '$' + (Number.isInteger(n)
+    ? n.toLocaleString('en-US')
+    : n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+};
+const startingPrice = money(Math.min(prices.intake, prices.assistants, prices.demand, prices.case));
+const withPrice = text => String(text || '').replace(/\{price\}/g, startingPrice);
+
+// Wraps the first occurrence of `phrase` in a highlight span (text is escaped first).
+function highlight(text, phrase, className) {
+  const html = escapeText(text);
+  const mark = escapeText(phrase);
+  const at = mark ? html.indexOf(mark) : -1;
+  return at === -1 ? html : `${html.slice(0, at)}<span class="${className}">${mark}</span>${html.slice(at + mark.length)}`;
+}
+const stripQuotes = text => String(text || '').trim().replace(/^["“”]+|["“”]+$/g, '');
+
 function fillBlock(source, name, lines) {
   const start = source.indexOf(`CMS:${name} START`);
   if (start === -1) return source;
@@ -267,9 +288,9 @@ const testimonialSlides = testimonials.flatMap((t, i) => [
   '            <div class="flex gap-1 mb-6">',
   ...Array(5).fill('                <i data-lucide="star" class="w-5 h-5 text-yellow-400 fill-yellow-400"></i>'),
   '            </div>',
-  '            <p class="text-white text-lg sm:text-xl lg:text-2xl font-bold leading-relaxed italic mb-6 sm:mb-8 max-w-3xl">',
+  `            <p class="text-white text-lg sm:text-xl lg:text-2xl font-bold leading-relaxed italic mb-6 sm:mb-8 max-w-3xl" data-i18n="testimonial${i + 1}">`,
   // Quotation marks are added here, so strip any the editor typed.
-  `                "${escapeText(String(t.quote).trim().replace(/^["“”]+|["“”]+$/g, ''))}"`,
+  `                "${escapeText(stripQuotes(t.quote))}"`,
   '            </p>',
   '            <div class="flex items-center gap-4">',
   `                <div class="w-12 h-12 rounded-2xl bg-yellow-400 flex items-center justify-center font-black text-[#1b1e2b] text-lg">${escapeText(String(t.name).trim().charAt(0).toUpperCase())}</div>`,
@@ -289,19 +310,19 @@ const testimonialDots = testimonials.map((t, i) => (i === 0
 
 // FAQ (home modal + FAQPage structured data, from the same text so they always match)
 const faqs = (readContent('faq').questions || []).filter(f => f.question && f.answer);
-const faqAnswerHtml = answer => marked.parseInline(String(answer).trim())
+const faqAnswerHtml = answer => marked.parseInline(withPrice(answer).trim())
   .replace(/&#39;/g, "'")
   .replace(/\n{2,}/g, '<br><br>')
   .replace(/<strong>/g, '<span class="font-black text-[#1b1e2b]">').replace(/<\/strong>/g, '</span>')
   .replace(/<a href=/g, '<a class="font-bold text-[#1b1e2b] underline decoration-yellow-400 underline-offset-2" href=');
-const faqItems = faqs.flatMap(f => [
+const faqItems = faqs.flatMap((f, i) => [
   '<div class="faq-item border border-slate-200 rounded-2xl overflow-hidden">',
   '    <button class="faq-trigger w-full flex items-center justify-between px-6 py-4 text-left hover:bg-slate-50 transition-colors">',
-  `        <span class="font-black text-[#1b1e2b] text-sm pr-4">${escapeText(f.question)}</span>`,
+  `        <span class="font-black text-[#1b1e2b] text-sm pr-4" data-i18n="faqQ${i + 1}">${escapeText(f.question)}</span>`,
   '        <i data-lucide="chevron-down" class="faq-chevron w-4 h-4 text-yellow-500 flex-shrink-0"></i>',
   '    </button>',
   '    <div class="faq-answer">',
-  `        <p class="px-6 pb-5 text-slate-600 text-sm font-medium leading-relaxed">${faqAnswerHtml(f.answer)}</p>`,
+  `        <p class="px-6 pb-5 text-slate-600 text-sm font-medium leading-relaxed" data-i18n="faqA${i + 1}">${faqAnswerHtml(f.answer)}</p>`,
   '    </div>',
   '</div>',
   ''
@@ -425,6 +446,47 @@ i18n.en.footerHours = escapeText(contact.hours_en);
 i18n.es.footerHours = escapeText(contact.hours_es || contact.hours_en);
 i18n.en.footerLocation = escapeText(contact.location_en);
 i18n.es.footerLocation = escapeText(contact.location_es || contact.location_en);
+testimonials.forEach((t, i) => {
+  i18n.en[`testimonial${i + 1}`] = `"${escapeText(stripQuotes(t.quote))}"`;
+  i18n.es[`testimonial${i + 1}`] = `"${escapeText(stripQuotes(t.quote_es || t.quote))}"`;
+});
+faqs.forEach((f, i) => {
+  i18n.en[`faqQ${i + 1}`] = escapeText(f.question);
+  i18n.es[`faqQ${i + 1}`] = escapeText(f.question_es || f.question);
+  i18n.en[`faqA${i + 1}`] = faqAnswerHtml(f.answer);
+  i18n.es[`faqA${i + 1}`] = faqAnswerHtml(f.answer_es || f.answer);
+});
+
+// Top of the home page (content/hero.json), EN + ES.
+const hero = readContent('hero');
+const heroText = lang => {
+  const priceClass = 'text-[#1b1e2b] font-black underline decoration-yellow-400 decoration-8 underline-offset-4';
+  const pick = key => hero[`${key}_${lang}`] || hero[`${key}_en`] || '';
+  const price = hero.show_price === false ? ''
+    : lang === 'es' ? ` Desde <span class="${priceClass}">${startingPrice}/hora</span>.`
+      : ` Starting at <span class="${priceClass}">${startingPrice}/hour</span>.`;
+  return {
+    heroBadge: escapeText(pick('badge')),
+    heroH1: highlight(pick('headline'), pick('highlight'), 'text-yellow-500'),
+    heroH2: escapeText(pick('text')) + price,
+    heroCta: escapeText(pick('button')),
+    heroVas: escapeText(pick('count')),
+    heroVasSub: escapeText(pick('count_sub')),
+    heroReview: `"${escapeText(stripQuotes(pick('review_quote')))}"`,
+    heroReviewRole: escapeText(pick('review_role'))
+  };
+};
+const heroEn = heroText('en');
+Object.assign(i18n.en, heroEn);
+Object.assign(i18n.es, heroText('es'));
+
+// Contact email: each page records the address it currently shows in a
+// <!-- CMS:email … --> comment; when the admin's address differs, every occurrence
+// on that page (links included) is swapped, the comment too.
+const contactEmail = String(contact.email || '').trim();
+const validEmail = /^[^\s@<>"'&]+@[^\s@<>"'&]+\.[a-z]{2,}$/i.test(contactEmail);
+if (contactEmail && !validEmail) console.warn(`WARNING: contact email "${contactEmail}" doesn't look valid; pages keep their current address`);
+
 const i18nLines = ['en', 'es'].flatMap(lang =>
   `Object.assign(translations.${lang}, ${JSON.stringify(i18n[lang], null, 4).replace(/</g, '\\u003c')});`.split('\n'));
 
@@ -497,10 +559,25 @@ fs.readdirSync(__dirname).filter(file => file.endsWith('.html')).forEach(file =>
   html = fillBlock(html, 'social', socialLinks);
   html = fillBlock(html, 'i18n', i18nLines);
   html = fillInline(html, 'hours', escapeText(contact.hours_en));
+  html = fillInline(html, 'hero-badge', heroEn.heroBadge);
+  html = fillInline(html, 'hero-h1', heroEn.heroH1);
+  html = fillInline(html, 'hero-h2', heroEn.heroH2);
+  html = fillInline(html, 'hero-cta', heroEn.heroCta);
+  html = fillInline(html, 'hero-count', heroEn.heroVas);
+  html = fillInline(html, 'hero-count-sub', heroEn.heroVasSub);
+  html = fillInline(html, 'hero-review', heroEn.heroReview);
+  html = fillInline(html, 'hero-review-name', escapeText(hero.review_name));
+  html = fillInline(html, 'hero-review-role', heroEn.heroReviewRole);
+  const shownEmail = (html.match(/<!-- CMS:email (\S+) /) || [])[1];
+  if (shownEmail) {
+    filledBlocks.add('email');
+    if (validEmail && shownEmail !== contactEmail) html = html.split(shownEmail).join(contactEmail);
+  }
   html = fillPictures(html);
   if (html !== before) fs.writeFileSync(filePath, html);
 });
-['testimonials', 'testimonial-dots', 'faq', 'faq-jsonld', 'stats', 'contact', 'contact-compact', 'social', 'i18n', 'hours', 'img', 'imgurl', 'imgpos'].forEach(name => {
+['testimonials', 'testimonial-dots', 'faq', 'faq-jsonld', 'stats', 'contact', 'contact-compact', 'social', 'i18n', 'hours', 'img', 'imgurl', 'imgpos', 'email',
+  'hero-badge', 'hero-h1', 'hero-h2', 'hero-cta', 'hero-count', 'hero-count-sub', 'hero-review', 'hero-review-name', 'hero-review-role'].forEach(name => {
   if (!filledBlocks.has(name)) throw new Error(`No page has the CMS:${name} markers — they were removed or renamed`);
 });
 console.log(`Built website content — ${testimonials.length} testimonial(s), ${faqs.length} FAQ(s), ${stats.length} stat(s)`);

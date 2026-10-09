@@ -178,8 +178,34 @@ collections:
   # pages (see "Website content" in build.js); previews are in admin/preview.js.
   - name: "website"
     label: "Website Content"
-    description: "Testimonials, FAQ, About numbers and contact details. Changes go live about a minute after you click Publish."
+    description: "Home page text, testimonials, FAQ, About numbers, prices, contact details and pictures. Changes go live about a minute after you click Publish."
     files:
+      - name: "hero"
+        label: "Home Page Top"
+        file: "content/hero.json"
+        description: "The headline area at the top of the home page, in English and Spanish. The photo is in Home Page Pictures; the starting price comes from Prices."
+        fields:
+          - { label: "Small label above the headline (English)", name: "badge_en", widget: "string" }
+          - { label: "Small label above the headline (Spanish)", name: "badge_es", widget: "string" }
+          - { label: "Headline (English)", name: "headline_en", widget: "string" }
+          - { label: "Words to highlight in yellow (English)", name: "highlight_en", widget: "string", required: false, hint: "Type the word(s) exactly as they appear in the headline, e.g. Bilingual. Leave empty for no highlight." }
+          - { label: "Headline (Spanish)", name: "headline_es", widget: "string" }
+          - { label: "Words to highlight in yellow (Spanish)", name: "highlight_es", widget: "string", required: false }
+          - { label: "Text under the headline (English)", name: "text_en", widget: "text" }
+          - { label: "Text under the headline (Spanish)", name: "text_es", widget: "text" }
+          - { label: "Add “Starting at $X/hour” after the text", name: "show_price", widget: "boolean", default: true, required: false, hint: "The price is the lowest rate in the Prices form." }
+          - { label: "Button (English)", name: "button_en", widget: "string" }
+          - { label: "Button (Spanish)", name: "button_es", widget: "string" }
+          - { label: "Count next to the faces (English)", name: "count_en", widget: "string", hint: "e.g. 50+ Active VA's" }
+          - { label: "Count next to the faces (Spanish)", name: "count_es", widget: "string" }
+          - { label: "Line under the count (English)", name: "count_sub_en", widget: "string" }
+          - { label: "Line under the count (Spanish)", name: "count_sub_es", widget: "string" }
+          - { label: "Floating review: quote (English)", name: "review_quote_en", widget: "text", hint: "The small review card over the photo. Quotation marks are added automatically." }
+          - { label: "Floating review: quote (Spanish)", name: "review_quote_es", widget: "text" }
+          - { label: "Floating review: name", name: "review_name", widget: "string" }
+          - { label: "Floating review: role (English)", name: "review_role_en", widget: "string" }
+          - { label: "Floating review: role (Spanish)", name: "review_role_es", widget: "string" }
+
       - name: "testimonials"
         label: "Testimonials"
         file: "content/testimonials.json"
@@ -197,6 +223,11 @@ collections:
                 name: "quote"
                 widget: "text"
                 hint: "What the client said. Quotation marks are added automatically."
+              - label: "Quote in Spanish"
+                name: "quote_es"
+                widget: "text"
+                required: false
+                hint: "Shown when a visitor switches the site to Español. Leave empty to show the English quote."
               - label: "Name"
                 name: "name"
                 widget: "string"
@@ -227,7 +258,19 @@ collections:
                 modes: ["rich_text"]
                 buttons: ["bold", "link"]
                 editor_components: []
-                hint: "Bold words are highlighted in dark navy."
+                hint: "Bold words are highlighted in dark navy. Type {price} where the current starting price should appear (it follows the Prices form)."
+              - label: "Question in Spanish"
+                name: "question_es"
+                widget: "string"
+                required: false
+                hint: "Shown when a visitor switches the site to Español. Leave empty to show the English one."
+              - label: "Answer in Spanish"
+                name: "answer_es"
+                widget: "markdown"
+                required: false
+                modes: ["rich_text"]
+                buttons: ["bold", "link"]
+                editor_components: []
 
       - name: "stats"
         label: "About Numbers"
@@ -291,8 +334,13 @@ collections:
       - name: "contact"
         label: "Contact & Hours"
         file: "content/contact.json"
-        description: "Office hours appear in the top bar, phone menu and footer of every page. The email address (contact@yvastaffing.agency) is part of the site's code; ask your developer to change it."
+        description: "Office hours appear in the top bar, phone menu and footer of every page."
         fields:
+          - label: "Contact email"
+            name: "email"
+            widget: "string"
+            pattern: ['^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$', "Enter a full email address, e.g. contact@yvastaffing.agency"]
+            hint: "Shown and linked on every page (top bar, menu, footer, privacy policy). Form submissions still go wherever EmailJS is set up to send them."
           - label: "Office hours (English)"
             name: "hours_en"
             widget: "string"
