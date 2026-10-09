@@ -1,0 +1,24 @@
+{
+  "testimonials": [
+    {
+      "quote": "YVA team has been exceptional with our bookkeeping needs. They are accurate, organized, and dependable, ensuring our records are always up to date and handled with the utmost professionalism.",
+      "name": "Junior Corrido",
+      "company": "SkyTalk"
+    },
+    {
+      "quote": "YVA's Team has been outstanding—organized, reliable, and proactive. They handle intake with professionalism, communicate promptly, and bring integrity and dedication to every task.",
+      "name": "Naveed Halavi",
+      "company": "Halavi Law"
+    },
+    {
+      "quote": "Hiring YVA was the best decision for my business. My bilingual assistant handles everything efficiently and frees up my time to focus on growth.",
+      "name": "Joshua Klugman",
+      "company": "Employees Work Right"
+    },
+    {
+      "quote": "Working with YVA team has been a game changer. They are efficient, detail oriented, and always take initiative, delivering quality work with professionalism and a positive attitude.",
+      "name": "Thomas Holmes",
+      "company": "Holmes Law"
+    }
+  ]
+}

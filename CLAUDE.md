@@ -150,6 +150,7 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 - `admin/editor-blocks.js`: the blog editor's "+" menu blocks: **Book a call button** (`.post-cta`, links to `/?contact=1` by default), **Highlight box** (`.post-callout`) and **Table** (rows typed with `|` or pasted from Excel/Sheets, saved as a markdown table; its pattern matches *every* markdown table, so old tables open in the same form). Blocks are saved into the post as HTML/markdown that `build.js` renders as-is and that each block's `pattern` reads back — change `toBlock` and `pattern` together, and keep old class names working (posts already contain them). Styles live in `tailwind.src.css` as plain CSS, not Tailwind utilities.
 - Blog `draft: true` → `build.js` skips the post (no listing, page or sitemap entry). `image_alt` → the featured image's alt text (falls back to the title).
 - Editor is rich-text only (Markdown mode hidden). Verified that re-saving every existing post in rich-text mode leaves the rendered pages unchanged, tables included.
+- **Website Content** collection (files in `content/`): `testimonials.json` (home slider), `faq.json` (FAQ modal + FAQPage JSON-LD, built from the same text), `stats.json` (the 6 About cards, EN + ES; card colours fixed by position), `contact.json` (office hours EN/ES on every page, location, optional phone / WhatsApp / LinkedIn / Instagram / Facebook). `build.js` writes them into the pages between `CMS:<name> START` / `CMS:<name> END` marker lines, or inline `<!-- CMS:hours -->…<!-- /CMS:hours -->` (index, blog, blog-post, careers), replacing what's there. **Edit these sections through the JSON files / admin, not in the HTML**, or the next build overwrites the change. The build fails if a marker goes missing. Stat labels and footer hours/location reach the EN/ES switch through the generated `// CMS:i18n` block after the `translations` object. The carousel counts its slides, so any number of testimonials works.
 - Test locally: add `local_backend: true` to a copy of `admin/config.yml`, run `npx decap-server` in the site folder and serve the site on localhost.
 
 ## Integrations
@@ -163,6 +164,7 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 
 ### Session 11 (content manager)
 - About section: Sam Colas removed (story, founder card, JSON-LD); Hans Henriquez → **Hans Esmel**, described as sole founder ("CEO & Founder"). Headings now "The Founder" / "Meet the Founder".
+- `/admin` "Website Content": testimonials, FAQ, About numbers, contact & hours now editable (see "Content Manager"). Top-bar/phone-menu hours on the home page now follow the EN/ES switch. FAQ structured data now uses the full answers shown on the page.
 - `/admin` editor blocks: Book a call button, Highlight box, Table (see "Content Manager").
 - `/admin` made simpler: YVA logo, plain-language field hints, Draft switch, image description field, today's date by default, Spanish accents stripped from new post URLs, newest-first sorting, Drafts / Open / Closed filters, trimmed rich-text toolbar, icon picker for jobs, and a live preview that looks like the real site. See "Content Manager" above.
 
@@ -258,7 +260,7 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 - [ ] Case studies — detailed client stories with results
 - [ ] Pricing toggle (part-time vs full-time hours)
 - [ ] Real photos of team / founders (currently pravatar.cc placeholders)
-- [ ] Social media links (footer currently href="#" placeholders)
+- [ ] Social media links: fields exist in /admin → Website Content → Contact & Hours; icons appear in the home footer once filled in
 - [ ] Connect landing pages to Google/Meta ad campaigns
 - [ ] A/B test landing page headlines once campaigns are live
 

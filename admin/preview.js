@@ -1,8 +1,9 @@
 /*
  * Live previews for the content manager (/admin).
  * The right-hand pane draws each entry with the site's own stylesheet, so editors
- * see a blog post (and its card in the blog list) or a job card the way visitors will.
- * Markup mirrors blog.html, build.js (post pages) and careers.html — keep them in step.
+ * see a blog post (and its card in the blog list), a job card or a home page section
+ * the way visitors will. Markup mirrors blog.html, careers.html and build.js (post
+ * pages, website content) — keep them in step.
  * Decap provides the `CMS` and `h` (React.createElement) globals; `lucide` is loaded
  * by admin/index.html. Classes used here are compiled into assets/css/tailwind.css
  * (tailwind.config.js scans admin/*.js), so always write full class names.
@@ -129,6 +130,124 @@
     );
   }
 
+  // ---- Website Content (content/*.json, written into the pages by build.js) ----
+
+  function list(props, key) {
+    var value = props.entry.getIn(['data', key]);
+    return value && value.toJS ? value.toJS() : [];
+  }
+
+  function TestimonialsPreview(props) {
+    var items = list(props, 'testimonials');
+    return h('div', { className: 'max-w-3xl mx-auto px-6 py-10 space-y-6' },
+      label('“What Our Clients Say” slider (one at a time on the site)'),
+      items.map(function (t, i) {
+        var name = String(t.name || '').trim();
+        var quote = String(t.quote || '').trim().replace(/^["“”]+|["“”]+$/g, '');
+        return h('div', { key: i, className: 'bg-[#1b1e2b] rounded-[2rem] p-7 sm:p-10 relative overflow-hidden' },
+          h('div', { className: 'flex gap-1 mb-6' }, [0, 1, 2, 3, 4].map(function (n) {
+            return h('span', { key: n, className: 'contents' }, icon('star', 'w-5 h-5 text-yellow-400 fill-yellow-400'));
+          })),
+          h('p', { className: 'text-white text-lg sm:text-xl font-bold leading-relaxed italic mb-6 sm:mb-8' }, '"' + quote + '"'),
+          h('div', { className: 'flex items-center gap-4' },
+            h('div', { className: 'w-12 h-12 rounded-2xl bg-yellow-400 flex items-center justify-center font-black text-[#1b1e2b] text-lg' }, name.charAt(0).toUpperCase()),
+            h('div', null,
+              h('p', { className: 'text-white font-black' }, name),
+              h('p', { className: 'text-yellow-400 text-sm font-bold uppercase tracking-widest' }, t.company || '')))
+        );
+      })
+    );
+  }
+
+  // Same formatting as faqAnswerHtml in build.js.
+  function faqAnswerHtml(answer) {
+    var html = window.marked ? window.marked.parseInline(String(answer || '').trim()) : String(answer || '');
+    return html
+      .replace(/\n{2,}/g, '<br><br>')
+      .replace(/<strong>/g, '<span class="font-black text-[#1b1e2b]">').replace(/<\/strong>/g, '</span>')
+      .replace(/<a href=/g, '<a class="font-bold text-[#1b1e2b] underline decoration-yellow-400 underline-offset-2" href=');
+  }
+
+  function FaqPreview(props) {
+    return h('div', { className: 'max-w-2xl mx-auto px-6 py-10' },
+      label('FAQ window (answers open when a question is clicked)'),
+      h('div', { className: 'bg-white rounded-[2rem] px-6 py-6 space-y-3 border-2 border-slate-100' },
+        list(props, 'questions').map(function (f, i) {
+          return h('div', { key: i, className: 'border border-slate-200 rounded-2xl overflow-hidden' },
+            h('div', { className: 'w-full flex items-center justify-between px-6 py-4' },
+              h('span', { className: 'font-black text-[#1b1e2b] text-sm pr-4' }, f.question || ''),
+              icon('chevron-up', 'w-4 h-4 text-yellow-500 flex-shrink-0')),
+            h('p', { className: 'px-6 pb-5 text-slate-600 text-sm font-medium leading-relaxed', dangerouslySetInnerHTML: { __html: faqAnswerHtml(f.answer) } })
+          );
+        })
+      )
+    );
+  }
+
+  // Card colours by position: mirrors STAT_STYLES / STAT_ORDER in build.js.
+  var STAT_STYLES = {
+    navy: { card: 'bg-[#1b1e2b] rounded-3xl sm:rounded-[2rem] p-5 sm:p-8 flex flex-col justify-between', iconBox: 'w-10 h-10 bg-yellow-400/20 rounded-xl flex items-center justify-center mb-4 sm:mb-6', icon: 'w-5 h-5 text-yellow-400', value: 'text-4xl sm:text-5xl font-black text-white leading-none mb-2', label: 'text-slate-400 font-bold text-[11px] sm:text-sm uppercase tracking-wider sm:tracking-widest', hover: 'text-slate-500 text-xs font-medium leading-relaxed mt-3' },
+    yellow: { card: 'bg-yellow-400 rounded-3xl sm:rounded-[2rem] p-5 sm:p-8 flex flex-col justify-between', iconBox: 'w-10 h-10 bg-[#1b1e2b]/10 rounded-xl flex items-center justify-center mb-4 sm:mb-6', icon: 'w-5 h-5 text-[#1b1e2b]', value: 'text-4xl sm:text-5xl font-black text-[#1b1e2b] leading-none mb-2', label: 'text-[#1b1e2b]/70 font-bold text-[11px] sm:text-sm uppercase tracking-wider sm:tracking-widest', hover: 'text-[#1b1e2b]/60 text-xs font-medium leading-relaxed mt-3' },
+    light: { card: 'bg-slate-50 border border-slate-100 rounded-3xl sm:rounded-[2rem] p-5 sm:p-8 flex flex-col justify-between', iconBox: 'w-10 h-10 bg-yellow-400/20 rounded-xl flex items-center justify-center mb-4 sm:mb-6', icon: 'w-5 h-5 text-yellow-500', value: 'text-4xl sm:text-5xl font-black text-[#1b1e2b] leading-none mb-2', label: 'text-slate-500 font-bold text-[11px] sm:text-sm uppercase tracking-wider sm:tracking-widest', hover: 'text-slate-400 text-xs font-medium leading-relaxed mt-3' }
+  };
+  var STAT_ORDER = ['navy', 'yellow', 'light', 'light', 'navy', 'yellow'];
+
+  function StatsPreview(props) {
+    var stats = list(props, 'stats');
+    var grid = function (lang) {
+      return h('div', { className: 'grid grid-cols-2 gap-3 sm:gap-6 mb-12' }, stats.map(function (stat, i) {
+        var style = STAT_STYLES[STAT_ORDER[i % STAT_ORDER.length]];
+        return h('div', { key: i, className: style.card },
+          h('div', { className: style.iconBox }, icon(stat.icon || 'star', style.icon)),
+          h('div', null,
+            h('p', { className: style.value }, stat.value || ''),
+            h('p', { className: style.label }, (lang === 'es' && stat.label_es) || stat.label_en || ''),
+            h('p', { className: style.hover }, (lang === 'es' && stat.hover_es) || stat.hover_en || ''))
+        );
+      }));
+    };
+    return h('div', { className: 'max-w-2xl mx-auto px-6 py-10' },
+      label('English (hover text shows when a visitor points at a card)'), grid('en'),
+      label('Español'), grid('es'));
+  }
+
+  function ContactPreview(props) {
+    var get = function (key) { return String(props.entry.getIn(['data', key]) || '').trim(); };
+    var row = function (iconName, text, key) {
+      return h('li', { key: key, className: 'flex items-start gap-3 text-slate-400 text-sm font-medium' },
+        icon(iconName, 'w-4 h-4 mt-0.5 flex-shrink-0'), text);
+    };
+    var socials = [['linkedin', 'LinkedIn'], ['instagram', 'Instagram'], ['facebook', 'Facebook']].filter(function (s) {
+      return /^https?:\/\//.test(get(s[0]));
+    });
+    return h('div', { className: 'max-w-md mx-auto px-6 py-10' },
+      label('Footer'),
+      h('div', { className: 'bg-[#1b1e2b] rounded-[2rem] p-8' },
+        h('div', { className: 'flex gap-3 mb-8' },
+          h('span', { className: 'w-9 h-9 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-slate-400' }, icon('mail', 'w-4 h-4')),
+          socials.map(function (s) {
+            return h('span', { key: s[0], title: s[1], className: 'w-9 h-9 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-slate-400' }, icon(s[0], 'w-4 h-4'));
+          })),
+        h('p', { className: 'text-white font-black text-xs uppercase tracking-widest mb-6' }, 'Get In Touch'),
+        h('ul', { className: 'space-y-4' },
+          row('mail', 'contact@yvastaffing.agency', 'mail'),
+          get('phone') ? row('phone', get('phone'), 'phone') : null,
+          get('whatsapp') ? row('message-circle', 'WhatsApp', 'whatsapp') : null,
+          row('clock', get('hours_en'), 'hours'),
+          row('map-pin', get('location_en'), 'location'))
+      ),
+      h('div', { className: 'h-8' }),
+      label('Español (home page)'),
+      h('ul', { className: 'space-y-2 text-sm font-medium text-slate-600' },
+        h('li', null, get('hours_es') || get('hours_en')),
+        h('li', null, get('location_es') || get('location_en')))
+    );
+  }
+
   CMS.registerPreviewTemplate('blog', BlogPreview);
   CMS.registerPreviewTemplate('jobs', JobPreview);
+  CMS.registerPreviewTemplate('testimonials', TestimonialsPreview);
+  CMS.registerPreviewTemplate('faq', FaqPreview);
+  CMS.registerPreviewTemplate('stats', StatsPreview);
+  CMS.registerPreviewTemplate('contact', ContactPreview);
 })();

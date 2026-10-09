@@ -60,7 +60,7 @@ collections:
         name: "image"
         widget: "image"
         required: false
-        hint: "Optional. A wide (landscape) photo, at least 1200 px wide. Shown at the top of the post, on its card in the blog list, and when the post is shared."
+        hint: "A wide (landscape) photo, at least 1200 px wide. Shown at the top of the post, on its card in the blog list, and when the post is shared."
       - label: "Image description"
         name: "image_alt"
         widget: "string"
@@ -172,4 +172,169 @@ collections:
         required: false
         buttons: ["bold", "italic", "link", "bulleted-list", "numbered-list"]
         editor_components: []
-        hint: "Optional. Not shown on the Careers page, but not private either: don't put confidential information here."
+        hint: "Not shown on the Careers page, but not private either: don't put confidential information here."
+
+  # Home page sections + contact details. build.js writes these files into the
+  # pages (see "Website content" in build.js); previews are in admin/preview.js.
+  - name: "website"
+    label: "Website Content"
+    description: "Testimonials, FAQ, About numbers and contact details. Changes go live about a minute after you click Publish."
+    files:
+      - name: "testimonials"
+        label: "Testimonials"
+        file: "content/testimonials.json"
+        description: "The “What Our Clients Say” slider on the home page."
+        fields:
+          - label: "Testimonials"
+            label_singular: "Testimonial"
+            name: "testimonials"
+            widget: "list"
+            min: 1
+            summary: "{{fields.name}} · {{fields.company}}"
+            hint: "Shown one at a time, in this order. Drag to reorder."
+            fields:
+              - label: "Quote"
+                name: "quote"
+                widget: "text"
+                hint: "What the client said. Quotation marks are added automatically."
+              - label: "Name"
+                name: "name"
+                widget: "string"
+              - label: "Company"
+                name: "company"
+                widget: "string"
+                required: false
+
+      - name: "faq"
+        label: "FAQ"
+        file: "content/faq.json"
+        description: "The “Frequently Asked Questions” window on the home page. Google can also show these questions in search results."
+        fields:
+          - label: "Questions"
+            label_singular: "Question"
+            name: "questions"
+            widget: "list"
+            min: 1
+            summary: "{{fields.question}}"
+            hint: "Drag to reorder."
+            fields:
+              - label: "Question"
+                name: "question"
+                widget: "string"
+              - label: "Answer"
+                name: "answer"
+                widget: "markdown"
+                modes: ["rich_text"]
+                buttons: ["bold", "link"]
+                editor_components: []
+                hint: "Bold words are highlighted in dark navy."
+
+      - name: "stats"
+        label: "About Numbers"
+        file: "content/stats.json"
+        description: "The six number cards next to “Our Story” on the home page. Each position has a fixed color (navy, yellow, light), so dragging a card to another position changes its color."
+        fields:
+          - label: "Cards"
+            label_singular: "Card"
+            name: "stats"
+            widget: "list"
+            allow_add: false
+            allow_remove: false
+            summary: "{{fields.value}} · {{fields.label_en}}"
+            fields:
+              - label: "Number"
+                name: "value"
+                widget: "string"
+                hint: "Keep it short, e.g. 2023, 60% or 50+."
+              - label: "Label (English)"
+                name: "label_en"
+                widget: "string"
+              - label: "Label (Spanish)"
+                name: "label_es"
+                widget: "string"
+                hint: "Shown when a visitor switches the site to Español."
+              - label: "Hover text (English)"
+                name: "hover_en"
+                widget: "text"
+                hint: "Appears when a visitor points at the card (computers only)."
+              - label: "Hover text (Spanish)"
+                name: "hover_es"
+                widget: "text"
+              - label: "Icon"
+                name: "icon"
+                widget: "select"
+                options:
+                  - { label: "Calendar", value: "calendar" }
+                  - { label: "Arrow down (savings)", value: "trending-down" }
+                  - { label: "Arrow up (growth)", value: "trending-up" }
+                  - { label: "Bar chart", value: "bar-chart-2" }
+                  - { label: "Line chart", value: "chart-line" }
+                  - { label: "Building", value: "building-2" }
+                  - { label: "People", value: "users" }
+                  - { label: "Person with check mark", value: "user-check" }
+                  - { label: "Lightning bolt", value: "zap" }
+                  - { label: "Clock", value: "clock" }
+                  - { label: "Globe", value: "globe" }
+                  - { label: "Languages", value: "languages" }
+                  - { label: "Briefcase", value: "briefcase" }
+                  - { label: "Scales of justice", value: "scale" }
+                  - { label: "Star", value: "star" }
+                  - { label: "Award", value: "award" }
+                  - { label: "Handshake", value: "heart-handshake" }
+                  - { label: "Dollar sign", value: "dollar-sign" }
+                  - { label: "Percent", value: "percent" }
+                  - { label: "Target", value: "target" }
+                  - { label: "Rocket", value: "rocket" }
+                  - { label: "Shield with check mark", value: "shield-check" }
+                  - { label: "Thumbs up", value: "thumbs-up" }
+
+      - name: "contact"
+        label: "Contact & Hours"
+        file: "content/contact.json"
+        description: "Office hours appear in the top bar, phone menu and footer of every page. The email address (contact@yvastaffing.agency) is part of the site's code; ask your developer to change it."
+        fields:
+          - label: "Office hours (English)"
+            name: "hours_en"
+            widget: "string"
+            hint: "e.g. Mon – Fri · 9am – 6pm EST"
+          - label: "Office hours (Spanish)"
+            name: "hours_es"
+            widget: "string"
+            hint: "Shown on the home page when a visitor switches to Español."
+          - label: "Location (English)"
+            name: "location_en"
+            widget: "string"
+            hint: "Shown in the home page footer."
+          - label: "Location (Spanish)"
+            name: "location_es"
+            widget: "string"
+          - label: "Phone"
+            name: "phone"
+            widget: "string"
+            required: false
+            pattern: ['^[+0-9 ().-]*$', "Use only numbers, spaces and + ( ) - ."]
+            hint: "Shown in the footer of the home page and blog when filled in. Include the country code, e.g. +1 305 555 0123."
+          - label: "WhatsApp number"
+            name: "whatsapp"
+            widget: "string"
+            required: false
+            pattern: ['^[+0-9 ().-]*$', "Use only numbers, spaces and + ( ) - ."]
+            hint: "Adds a “WhatsApp” link to the footer of the home page and blog. Include the country code, e.g. +1 809 555 0123."
+          - label: "LinkedIn page"
+            name: "linkedin"
+            widget: "string"
+            required: false
+            pattern: ['^(https://\S+)?$', "Paste the full address, starting with https://"]
+            hint: "The full address, starting with https://. Adds a LinkedIn icon to the home page footer."
+          - label: "Instagram page"
+            name: "instagram"
+            widget: "string"
+            required: false
+            pattern: ['^(https://\S+)?$', "Paste the full address, starting with https://"]
+            hint: "Adds an Instagram icon to the home page footer."
+          - label: "Facebook page"
+            name: "facebook"
+            widget: "string"
+            required: false
+            pattern: ['^(https://\S+)?$', "Paste the full address, starting with https://"]
+            hint: "Adds a Facebook icon to the home page footer."

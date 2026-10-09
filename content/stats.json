@@ -1,0 +1,52 @@
+{
+  "stats": [
+    {
+      "value": "2023",
+      "icon": "calendar",
+      "label_en": "Founded",
+      "label_es": "Fundada",
+      "hover_en": "From a single placement to a full agency in just 2 years — built on results, not promises.",
+      "hover_es": "De una sola colocación a una agencia completa en apenas 2 años — construida sobre resultados, no promesas."
+    },
+    {
+      "value": "60%",
+      "icon": "trending-down",
+      "label_en": "Avg. Cost Reduction",
+      "label_es": "Reducción Promedio de Costos",
+      "hover_en": "Our clients consistently cut staffing costs in half while getting more done — no quality trade-off.",
+      "hover_es": "Nuestros clientes reducen consistentemente sus costos de personal a la mitad mientras logran más — sin sacrificar calidad."
+    },
+    {
+      "value": "50+",
+      "icon": "building-2",
+      "label_en": "Law Firms Served",
+      "label_es": "Firmas Atendidas",
+      "hover_en": "From solo practitioners to growing multi-attorney firms across the U.S. — all scaling smarter.",
+      "hover_es": "Desde abogados independientes hasta firmas con múltiples socios en EE.UU. — todos creciendo de forma más inteligente."
+    },
+    {
+      "value": "100+",
+      "icon": "users",
+      "label_en": "Assistants Placed",
+      "label_es": "Asistentes Colocados",
+      "hover_en": "Over 100 bilingual virtual assistants placed and actively working inside U.S. law firms — all vetted and trained by YVA.",
+      "hover_es": "Más de 100 asistentes virtuales bilingües colocados y trabajando activamente en firmas de abogados en EE.UU. — todos evaluados y capacitados por YVA."
+    },
+    {
+      "value": "35%",
+      "icon": "zap",
+      "label_en": "Avg. Productivity Increase",
+      "label_es": "Aumento Promedio de Productividad",
+      "hover_en": "Attorneys and managers reclaim hours every week when admin, intake, and follow-ups are fully delegated.",
+      "hover_es": "Los abogados y gerentes recuperan horas cada semana cuando la administración, el intake y los seguimientos están completamente delegados."
+    },
+    {
+      "value": "40%",
+      "icon": "bar-chart-2",
+      "label_en": "Avg. Profit Growth",
+      "label_es": "Crecimiento Promedio de Rentabilidad",
+      "hover_en": "Lower overhead, more capacity, faster turnaround — our clients close more cases and keep more revenue.",
+      "hover_es": "Menos costos fijos, más capacidad, entregas más rápidas — nuestros clientes cierran más casos y retienen más ingresos."
+    }
+  ]
+}

@@ -203,6 +203,235 @@ fs.writeFileSync(
 
 console.log(`Built jobs/index.json — ${jobs.length} job post(s)`);
 
+// Website content edited in /admin ("Website Content": content/*.json).
+// Written into the pages between `CMS:<name> START` / `CMS:<name> END` marker
+// lines (or inline <!-- CMS:<name> -->…<!-- /CMS:<name> -->), replacing whatever
+// is there, so the committed HTML always matches the JSON. Runs before the blog
+// pages are generated (blog-post.html has markers) and before Tailwind/Lucide
+// scan the pages for classes and icons.
+const contentDir = path.join(__dirname, 'content');
+const readContent = name => JSON.parse(fs.readFileSync(path.join(contentDir, `${name}.json`), 'utf8'));
+const escapeText = value => String(value == null ? '' : value).trim()
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const htmlToText = html => html
+  .replace(/<br\s*\/?>/g, ' ').replace(/<[^>]+>/g, '')
+  .replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&')
+  .replace(/\s+/g, ' ').trim();
+const filledBlocks = new Set();
+
+function fillBlock(source, name, lines) {
+  const start = source.indexOf(`CMS:${name} START`);
+  if (start === -1) return source;
+  const end = source.indexOf(`CMS:${name} END`, start);
+  if (end === -1) throw new Error(`CMS:${name} START marker has no matching END marker`);
+  filledBlocks.add(name);
+  const bodyStart = source.indexOf('\n', start) + 1;
+  const bodyEnd = source.lastIndexOf('\n', end) + 1;
+  const indent = source.slice(bodyEnd, end).match(/^[ \t]*/)[0];
+  return source.slice(0, bodyStart) + lines.map(line => (line ? indent + line : '') + '\n').join('') + source.slice(bodyEnd);
+}
+
+function fillInline(source, name, html) {
+  return source.replace(new RegExp(`(<!-- CMS:${name} -->)[\\s\\S]*?(<!-- /CMS:${name} -->)`, 'g'), (all, open, close) => {
+    filledBlocks.add(name);
+    return open + html + close;
+  });
+}
+
+// Testimonials slider (home)
+const testimonials = (readContent('testimonials').testimonials || []).filter(t => t.quote && t.name);
+const testimonialSlides = testimonials.flatMap((t, i) => [
+  `<!-- Slide ${i + 1} -->`,
+  '<div class="testimonial-slide px-2">',
+  '    <div class="bg-[#1b1e2b] rounded-[2rem] p-7 sm:p-10 lg:p-14 relative overflow-hidden h-full">',
+  '        <div class="absolute top-0 right-0 w-64 h-64 bg-yellow-400/10 rounded-full blur-[80px] -z-0"></div>',
+  '        <div class="relative z-10">',
+  '            <div class="flex gap-1 mb-6">',
+  ...Array(5).fill('                <i data-lucide="star" class="w-5 h-5 text-yellow-400 fill-yellow-400"></i>'),
+  '            </div>',
+  '            <p class="text-white text-lg sm:text-xl lg:text-2xl font-bold leading-relaxed italic mb-6 sm:mb-8 max-w-3xl">',
+  // Quotation marks are added here, so strip any the editor typed.
+  `                "${escapeText(String(t.quote).trim().replace(/^["“”]+|["“”]+$/g, ''))}"`,
+  '            </p>',
+  '            <div class="flex items-center gap-4">',
+  `                <div class="w-12 h-12 rounded-2xl bg-yellow-400 flex items-center justify-center font-black text-[#1b1e2b] text-lg">${escapeText(String(t.name).trim().charAt(0).toUpperCase())}</div>`,
+  '                <div>',
+  `                    <p class="text-white font-black">${escapeText(t.name)}</p>`,
+  `                    <p class="text-yellow-400 text-sm font-bold uppercase tracking-widest">${escapeText(t.company)}</p>`,
+  '                </div>',
+  '            </div>',
+  '        </div>',
+  '    </div>',
+  '</div>',
+  ''
+]);
+const testimonialDots = testimonials.map((t, i) => (i === 0
+  ? `<button class="testimonial-dot relative w-8 h-2 rounded-full bg-[#1b1e2b] transition-all after:absolute after:-inset-3" data-index="${i}" aria-label="Show testimonial ${i + 1}"></button>`
+  : `<button class="testimonial-dot relative w-2 h-2 rounded-full bg-slate-300 transition-all after:absolute after:-inset-3" data-index="${i}" aria-label="Show testimonial ${i + 1}"></button>`));
+
+// FAQ (home modal + FAQPage structured data, from the same text so they always match)
+const faqs = (readContent('faq').questions || []).filter(f => f.question && f.answer);
+const faqAnswerHtml = answer => marked.parseInline(String(answer).trim())
+  .replace(/&#39;/g, "'")
+  .replace(/\n{2,}/g, '<br><br>')
+  .replace(/<strong>/g, '<span class="font-black text-[#1b1e2b]">').replace(/<\/strong>/g, '</span>')
+  .replace(/<a href=/g, '<a class="font-bold text-[#1b1e2b] underline decoration-yellow-400 underline-offset-2" href=');
+const faqItems = faqs.flatMap(f => [
+  '<div class="faq-item border border-slate-200 rounded-2xl overflow-hidden">',
+  '    <button class="faq-trigger w-full flex items-center justify-between px-6 py-4 text-left hover:bg-slate-50 transition-colors">',
+  `        <span class="font-black text-[#1b1e2b] text-sm pr-4">${escapeText(f.question)}</span>`,
+  '        <i data-lucide="chevron-down" class="faq-chevron w-4 h-4 text-yellow-500 flex-shrink-0"></i>',
+  '    </button>',
+  '    <div class="faq-answer">',
+  `        <p class="px-6 pb-5 text-slate-600 text-sm font-medium leading-relaxed">${faqAnswerHtml(f.answer)}</p>`,
+  '    </div>',
+  '</div>',
+  ''
+]);
+const faqJsonLd = [
+  '<script type="application/ld+json">',
+  '{',
+  '  "@context": "https://schema.org",',
+  '  "@type": "FAQPage",',
+  '  "mainEntity": [',
+  ...faqs.map((f, i) => '    ' + JSON.stringify({
+    '@type': 'Question',
+    name: String(f.question).trim(),
+    acceptedAnswer: { '@type': 'Answer', text: htmlToText(faqAnswerHtml(f.answer)) }
+  }).replace(/</g, '\\u003c') + (i < faqs.length - 1 ? ',' : '')),
+  '  ]',
+  '}',
+  '</script>'
+];
+
+// About numbers (home). Card colours follow the position in the grid; the text,
+// number and icon come from the admin. Labels/hover text are also given to the
+// EN/ES switch through the translations block below.
+const STAT_STYLES = {
+  navy: {
+    card: 'group bg-[#1b1e2b] rounded-3xl sm:rounded-[2rem] p-5 sm:p-8 flex flex-col justify-between cursor-default hover:-translate-y-2 hover:shadow-2xl hover:shadow-[#1b1e2b]/30 hover:z-10 transition-all duration-300',
+    iconBox: 'w-10 h-10 bg-yellow-400/20 rounded-xl flex items-center justify-center mb-4 sm:mb-6',
+    icon: 'w-5 h-5 text-yellow-400',
+    value: 'text-4xl sm:text-5xl font-black text-white leading-none mb-2',
+    label: 'text-slate-400 font-bold text-[11px] sm:text-sm uppercase tracking-wider sm:tracking-widest',
+    hover: 'text-slate-500 hidden lg:block text-xs font-medium leading-relaxed mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300'
+  },
+  yellow: {
+    card: 'group bg-yellow-400 rounded-3xl sm:rounded-[2rem] p-5 sm:p-8 flex flex-col justify-between cursor-default hover:-translate-y-2 hover:shadow-2xl hover:shadow-yellow-400/40 hover:z-10 transition-all duration-300',
+    iconBox: 'w-10 h-10 bg-[#1b1e2b]/10 rounded-xl flex items-center justify-center mb-4 sm:mb-6',
+    icon: 'w-5 h-5 text-[#1b1e2b]',
+    value: 'text-4xl sm:text-5xl font-black text-[#1b1e2b] leading-none mb-2',
+    label: 'text-[#1b1e2b]/70 font-bold text-[11px] sm:text-sm uppercase tracking-wider sm:tracking-widest',
+    hover: 'text-[#1b1e2b]/60 hidden lg:block text-xs font-medium leading-relaxed mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300'
+  },
+  light: {
+    card: 'group bg-slate-50 border border-slate-100 rounded-3xl sm:rounded-[2rem] p-5 sm:p-8 flex flex-col justify-between cursor-default hover:-translate-y-2 hover:border-yellow-400 hover:shadow-2xl hover:z-10 transition-all duration-300',
+    iconBox: 'w-10 h-10 bg-yellow-400/20 rounded-xl flex items-center justify-center mb-4 sm:mb-6',
+    icon: 'w-5 h-5 text-yellow-500',
+    value: 'text-4xl sm:text-5xl font-black text-[#1b1e2b] leading-none mb-2',
+    label: 'text-slate-500 font-bold text-[11px] sm:text-sm uppercase tracking-wider sm:tracking-widest',
+    hover: 'text-slate-400 hidden lg:block text-xs font-medium leading-relaxed mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300'
+  }
+};
+const STAT_ORDER = ['navy', 'yellow', 'light', 'light', 'navy', 'yellow'];
+const stats = readContent('stats').stats || [];
+const statCards = stats.flatMap((stat, i) => {
+  const style = STAT_STYLES[STAT_ORDER[i % STAT_ORDER.length]];
+  return [
+    `<div class="${style.card}">`,
+    `    <div class="${style.iconBox}">`,
+    `        <i data-lucide="${escapeHtml(String(stat.icon || 'star').trim())}" class="${style.icon}"></i>`,
+    '    </div>',
+    '    <div>',
+    `        <p class="${style.value}">${escapeText(stat.value)}</p>`,
+    `        <p class="${style.label}" data-i18n="stat${i + 1}Label">${escapeText(stat.label_en)}</p>`,
+    `        <p class="${style.hover}" data-i18n="stat${i + 1}Hover">${escapeText(stat.hover_en)}</p>`,
+    '    </div>',
+    '</div>',
+    ''
+  ];
+});
+
+// Contact details: hours (every page), location (home footer), phone / WhatsApp
+// (home + blog footers) and social links (home footer). Empty fields are left out.
+const contact = readContent('contact');
+const phone = String(contact.phone || '').trim();
+const whatsapp = String(contact.whatsapp || '').replace(/\D/g, '');
+const contactLink = (href, newTab) =>
+  `<a href="${escapeHtml(href)}"${newTab ? ' target="_blank" rel="noopener"' : ''} class="flex items-start gap-3 text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors">`;
+const contactLinks = [
+  phone && { href: `tel:${phone.replace(/[^\d+]/g, '')}`, icon: 'phone', text: phone, newTab: false },
+  whatsapp && { href: `https://wa.me/${whatsapp}`, icon: 'message-circle', text: 'WhatsApp', newTab: true }
+].filter(Boolean);
+const footerContactItems = [
+  ...contactLinks.flatMap(link => [
+    '<li>',
+    '    ' + contactLink(link.href, link.newTab),
+    `        <i data-lucide="${link.icon}" class="w-4 h-4 mt-0.5 flex-shrink-0"></i>`,
+    `        ${escapeText(link.text)}`,
+    '    </a>',
+    '</li>'
+  ]),
+  '<li>',
+  '    <div class="flex items-start gap-3 text-slate-400 text-sm font-medium">',
+  '        <i data-lucide="clock" class="w-4 h-4 mt-0.5 flex-shrink-0"></i>',
+  `        <span data-i18n="footerHours">${escapeText(contact.hours_en)}</span>`,
+  '    </div>',
+  '</li>',
+  '<li>',
+  '    <div class="flex items-start gap-3 text-slate-400 text-sm font-medium">',
+  '        <i data-lucide="map-pin" class="w-4 h-4 mt-0.5 flex-shrink-0"></i>',
+  `        <span data-i18n="footerLocation">${escapeText(contact.location_en)}</span>`,
+  '    </div>',
+  '</li>'
+];
+const compactContactItems = contactLinks.map(link =>
+  `<li>${contactLink(link.href, link.newTab)}<i data-lucide="${link.icon}" class="w-4 h-4 mt-0.5 flex-shrink-0"></i> ${escapeText(link.text)}</a></li>`);
+const socialLinks = [
+  ['linkedin', 'LinkedIn'], ['instagram', 'Instagram'], ['facebook', 'Facebook']
+].filter(([key]) => /^https?:\/\//.test(String(contact[key] || '').trim())).flatMap(([key, label]) => [
+  `<a href="${escapeHtml(String(contact[key]).trim())}" target="_blank" rel="noopener" aria-label="${label}" class="w-9 h-9 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-yellow-400 hover:text-[#1b1e2b] hover:border-yellow-400 transition-all">`,
+  `    <i data-lucide="${key}" class="w-4 h-4"></i>`,
+  '</a>'
+]);
+
+// EN/ES text for the language switch on the home page (merged into `translations`).
+const i18n = { en: {}, es: {} };
+stats.forEach((stat, i) => {
+  i18n.en[`stat${i + 1}Label`] = escapeText(stat.label_en);
+  i18n.es[`stat${i + 1}Label`] = escapeText(stat.label_es || stat.label_en);
+  i18n.en[`stat${i + 1}Hover`] = escapeText(stat.hover_en);
+  i18n.es[`stat${i + 1}Hover`] = escapeText(stat.hover_es || stat.hover_en);
+});
+i18n.en.footerHours = escapeText(contact.hours_en);
+i18n.es.footerHours = escapeText(contact.hours_es || contact.hours_en);
+i18n.en.footerLocation = escapeText(contact.location_en);
+i18n.es.footerLocation = escapeText(contact.location_es || contact.location_en);
+const i18nLines = ['en', 'es'].flatMap(lang =>
+  `Object.assign(translations.${lang}, ${JSON.stringify(i18n[lang], null, 4).replace(/</g, '\\u003c')});`.split('\n'));
+
+fs.readdirSync(__dirname).filter(file => file.endsWith('.html')).forEach(file => {
+  const filePath = path.join(__dirname, file);
+  const before = fs.readFileSync(filePath, 'utf8');
+  if (!before.includes('CMS:')) return;
+  let html = before;
+  html = fillBlock(html, 'testimonials', testimonialSlides);
+  html = fillBlock(html, 'testimonial-dots', testimonialDots);
+  html = fillBlock(html, 'faq', faqItems);
+  html = fillBlock(html, 'faq-jsonld', faqJsonLd);
+  html = fillBlock(html, 'stats', statCards);
+  html = fillBlock(html, 'contact', footerContactItems);
+  html = fillBlock(html, 'contact-compact', compactContactItems);
+  html = fillBlock(html, 'social', socialLinks);
+  html = fillBlock(html, 'i18n', i18nLines);
+  html = fillInline(html, 'hours', escapeText(contact.hours_en));
+  if (html !== before) fs.writeFileSync(filePath, html);
+});
+['testimonials', 'testimonial-dots', 'faq', 'faq-jsonld', 'stats', 'contact', 'contact-compact', 'social', 'i18n', 'hours'].forEach(name => {
+  if (!filledBlocks.has(name)) throw new Error(`No page has the CMS:${name} markers — they were removed or renamed`);
+});
+console.log(`Built website content — ${testimonials.length} testimonial(s), ${faqs.length} FAQ(s), ${stats.length} stat(s)`);
+
 // Generate static blog post pages (/blog/<slug>/index.html)
 // Uses blog-post.html as the template so the design stays in one place.
 // Each page ships with its own <title>, description, canonical, Open Graph
