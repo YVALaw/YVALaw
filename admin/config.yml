@@ -206,6 +206,17 @@ collections:
           - { label: "Floating review: role (English)", name: "review_role_en", widget: "string" }
           - { label: "Floating review: role (Spanish)", name: "review_role_es", widget: "string" }
 
+      - name: "prices"
+        label: "Prices"
+        file: "content/prices.json"
+        description: "Hourly rates used everywhere on the website and the landing pages: price cards, comparison tables, the savings calculator, the headline (“Starting at”), FAQ answers and Google's search data. Monthly totals and savings are worked out automatically. The in-house costs they're compared with stay as written on each page."
+        fields:
+          - { label: "Legal Intake ($ per hour)", name: "intake", widget: "number", value_type: "float", min: 1, step: 0.5 }
+          - { label: "Legal Assistants ($ per hour)", name: "assistants", widget: "number", value_type: "float", min: 1, step: 0.5 }
+          - { label: "Demand Writing ($ per hour)", name: "demand", widget: "number", value_type: "float", min: 1, step: 0.5 }
+          - { label: "Case Managers ($ per hour)", name: "case", widget: "number", value_type: "float", min: 1, step: 0.5 }
+          - { label: "Full-time hours per month", name: "hours_per_month", widget: "number", value_type: "int", min: 1, default: 160, hint: "Used for the monthly prices (hourly rate × these hours)." }
+
       - name: "testimonials"
         label: "Testimonials"
         file: "content/testimonials.json"

@@ -112,6 +112,7 @@
         .ping-slow { animation: ping-slow 2s cubic-bezier(0,0,0.2,1) infinite; }
     </style>
   <!-- CMS:email contact@yvastaffing.agency · the contact address on this page, set in /admin (Contact & Hours) -->
+  <!-- CMS:head-price rate-intake $7.50 · the price in this page's description/search data, set in /admin (Prices) -->
 </head>
 <body class="bg-white text-slate-900 overflow-x-hidden">
     <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=1539862044149292&ev=PageView&noscript=1"></noscript>
@@ -155,7 +156,7 @@
 
                 <p class="text-lg text-slate-600 font-medium leading-relaxed">
                     YVA Law Staffing provides fully trained bilingual intake specialists who answer every call, screen every lead, and keep your CRM updated — so your attorneys only deal with qualified clients.
-                    <span class="font-black text-[#1b1e2b]">Starting at $7.50/hr. No contracts.</span>
+                    <span class="font-black text-[#1b1e2b]">Starting at <!-- CMS:price:rate-intake -->$7.50<!-- /CMS:price:rate-intake -->/hr. No contracts.</span>
                 </p>
 
                 <!-- CTA -->
@@ -222,8 +223,8 @@
                 <!-- Floating price -->
                 <div class="float absolute -left-6 top-8 bg-[#1b1e2b] text-white p-5 rounded-2xl shadow-2xl border-4 border-white z-10">
                     <p class="text-yellow-400 text-[9px] font-black uppercase tracking-widest mb-1">Starting From</p>
-                    <p class="text-3xl font-black leading-none">$7.50<span class="text-sm font-bold text-slate-400">/hr</span></p>
-                    <p class="text-slate-400 text-[10px] font-bold mt-1">~$1,200/mo full-time</p>
+                    <p class="text-3xl font-black leading-none"><!-- CMS:price:rate-intake -->$7.50<!-- /CMS:price:rate-intake --><span class="text-sm font-bold text-slate-400">/hr</span></p>
+                    <p class="text-slate-400 text-[10px] font-bold mt-1">~<!-- CMS:price:month-intake -->$1,200<!-- /CMS:price:month-intake -->/mo full-time</p>
                 </div>
                 <!-- Star rating -->
                 <div class="absolute -bottom-4 right-4 bg-white px-4 py-3 rounded-2xl shadow-xl border border-slate-100 z-10">
@@ -360,17 +361,17 @@
                 <div class="bg-[#1b1e2b] rounded-2xl p-6 border border-[#1b1e2b]">
                     <div class="flex items-center justify-between mb-3">
                         <p class="font-black text-white text-sm uppercase tracking-widest">YVA Law Staffing</p>
-                        <span class="bg-yellow-400 text-[#1b1e2b] text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">Save 71%</span>
+                        <span class="bg-yellow-400 text-[#1b1e2b] text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">Save <!-- CMS:price:savepct-4200-intake -->71%<!-- /CMS:price:savepct-4200-intake --></span>
                     </div>
-                    <p class="text-4xl font-black text-yellow-400">$1,200<span class="text-lg font-bold text-slate-400">/mo</span></p>
-                    <p class="text-slate-400 text-xs font-medium mt-2">Full-time · 160 hrs · $7.50/hr</p>
+                    <p class="text-4xl font-black text-yellow-400"><!-- CMS:price:month-intake -->$1,200<!-- /CMS:price:month-intake --><span class="text-lg font-bold text-slate-400">/mo</span></p>
+                    <p class="text-slate-400 text-xs font-medium mt-2">Full-time · <!-- CMS:price:hours -->160<!-- /CMS:price:hours --> hrs · <!-- CMS:price:rate-intake -->$7.50<!-- /CMS:price:rate-intake -->/hr</p>
                     <ul class="mt-4 space-y-1.5">
                         <li class="flex items-center gap-2 text-xs text-slate-300 font-medium"><i data-lucide="check" class="w-3.5 h-3.5 text-yellow-400 flex-shrink-0"></i> Ready in 72 hours</li>
                         <li class="flex items-center gap-2 text-xs text-slate-300 font-medium"><i data-lucide="check" class="w-3.5 h-3.5 text-yellow-400 flex-shrink-0"></i> No contracts or minimums</li>
                         <li class="flex items-center gap-2 text-xs text-slate-300 font-medium"><i data-lucide="check" class="w-3.5 h-3.5 text-yellow-400 flex-shrink-0"></i> Fully bilingual, pre-trained</li>
                     </ul>
                 </div>
-                <p class="text-center text-slate-400 text-xs font-medium mt-4">* Based on full-time (160 hrs/mo). In-house reflects avg. U.S. salary + overhead.</p>
+                <p class="text-center text-slate-400 text-xs font-medium mt-4">* Based on full-time (<!-- CMS:price:hours -->160<!-- /CMS:price:hours --> hrs/mo). In-house reflects avg. U.S. salary + overhead.</p>
             </div>
 
         </div>
@@ -563,7 +564,7 @@
             Your next qualified client<br>deserves to reach someone.
         </h2>
         <p class="text-slate-400 font-medium text-lg leading-relaxed mb-10 max-w-xl mx-auto">
-            Book a free 20-minute call. We'll learn your process and have a bilingual intake specialist ready for your firm in 72 hours — starting at <span class="text-yellow-400 font-black">$7.50/hr</span>.
+            Book a free 20-minute call. We'll learn your process and have a bilingual intake specialist ready for your firm in 72 hours — starting at <span class="text-yellow-400 font-black"><!-- CMS:price:rate-intake -->$7.50<!-- /CMS:price:rate-intake -->/hr</span>.
         </p>
         <button onclick="openModal()" class="bg-yellow-400 text-[#1b1e2b] px-14 py-6 rounded-2xl font-black text-base uppercase tracking-widest inline-flex items-center gap-3 hover:bg-yellow-300 transition-all shadow-2xl shadow-yellow-400/20">
             Book My Free Call <i data-lucide="arrow-right" class="w-5 h-5"></i>

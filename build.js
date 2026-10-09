@@ -247,7 +247,68 @@ const money = value => {
     : n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 };
 const startingPrice = money(Math.min(prices.intake, prices.assistants, prices.demand, prices.case));
-const withPrice = text => String(text || '').replace(/\{price\}/g, startingPrice);
+// {price} = lowest rate; {intake} {assistants} {demand} {case} = that service's rate.
+const withPrice = text => String(text || '')
+  .replace(/\{price\}/g, startingPrice)
+  .replace(/\{(intake|assistants|demand|case)\}/g, (all, key) => money(prices[key]));
+
+// Every price on the pages is a marker whose name says what to show:
+//   <!-- CMS:price:EXPR -->$7.50<!-- /CMS:price:EXPR -->   (text)
+//   /* CMS:price:EXPR */7.5/* /CMS:price:EXPR */          (inside scripts)
+// EXPR: start | hours | rate-S | month-S | save-N-S | savepct-N-S | savek-N-S | num-S | strhr-S
+// where S is a service (intake, assistants, demand, case), several joined with +, or
+// "all", and N is the in-house monthly cost written on that page (the comparison
+// figures aren't prices, so they stay as the page states them).
+const SERVICES = ['intake', 'assistants', 'demand', 'case'];
+const hoursPerMonth = Number(prices.hours_per_month) || 160;
+function servicesOf(part) {
+  const list = part === 'all' ? SERVICES : String(part).split('+');
+  list.forEach(key => { if (!SERVICES.includes(key)) throw new Error(`Unknown service "${key}" in a CMS:price marker`); });
+  return list;
+}
+const monthOf = part => servicesOf(part).reduce((sum, key) => sum + Number(prices[key]) * hoursPerMonth, 0);
+function priceValue(expr) {
+  const [kind, a, b] = expr.split('-');
+  const saved = () => Math.max(0, Number(a) - monthOf(b));
+  switch (kind) {
+    case 'start': return startingPrice;
+    case 'hours': return String(hoursPerMonth);
+    case 'rate': return money(prices[servicesOf(a)[0]]);
+    case 'month': return money(monthOf(a));
+    case 'save': return money(saved());
+    case 'savepct': return Math.round(saved() / Number(a) * 100) + '%';
+    case 'savek': return money(Math.floor(saved() / 1000) * 1000);
+    case 'num': return String(Number(prices[servicesOf(a)[0]]));
+    case 'strhr': return JSON.stringify(money(prices[servicesOf(a)[0]]) + '/hr');
+    default: throw new Error(`Unknown price marker CMS:price:${expr}`);
+  }
+}
+// The home page's search data lists each service with its hourly price.
+const OFFER_SERVICE = { 'Legal Intake Specialist': 'intake', 'Legal Assistant': 'assistants', 'Demand Writing Specialist': 'demand', 'Virtual Case Manager': 'case' };
+
+function fillPrices(source) {
+  source = source.replace(/<!-- CMS:price:([a-z0-9+-]+) -->[\s\S]*?<!-- \/CMS:price:\1 -->/g, (all, expr) => {
+    filledBlocks.add('price');
+    return `<!-- CMS:price:${expr} -->${priceValue(expr)}<!-- /CMS:price:${expr} -->`;
+  });
+  source = source.replace(/\/\* CMS:price:([a-z0-9+-]+) \*\/[\s\S]*?\/\* \/CMS:price:\1 \*\//g, (all, expr) =>
+    `/* CMS:price:${expr} */${priceValue(expr)}/* /CMS:price:${expr} */`);
+  source = source.replace(/("name": "([^"]+)",\s*"description": "[^"]*"\s*\},\s*"priceSpecification": \{\s*"@type": "UnitPriceSpecification",\s*"price": )([0-9.]+)/g,
+    (all, before, name) => (OFFER_SERVICE[name] ? before + Number(prices[OFFER_SERVICE[name]]) : all));
+  // Descriptions and search data in <head> can't hold markers: the page records the
+  // price they show (<!-- CMS:head-price EXPR $7.50 -->) and it's swapped when it changes.
+  const shown = source.match(/<!-- CMS:head-price ([a-z0-9+-]+) (\S+) /);
+  if (shown) {
+    filledBlocks.add('head-price');
+    const value = priceValue(shown[1]);
+    const end = source.indexOf('</head>');
+    if (value !== shown[2] && end !== -1) {
+      source = source.slice(0, end).split(`${shown[2]}/hr`).join(`${value}/hr`)
+        .replace(`CMS:head-price ${shown[1]} ${shown[2]} `, `CMS:head-price ${shown[1]} ${value} `) + source.slice(end);
+    }
+  }
+  return source;
+}
 
 // Wraps the first occurrence of `phrase` in a highlight span (text is escaped first).
 function highlight(text, phrase, className) {
@@ -674,9 +735,10 @@ fs.readdirSync(__dirname).filter(file => file.endsWith('.html')).forEach(file =>
     if (validEmail && shownEmail !== contactEmail) html = html.split(shownEmail).join(contactEmail);
   }
   html = fillPictures(html);
+  html = fillPrices(html);
   if (html !== before) fs.writeFileSync(filePath, html);
 });
-['testimonials', 'testimonial-dots', 'faq', 'faq-jsonld', 'stats', 'contact', 'contact-compact', 'social', 'i18n', 'hours', 'img', 'imgurl', 'imgpos', 'email', 'lp-testimonials', 'lp-faq',
+['testimonials', 'testimonial-dots', 'faq', 'faq-jsonld', 'stats', 'contact', 'contact-compact', 'social', 'i18n', 'hours', 'img', 'imgurl', 'imgpos', 'email', 'lp-testimonials', 'lp-faq', 'price', 'head-price',
   'hero-badge', 'hero-h1', 'hero-h2', 'hero-cta', 'hero-count', 'hero-count-sub', 'hero-review', 'hero-review-name', 'hero-review-role'].forEach(name => {
   if (!filledBlocks.has(name)) throw new Error(`No page has the CMS:${name} markers — they were removed or renamed`);
 });

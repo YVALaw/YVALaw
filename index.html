@@ -159,7 +159,7 @@
                 },
                 "priceSpecification": {
                   "@type": "UnitPriceSpecification",
-                  "price": 10.0,
+                  "price": 10,
                   "priceCurrency": "USD",
                   "unitCode": "HUR",
                   "unitText": "hour"
@@ -174,7 +174,7 @@
                 },
                 "priceSpecification": {
                   "@type": "UnitPriceSpecification",
-                  "price": 12.0,
+                  "price": 12,
                   "priceCurrency": "USD",
                   "unitCode": "HUR",
                   "unitText": "hour"
@@ -473,6 +473,7 @@
         }
     </style>
   <!-- CMS:email contact@yvastaffing.agency · the contact address on this page, set in /admin (Contact & Hours) -->
+  <!-- CMS:head-price start $7.50 · the price in this page's description/search data, set in /admin (Prices) -->
 </head>
 <body class="bg-white text-slate-900 overflow-x-hidden">
     <!-- Netlify Forms: declares the "lead-backup" form so Netlify accepts it. Never shown;
@@ -680,7 +681,7 @@
                     <div class="hidden lg:block absolute lg:-left-6 xl:-left-12 top-1/4 z-20 bg-[#1b1e2b] p-8 rounded-[2rem] shadow-2xl border-4 border-white animate-float text-white">
                         <p class="text-yellow-400 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Starting From</p>
                         <div class="flex items-baseline gap-1">
-                            <span class="text-4xl font-black">$7.50</span>
+                            <span class="text-4xl font-black"><!-- CMS:price:start -->$7.50<!-- /CMS:price:start --></span>
                             <span class="text-slate-400 font-bold text-sm">/hr</span>
                         </div>
                     </div>
@@ -893,7 +894,7 @@
                                 <div class="absolute inset-0 bg-gradient-to-r from-[#1b1e2b]/60 to-transparent lg:bg-gradient-to-t"></div>
                                 <div class="absolute bottom-6 left-6 bg-yellow-400 text-[#1b1e2b] px-5 py-3 rounded-2xl shadow-lg">
                                     <p class="text-[10px] font-black uppercase tracking-widest mb-0.5">Starting From</p>
-                                    <p class="text-2xl font-black leading-none">$7.50<span class="text-sm font-bold">/hr</span></p>
+                                    <p class="text-2xl font-black leading-none"><!-- CMS:price:rate-intake -->$7.50<!-- /CMS:price:rate-intake --><span class="text-sm font-bold">/hr</span></p>
                                 </div>
                             </div>
                             <div class="bg-white p-10 lg:p-14 flex flex-col justify-center">
@@ -940,7 +941,7 @@
                                 <div class="absolute inset-0 bg-gradient-to-r from-[#1b1e2b]/60 to-transparent lg:bg-gradient-to-t"></div>
                                 <div class="absolute bottom-6 left-6 bg-yellow-400 text-[#1b1e2b] px-5 py-3 rounded-2xl shadow-lg">
                                     <p class="text-[10px] font-black uppercase tracking-widest mb-0.5">Starting From</p>
-                                    <p class="text-2xl font-black leading-none">$8.50<span class="text-sm font-bold">/hr</span></p>
+                                    <p class="text-2xl font-black leading-none"><!-- CMS:price:rate-assistants -->$8.50<!-- /CMS:price:rate-assistants --><span class="text-sm font-bold">/hr</span></p>
                                 </div>
                             </div>
                             <div class="bg-white p-10 lg:p-14 flex flex-col justify-center">
@@ -987,7 +988,7 @@
                                 <div class="absolute inset-0 bg-gradient-to-r from-[#1b1e2b]/60 to-transparent lg:bg-gradient-to-t"></div>
                                 <div class="absolute bottom-6 left-6 bg-yellow-400 text-[#1b1e2b] px-5 py-3 rounded-2xl shadow-lg">
                                     <p class="text-[10px] font-black uppercase tracking-widest mb-0.5">Starting From</p>
-                                    <p class="text-2xl font-black leading-none">$10<span class="text-sm font-bold">/hr</span></p>
+                                    <p class="text-2xl font-black leading-none"><!-- CMS:price:rate-demand -->$10<!-- /CMS:price:rate-demand --><span class="text-sm font-bold">/hr</span></p>
                                 </div>
                             </div>
                             <div class="bg-white p-10 lg:p-14 flex flex-col justify-center">
@@ -1034,7 +1035,7 @@
                                 <div class="absolute inset-0 bg-gradient-to-r from-[#1b1e2b]/60 to-transparent lg:bg-gradient-to-t"></div>
                                 <div class="absolute bottom-6 left-6 bg-yellow-400 text-[#1b1e2b] px-5 py-3 rounded-2xl shadow-lg">
                                     <p class="text-[10px] font-black uppercase tracking-widest mb-0.5">Starting From</p>
-                                    <p class="text-2xl font-black leading-none">$12<span class="text-sm font-bold">/hr</span></p>
+                                    <p class="text-2xl font-black leading-none"><!-- CMS:price:rate-case -->$12<!-- /CMS:price:rate-case --><span class="text-sm font-bold">/hr</span></p>
                                 </div>
                             </div>
                             <div class="bg-white p-10 lg:p-14 flex flex-col justify-center">
@@ -1099,10 +1100,10 @@
                     </div>
                     <p class="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">Legal Intake</p>
                     <div class="flex items-baseline gap-1 mb-1">
-                        <span class="text-4xl font-black text-[#1b1e2b]">$7.50</span>
+                        <span class="text-4xl font-black text-[#1b1e2b]"><!-- CMS:price:rate-intake -->$7.50<!-- /CMS:price:rate-intake --></span>
                         <span class="text-slate-400 font-bold text-sm">/hr</span>
                     </div>
-                    <p class="text-yellow-500 text-xs font-black mb-6">~$1,200/mo <span data-i18n="pricingFullTime">full-time</span></p>
+                    <p class="text-yellow-500 text-xs font-black mb-6">~<!-- CMS:price:month-intake -->$1,200<!-- /CMS:price:month-intake -->/mo <span data-i18n="pricingFullTime">full-time</span></p>
                     <ul class="space-y-2 mb-8">
                         <li class="flex items-center gap-2 text-xs font-bold text-slate-600"><div class="w-4 h-4 rounded-full bg-yellow-400/20 flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-2.5 h-2.5 text-yellow-600"></i></div> Bilingual call & email handling</li>
                         <li class="flex items-center gap-2 text-xs font-bold text-slate-600"><div class="w-4 h-4 rounded-full bg-yellow-400/20 flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-2.5 h-2.5 text-yellow-600"></i></div> Client screening & eligibility</li>
@@ -1123,10 +1124,10 @@
                     </div>
                     <p class="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">Legal Assistants</p>
                     <div class="flex items-baseline gap-1 mb-1">
-                        <span class="text-4xl font-black text-white">$8.50</span>
+                        <span class="text-4xl font-black text-white"><!-- CMS:price:rate-assistants -->$8.50<!-- /CMS:price:rate-assistants --></span>
                         <span class="text-slate-400 font-bold text-sm">/hr</span>
                     </div>
-                    <p class="text-yellow-400 text-xs font-black mb-6">~$1,360/mo <span data-i18n="pricingFullTime">full-time</span></p>
+                    <p class="text-yellow-400 text-xs font-black mb-6">~<!-- CMS:price:month-assistants -->$1,360<!-- /CMS:price:month-assistants -->/mo <span data-i18n="pricingFullTime">full-time</span></p>
                     <ul class="space-y-2 mb-8">
                         <li class="flex items-center gap-2 text-xs font-bold text-slate-300"><div class="w-4 h-4 rounded-full bg-yellow-400/20 flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-2.5 h-2.5 text-yellow-400"></i></div> Calendar & scheduling management</li>
                         <li class="flex items-center gap-2 text-xs font-bold text-slate-300"><div class="w-4 h-4 rounded-full bg-yellow-400/20 flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-2.5 h-2.5 text-yellow-400"></i></div> Client correspondence & follow-ups</li>
@@ -1146,10 +1147,10 @@
                     </div>
                     <p class="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">Demand Writing</p>
                     <div class="flex items-baseline gap-1 mb-1">
-                        <span class="text-4xl font-black text-[#1b1e2b]">$10</span>
+                        <span class="text-4xl font-black text-[#1b1e2b]"><!-- CMS:price:rate-demand -->$10<!-- /CMS:price:rate-demand --></span>
                         <span class="text-slate-400 font-bold text-sm">/hr</span>
                     </div>
-                    <p class="text-yellow-500 text-xs font-black mb-6">~$1,600/mo <span data-i18n="pricingFullTime">full-time</span></p>
+                    <p class="text-yellow-500 text-xs font-black mb-6">~<!-- CMS:price:month-demand -->$1,600<!-- /CMS:price:month-demand -->/mo <span data-i18n="pricingFullTime">full-time</span></p>
                     <ul class="space-y-2 mb-8">
                         <li class="flex items-center gap-2 text-xs font-bold text-slate-600"><div class="w-4 h-4 rounded-full bg-yellow-400/20 flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-2.5 h-2.5 text-yellow-600"></i></div> Medical record review</li>
                         <li class="flex items-center gap-2 text-xs font-bold text-slate-600"><div class="w-4 h-4 rounded-full bg-yellow-400/20 flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-2.5 h-2.5 text-yellow-600"></i></div> Damages calculation</li>
@@ -1169,10 +1170,10 @@
                     </div>
                     <p class="text-xs font-black uppercase tracking-widest text-slate-400 mb-2">Case Managers</p>
                     <div class="flex items-baseline gap-1 mb-1">
-                        <span class="text-4xl font-black text-[#1b1e2b]">$12</span>
+                        <span class="text-4xl font-black text-[#1b1e2b]"><!-- CMS:price:rate-case -->$12<!-- /CMS:price:rate-case --></span>
                         <span class="text-slate-400 font-bold text-sm">/hr</span>
                     </div>
-                    <p class="text-yellow-500 text-xs font-black mb-6">~$1,920/mo <span data-i18n="pricingFullTime">full-time</span></p>
+                    <p class="text-yellow-500 text-xs font-black mb-6">~<!-- CMS:price:month-case -->$1,920<!-- /CMS:price:month-case -->/mo <span data-i18n="pricingFullTime">full-time</span></p>
                     <ul class="space-y-2 mb-8">
                         <li class="flex items-center gap-2 text-xs font-bold text-slate-600"><div class="w-4 h-4 rounded-full bg-yellow-400/20 flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-2.5 h-2.5 text-yellow-600"></i></div> Full case lifecycle management</li>
                         <li class="flex items-center gap-2 text-xs font-bold text-slate-600"><div class="w-4 h-4 rounded-full bg-yellow-400/20 flex items-center justify-center flex-shrink-0"><i data-lucide="check" class="w-2.5 h-2.5 text-yellow-600"></i></div> Medical treatment follow-up</li>
@@ -1210,32 +1211,32 @@
                             <tr class="border-t border-slate-100 hover:bg-slate-50 transition-colors">
                                 <td class="px-8 py-5 font-black text-[#1b1e2b] text-sm">Legal Intake</td>
                                 <td class="px-8 py-5 text-center text-slate-500 font-bold text-sm line-through decoration-red-400">$4,200</td>
-                                <td class="px-8 py-5 text-center bg-[#1b1e2b]/5 font-black text-[#1b1e2b] text-sm">$1,200</td>
-                                <td class="px-8 py-5 text-center bg-yellow-400/10 font-black text-emerald-600 text-sm">$3,000 <span class="text-xs text-emerald-500">(71%)</span></td>
+                                <td class="px-8 py-5 text-center bg-[#1b1e2b]/5 font-black text-[#1b1e2b] text-sm"><!-- CMS:price:month-intake -->$1,200<!-- /CMS:price:month-intake --></td>
+                                <td class="px-8 py-5 text-center bg-yellow-400/10 font-black text-emerald-600 text-sm"><!-- CMS:price:save-4200-intake -->$3,000<!-- /CMS:price:save-4200-intake --> <span class="text-xs text-emerald-500">(<!-- CMS:price:savepct-4200-intake -->71%<!-- /CMS:price:savepct-4200-intake -->)</span></td>
                             </tr>
                             <tr class="border-t border-slate-100 hover:bg-slate-50 transition-colors">
                                 <td class="px-8 py-5 font-black text-[#1b1e2b] text-sm">Legal Assistants</td>
                                 <td class="px-8 py-5 text-center text-slate-500 font-bold text-sm line-through decoration-red-400">$5,000</td>
-                                <td class="px-8 py-5 text-center bg-[#1b1e2b]/5 font-black text-[#1b1e2b] text-sm">$1,360</td>
-                                <td class="px-8 py-5 text-center bg-yellow-400/10 font-black text-emerald-600 text-sm">$3,640 <span class="text-xs text-emerald-500">(73%)</span></td>
+                                <td class="px-8 py-5 text-center bg-[#1b1e2b]/5 font-black text-[#1b1e2b] text-sm"><!-- CMS:price:month-assistants -->$1,360<!-- /CMS:price:month-assistants --></td>
+                                <td class="px-8 py-5 text-center bg-yellow-400/10 font-black text-emerald-600 text-sm"><!-- CMS:price:save-5000-assistants -->$3,640<!-- /CMS:price:save-5000-assistants --> <span class="text-xs text-emerald-500">(<!-- CMS:price:savepct-5000-assistants -->73%<!-- /CMS:price:savepct-5000-assistants -->)</span></td>
                             </tr>
                             <tr class="border-t border-slate-100 hover:bg-slate-50 transition-colors">
                                 <td class="px-8 py-5 font-black text-[#1b1e2b] text-sm">Demand Writing</td>
                                 <td class="px-8 py-5 text-center text-slate-500 font-bold text-sm line-through decoration-red-400">$5,500</td>
-                                <td class="px-8 py-5 text-center bg-[#1b1e2b]/5 font-black text-[#1b1e2b] text-sm">$1,600</td>
-                                <td class="px-8 py-5 text-center bg-yellow-400/10 font-black text-emerald-600 text-sm">$3,900 <span class="text-xs text-emerald-500">(71%)</span></td>
+                                <td class="px-8 py-5 text-center bg-[#1b1e2b]/5 font-black text-[#1b1e2b] text-sm"><!-- CMS:price:month-demand -->$1,600<!-- /CMS:price:month-demand --></td>
+                                <td class="px-8 py-5 text-center bg-yellow-400/10 font-black text-emerald-600 text-sm"><!-- CMS:price:save-5500-demand -->$3,900<!-- /CMS:price:save-5500-demand --> <span class="text-xs text-emerald-500">(<!-- CMS:price:savepct-5500-demand -->71%<!-- /CMS:price:savepct-5500-demand -->)</span></td>
                             </tr>
                             <tr class="border-t border-slate-100 hover:bg-slate-50 transition-colors">
                                 <td class="px-8 py-5 font-black text-[#1b1e2b] text-sm">Case Managers</td>
                                 <td class="px-8 py-5 text-center text-slate-500 font-bold text-sm line-through decoration-red-400">$5,500</td>
-                                <td class="px-8 py-5 text-center bg-[#1b1e2b]/5 font-black text-[#1b1e2b] text-sm">$1,920</td>
-                                <td class="px-8 py-5 text-center bg-yellow-400/10 font-black text-emerald-600 text-sm">$3,580 <span class="text-xs text-emerald-500">(65%)</span></td>
+                                <td class="px-8 py-5 text-center bg-[#1b1e2b]/5 font-black text-[#1b1e2b] text-sm"><!-- CMS:price:month-case -->$1,920<!-- /CMS:price:month-case --></td>
+                                <td class="px-8 py-5 text-center bg-yellow-400/10 font-black text-emerald-600 text-sm"><!-- CMS:price:save-5500-case -->$3,580<!-- /CMS:price:save-5500-case --> <span class="text-xs text-emerald-500">(<!-- CMS:price:savepct-5500-case -->65%<!-- /CMS:price:savepct-5500-case -->)</span></td>
                             </tr>
                             <tr class="border-t-2 border-[#1b1e2b] bg-[#1b1e2b]">
                                 <td class="px-8 py-5 font-black text-white text-sm" data-i18n="cmpFullTeam">Full Team (4 roles)</td>
                                 <td class="px-8 py-5 text-center font-black text-slate-400 text-sm line-through decoration-red-400">$20,200</td>
-                                <td class="px-8 py-5 text-center font-black text-yellow-400 text-sm">$6,080</td>
-                                <td class="px-8 py-5 text-center font-black text-yellow-400 text-sm">$14,120 <span class="text-xs">(70%)</span></td>
+                                <td class="px-8 py-5 text-center font-black text-yellow-400 text-sm"><!-- CMS:price:month-all -->$6,080<!-- /CMS:price:month-all --></td>
+                                <td class="px-8 py-5 text-center font-black text-yellow-400 text-sm"><!-- CMS:price:save-20200-all -->$14,120<!-- /CMS:price:save-20200-all --> <span class="text-xs">(<!-- CMS:price:savepct-20200-all -->70%<!-- /CMS:price:savepct-20200-all -->)</span></td>
                             </tr>
                         </tbody>
                     </table>
@@ -1247,7 +1248,7 @@
                     <div class="comparison-mobile-card shadow-sm">
                         <div class="bg-slate-50 px-5 py-3 border-b border-slate-100 flex items-center justify-between">
                             <span class="font-black text-[#1b1e2b] text-sm">Legal Intake</span>
-                            <span class="bg-yellow-400/20 text-yellow-700 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">Save 71%</span>
+                            <span class="bg-yellow-400/20 text-yellow-700 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">Save <!-- CMS:price:savepct-4200-intake -->71%<!-- /CMS:price:savepct-4200-intake --></span>
                         </div>
                         <div class="grid grid-cols-2 divide-x divide-slate-100">
                             <div class="px-5 py-4 text-center">
@@ -1256,18 +1257,18 @@
                             </div>
                             <div class="px-5 py-4 text-center bg-[#1b1e2b]/3">
                                 <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">YVA</p>
-                                <p class="text-lg font-black text-[#1b1e2b]">$1,200<span class="text-xs font-bold">/mo</span></p>
+                                <p class="text-lg font-black text-[#1b1e2b]"><!-- CMS:price:month-intake -->$1,200<!-- /CMS:price:month-intake --><span class="text-xs font-bold">/mo</span></p>
                             </div>
                         </div>
                         <div class="px-5 py-3 bg-emerald-50 border-t border-emerald-100 text-center">
-                            <p class="text-sm font-black text-emerald-600"><span data-i18n="cmpYouSave">You save</span> <span class="text-base">$3,000</span> <span data-i18n="everyMonth">every month</span></p>
+                            <p class="text-sm font-black text-emerald-600"><span data-i18n="cmpYouSave">You save</span> <span class="text-base"><!-- CMS:price:save-4200-intake -->$3,000<!-- /CMS:price:save-4200-intake --></span> <span data-i18n="everyMonth">every month</span></p>
                         </div>
                     </div>
                     <!-- Legal Assistants -->
                     <div class="comparison-mobile-card shadow-sm">
                         <div class="bg-slate-50 px-5 py-3 border-b border-slate-100 flex items-center justify-between">
                             <span class="font-black text-[#1b1e2b] text-sm">Legal Assistants</span>
-                            <span class="bg-yellow-400/20 text-yellow-700 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">Save 73%</span>
+                            <span class="bg-yellow-400/20 text-yellow-700 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">Save <!-- CMS:price:savepct-5000-assistants -->73%<!-- /CMS:price:savepct-5000-assistants --></span>
                         </div>
                         <div class="grid grid-cols-2 divide-x divide-slate-100">
                             <div class="px-5 py-4 text-center">
@@ -1276,18 +1277,18 @@
                             </div>
                             <div class="px-5 py-4 text-center bg-[#1b1e2b]/3">
                                 <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">YVA</p>
-                                <p class="text-lg font-black text-[#1b1e2b]">$1,360<span class="text-xs font-bold">/mo</span></p>
+                                <p class="text-lg font-black text-[#1b1e2b]"><!-- CMS:price:month-assistants -->$1,360<!-- /CMS:price:month-assistants --><span class="text-xs font-bold">/mo</span></p>
                             </div>
                         </div>
                         <div class="px-5 py-3 bg-emerald-50 border-t border-emerald-100 text-center">
-                            <p class="text-sm font-black text-emerald-600"><span data-i18n="cmpYouSave">You save</span> <span class="text-base">$3,640</span> <span data-i18n="everyMonth">every month</span></p>
+                            <p class="text-sm font-black text-emerald-600"><span data-i18n="cmpYouSave">You save</span> <span class="text-base"><!-- CMS:price:save-5000-assistants -->$3,640<!-- /CMS:price:save-5000-assistants --></span> <span data-i18n="everyMonth">every month</span></p>
                         </div>
                     </div>
                     <!-- Demand Writing -->
                     <div class="comparison-mobile-card shadow-sm">
                         <div class="bg-slate-50 px-5 py-3 border-b border-slate-100 flex items-center justify-between">
                             <span class="font-black text-[#1b1e2b] text-sm">Demand Writing</span>
-                            <span class="bg-yellow-400/20 text-yellow-700 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">Save 71%</span>
+                            <span class="bg-yellow-400/20 text-yellow-700 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">Save <!-- CMS:price:savepct-5500-demand -->71%<!-- /CMS:price:savepct-5500-demand --></span>
                         </div>
                         <div class="grid grid-cols-2 divide-x divide-slate-100">
                             <div class="px-5 py-4 text-center">
@@ -1296,18 +1297,18 @@
                             </div>
                             <div class="px-5 py-4 text-center bg-[#1b1e2b]/3">
                                 <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">YVA</p>
-                                <p class="text-lg font-black text-[#1b1e2b]">$1,600<span class="text-xs font-bold">/mo</span></p>
+                                <p class="text-lg font-black text-[#1b1e2b]"><!-- CMS:price:month-demand -->$1,600<!-- /CMS:price:month-demand --><span class="text-xs font-bold">/mo</span></p>
                             </div>
                         </div>
                         <div class="px-5 py-3 bg-emerald-50 border-t border-emerald-100 text-center">
-                            <p class="text-sm font-black text-emerald-600"><span data-i18n="cmpYouSave">You save</span> <span class="text-base">$3,900</span> <span data-i18n="everyMonth">every month</span></p>
+                            <p class="text-sm font-black text-emerald-600"><span data-i18n="cmpYouSave">You save</span> <span class="text-base"><!-- CMS:price:save-5500-demand -->$3,900<!-- /CMS:price:save-5500-demand --></span> <span data-i18n="everyMonth">every month</span></p>
                         </div>
                     </div>
                     <!-- Case Managers -->
                     <div class="comparison-mobile-card shadow-sm">
                         <div class="bg-slate-50 px-5 py-3 border-b border-slate-100 flex items-center justify-between">
                             <span class="font-black text-[#1b1e2b] text-sm">Case Managers</span>
-                            <span class="bg-yellow-400/20 text-yellow-700 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">Save 65%</span>
+                            <span class="bg-yellow-400/20 text-yellow-700 text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">Save <!-- CMS:price:savepct-5500-case -->65%<!-- /CMS:price:savepct-5500-case --></span>
                         </div>
                         <div class="grid grid-cols-2 divide-x divide-slate-100">
                             <div class="px-5 py-4 text-center">
@@ -1316,18 +1317,18 @@
                             </div>
                             <div class="px-5 py-4 text-center bg-[#1b1e2b]/3">
                                 <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">YVA</p>
-                                <p class="text-lg font-black text-[#1b1e2b]">$1,920<span class="text-xs font-bold">/mo</span></p>
+                                <p class="text-lg font-black text-[#1b1e2b]"><!-- CMS:price:month-case -->$1,920<!-- /CMS:price:month-case --><span class="text-xs font-bold">/mo</span></p>
                             </div>
                         </div>
                         <div class="px-5 py-3 bg-emerald-50 border-t border-emerald-100 text-center">
-                            <p class="text-sm font-black text-emerald-600"><span data-i18n="cmpYouSave">You save</span> <span class="text-base">$3,580</span> <span data-i18n="everyMonth">every month</span></p>
+                            <p class="text-sm font-black text-emerald-600"><span data-i18n="cmpYouSave">You save</span> <span class="text-base"><!-- CMS:price:save-5500-case -->$3,580<!-- /CMS:price:save-5500-case --></span> <span data-i18n="everyMonth">every month</span></p>
                         </div>
                     </div>
                     <!-- Full Team Total -->
                     <div class="bg-[#1b1e2b] rounded-[1.5rem] overflow-hidden">
                         <div class="px-5 py-4 border-b border-white/10 flex items-center justify-between">
                             <span class="font-black text-white text-sm">Full Team (4 roles)</span>
-                            <span class="bg-yellow-400 text-[#1b1e2b] text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">Save 70%</span>
+                            <span class="bg-yellow-400 text-[#1b1e2b] text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full">Save <!-- CMS:price:savepct-20200-all -->70%<!-- /CMS:price:savepct-20200-all --></span>
                         </div>
                         <div class="grid grid-cols-2 divide-x divide-white/10">
                             <div class="px-5 py-4 text-center">
@@ -1336,16 +1337,16 @@
                             </div>
                             <div class="px-5 py-4 text-center">
                                 <p class="text-[10px] font-black uppercase tracking-widest text-yellow-400 mb-1">YVA</p>
-                                <p class="text-lg font-black text-yellow-400">$6,080<span class="text-xs font-bold">/mo</span></p>
+                                <p class="text-lg font-black text-yellow-400"><!-- CMS:price:month-all -->$6,080<!-- /CMS:price:month-all --><span class="text-xs font-bold">/mo</span></p>
                             </div>
                         </div>
                         <div class="px-5 py-3 bg-yellow-400/10 border-t border-white/10 text-center">
-                            <p class="text-sm font-black text-yellow-400">You save <span class="text-base">$14,120</span> every month</p>
+                            <p class="text-sm font-black text-yellow-400">You save <span class="text-base"><!-- CMS:price:save-20200-all -->$14,120<!-- /CMS:price:save-20200-all --></span> every month</p>
                         </div>
                     </div>
                 </div>
 
-                <p class="text-center text-slate-400 text-xs font-medium mt-4">* Monthly estimates based on full-time (160 hrs). In-house figures reflect average U.S. salaries + overhead.</p>
+                <p class="text-center text-slate-400 text-xs font-medium mt-4">* Monthly estimates based on full-time (<!-- CMS:price:hours -->160<!-- /CMS:price:hours --> hrs). In-house figures reflect average U.S. salaries + overhead.</p>
 
                 <!-- Bottom CTA -->
                 <div class="mt-12 text-center">
@@ -1402,7 +1403,7 @@
                                 </div>
                                 <div class="flex-1 min-w-0">
                                     <p class="font-black text-[#1b1e2b] text-sm">Legal Intake Specialist</p>
-                                    <p class="text-xs text-slate-400 font-semibold">$7.50/hr with YVA &nbsp;·&nbsp; ~$4,200/mo in-house</p>
+                                    <p class="text-xs text-slate-400 font-semibold"><!-- CMS:price:rate-intake -->$7.50<!-- /CMS:price:rate-intake -->/hr with YVA &nbsp;·&nbsp; ~$4,200/mo in-house</p>
                                 </div>
                             </label>
 
@@ -1413,7 +1414,7 @@
                                 </div>
                                 <div class="flex-1 min-w-0">
                                     <p class="font-black text-[#1b1e2b] text-sm">Legal Assistant</p>
-                                    <p class="text-xs text-slate-400 font-semibold">$8.50/hr with YVA &nbsp;·&nbsp; ~$5,000/mo in-house</p>
+                                    <p class="text-xs text-slate-400 font-semibold"><!-- CMS:price:rate-assistants -->$8.50<!-- /CMS:price:rate-assistants -->/hr with YVA &nbsp;·&nbsp; ~$5,000/mo in-house</p>
                                 </div>
                             </label>
 
@@ -1424,7 +1425,7 @@
                                 </div>
                                 <div class="flex-1 min-w-0">
                                     <p class="font-black text-[#1b1e2b] text-sm">Demand Writer</p>
-                                    <p class="text-xs text-slate-400 font-semibold">$10/hr with YVA &nbsp;·&nbsp; ~$5,500/mo in-house</p>
+                                    <p class="text-xs text-slate-400 font-semibold"><!-- CMS:price:rate-demand -->$10<!-- /CMS:price:rate-demand -->/hr with YVA &nbsp;·&nbsp; ~$5,500/mo in-house</p>
                                 </div>
                             </label>
 
@@ -1435,7 +1436,7 @@
                                 </div>
                                 <div class="flex-1 min-w-0">
                                     <p class="font-black text-[#1b1e2b] text-sm">Case Manager</p>
-                                    <p class="text-xs text-slate-400 font-semibold">$12/hr with YVA &nbsp;·&nbsp; ~$5,500/mo in-house</p>
+                                    <p class="text-xs text-slate-400 font-semibold"><!-- CMS:price:rate-case -->$12<!-- /CMS:price:rate-case -->/hr with YVA &nbsp;·&nbsp; ~$5,500/mo in-house</p>
                                 </div>
                             </label>
 
@@ -1571,7 +1572,7 @@
                 <div>
                     <p class="text-yellow-400 font-black uppercase text-xs tracking-[0.2em] sm:tracking-[0.3em] mb-2">No Contracts. No Minimums.</p>
                     <h3 class="text-white font-black text-2xl lg:text-3xl">Ready to get started?</h3>
-                    <p class="text-slate-400 font-medium mt-2">Join the firms already growing with YVA Law Staffing. Bilingual support starting at <span class="text-yellow-400 font-black">$7.50/hr</span>.</p>
+                    <p class="text-slate-400 font-medium mt-2">Join the firms already growing with YVA Law Staffing. Bilingual support starting at <span class="text-yellow-400 font-black"><!-- CMS:price:start -->$7.50<!-- /CMS:price:start -->/hr</span>.</p>
                 </div>
                 <button onclick="openCalendly()" class="w-full lg:w-auto flex-shrink-0 bg-yellow-400 text-[#1b1e2b] px-6 sm:px-10 py-4 sm:py-5 rounded-2xl font-black text-sm uppercase tracking-wider sm:tracking-widest flex items-center justify-center gap-3 hover:bg-yellow-300 transition-all shadow-xl whitespace-nowrap">
                     Book Your Free Call <i data-lucide="arrow-right" class="w-5 h-5"></i>
@@ -1872,7 +1873,7 @@
                         <img src="logo/img2.png" alt="" width="44" height="44" loading="lazy" class="h-11 w-11 rounded-xl shadow-lg transition-transform group-hover:rotate-6">
                         <span class="text-xl font-black tracking-tight leading-none text-white whitespace-nowrap">YVA Law Staffing</span>
                     </a>
-                    <p class="text-slate-400 text-sm font-medium leading-relaxed mb-6" data-i18n="footerDesc">Elite bilingual virtual staffing for law firms and professional services. Starting at <span class="text-yellow-400 font-bold">$7.50/hr</span>.</p>
+                    <p class="text-slate-400 text-sm font-medium leading-relaxed mb-6" data-i18n="footerDesc">Elite bilingual virtual staffing for law firms and professional services. Starting at <span class="text-yellow-400 font-bold"><!-- CMS:price:start -->$7.50<!-- /CMS:price:start -->/hr</span>.</p>
                     <div class="flex gap-3">
                         <a href="#" onclick="openEmailPicker(event)" aria-label="Email" class="w-9 h-9 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-yellow-400 hover:text-[#1b1e2b] hover:border-yellow-400 transition-all">
                             <i data-lucide="mail" class="w-4 h-4"></i>
@@ -2470,7 +2471,7 @@
             {
                 name: 'Legal Intake',
                 icon: 'scale',
-                rate: '$7.50/hr',
+                rate: /* CMS:price:strhr-intake */"$7.50/hr"/* /CMS:price:strhr-intake */,
                 image: /* CMS:imgurl:service_intake */"/assets/img/site/service-legal-intake-57fed261c6-800.webp"/* /CMS:imgurl:service_intake */,
                 imagePosition: /* CMS:imgpos:service_intake */"50% 50%"/* /CMS:imgpos:service_intake */,
                 headline: 'Stop losing potential clients to missed calls or delayed responses.',
@@ -2488,7 +2489,7 @@
             {
                 name: 'Legal Assistants',
                 icon: 'gavel',
-                rate: '$8.50/hr',
+                rate: /* CMS:price:strhr-assistants */"$8.50/hr"/* /CMS:price:strhr-assistants */,
                 image: /* CMS:imgurl:service_assistants */"/assets/img/site/service-legal-assistants-6cbdfc58df-800.webp"/* /CMS:imgurl:service_assistants */,
                 imagePosition: /* CMS:imgpos:service_assistants */"50% 50%"/* /CMS:imgpos:service_assistants */,
                 headline: 'Give your attorneys the support they need to stay focused on cases — not paperwork.',
@@ -2506,7 +2507,7 @@
             {
                 name: 'Demand Writing',
                 icon: 'file-text',
-                rate: '$10/hr',
+                rate: /* CMS:price:strhr-demand */"$10/hr"/* /CMS:price:strhr-demand */,
                 image: /* CMS:imgurl:service_demand */"/assets/img/site/service-demand-writing-45dfb2360a-800.webp"/* /CMS:imgurl:service_demand */,
                 imagePosition: /* CMS:imgpos:service_demand */"50% 50%"/* /CMS:imgpos:service_demand */,
                 headline: 'Turn case records into complete demand packages without slowing down your attorneys.',
@@ -2524,7 +2525,7 @@
             {
                 name: 'Case Managers',
                 icon: 'users',
-                rate: '$12/hr',
+                rate: /* CMS:price:strhr-case */"$12/hr"/* /CMS:price:strhr-case */,
                 image: /* CMS:imgurl:service_case */"/assets/img/site/service-case-managers-eb7e9c2782-800.webp"/* /CMS:imgurl:service_case */,
                 imagePosition: /* CMS:imgpos:service_case */"50% 50%"/* /CMS:imgpos:service_case */,
                 headline: 'Keep every case on track from the moment it opens to the day it settles.',
@@ -2718,10 +2719,10 @@
 
         // ROI Calculator
         const roiRoles = {
-            intake:      { name: 'Legal Intake Specialist', rate: 7.50,  inhouse: 4200 },
-            assistant:   { name: 'Legal Assistant',         rate: 8.50,  inhouse: 5000 },
-            demand:      { name: 'Demand Writer',           rate: 10.00, inhouse: 5500 },
-            casemanager: { name: 'Case Manager',            rate: 12.00, inhouse: 5500 }
+            intake:      { name: 'Legal Intake Specialist', rate: /* CMS:price:num-intake */7.5/* /CMS:price:num-intake */,  inhouse: 4200 },
+            assistant:   { name: 'Legal Assistant',         rate: /* CMS:price:num-assistants */8.5/* /CMS:price:num-assistants */,  inhouse: 5000 },
+            demand:      { name: 'Demand Writer',           rate: /* CMS:price:num-demand */10/* /CMS:price:num-demand */, inhouse: 5500 },
+            casemanager: { name: 'Case Manager',            rate: /* CMS:price:num-case */12/* /CMS:price:num-case */, inhouse: 5500 }
         };
 
         let roiHours = 40;
@@ -3122,7 +3123,7 @@
                 hansRole: 'CEO & Founder',
                 hansBio: 'Drives the vision and growth of YVA Law Staffing. Built the agency with a mission to connect U.S. law firms with elite bilingual talent — at a price that actually makes sense.',
                 meetFounder: 'Meet the Founder',
-                footerDesc: 'Elite bilingual virtual staffing for law firms and professional services. Starting at <span class="text-yellow-400 font-bold">$7.50/hr</span>.',
+                footerDesc: 'Elite bilingual virtual staffing for law firms and professional services. Starting at <span class="text-yellow-400 font-bold"><!-- CMS:price:start -->$7.50<!-- /CMS:price:start -->/hr</span>.',
                 footerQuickLinks: 'Quick Links', footerOurServices: 'Our Services', footerGetInTouch: 'Get In Touch',
                 footerTestimonials: 'Testimonials', footerFaq: 'FAQ', footerBlog: 'Blog',
                 footerBookCall: 'Book a Free Call',
@@ -3214,7 +3215,7 @@
                 hansRole: 'CEO y Fundador',
                 hansBio: 'Impulsa la visión y el crecimiento de YVA Law Staffing. Construyó la agencia con la misión de conectar firmas de abogados en EE.UU. con talento bilingüe de élite — a un precio que realmente tiene sentido.',
                 meetFounder: 'Conoce al Fundador',
-                footerDesc: 'Personal virtual bilingüe de élite para firmas de abogados y servicios profesionales. Desde <span class="text-yellow-400 font-bold">$7.50/hr</span>.',
+                footerDesc: 'Personal virtual bilingüe de élite para firmas de abogados y servicios profesionales. Desde <span class="text-yellow-400 font-bold"><!-- CMS:price:start -->$7.50<!-- /CMS:price:start -->/hr</span>.',
                 footerQuickLinks: 'Accesos Directos', footerOurServices: 'Nuestros Servicios', footerGetInTouch: 'Contáctanos',
                 footerTestimonials: 'Testimonios', footerFaq: 'Preguntas Frecuentes', footerBlog: 'Blog',
                 footerBookCall: 'Reservar Llamada Gratuita',

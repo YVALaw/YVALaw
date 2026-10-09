@@ -343,6 +343,44 @@
     );
   }
 
+  // ---- Prices: what the main price spots will show (mirrors priceValue in build.js) ----
+  var PRICE_SERVICES = [['intake', 'Legal Intake', 4200], ['assistants', 'Legal Assistants', 5000], ['demand', 'Demand Writing', 5500], ['case', 'Case Managers', 5500]];
+
+  function PricesPreview(props) {
+    var get = function (key) { return Number(props.entry.getIn(['data', key])) || 0; };
+    var hours = get('hours_per_month') || 160;
+    var rows = PRICE_SERVICES.map(function (s) {
+      var month = get(s[0]) * hours;
+      return { name: s[1], rate: get(s[0]), month: month, inhouse: s[2], save: Math.max(0, s[2] - month) };
+    });
+    var lowest = Math.min.apply(null, rows.map(function (r) { return r.rate; }));
+    var total = rows.reduce(function (sum, r) { return sum + r.month; }, 0);
+    var cell = 'px-4 py-3 text-sm';
+    return h('div', { className: 'max-w-2xl mx-auto px-6 py-10' },
+      label('Home page price cards and comparison table'),
+      h('div', { className: 'bg-white rounded-[2rem] border-2 border-slate-100 overflow-hidden mb-8' },
+        h('table', { className: 'w-full' },
+          h('thead', null, h('tr', { className: 'bg-[#1b1e2b] text-white text-xs uppercase tracking-widest' },
+            ['Service', 'Hourly', 'Per month', 'In-house', 'You save'].map(function (t) { return h('th', { key: t, className: 'px-4 py-3 text-left font-black' }, t); }))),
+          h('tbody', null, rows.map(function (r) {
+            return h('tr', { key: r.name, className: 'border-t border-slate-100' },
+              h('td', { className: cell + ' font-black text-[#1b1e2b]' }, r.name),
+              h('td', { className: cell + ' font-bold' }, money(r.rate) + '/hr'),
+              h('td', { className: cell + ' font-bold' }, money(r.month)),
+              h('td', { className: cell + ' text-slate-400 line-through' }, money(r.inhouse)),
+              h('td', { className: cell + ' font-black text-emerald-600' }, money(r.save) + ' (' + Math.round(r.save / r.inhouse * 100) + '%)'));
+          }).concat([h('tr', { key: 'all', className: 'bg-[#1b1e2b] text-white' },
+            h('td', { className: cell + ' font-black' }, 'Full team'), h('td', { className: cell }, ''),
+            h('td', { className: cell + ' font-black text-yellow-400' }, money(total)),
+            h('td', { className: cell + ' text-slate-400 line-through' }, money(20200)),
+            h('td', { className: cell + ' font-black text-yellow-400' }, money(Math.max(0, 20200 - total)) + ' (' + Math.round(Math.max(0, 20200 - total) / 20200 * 100) + '%)'))])))),
+      h('p', { className: 'text-sm font-bold text-slate-600' }, '“Starting at” price everywhere: ', h('span', { className: 'font-black text-[#1b1e2b] underline decoration-yellow-400 decoration-4 underline-offset-4' }, money(lowest) + '/hr')),
+      rows.some(function (r) { return r.save === 0; })
+        ? h('p', { className: 'mt-4 text-sm font-bold text-amber-600' }, 'A monthly price is now at or above its in-house comparison, so that saving shows $0.')
+        : null
+    );
+  }
+
   // ---- Landing Pages (content/landing-*.json): photo crops, testimonials, FAQ ------
 
   function LandingPreview(props) {
@@ -390,6 +428,7 @@
   CMS.registerPreviewTemplate('blog', BlogPreview);
   CMS.registerPreviewTemplate('jobs', JobPreview);
   CMS.registerPreviewTemplate('hero', HeroPreview);
+  CMS.registerPreviewTemplate('prices', PricesPreview);
   CMS.registerPreviewTemplate('testimonials', TestimonialsPreview);
   CMS.registerPreviewTemplate('faq', FaqPreview);
   CMS.registerPreviewTemplate('stats', StatsPreview);
