@@ -678,7 +678,7 @@ collections:
                 hint: "Quotation marks are added automatically."
               - { label: "Name", name: "name", widget: "string" }
               - { label: "Company / role", name: "company", widget: "string", required: false }
-          - label: "FAQ"
+          - label: "Questions"
             label_singular: "Question"
             name: "faq"
             widget: "list"
@@ -738,7 +738,7 @@ collections:
                 hint: "Quotation marks are added automatically."
               - { label: "Name", name: "name", widget: "string" }
               - { label: "Company / role", name: "company", widget: "string", required: false }
-          - label: "FAQ"
+          - label: "Questions"
             label_singular: "Question"
             name: "faq"
             widget: "list"
@@ -798,7 +798,7 @@ collections:
                 hint: "Quotation marks are added automatically."
               - { label: "Name", name: "name", widget: "string" }
               - { label: "Company / role", name: "company", widget: "string", required: false }
-          - label: "FAQ"
+          - label: "Questions"
             label_singular: "Question"
             name: "faq"
             widget: "list"
@@ -858,7 +858,7 @@ collections:
                 hint: "Quotation marks are added automatically."
               - { label: "Name", name: "name", widget: "string" }
               - { label: "Company / role", name: "company", widget: "string", required: false }
-          - label: "FAQ"
+          - label: "Questions"
             label_singular: "Question"
             name: "faq"
             widget: "list"
@@ -918,7 +918,7 @@ collections:
                 hint: "Quotation marks are added automatically."
               - { label: "Name", name: "name", widget: "string" }
               - { label: "Company / role", name: "company", widget: "string", required: false }
-          - label: "FAQ"
+          - label: "Questions"
             label_singular: "Question"
             name: "faq"
             widget: "list"
@@ -978,7 +978,7 @@ collections:
                 hint: "Quotation marks are added automatically."
               - { label: "Name", name: "name", widget: "string" }
               - { label: "Company / role", name: "company", widget: "string", required: false }
-          - label: "FAQ"
+          - label: "Questions"
             label_singular: "Question"
             name: "faq"
             widget: "list"
@@ -1018,7 +1018,7 @@ collections:
                 required: false
                 choose_url: false
                 hint: "A small square photo of the person (shown as a circle). Leave empty to show their initial."
-          - label: "FAQ"
+          - label: "Questions"
             label_singular: "Question"
             name: "faq"
             widget: "list"
