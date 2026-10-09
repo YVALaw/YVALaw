@@ -135,6 +135,8 @@ function readCollection(dir, mapper, sorter) {
 
 const postBodies = {};
 const draftPosts = [];
+const scheduledPosts = []; // { slug, date } — publish date still in the future
+const buildTime = new Date();
 
 const posts = readCollection(
   postsDir,
@@ -144,6 +146,13 @@ const posts = readCollection(
     // given a page or put in the sitemap until it's switched off.
     if (frontmatter.draft === true) {
       draftPosts.push(slug);
+      return null;
+    }
+    // Scheduled: hidden the same way until its publish date. The hourly
+    // publish-scheduled-posts function rebuilds the site once that date passes.
+    const publishAt = frontmatter.date ? new Date(frontmatter.date) : null;
+    if (publishAt && !Number.isNaN(publishAt.getTime()) && publishAt > buildTime) {
+      scheduledPosts.push({ slug, date: publishAt.toISOString() });
       return null;
     }
     postBodies[slug] = (content.split(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/)[1] || '').trim();
@@ -164,7 +173,15 @@ fs.writeFileSync(
   JSON.stringify(posts, null, 2)
 );
 
-console.log(`Built posts/index.json — ${posts.length} post(s)${draftPosts.length ? `, skipped ${draftPosts.length} draft(s): ${draftPosts.join(', ')}` : ''}`);
+// Only the dates, so unpublished titles aren't listed anywhere.
+fs.writeFileSync(
+  path.join(postsDir, 'scheduled.json'),
+  JSON.stringify({ dates: scheduledPosts.map(p => p.date).sort() }, null, 2) + '\n'
+);
+
+console.log(`Built posts/index.json — ${posts.length} post(s)` +
+  (draftPosts.length ? `, skipped ${draftPosts.length} draft(s): ${draftPosts.join(', ')}` : '') +
+  (scheduledPosts.length ? `, ${scheduledPosts.length} scheduled: ${scheduledPosts.map(p => `${p.slug} (${p.date})`).join(', ')}` : ''));
 
 const jobs = readCollection(
   jobsDir,

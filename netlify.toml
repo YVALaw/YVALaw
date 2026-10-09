@@ -6,6 +6,10 @@
 [functions."run-autopay"]
   schedule = "0 13 * * *"
 
+# Marketing-site blog: publishes scheduled posts (see the function for setup)
+[functions."publish-scheduled-posts"]
+  schedule = "@hourly"
+
 # Internal staff app (YVA LawOS) — keep it out of search results
 [[headers]]
   for = "/os/*"

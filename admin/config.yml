@@ -51,7 +51,7 @@ collections:
         name: "date"
         widget: "datetime"
         default: "{{now}}"
-        hint: "Filled in with today's date. The blog lists the newest posts first."
+        hint: "Filled in with today's date. To schedule the post, pick a later date and time: it stays hidden until then and goes live by itself (within the hour). The blog lists the newest posts first."
       - label: "Summary"
         name: "description"
         widget: "text"

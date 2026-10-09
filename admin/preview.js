@@ -75,6 +75,10 @@
 
     return h('div', { className: 'max-w-3xl mx-auto px-6 py-10' },
       get('draft') ? notice('Draft: saved but hidden from the website. Turn off “Draft” and click Publish when it’s ready.') : null,
+      !get('draft') && get('date') && new Date(get('date')) > new Date()
+        ? notice('Scheduled: after you click Publish, this post stays hidden until ' +
+          new Date(get('date')).toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' }) + ', then goes live by itself.')
+        : null,
       label('In the blog list'),
       card,
       counter,
