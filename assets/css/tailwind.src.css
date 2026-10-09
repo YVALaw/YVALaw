@@ -38,3 +38,25 @@
     display: none;
   }
 }
+
+/* Article text for blog posts (markdown rendered by build.js / blog-post.html).
+   Kept here rather than in blog-post.html so the content manager's live preview
+   (/admin) shows posts with exactly the same styling. */
+.prose h2 { font-size: 1.5rem; font-weight: 900; color: #1b1e2b; margin-top: 2.5rem; margin-bottom: 1rem; line-height: 1.2; }
+.prose h3 { font-size: 1.2rem; font-weight: 900; color: #1b1e2b; margin-top: 2rem; margin-bottom: 0.75rem; }
+.prose p { color: #475569; font-size: 1.05rem; line-height: 1.8; margin-bottom: 1.25rem; font-weight: 500; }
+.prose ul { list-style: none; padding: 0; margin-bottom: 1.25rem; }
+.prose ul li { color: #475569; font-size: 1.05rem; line-height: 1.8; font-weight: 500; padding-left: 1.5rem; position: relative; margin-bottom: 0.4rem; }
+.prose ul li::before { content: ''; position: absolute; left: 0; top: 0.65rem; width: 8px; height: 8px; background: #facc15; border-radius: 50%; }
+.prose ol { list-style: decimal; padding-left: 1.5rem; margin-bottom: 1.25rem; }
+.prose ol li { color: #475569; font-size: 1.05rem; line-height: 1.8; font-weight: 500; margin-bottom: 0.4rem; }
+.prose strong { color: #1b1e2b; font-weight: 900; }
+.prose a { color: #1b1e2b; font-weight: 700; text-decoration: underline; text-decoration-color: #facc15; text-underline-offset: 3px; }
+.prose a:hover { color: #facc15; }
+.prose blockquote { border-left: 4px solid #facc15; padding-left: 1.25rem; margin: 1.5rem 0; }
+.prose blockquote p { color: #64748b; font-style: italic; }
+.prose hr { border: none; border-top: 1px solid #e2e8f0; margin: 2rem 0; }
+.prose table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; font-size: 0.95rem; }
+.prose th { text-align: left; background: #1b1e2b; color: #fff; font-weight: 900; padding: 0.75rem 1rem; }
+.prose td { color: #475569; font-weight: 500; padding: 0.75rem 1rem; border-bottom: 1px solid #e2e8f0; }
+.prose tr:nth-child(even) td { background: #f8fafc; }

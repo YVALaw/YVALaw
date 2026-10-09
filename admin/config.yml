@@ -1,43 +1,175 @@
+# Content manager (Decap CMS) for yvastaffing.agency/admin.
+# Field `name`s are the keys build.js reads from each file's frontmatter —
+# rename one here only together with build.js. Labels and hints are free to change.
+# Live previews for these collections are in admin/preview.js.
+
 backend:
   name: git-gateway
   branch: main
 
+site_url: https://yvastaffing.agency
+display_url: https://yvastaffing.agency
+logo:
+  src: /logo/img2.png
+  show_in_header: true
+
 media_folder: "images/uploads"
 public_folder: "/images/uploads"
+
+# Plain-ASCII file names and URLs, also for Spanish titles ("Cómo contratar…" -> como-contratar)
+slug:
+  encoding: "ascii"
+  clean_accents: true
 
 collections:
   - name: "blog"
     label: "Blog Posts"
+    label_singular: "Blog Post"
+    description: "Articles on the Blog page. Changes go live about a minute after you click Publish. Turn on “Draft” to save a post without showing it on the website."
     folder: "posts"
     create: true
     slug: "{{year}}-{{month}}-{{day}}-{{slug}}"
+    preview_path: "blog/{{slug}}/"
+    summary: "{{fields.draft | ternary('DRAFT · ', '')}}{{fields.title}} · {{fields.date | date('MMM D, YYYY')}}"
+    sortable_fields:
+      - { field: "date", label: "Publish date", default_sort: "desc" }
+      - { field: "title", label: "Title" }
+    view_filters:
+      - { label: "Drafts", field: "draft", pattern: true }
     fields:
-      - { label: "Title", name: "title", widget: "string" }
-      - { label: "Publish Date", name: "date", widget: "datetime" }
-      - { label: "Description", name: "description", widget: "string", hint: "Short summary shown in the blog listing" }
-      - { label: "Featured Image", name: "image", widget: "image", required: false }
-      - { label: "Body", name: "body", widget: "markdown" }
+      - label: "Title"
+        name: "title"
+        widget: "string"
+        hint: "The headline. It's also the title Google shows in search results."
+      - label: "Draft"
+        name: "draft"
+        widget: "boolean"
+        default: false
+        required: false
+        hint: "On = saved but hidden from the website. Turn it off and click Publish when the post is ready."
+      - label: "Publish date"
+        name: "date"
+        widget: "datetime"
+        default: "{{now}}"
+        hint: "Filled in with today's date. The blog lists the newest posts first."
+      - label: "Summary"
+        name: "description"
+        widget: "text"
+        hint: "1–2 sentences (about 150 characters). Shown under the title in the blog list and in Google results. The preview on the right counts the characters."
+      - label: "Featured image"
+        name: "image"
+        widget: "image"
+        required: false
+        hint: "Optional. A wide (landscape) photo, at least 1200 px wide. Shown at the top of the post, on its card in the blog list, and when the post is shared."
+      - label: "Image description"
+        name: "image_alt"
+        widget: "string"
+        required: false
+        hint: "A few words describing the photo, e.g. “Attorney reviewing case files with an assistant”. Read aloud to blind visitors and used by Google."
+      - label: "Post"
+        name: "body"
+        widget: "markdown"
+        modes: ["rich_text"]
+        buttons: ["bold", "italic", "link", "heading-two", "heading-three", "quote", "bulleted-list", "numbered-list"]
+        editor_components: ["image"]
+        hint: "Use “Heading 2” for section titles and “Heading 3” for sub-sections."
+
   - name: "jobs"
     label: "Job Posts"
+    label_singular: "Job Post"
+    description: "Roles on the Careers page. To stop taking applications, set Status to Closed instead of deleting the post."
     folder: "jobs"
     create: true
     slug: "{{slug}}"
+    preview_path: "careers.html"
+    summary: "{{fields.title}} · {{fields.status}}"
+    sortable_fields:
+      - { field: "title", label: "Job title", default_sort: "asc" }
+      - { field: "date", label: "Publish date" }
+    view_filters:
+      - { label: "Open", field: "status", pattern: "Open" }
+      - { label: "Closed", field: "status", pattern: "Closed" }
     fields:
-      - { label: "Job Title", name: "title", widget: "string" }
-      - { label: "Publish Date", name: "date", widget: "datetime" }
-      - { label: "Status", name: "status", widget: "select", default: "Open", options: ["Open", "Closed"] }
-      - { label: "Featured In Hero", name: "featured", widget: "boolean", default: false, required: false }
-      - { label: "Location", name: "location", widget: "string", default: "Remote" }
-      - { label: "Schedule", name: "schedule", widget: "string", default: "Full / Part-time" }
-      - { label: "Icon", name: "icon", widget: "string", required: false, hint: "Lucide icon name like phone, scale, file-text, users, share-2, layout, megaphone" }
-      - { label: "Short Description", name: "description", widget: "text", hint: "Shown on the careers page card" }
-      - label: "Key Skills"
+      - label: "Job title"
+        name: "title"
+        widget: "string"
+        hint: "The role name, e.g. “Legal Intake Specialist”. Also appears in the application form's role list."
+      - label: "Status"
+        name: "status"
+        widget: "select"
+        default: "Open"
+        options: ["Open", "Closed"]
+        hint: "Closed roles stay on the page with an “Applications Closed” button."
+      - label: "Highlight at the top of the Careers page"
+        name: "featured"
+        widget: "boolean"
+        default: false
+        required: false
+        hint: "Up to 3 highlighted open roles appear in the box at the top of the page."
+      - label: "Publish date"
+        name: "date"
+        widget: "datetime"
+        default: "{{now}}"
+        hint: "Newer roles are listed first."
+      - label: "Location"
+        name: "location"
+        widget: "string"
+        default: "Remote"
+      - label: "Schedule"
+        name: "schedule"
+        widget: "string"
+        default: "Full / Part-time"
+      - label: "Icon"
+        name: "icon"
+        widget: "select"
+        default: "briefcase"
+        required: false
+        hint: "The picture on the role's card. The preview on the right shows it."
+        options:
+          - { label: "Briefcase", value: "briefcase" }
+          - { label: "Phone", value: "phone" }
+          - { label: "Headset", value: "headset" }
+          - { label: "Scales of justice", value: "scale" }
+          - { label: "Gavel", value: "gavel" }
+          - { label: "Document", value: "file-text" }
+          - { label: "Signed document", value: "file-signature" }
+          - { label: "Folder", value: "folder-open" }
+          - { label: "Checklist", value: "clipboard-list" }
+          - { label: "Calendar", value: "calendar" }
+          - { label: "People", value: "users" }
+          - { label: "Person with check mark", value: "user-check" }
+          - { label: "Handshake", value: "heart-handshake" }
+          - { label: "Languages", value: "languages" }
+          - { label: "Email", value: "mail" }
+          - { label: "Chat bubble", value: "message-circle" }
+          - { label: "Calculator", value: "calculator" }
+          - { label: "Medical (stethoscope)", value: "stethoscope" }
+          - { label: "Social media (share)", value: "share-2" }
+          - { label: "Megaphone", value: "megaphone" }
+          - { label: "Web layout", value: "layout" }
+          - { label: "Computer", value: "monitor" }
+          - { label: "Design (pen)", value: "pen-tool" }
+          - { label: "Palette", value: "palette" }
+          - { label: "Growth chart", value: "chart-line" }
+      - label: "Short description"
+        name: "description"
+        widget: "text"
+        hint: "1–2 sentences shown on the role's card."
+      - label: "Key skills"
         name: "skills"
         widget: "list"
         min: 1
         summary: "{{fields.skill}}"
+        hint: "3–4 short skills shown as tags on the card, e.g. “Bilingual”."
         field:
           label: "Skill"
           name: "skill"
           widget: "string"
-      - { label: "Full Notes", name: "body", widget: "markdown", required: false, hint: "Optional internal notes or a fuller job description for later use" }
+      - label: "Notes"
+        name: "body"
+        widget: "markdown"
+        modes: ["rich_text"]
+        required: false
+        buttons: ["bold", "italic", "link", "bulleted-list", "numbered-list"]
+        editor_components: []
+        hint: "Optional. Not shown on the Careers page, but not private either: don't put confidential information here."

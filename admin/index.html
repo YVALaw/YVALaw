@@ -1,13 +1,19 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="robots" content="noindex, nofollow">
-  <title>Blog Admin | YVA Law Staffing</title>
+  <title>Content Manager | YVA Law Staffing</title>
+  <link rel="icon" href="/favicon.ico" sizes="48x48">
+  <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png">
 </head>
 <body>
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
-  <script src="https://unpkg.com/decap-cms@^3.0.0/dist/decap-cms.js"></script>
+  <!-- Exact version: a floating range could pull in a release that breaks admin/config.yml. -->
+  <script src="https://unpkg.com/decap-cms@3.16.3/dist/decap-cms.js"></script>
+  <!-- Same Lucide version as the site; draws the job icons in the preview. -->
+  <script src="https://unpkg.com/lucide@0.469.0/dist/umd/lucide.min.js"></script>
+  <script src="/admin/preview.js"></script>
 </body>
 </html>

@@ -8,7 +8,7 @@ Single file: `index.html` (~3200 lines). Plain HTML pages + a small build step (
 - `assets/css/tailwind.css` — compiled from `assets/css/tailwind.src.css` using the classes found in `*.html` + `build.js` (`tailwind.config.js`). Pages link this file; the Tailwind Play CDN is no longer used (it was ~400 KB of render-blocking JS). **After adding new Tailwind classes, run `npm run build` (or `npm run build:css`) before previewing locally** — Netlify rebuilds it on deploy anyway. Never build class names from string pieces in JS (`'bg-' + color`); the compiler only sees full class names.
 - `assets/js/lucide.js` — generated subset of Lucide v0.469.0 with only the icons the site uses (found as `data-lucide="…"`, any quoted icon name in the pages, and job-post `icon` fields). Same API as the library: `lucide.createIcons()`.
 - `tailwind.config.js` sets `future.hoverOnlyWhenSupported`, so `hover:` styles only apply on devices with a mouse (no "stuck" hover colors after a tap on phones).
-- Shared base CSS in `tailwind.src.css`: icon placeholders keep their size before Lucide runs (no layout shift), and form fields are 16px on phones (prevents iOS zoom-on-focus).
+- Shared base CSS in `tailwind.src.css`: icon placeholders keep their size before Lucide runs (no layout shift), form fields are 16px on phones (prevents iOS zoom-on-focus), and the blog article (`.prose`) styles used by blog posts and the `/admin` preview.
 - Generated files (`tailwind.css`, `lucide.js`, `posts/index.json`, `jobs/index.json`, `sitemap.xml`) are committed so the site still works if previewed without building.
 
 **Standalone pages:**
@@ -143,6 +143,14 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 
 ---
 
+## Content Manager (`/admin`)
+- Decap CMS, pinned to an exact version in `admin/index.html` (a floating range could ship a release that rejects `admin/config.yml` and breaks the whole admin). Login: Netlify Identity + Git Gateway, commits straight to `main`.
+- `admin/config.yml`: two collections, Blog Posts (`posts/`) and Job Posts (`jobs/`). Field `name`s are the frontmatter keys `build.js` reads; labels/hints are plain-language copy for non-technical editors.
+- `admin/preview.js`: live preview pane drawn with the site's own CSS (blog card + post page, careers job card). Its markup mirrors `blog.html`, `build.js` and `careers.html` — update it when those change. `tailwind.config.js` scans `admin/*.js`.
+- Blog `draft: true` → `build.js` skips the post (no listing, page or sitemap entry). `image_alt` → the featured image's alt text (falls back to the title).
+- Editor is rich-text only (Markdown mode hidden). Verified that re-saving every existing post in rich-text mode leaves the rendered pages unchanged, tables included.
+- Test locally: add `local_backend: true` to a copy of `admin/config.yml`, run `npx decap-server` in the site folder and serve the site on localhost.
+
 ## Integrations
 - **Google Analytics:** `G-V2Q6V4HE4F`
 - **EmailJS:** Public key `Vsnmntfk0c8ChKXVL`
@@ -151,6 +159,10 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 ---
 
 ## Things Completed
+
+### Session 11 (content manager)
+- About section: Sam Colas removed (story, founder card, JSON-LD); Hans Henriquez → **Hans Esmel**, described as sole founder ("CEO & Founder"). Headings now "The Founder" / "Meet the Founder".
+- `/admin` made simpler: YVA logo, plain-language field hints, Draft switch, image description field, today's date by default, Spanish accents stripped from new post URLs, newest-first sorting, Drafts / Open / Closed filters, trimmed rich-text toolbar, icon picker for jobs, and a live preview that looks like the real site. See "Content Manager" above.
 
 ### Session 10 (SEO, branding, mobile)
 - Title/brand: header, drawer and footer now read **YVA Law Staffing** (the logo image only says "YV"). Home `<title>`: "YVA Law Staffing | Bilingual Virtual Legal Staff for Law Firms".

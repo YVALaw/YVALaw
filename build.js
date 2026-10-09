@@ -134,18 +134,26 @@ function readCollection(dir, mapper, sorter) {
 }
 
 const postBodies = {};
+const draftPosts = [];
 
 const posts = readCollection(
   postsDir,
   (frontmatter, file, content) => {
     const slug = file.replace('.md', '');
+    // "Draft" switch in the content manager: saved to the repo, but not listed,
+    // given a page or put in the sitemap until it's switched off.
+    if (frontmatter.draft === true) {
+      draftPosts.push(slug);
+      return null;
+    }
     postBodies[slug] = (content.split(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/)[1] || '').trim();
     return {
       slug,
       title: frontmatter.title || 'Untitled',
       date: frontmatter.date || '',
       description: frontmatter.description || '',
-      image: frontmatter.image || ''
+      image: frontmatter.image || '',
+      imageAlt: frontmatter.image_alt || ''
     };
   },
   (a, b) => new Date(b.date) - new Date(a.date)
@@ -156,7 +164,7 @@ fs.writeFileSync(
   JSON.stringify(posts, null, 2)
 );
 
-console.log(`Built posts/index.json — ${posts.length} post(s)`);
+console.log(`Built posts/index.json — ${posts.length} post(s)${draftPosts.length ? `, skipped ${draftPosts.length} draft(s): ${draftPosts.join(', ')}` : ''}`);
 
 const jobs = readCollection(
   jobsDir,
@@ -289,7 +297,7 @@ ${isoDate ? `  <meta property="article:published_time" content="${isoDate}">\n` 
 
   const body = `    <div id="post-content">
 ${post.image ? `      <div id="post-image-wrap" class="mb-10 rounded-3xl overflow-hidden shadow-xl">
-        <img id="post-image" src="${escapeHtml(post.image)}" alt="${escapeHtml(post.title)}" class="w-full max-h-96 object-cover">
+        <img id="post-image" src="${escapeHtml(post.image)}" alt="${escapeHtml(post.imageAlt || post.title)}" class="w-full max-h-96 object-cover">
       </div>
 ` : ''}${post.date ? `      <p id="post-date" class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4"><time datetime="${isoDate}">${formatDate(post.date)}</time></p>
 ` : ''}      <h1 id="post-title" class="text-4xl lg:text-5xl font-black text-[#1b1e2b] leading-tight tracking-tight mb-6">${escapeHtml(post.title)}</h1>
