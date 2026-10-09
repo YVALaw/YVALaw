@@ -29,17 +29,17 @@ That works out to **$32–$37/hr** for a role that shows up on the books at $22/
 
 ## The True Cost of a Virtual Legal Staff Member
 
-A virtual legal assistant through YVA Law Staffing is billed at **$8.50/hr**. Full-time (160 hrs/month) comes to **$1,360/month** or **$16,320/year**.
+A virtual legal assistant through YVA Law Staffing is billed at **{assistants}/hr**. Full-time ({hours} hrs/month) comes to **{month-assistants}/month** or **{year-assistants}/year**.
 
 There are no additional costs. No payroll taxes. No benefits. No office space. No recruiting fees. No equipment.
 
-The effective hourly rate is $8.50 — full stop.
+The effective hourly rate is {assistants} — full stop.
 
 ## Side-by-Side Comparison
 
 | | In-House | Virtual (YVA) |
 |---|---|---|
-| Annual cost | $66,000–$76,500 | $16,320 |
+| Annual cost | $66,000–$76,500 | {year-assistants} |
 | Payroll taxes | Yes | No |
 | Benefits | Yes | No |
 | Office space | Yes | No |

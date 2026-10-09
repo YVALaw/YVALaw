@@ -43,7 +43,7 @@ In many firms, a significant portion of attorney time goes to coordination, clie
 
 ## What a Virtual Case Manager Costs vs. What They're Worth
 
-A virtual case manager through YVA Law Staffing starts at **$12/hr** — roughly $1,920/month full-time. An attorney billing at $300/hr who reclaims just 20 hours per month of coordination time generates $6,000 in recoverable billing capacity.
+A virtual case manager through YVA Law Staffing starts at **{case}/hr** — roughly {month-case}/month full-time. An attorney billing at $300/hr who reclaims just 20 hours per month of coordination time generates $6,000 in recoverable billing capacity.
 
 The math doesn't require a spreadsheet.
 

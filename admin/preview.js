@@ -70,7 +70,7 @@
       date ? h('p', { className: 'text-xs font-black text-slate-400 uppercase tracking-widest mb-4' }, date) : null,
       h('h1', { className: 'text-4xl lg:text-5xl font-black text-[#1b1e2b] leading-tight tracking-tight mb-6' }, title),
       description ? h('p', { className: 'text-xl text-slate-500 font-medium leading-relaxed mb-10 pb-10 border-b border-slate-100' }, description) : null,
-      h('div', { className: 'prose' }, props.widgetFor('body'))
+      h(PriceText, { className: 'prose' }, props.widgetFor('body'))
     );
 
     return h('div', { className: 'max-w-3xl mx-auto px-6 py-10' },
@@ -136,16 +136,49 @@
 
   // ---- Website Content (content/*.json, written into the pages by build.js) ----
 
-  // Starting price for {price} in previews: the lowest rate in the published
+  // Prices for {price}, {intake}, {month-intake}… in previews: the published
   // content/prices.json (the Prices form's own preview uses its live values).
+  // Mirrors withPrice in build.js.
   var startingPrice = '{price}';
+  var publishedPrices = null;
   function money(value) {
     var n = Number(value);
     return '$' + (Number.isInteger(n) ? n.toLocaleString('en-US') : n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
   }
   fetch('/content/prices.json').then(function (res) { return res.json(); }).then(function (p) {
+    publishedPrices = p;
     startingPrice = money(Math.min(p.intake, p.assistants, p.demand, p.case));
   }).catch(function () {});
+  function withPrice(text) {
+    var p = publishedPrices;
+    if (!p) return String(text || '');
+    var hours = Number(p.hours_per_month) || 160;
+    return String(text || '')
+      .replace(/\{price\}/g, startingPrice)
+      .replace(/\{(intake|assistants|demand|case)\}/g, function (all, key) { return money(p[key]); })
+      .replace(/\{(month|year)-(intake|assistants|demand|case)\}/g, function (all, kind, key) {
+        return money(Number(p[key]) * hours * (kind === 'year' ? 12 : 1));
+      })
+      .replace(/\{hours\}/g, String(hours));
+  }
+
+  // The post text comes from Decap's own markdown preview; this swaps the price
+  // placeholders in its text after each render, as build.js does for the real page.
+  var PriceText = createClass({
+    componentDidMount: function () { this.fill(); },
+    componentDidUpdate: function () { this.fill(); },
+    fill: function () {
+      if (!this.el || !publishedPrices) return;
+      var walker = this.el.ownerDocument.createTreeWalker(this.el, 4 /* text nodes */);
+      for (var node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (node.nodeValue.indexOf('{') !== -1) node.nodeValue = withPrice(node.nodeValue);
+      }
+    },
+    render: function () {
+      var self = this;
+      return h('div', { className: this.props.className, ref: function (el) { self.el = el; } }, this.props.children);
+    }
+  });
 
   function list(props, key) {
     var value = props.entry.getIn(['data', key]);
@@ -178,7 +211,7 @@
 
   // Same formatting as faqAnswerHtml in build.js.
   function faqAnswerHtml(answer) {
-    var text = String(answer || '').replace(/\{price\}/g, startingPrice).trim();
+    var text = withPrice(answer).trim();
     var html = window.marked ? window.marked.parseInline(text) : text;
     return html
       .replace(/\n{2,}/g, '<br><br>')

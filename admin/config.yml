@@ -72,7 +72,7 @@ collections:
         modes: ["rich_text"]
         buttons: ["bold", "italic", "link", "heading-two", "heading-three", "quote", "bulleted-list", "numbered-list"]
         editor_components: ["cta", "callout", "table", "image"]
-        hint: "Use “Heading 2” for section titles and “Heading 3” for sub-sections. The + button adds a “Book a call” button, a highlight box, a table or an image."
+        hint: "Use “Heading 2” for section titles and “Heading 3” for sub-sections. The + button adds a “Book a call” button, a highlight box, a table or an image. Prices: type {intake}, {assistants}, {demand} or {case} for that hourly rate, {month-intake} or {year-intake} (etc.) for the full-time cost per month or year, {hours} for hours a month and {price} for the starting rate. They show the current prices and follow the Prices form."
 
   - name: "jobs"
     label: "Job Posts"

@@ -238,7 +238,7 @@ const htmlToText = html => html
 const filledBlocks = new Set();
 
 // Prices (content/prices.json, hourly rates). Whole dollars show without cents ($10),
-// others with two decimals ($7.50); {price} in hero/FAQ text is the lowest rate.
+// others with two decimals ($7.50). Hero/FAQ text and blog articles use placeholders.
 const prices = readContent('prices');
 const money = value => {
   const n = Number(value);
@@ -247,15 +247,17 @@ const money = value => {
     : n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
 };
 const startingPrice = money(Math.min(prices.intake, prices.assistants, prices.demand, prices.case));
-// {price} = lowest rate; {intake} {assistants} {demand} {case} = that service's rate.
+// {price} = lowest rate; {intake} {assistants} {demand} {case} = that service's rate;
+// {month-intake} / {year-intake} (etc.) = full-time cost per month / year; {hours} = hours a month.
 const withPrice = text => String(text || '')
   .replace(/\{price\}/g, startingPrice)
-  .replace(/\{(intake|assistants|demand|case)\}/g, (all, key) => money(prices[key]));
+  .replace(/\{(intake|assistants|demand|case)\}/g, (all, key) => money(prices[key]))
+  .replace(/\{((?:month|year)-(?:intake|assistants|demand|case)|hours)\}/g, (all, expr) => priceValue(expr));
 
 // Every price on the pages is a marker whose name says what to show:
 //   <!-- CMS:price:EXPR -->$7.50<!-- /CMS:price:EXPR -->   (text)
 //   /* CMS:price:EXPR */7.5/* /CMS:price:EXPR */          (inside scripts)
-// EXPR: start | hours | rate-S | month-S | save-N-S | savepct-N-S | savek-N-S | num-S | strhr-S
+// EXPR: start | hours | rate-S | month-S | year-S | save-N-S | savepct-N-S | savek-N-S | num-S | strhr-S
 // where S is a service (intake, assistants, demand, case), several joined with +, or
 // "all", and N is the in-house monthly cost written on that page (the comparison
 // figures aren't prices, so they stay as the page states them).
@@ -275,6 +277,7 @@ function priceValue(expr) {
     case 'hours': return String(hoursPerMonth);
     case 'rate': return money(prices[servicesOf(a)[0]]);
     case 'month': return money(monthOf(a));
+    case 'year': return money(monthOf(a) * 12);
     case 'save': return money(saved());
     case 'savepct': return Math.round(saved() / Number(a) * 100) + '%';
     case 'savek': return money(Math.floor(saved() / 1000) * 1000);
@@ -844,7 +847,7 @@ ${post.image ? `      <div id="post-image-wrap" class="mb-10 rounded-3xl overflo
 ` : ''}      <h1 id="post-title" class="text-4xl lg:text-5xl font-black text-[#1b1e2b] leading-tight tracking-tight mb-6">${escapeHtml(post.title)}</h1>
 ${post.description ? `      <p id="post-description" class="text-xl text-slate-500 font-medium leading-relaxed mb-10 pb-10 border-b border-slate-100">${escapeHtml(post.description)}</p>
 ` : ''}      <div id="post-body" class="prose">
-${marked.parse(postBodies[post.slug] || '')}
+${marked.parse(withPrice(postBodies[post.slug]))}
       </div>
     </div>`;
 

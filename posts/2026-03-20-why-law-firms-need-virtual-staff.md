@@ -22,7 +22,7 @@ Virtual staffing isn't about hiring a random freelancer from a gig platform. At 
 
 ## The Numbers Make Sense
 
-A full-time virtual legal intake specialist through YVA starts at **$7.50/hr** — roughly $1,200/month for 160 hours. Compare that to $5,000+ per month for an equivalent in-house hire, and the math is hard to argue with.
+A full-time virtual legal intake specialist through YVA starts at **{intake}/hr** — roughly {month-intake}/month for {hours} hours. Compare that to $5,000+ per month for an equivalent in-house hire, and the math is hard to argue with.
 
 The savings don't just go back into your pocket — they free up budget to hire more attorneys, invest in marketing, or take on more cases.
 

@@ -46,7 +46,7 @@ Whether you hire in-house or virtually, a strong legal intake specialist should 
 
 A full-time in-house legal intake specialist in a major U.S. city typically costs $40,000–$55,000 per year in salary alone — plus benefits, taxes, office space, and equipment.
 
-A virtual intake specialist through a staffing agency like YVA Law Staffing starts at **$7.50/hr** — roughly $1,200/month for full-time coverage. That's a fraction of the cost with no reduction in quality.
+A virtual intake specialist through a staffing agency like YVA Law Staffing starts at **{intake}/hr** — roughly {month-intake}/month for full-time coverage. That's a fraction of the cost with no reduction in quality.
 
 ## Getting Started
 

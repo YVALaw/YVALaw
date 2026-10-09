@@ -50,7 +50,7 @@ Because they do this all day, every day, they're faster, more accurate, and more
 
 ## The Cost Argument
 
-A virtual demand writing specialist through YVA Law Staffing starts at **$10/hr** — about $1,600/month for full-time coverage.
+A virtual demand writing specialist through YVA Law Staffing starts at **{demand}/hr** — about {month-demand}/month for full-time coverage.
 
 Consider what it costs when an attorney spends 10 hours per week on demand prep: at even $200/hr, that's $2,000/week in attorney time doing non-attorney work. A specialist handles it at a fraction of that cost, freeing your attorneys for billable work that moves cases forward.
 
