@@ -147,6 +147,7 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 - Decap CMS, pinned to an exact version in `admin/index.html` (a floating range could ship a release that rejects `admin/config.yml` and breaks the whole admin). Login: Netlify Identity + Git Gateway, commits straight to `main`.
 - `admin/config.yml`: two collections, Blog Posts (`posts/`) and Job Posts (`jobs/`). Field `name`s are the frontmatter keys `build.js` reads; labels/hints are plain-language copy for non-technical editors.
 - `admin/preview.js`: live preview pane drawn with the site's own CSS (blog card + post page, careers job card). Its markup mirrors `blog.html`, `build.js` and `careers.html` — update it when those change. `tailwind.config.js` scans `admin/*.js`.
+- `admin/editor-blocks.js`: the blog editor's "+" menu blocks: **Book a call button** (`.post-cta`, links to `/?contact=1` by default), **Highlight box** (`.post-callout`) and **Table** (rows typed with `|` or pasted from Excel/Sheets, saved as a markdown table; its pattern matches *every* markdown table, so old tables open in the same form). Blocks are saved into the post as HTML/markdown that `build.js` renders as-is and that each block's `pattern` reads back — change `toBlock` and `pattern` together, and keep old class names working (posts already contain them). Styles live in `tailwind.src.css` as plain CSS, not Tailwind utilities.
 - Blog `draft: true` → `build.js` skips the post (no listing, page or sitemap entry). `image_alt` → the featured image's alt text (falls back to the title).
 - Editor is rich-text only (Markdown mode hidden). Verified that re-saving every existing post in rich-text mode leaves the rendered pages unchanged, tables included.
 - Test locally: add `local_backend: true` to a copy of `admin/config.yml`, run `npx decap-server` in the site folder and serve the site on localhost.
@@ -162,6 +163,7 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 
 ### Session 11 (content manager)
 - About section: Sam Colas removed (story, founder card, JSON-LD); Hans Henriquez → **Hans Esmel**, described as sole founder ("CEO & Founder"). Headings now "The Founder" / "Meet the Founder".
+- `/admin` editor blocks: Book a call button, Highlight box, Table (see "Content Manager").
 - `/admin` made simpler: YVA logo, plain-language field hints, Draft switch, image description field, today's date by default, Spanish accents stripped from new post URLs, newest-first sorting, Drafts / Open / Closed filters, trimmed rich-text toolbar, icon picker for jobs, and a live preview that looks like the real site. See "Content Manager" above.
 
 ### Session 10 (SEO, branding, mobile)

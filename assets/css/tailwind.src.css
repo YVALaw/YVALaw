@@ -60,3 +60,21 @@
 .prose th { text-align: left; background: #1b1e2b; color: #fff; font-weight: 900; padding: 0.75rem 1rem; }
 .prose td { color: #475569; font-weight: 500; padding: 0.75rem 1rem; border-bottom: 1px solid #e2e8f0; }
 .prose tr:nth-child(even) td { background: #f8fafc; }
+
+/* Blocks added from the "+" menu of the blog editor (admin/editor-blocks.js).
+   Old posts keep these class names, so restyle them here rather than renaming. */
+.post-cta { margin: 2.5rem 0; padding: 1.75rem 1.25rem; border-radius: 1.5rem; background: #1b1e2b; text-align: center; }
+.prose .post-cta-text { color: #fff; font-size: 1.2rem; font-weight: 900; line-height: 1.4; margin-bottom: 1.25rem; }
+.prose a.post-cta-button,
+.prose a.post-cta-button:hover { display: inline-flex; align-items: center; justify-content: center; gap: 0.6rem; max-width: 100%; background: #facc15; color: #1b1e2b; font-size: 0.875rem; font-weight: 900; letter-spacing: 0.1em; text-transform: uppercase; text-decoration: none; padding: 1rem 1.5rem; border-radius: 1rem; transition: background-color 0.2s, transform 0.2s; }
+.prose a.post-cta-button::after { content: '\2192'; font-size: 1.1em; }
+@media (hover: hover) {
+  .prose a.post-cta-button:hover { background: #fde047; transform: translateY(-2px); }
+}
+@media (min-width: 640px) {
+  .post-cta { padding: 2.5rem; }
+  .prose a.post-cta-button, .prose a.post-cta-button:hover { padding: 1rem 2rem; }
+}
+.post-callout { margin: 2rem 0; padding: 1.5rem 1.75rem; border-radius: 1.25rem; background: #fefce8; border-left: 4px solid #facc15; }
+.prose .post-callout-title { color: #1b1e2b; font-size: 0.75rem; font-weight: 900; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 0.5rem; }
+.prose .post-callout > :last-child { margin-bottom: 0; }

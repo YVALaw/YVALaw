@@ -71,8 +71,8 @@ collections:
         widget: "markdown"
         modes: ["rich_text"]
         buttons: ["bold", "italic", "link", "heading-two", "heading-three", "quote", "bulleted-list", "numbered-list"]
-        editor_components: ["image"]
-        hint: "Use “Heading 2” for section titles and “Heading 3” for sub-sections."
+        editor_components: ["cta", "callout", "table", "image"]
+        hint: "Use “Heading 2” for section titles and “Heading 3” for sub-sections. The + button adds a “Book a call” button, a highlight box, a table or an image."
 
   - name: "jobs"
     label: "Job Posts"
