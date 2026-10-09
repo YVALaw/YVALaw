@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { marked } = require('marked');
+const { execFileSync } = require('child_process');
 
 const postsDir = path.join(__dirname, 'posts');
 const jobsDir = path.join(__dirname, 'jobs');
@@ -427,6 +428,44 @@ i18n.es.footerLocation = escapeText(contact.location_es || contact.location_en);
 const i18nLines = ['en', 'es'].flatMap(lang =>
   `Object.assign(translations.${lang}, ${JSON.stringify(i18n[lang], null, 4).replace(/</g, '\\u003c')});`.split('\n'));
 
+// Pictures (content/pictures-*.json): build-images.js resizes them into assets/img/site/
+// (not committed) and lists the results; here they go into the <img> tags wrapped in
+// <!-- CMS:img:<spot> --> markers, keeping each tag's own class/sizes/width/height,
+// and into the phone service pop-up data (/* CMS:imgurl:<spot> */, /* CMS:imgpos:<spot> */).
+execFileSync(process.execPath, [path.join(__dirname, 'build-images.js')], { stdio: 'inherit' });
+const pictures = JSON.parse(fs.readFileSync(path.join(__dirname, 'assets/img/site/manifest.json'), 'utf8'));
+
+function fillPictures(source) {
+  source = source.replace(/<!-- CMS:img:([a-z0-9_]+) -->(<img\b[^>]*>)<!-- \/CMS:img:\1 -->/g, (all, spot, tag) => {
+    filledBlocks.add('img');
+    const picture = pictures[spot];
+    if (!picture) return all;
+    const attrs = []; // { name, value, raw }: raw values are copied as they are in the page
+    tag.replace(/^<img\b|\/?>$/g, '').replace(/([^\s=]+)(?:="([^"]*)")?/g, (match, name, value) => {
+      attrs.push({ name, value: value === undefined ? null : value, raw: true });
+      return '';
+    });
+    const set = (name, value) => {
+      const attr = attrs.find(a => a.name === name);
+      if (attr) Object.assign(attr, { value, raw: false }); else attrs.push({ name, value, raw: false });
+    };
+    set('src', picture.src);
+    if (picture.srcset) set('srcset', picture.srcset);
+    else attrs.splice(0, attrs.length, ...attrs.filter(a => a.name !== 'srcset'));
+    set('alt', picture.alt);
+    set('style', `object-position: ${picture.position}`);
+    const html = attrs.map(a => (a.value === null ? a.name : `${a.name}="${a.raw ? a.value : escapeHtml(a.value)}"`)).join(' ');
+    return `<!-- CMS:img:${spot} --><img ${html}><!-- /CMS:img:${spot} -->`;
+  });
+  return source.replace(/\/\* CMS:(imgurl|imgpos):([a-z0-9_]+) \*\/[\s\S]*?\/\* \/CMS:\1:\2 \*\//g, (all, kind, spot) => {
+    filledBlocks.add(kind);
+    const picture = pictures[spot];
+    if (!picture) return all;
+    const value = kind === 'imgurl' ? picture.src : picture.position;
+    return `/* CMS:${kind}:${spot} */${JSON.stringify(value)}/* /CMS:${kind}:${spot} */`;
+  });
+}
+
 fs.readdirSync(__dirname).filter(file => file.endsWith('.html')).forEach(file => {
   const filePath = path.join(__dirname, file);
   const before = fs.readFileSync(filePath, 'utf8');
@@ -442,9 +481,10 @@ fs.readdirSync(__dirname).filter(file => file.endsWith('.html')).forEach(file =>
   html = fillBlock(html, 'social', socialLinks);
   html = fillBlock(html, 'i18n', i18nLines);
   html = fillInline(html, 'hours', escapeText(contact.hours_en));
+  html = fillPictures(html);
   if (html !== before) fs.writeFileSync(filePath, html);
 });
-['testimonials', 'testimonial-dots', 'faq', 'faq-jsonld', 'stats', 'contact', 'contact-compact', 'social', 'i18n', 'hours'].forEach(name => {
+['testimonials', 'testimonial-dots', 'faq', 'faq-jsonld', 'stats', 'contact', 'contact-compact', 'social', 'i18n', 'hours', 'img', 'imgurl', 'imgpos'].forEach(name => {
   if (!filledBlocks.has(name)) throw new Error(`No page has the CMS:${name} markers — they were removed or renamed`);
 });
 console.log(`Built website content — ${testimonials.length} testimonial(s), ${faqs.length} FAQ(s), ${stats.length} stat(s)`);
@@ -613,7 +653,6 @@ console.log(`Built sitemap.xml — ${allPages.length} URL(s)`);
 // Compile Tailwind CSS (assets/css/tailwind.src.css -> assets/css/tailwind.css).
 // Pages link the compiled file instead of loading Tailwind's in-browser compiler,
 // which is slow on phones and not meant for production.
-const { execFileSync } = require('child_process');
 execFileSync(process.execPath, [
   require.resolve('tailwindcss/lib/cli.js'),
   '--config', path.join(__dirname, 'tailwind.config.js'),

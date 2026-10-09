@@ -248,10 +248,66 @@
     );
   }
 
+  // ---- Pictures: how each spot crops the photo, at its real shape ----------------
+  // Shapes (CSS px) measured on the site; mirror the img classes in index.html and
+  // the landing pages if those change. Focus values match build-images.js.
+  var FOCUS_CSS = { center: '50% 50%', top: '50% 0%', bottom: '50% 100%', left: '0% 50%', right: '100% 50%' };
+  var PICTURE_SPOTS = {
+    hero: { label: 'Top of the page', shapes: [['Computer', 552, 650], ['Phone', 431, 280]] },
+    service_intake: { label: 'Legal Intake', shapes: [['Computer panel', 615, 749], ['Phone pop-up', 390, 176]] },
+    service_assistants: { label: 'Legal Assistants', shapes: [['Computer panel', 615, 749], ['Phone pop-up', 390, 176]] },
+    service_demand: { label: 'Demand Writing', shapes: [['Computer panel', 615, 749], ['Phone pop-up', 390, 176]] },
+    service_case: { label: 'Case Managers', shapes: [['Computer panel', 615, 749], ['Phone pop-up', 390, 176]] },
+    face_1: { label: 'Face 1', face: true },
+    face_2: { label: 'Face 2', face: true },
+    face_3: { label: 'Face 3', face: true },
+    review_face: { label: 'Floating review', face: true },
+    landing_intake: { label: 'Legal Intake page', shapes: [['Computer', 440, 480], ['Phone', 322, 360]] },
+    landing_assistants: { label: 'Legal Assistants page', shapes: [['Computer', 440, 480], ['Phone', 322, 360]] },
+    landing_demand: { label: 'Demand Writing page', shapes: [['Computer', 440, 480], ['Phone', 322, 360]] },
+    landing_case_managers: { label: 'Case Managers page', shapes: [['Computer', 440, 480], ['Phone', 322, 360]] },
+    landing_pi: { label: 'Personal Injury page', shapes: [['Computer', 440, 480], ['Phone', 322, 360]] },
+    landing_employment: { label: 'Employment Law page', shapes: [['Computer', 440, 480], ['Phone', 322, 360]] }
+  };
+
+  function PicturesPreview(props) {
+    var data = props.entry.get('data');
+    var spots = Object.keys(PICTURE_SPOTS).filter(function (key) { return data && data.has(key); });
+    var faces = spots.filter(function (key) { return PICTURE_SPOTS[key].face; });
+    var photo = function (key, width, height, round) {
+      var value = data.getIn([key, 'image']);
+      var style = { width: width + 'px', height: height + 'px', objectFit: 'cover', objectPosition: FOCUS_CSS[data.getIn([key, 'focus'])] || FOCUS_CSS.center, display: 'block', background: '#e2e8f0' };
+      return value
+        ? h('img', { src: props.getAsset(value).toString(), alt: '', style: style, className: round ? 'rounded-full border-4 border-white shadow-md' : 'rounded-2xl' })
+        : h('div', { style: style, className: round ? 'rounded-full' : 'rounded-2xl' });
+    };
+    return h('div', { className: 'max-w-3xl mx-auto px-6 py-10 space-y-10' },
+      label('How each spot crops the photo (shown at half size)'),
+      spots.filter(function (key) { return !PICTURE_SPOTS[key].face; }).map(function (key) {
+        var spot = PICTURE_SPOTS[key];
+        return h('div', { key: key },
+          h('p', { className: 'font-black text-[#1b1e2b] mb-3' }, spot.label),
+          h('div', { className: 'flex flex-wrap items-end gap-6' }, spot.shapes.map(function (shape) {
+            return h('div', { key: shape[0] },
+              photo(key, Math.round(shape[1] / 2), Math.round(shape[2] / 2)),
+              h('p', { className: 'text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-2' }, shape[0]));
+          })));
+      }),
+      faces.length ? h('div', null,
+        h('p', { className: 'font-black text-[#1b1e2b] mb-3' }, 'Faces'),
+        h('div', { className: 'flex flex-wrap gap-6' }, faces.map(function (key) {
+          return h('div', { key: key, className: 'text-center' }, photo(key, 64, 64, true),
+            h('p', { className: 'text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-2' }, PICTURE_SPOTS[key].label));
+        }))) : null
+    );
+  }
+
   CMS.registerPreviewTemplate('blog', BlogPreview);
   CMS.registerPreviewTemplate('jobs', JobPreview);
   CMS.registerPreviewTemplate('testimonials', TestimonialsPreview);
   CMS.registerPreviewTemplate('faq', FaqPreview);
   CMS.registerPreviewTemplate('stats', StatsPreview);
   CMS.registerPreviewTemplate('contact', ContactPreview);
+  CMS.registerPreviewTemplate('pictures_home', PicturesPreview);
+  CMS.registerPreviewTemplate('pictures_landing', PicturesPreview);
 })();

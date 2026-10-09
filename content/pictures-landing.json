@@ -1,0 +1,32 @@
+{
+  "landing_intake": {
+    "image": "/images/uploads/service-legal-intake.jpg",
+    "alt": "Bilingual Legal Intake Specialist",
+    "focus": "center"
+  },
+  "landing_assistants": {
+    "image": "/images/uploads/service-case-managers.jpg",
+    "alt": "Legal Assistant working at desk",
+    "focus": "center"
+  },
+  "landing_demand": {
+    "image": "/images/uploads/service-demand-writing.jpg",
+    "alt": "Demand writing specialist reviewing documents",
+    "focus": "center"
+  },
+  "landing_case_managers": {
+    "image": "/images/uploads/home-hero.jpg",
+    "alt": "Legal case manager coordinating cases",
+    "focus": "center"
+  },
+  "landing_pi": {
+    "image": "/images/uploads/service-demand-writing.jpg",
+    "alt": "Personal Injury Law Firm Virtual Staff",
+    "focus": "center"
+  },
+  "landing_employment": {
+    "image": "/images/uploads/landing-employment-law.jpg",
+    "alt": "Employment Law Firm Virtual Staff",
+    "focus": "center"
+  }
+}

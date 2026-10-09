@@ -338,3 +338,400 @@ collections:
             required: false
             pattern: ['^(https://\S+)?$', "Paste the full address, starting with https://"]
             hint: "Adds a Facebook icon to the home page footer."
+
+      - name: "pictures_home"
+        label: "Home Page Pictures"
+        file: "content/pictures-home.json"
+        description: "Photos on the home page. Each upload is resized and compressed for phones and computers automatically, and the preview shows how each spot crops it."
+        fields:
+          - label: "Top of the page (main photo)"
+            name: "hero"
+            widget: "object"
+            collapsed: true
+            summary: "{{fields.image}}"
+            fields:
+              - label: "Picture"
+                name: "image"
+                widget: "image"
+                choose_url: false
+                hint: "Upload any size; the site resizes and compresses it automatically. Landscape photos work best. Shown tall on computers and wide on phones."
+              - label: "Description"
+                name: "alt"
+                widget: "string"
+                required: false
+                hint: "Describe the photo in a few words for Google and screen readers."
+              - label: "Keep in view"
+                name: "focus"
+                widget: "select"
+                default: "center"
+                hint: "Which part of the photo stays in view when the spot crops it (the preview shows phone and computer)."
+                options:
+                  - { label: "Center", value: "center" }
+                  - { label: "Top (keeps heads in view)", value: "top" }
+                  - { label: "Bottom", value: "bottom" }
+                  - { label: "Left side", value: "left" }
+                  - { label: "Right side", value: "right" }
+          - label: "Legal Intake service"
+            name: "service_intake"
+            widget: "object"
+            collapsed: true
+            summary: "{{fields.image}}"
+            fields:
+              - label: "Picture"
+                name: "image"
+                widget: "image"
+                choose_url: false
+                hint: "Upload any size; the site resizes and compresses it automatically. Shown in the service panel (computers) and the service pop-up (phones)."
+              - label: "Description"
+                name: "alt"
+                widget: "string"
+                required: false
+                hint: "Describe the photo in a few words for Google and screen readers."
+              - label: "Keep in view"
+                name: "focus"
+                widget: "select"
+                default: "center"
+                hint: "Which part of the photo stays in view when the spot crops it (the preview shows phone and computer)."
+                options:
+                  - { label: "Center", value: "center" }
+                  - { label: "Top (keeps heads in view)", value: "top" }
+                  - { label: "Bottom", value: "bottom" }
+                  - { label: "Left side", value: "left" }
+                  - { label: "Right side", value: "right" }
+          - label: "Legal Assistants service"
+            name: "service_assistants"
+            widget: "object"
+            collapsed: true
+            summary: "{{fields.image}}"
+            fields:
+              - label: "Picture"
+                name: "image"
+                widget: "image"
+                choose_url: false
+                hint: "Upload any size; the site resizes and compresses it automatically. Shown in the service panel (computers) and the service pop-up (phones)."
+              - label: "Description"
+                name: "alt"
+                widget: "string"
+                required: false
+                hint: "Describe the photo in a few words for Google and screen readers."
+              - label: "Keep in view"
+                name: "focus"
+                widget: "select"
+                default: "center"
+                hint: "Which part of the photo stays in view when the spot crops it (the preview shows phone and computer)."
+                options:
+                  - { label: "Center", value: "center" }
+                  - { label: "Top (keeps heads in view)", value: "top" }
+                  - { label: "Bottom", value: "bottom" }
+                  - { label: "Left side", value: "left" }
+                  - { label: "Right side", value: "right" }
+          - label: "Demand Writing service"
+            name: "service_demand"
+            widget: "object"
+            collapsed: true
+            summary: "{{fields.image}}"
+            fields:
+              - label: "Picture"
+                name: "image"
+                widget: "image"
+                choose_url: false
+                hint: "Upload any size; the site resizes and compresses it automatically. Shown in the service panel (computers) and the service pop-up (phones)."
+              - label: "Description"
+                name: "alt"
+                widget: "string"
+                required: false
+                hint: "Describe the photo in a few words for Google and screen readers."
+              - label: "Keep in view"
+                name: "focus"
+                widget: "select"
+                default: "center"
+                hint: "Which part of the photo stays in view when the spot crops it (the preview shows phone and computer)."
+                options:
+                  - { label: "Center", value: "center" }
+                  - { label: "Top (keeps heads in view)", value: "top" }
+                  - { label: "Bottom", value: "bottom" }
+                  - { label: "Left side", value: "left" }
+                  - { label: "Right side", value: "right" }
+          - label: "Case Managers service"
+            name: "service_case"
+            widget: "object"
+            collapsed: true
+            summary: "{{fields.image}}"
+            fields:
+              - label: "Picture"
+                name: "image"
+                widget: "image"
+                choose_url: false
+                hint: "Upload any size; the site resizes and compresses it automatically. Shown in the service panel (computers) and the service pop-up (phones)."
+              - label: "Description"
+                name: "alt"
+                widget: "string"
+                required: false
+                hint: "Describe the photo in a few words for Google and screen readers."
+              - label: "Keep in view"
+                name: "focus"
+                widget: "select"
+                default: "center"
+                hint: "Which part of the photo stays in view when the spot crops it (the preview shows phone and computer)."
+                options:
+                  - { label: "Center", value: "center" }
+                  - { label: "Top (keeps heads in view)", value: "top" }
+                  - { label: "Bottom", value: "bottom" }
+                  - { label: "Left side", value: "left" }
+                  - { label: "Right side", value: "right" }
+          - label: "Face 1 next to “50+ Active VA’s”"
+            name: "face_1"
+            widget: "object"
+            collapsed: true
+            summary: "{{fields.image}}"
+            fields:
+              - label: "Picture"
+                name: "image"
+                widget: "image"
+                choose_url: false
+                hint: "Any photo of the person; it is cut to a small circle automatically."
+              - label: "Keep in view"
+                name: "focus"
+                widget: "select"
+                default: "center"
+                hint: "Which part of the photo to keep when it is cut to a circle."
+                options:
+                  - { label: "Center", value: "center" }
+                  - { label: "Top (keeps heads in view)", value: "top" }
+                  - { label: "Bottom", value: "bottom" }
+                  - { label: "Left side", value: "left" }
+                  - { label: "Right side", value: "right" }
+          - label: "Face 2 next to “50+ Active VA’s”"
+            name: "face_2"
+            widget: "object"
+            collapsed: true
+            summary: "{{fields.image}}"
+            fields:
+              - label: "Picture"
+                name: "image"
+                widget: "image"
+                choose_url: false
+                hint: "Any photo of the person; it is cut to a small circle automatically."
+              - label: "Keep in view"
+                name: "focus"
+                widget: "select"
+                default: "center"
+                hint: "Which part of the photo to keep when it is cut to a circle."
+                options:
+                  - { label: "Center", value: "center" }
+                  - { label: "Top (keeps heads in view)", value: "top" }
+                  - { label: "Bottom", value: "bottom" }
+                  - { label: "Left side", value: "left" }
+                  - { label: "Right side", value: "right" }
+          - label: "Face 3 next to “50+ Active VA’s”"
+            name: "face_3"
+            widget: "object"
+            collapsed: true
+            summary: "{{fields.image}}"
+            fields:
+              - label: "Picture"
+                name: "image"
+                widget: "image"
+                choose_url: false
+                hint: "Any photo of the person; it is cut to a small circle automatically."
+              - label: "Keep in view"
+                name: "focus"
+                widget: "select"
+                default: "center"
+                hint: "Which part of the photo to keep when it is cut to a circle."
+                options:
+                  - { label: "Center", value: "center" }
+                  - { label: "Top (keeps heads in view)", value: "top" }
+                  - { label: "Bottom", value: "bottom" }
+                  - { label: "Left side", value: "left" }
+                  - { label: "Right side", value: "right" }
+          - label: "Photo in the floating review (Joshua K.)"
+            name: "review_face"
+            widget: "object"
+            collapsed: true
+            summary: "{{fields.image}}"
+            fields:
+              - label: "Picture"
+                name: "image"
+                widget: "image"
+                choose_url: false
+                hint: "Any photo of the person; it is cut to a small circle automatically."
+              - label: "Keep in view"
+                name: "focus"
+                widget: "select"
+                default: "center"
+                hint: "Which part of the photo to keep when it is cut to a circle."
+                options:
+                  - { label: "Center", value: "center" }
+                  - { label: "Top (keeps heads in view)", value: "top" }
+                  - { label: "Bottom", value: "bottom" }
+                  - { label: "Left side", value: "left" }
+                  - { label: "Right side", value: "right" }
+
+      - name: "pictures_landing"
+        label: "Landing Page Pictures"
+        file: "content/pictures-landing.json"
+        description: "The photo next to the headline on each ad landing page (Workers’ Comp has none). Each upload is resized automatically."
+        fields:
+          - label: "Legal Intake page"
+            name: "landing_intake"
+            widget: "object"
+            collapsed: true
+            summary: "{{fields.image}}"
+            fields:
+              - label: "Picture"
+                name: "image"
+                widget: "image"
+                choose_url: false
+                hint: "Upload any size; the site resizes and compresses it automatically. Shown next to the headline."
+              - label: "Description"
+                name: "alt"
+                widget: "string"
+                required: false
+                hint: "Describe the photo in a few words for Google and screen readers."
+              - label: "Keep in view"
+                name: "focus"
+                widget: "select"
+                default: "center"
+                hint: "Which part of the photo stays in view when the spot crops it (the preview shows phone and computer)."
+                options:
+                  - { label: "Center", value: "center" }
+                  - { label: "Top (keeps heads in view)", value: "top" }
+                  - { label: "Bottom", value: "bottom" }
+                  - { label: "Left side", value: "left" }
+                  - { label: "Right side", value: "right" }
+          - label: "Legal Assistants page"
+            name: "landing_assistants"
+            widget: "object"
+            collapsed: true
+            summary: "{{fields.image}}"
+            fields:
+              - label: "Picture"
+                name: "image"
+                widget: "image"
+                choose_url: false
+                hint: "Upload any size; the site resizes and compresses it automatically. Shown next to the headline."
+              - label: "Description"
+                name: "alt"
+                widget: "string"
+                required: false
+                hint: "Describe the photo in a few words for Google and screen readers."
+              - label: "Keep in view"
+                name: "focus"
+                widget: "select"
+                default: "center"
+                hint: "Which part of the photo stays in view when the spot crops it (the preview shows phone and computer)."
+                options:
+                  - { label: "Center", value: "center" }
+                  - { label: "Top (keeps heads in view)", value: "top" }
+                  - { label: "Bottom", value: "bottom" }
+                  - { label: "Left side", value: "left" }
+                  - { label: "Right side", value: "right" }
+          - label: "Demand Writing page"
+            name: "landing_demand"
+            widget: "object"
+            collapsed: true
+            summary: "{{fields.image}}"
+            fields:
+              - label: "Picture"
+                name: "image"
+                widget: "image"
+                choose_url: false
+                hint: "Upload any size; the site resizes and compresses it automatically. Shown next to the headline."
+              - label: "Description"
+                name: "alt"
+                widget: "string"
+                required: false
+                hint: "Describe the photo in a few words for Google and screen readers."
+              - label: "Keep in view"
+                name: "focus"
+                widget: "select"
+                default: "center"
+                hint: "Which part of the photo stays in view when the spot crops it (the preview shows phone and computer)."
+                options:
+                  - { label: "Center", value: "center" }
+                  - { label: "Top (keeps heads in view)", value: "top" }
+                  - { label: "Bottom", value: "bottom" }
+                  - { label: "Left side", value: "left" }
+                  - { label: "Right side", value: "right" }
+          - label: "Case Managers page"
+            name: "landing_case_managers"
+            widget: "object"
+            collapsed: true
+            summary: "{{fields.image}}"
+            fields:
+              - label: "Picture"
+                name: "image"
+                widget: "image"
+                choose_url: false
+                hint: "Upload any size; the site resizes and compresses it automatically. Shown next to the headline."
+              - label: "Description"
+                name: "alt"
+                widget: "string"
+                required: false
+                hint: "Describe the photo in a few words for Google and screen readers."
+              - label: "Keep in view"
+                name: "focus"
+                widget: "select"
+                default: "center"
+                hint: "Which part of the photo stays in view when the spot crops it (the preview shows phone and computer)."
+                options:
+                  - { label: "Center", value: "center" }
+                  - { label: "Top (keeps heads in view)", value: "top" }
+                  - { label: "Bottom", value: "bottom" }
+                  - { label: "Left side", value: "left" }
+                  - { label: "Right side", value: "right" }
+          - label: "Personal Injury page"
+            name: "landing_pi"
+            widget: "object"
+            collapsed: true
+            summary: "{{fields.image}}"
+            fields:
+              - label: "Picture"
+                name: "image"
+                widget: "image"
+                choose_url: false
+                hint: "Upload any size; the site resizes and compresses it automatically. Shown next to the headline."
+              - label: "Description"
+                name: "alt"
+                widget: "string"
+                required: false
+                hint: "Describe the photo in a few words for Google and screen readers."
+              - label: "Keep in view"
+                name: "focus"
+                widget: "select"
+                default: "center"
+                hint: "Which part of the photo stays in view when the spot crops it (the preview shows phone and computer)."
+                options:
+                  - { label: "Center", value: "center" }
+                  - { label: "Top (keeps heads in view)", value: "top" }
+                  - { label: "Bottom", value: "bottom" }
+                  - { label: "Left side", value: "left" }
+                  - { label: "Right side", value: "right" }
+          - label: "Employment Law page"
+            name: "landing_employment"
+            widget: "object"
+            collapsed: true
+            summary: "{{fields.image}}"
+            fields:
+              - label: "Picture"
+                name: "image"
+                widget: "image"
+                choose_url: false
+                hint: "Upload any size; the site resizes and compresses it automatically. Shown next to the headline."
+              - label: "Description"
+                name: "alt"
+                widget: "string"
+                required: false
+                hint: "Describe the photo in a few words for Google and screen readers."
+              - label: "Keep in view"
+                name: "focus"
+                widget: "select"
+                default: "center"
+                hint: "Which part of the photo stays in view when the spot crops it (the preview shows phone and computer)."
+                options:
+                  - { label: "Center", value: "center" }
+                  - { label: "Top (keeps heads in view)", value: "top" }
+                  - { label: "Bottom", value: "bottom" }
+                  - { label: "Left side", value: "left" }
+                  - { label: "Right side", value: "right" }

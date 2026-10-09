@@ -1,0 +1,47 @@
+{
+  "hero": {
+    "image": "/images/uploads/home-hero.jpg",
+    "alt": "Bilingual virtual legal staff at work",
+    "focus": "center"
+  },
+  "service_intake": {
+    "image": "/images/uploads/service-legal-intake.jpg",
+    "alt": "Legal Intake",
+    "focus": "center"
+  },
+  "service_assistants": {
+    "image": "/images/uploads/service-legal-assistants.jpg",
+    "alt": "Legal Assistants",
+    "focus": "center"
+  },
+  "service_demand": {
+    "image": "/images/uploads/service-demand-writing.jpg",
+    "alt": "Demand Writing",
+    "focus": "center"
+  },
+  "service_case": {
+    "image": "/images/uploads/service-case-managers.jpg",
+    "alt": "Case Managers",
+    "focus": "center"
+  },
+  "face_1": {
+    "image": "/images/uploads/face-yva1.jpg",
+    "alt": "",
+    "focus": "center"
+  },
+  "face_2": {
+    "image": "/images/uploads/face-yva2.jpg",
+    "alt": "",
+    "focus": "center"
+  },
+  "face_3": {
+    "image": "/images/uploads/face-yva3.jpg",
+    "alt": "",
+    "focus": "center"
+  },
+  "review_face": {
+    "image": "/images/uploads/face-testi.jpg",
+    "alt": "",
+    "focus": "center"
+  }
+}
