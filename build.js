@@ -432,8 +432,23 @@ const i18nLines = ['en', 'es'].flatMap(lang =>
 // (not committed) and lists the results; here they go into the <img> tags wrapped in
 // <!-- CMS:img:<spot> --> markers, keeping each tag's own class/sizes/width/height,
 // and into the phone service pop-up data (/* CMS:imgurl:<spot> */, /* CMS:imgpos:<spot> */).
-execFileSync(process.execPath, [path.join(__dirname, 'build-images.js')], { stdio: 'inherit' });
-const pictures = JSON.parse(fs.readFileSync(path.join(__dirname, 'assets/img/site/manifest.json'), 'utf8'));
+let pictures;
+try {
+  execFileSync(process.execPath, [path.join(__dirname, 'build-images.js')], { stdio: 'inherit' });
+  pictures = JSON.parse(fs.readFileSync(path.join(__dirname, 'assets/img/site/manifest.json'), 'utf8'));
+} catch (error) {
+  // Never let picture resizing stop a deploy (e.g. sharp needs Node 20.9+):
+  // fall back to the uploaded files as they are, without resized versions.
+  console.warn(`WARNING: resizing pictures failed (${error.message.split('\n')[0]}); using the original uploads`);
+  const FOCUS_CSS = { center: '50% 50%', top: '50% 0%', bottom: '50% 100%', left: '0% 50%', right: '100% 50%' };
+  pictures = {};
+  ['pictures-home', 'pictures-landing'].forEach(name => {
+    if (!fs.existsSync(path.join(contentDir, `${name}.json`))) return;
+    Object.entries(readContent(name)).forEach(([spot, entry]) => {
+      if (entry && entry.image) pictures[spot] = { src: entry.image, alt: String(entry.alt || '').trim(), position: FOCUS_CSS[entry.focus] || FOCUS_CSS.center };
+    });
+  });
+}
 
 function fillPictures(source) {
   source = source.replace(/<!-- CMS:img:([a-z0-9_]+) -->(<img\b[^>]*>)<!-- \/CMS:img:\1 -->/g, (all, spot, tag) => {
@@ -450,9 +465,10 @@ function fillPictures(source) {
       if (attr) Object.assign(attr, { value, raw: false }); else attrs.push({ name, value, raw: false });
     };
     set('src', picture.src);
-    if (picture.srcset) set('srcset', picture.srcset);
-    else attrs.splice(0, attrs.length, ...attrs.filter(a => a.name !== 'srcset'));
     set('alt', picture.alt);
+    // srcset/style always go last, so the tag reads the same whatever was there before.
+    attrs.splice(0, attrs.length, ...attrs.filter(a => a.name !== 'srcset' && a.name !== 'style'));
+    if (picture.srcset) set('srcset', picture.srcset);
     set('style', `object-position: ${picture.position}`);
     const html = attrs.map(a => (a.value === null ? a.name : `${a.name}="${a.raw ? a.value : escapeHtml(a.value)}"`)).join(' ');
     return `<!-- CMS:img:${spot} --><img ${html}><!-- /CMS:img:${spot} -->`;
