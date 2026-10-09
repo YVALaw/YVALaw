@@ -1,0 +1,37 @@
+{
+  "picture": {
+    "image": "/images/uploads/service-demand-writing.jpg",
+    "alt": "Personal Injury Law Firm Virtual Staff",
+    "focus": "center"
+  },
+  "testimonials": [
+    {
+      "quote": "YVA's Team has been outstanding — organized, reliable, and proactive. They handle intake with professionalism, communicate promptly, and bring integrity and dedication to every task.",
+      "name": "Naveed Halavi",
+      "company": "Halavi Law"
+    },
+    {
+      "quote": "Our intake volume doubled in 3 months. We were losing leads before — now every call gets answered and screened the same day. The bilingual piece has been especially valuable for our PI practice.",
+      "name": "Rafael M.",
+      "company": "PI Firm · Texas"
+    }
+  ],
+  "faq": [
+    {
+      "question": "Do your VAs understand personal injury case workflows?",
+      "answer": "Yes. Our PI-focused VAs are trained on SOL tracking, medical record review, insurance adjuster communication, demand package preparation, and common PI CRMs like Filevine, Clio, and MyCase."
+    },
+    {
+      "question": "Can I hire just one role, or do I need a full team?",
+      "answer": "You can start with one role and add more as your firm grows. Most PI firms start with intake or demand writing, then add case managers once they see the results."
+    },
+    {
+      "question": "How quickly can my VA start handling real calls and cases?",
+      "answer": "Within 72 hours of confirming the match. We handle the briefing on your systems and processes so your VA hits the ground running — not weeks later."
+    },
+    {
+      "question": "Are there any contracts or minimum commitments?",
+      "answer": "No lock-ins. We believe our results should keep you — not a contract. Exit anytime with no penalties."
+    }
+  ]
+}

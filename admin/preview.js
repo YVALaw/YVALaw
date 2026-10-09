@@ -308,13 +308,7 @@
     face_1: { label: 'Face 1', face: true },
     face_2: { label: 'Face 2', face: true },
     face_3: { label: 'Face 3', face: true },
-    review_face: { label: 'Floating review', face: true },
-    landing_intake: { label: 'Legal Intake page', shapes: [['Computer', 440, 480], ['Phone', 322, 360]] },
-    landing_assistants: { label: 'Legal Assistants page', shapes: [['Computer', 440, 480], ['Phone', 322, 360]] },
-    landing_demand: { label: 'Demand Writing page', shapes: [['Computer', 440, 480], ['Phone', 322, 360]] },
-    landing_case_managers: { label: 'Case Managers page', shapes: [['Computer', 440, 480], ['Phone', 322, 360]] },
-    landing_pi: { label: 'Personal Injury page', shapes: [['Computer', 440, 480], ['Phone', 322, 360]] },
-    landing_employment: { label: 'Employment Law page', shapes: [['Computer', 440, 480], ['Phone', 322, 360]] }
+    review_face: { label: 'Floating review', face: true }
   };
 
   function PicturesPreview(props) {
@@ -349,6 +343,50 @@
     );
   }
 
+  // ---- Landing Pages (content/landing-*.json): photo crops, testimonials, FAQ ------
+
+  function LandingPreview(props) {
+    var data = props.entry.get('data');
+    var get = function (path) { return data && data.getIn(path); };
+    var crop = function (width, height) {
+      var value = get(['picture', 'image']);
+      var style = { width: width + 'px', height: height + 'px', objectFit: 'cover', objectPosition: FOCUS_CSS[get(['picture', 'focus'])] || FOCUS_CSS.center, display: 'block', background: '#e2e8f0' };
+      return value ? h('img', { src: props.getAsset(value).toString(), alt: '', style: style, className: 'rounded-2xl' }) : h('div', { style: style, className: 'rounded-2xl' });
+    };
+    var testimonials = list(props, 'testimonials');
+    var faq = list(props, 'faq');
+    return h('div', { className: 'max-w-3xl mx-auto px-6 py-10 space-y-10' },
+      get(['picture']) ? h('div', null,
+        label('Photo next to the headline (half size)'),
+        h('div', { className: 'flex flex-wrap items-end gap-6' },
+          h('div', null, crop(220, 240), h('p', { className: 'text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-2' }, 'Computer')),
+          h('div', null, crop(161, 180), h('p', { className: 'text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-2' }, 'Phone')))) : null,
+      h('div', null,
+        label('Testimonials'),
+        h('div', { className: 'bg-[#1b1e2b] rounded-[2rem] p-6 grid grid-cols-1 md:grid-cols-2 gap-6' }, testimonials.map(function (t, i) {
+          var name = String(t.name || '').trim();
+          return h('div', { key: i, className: 'bg-white/5 border border-white/10 rounded-[2rem] p-8' },
+            h('p', { className: 'text-white text-base font-bold leading-relaxed italic mb-6' }, '"' + String(t.quote || '').trim().replace(/^["“”]+|["“”]+$/g, '') + '"'),
+            h('div', { className: 'flex items-center gap-3' },
+              t.photo
+                ? h('img', { src: props.getAsset(t.photo).toString(), alt: '', className: 'w-10 h-10 rounded-full object-cover' })
+                : h('div', { className: 'w-10 h-10 rounded-2xl bg-yellow-400 flex items-center justify-center font-black text-[#1b1e2b]' }, name.charAt(0).toUpperCase()),
+              h('div', null,
+                h('p', { className: 'text-white font-black text-sm' }, name),
+                h('p', { className: 'text-yellow-400 text-xs font-bold uppercase tracking-widest' }, t.company || ''))));
+        }))),
+      h('div', null,
+        label('FAQ (answers open when a question is clicked)'),
+        h('div', { className: 'space-y-3' }, faq.map(function (f, i) {
+          return h('div', { key: i, className: 'bg-white border border-slate-200 rounded-2xl overflow-hidden' },
+            h('div', { className: 'flex items-center justify-between px-6 py-5' },
+              h('span', { className: 'font-black text-[#1b1e2b] text-sm pr-4' }, f.question || ''),
+              icon('chevron-up', 'w-4 h-4 text-yellow-500 flex-shrink-0')),
+            h('p', { className: 'px-6 pb-5 text-slate-600 text-sm font-medium leading-relaxed', dangerouslySetInnerHTML: { __html: faqAnswerHtml(f.answer) } }));
+        })))
+    );
+  }
+
   CMS.registerPreviewTemplate('blog', BlogPreview);
   CMS.registerPreviewTemplate('jobs', JobPreview);
   CMS.registerPreviewTemplate('hero', HeroPreview);
@@ -357,5 +395,6 @@
   CMS.registerPreviewTemplate('stats', StatsPreview);
   CMS.registerPreviewTemplate('contact', ContactPreview);
   CMS.registerPreviewTemplate('pictures_home', PicturesPreview);
-  CMS.registerPreviewTemplate('pictures_landing', PicturesPreview);
+  ['landing_intake', 'landing_assistants', 'landing_demand', 'landing_case_managers', 'landing_pi', 'landing_employment', 'landing_workers_comp']
+    .forEach(function (name) { CMS.registerPreviewTemplate(name, LandingPreview); });
 })();

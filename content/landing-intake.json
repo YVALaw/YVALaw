@@ -1,0 +1,41 @@
+{
+  "picture": {
+    "image": "/images/uploads/service-legal-intake.jpg",
+    "alt": "Bilingual Legal Intake Specialist",
+    "focus": "center"
+  },
+  "testimonials": [
+    {
+      "quote": "YVA's Team has been outstanding — organized, reliable, and proactive. They handle intake with professionalism, communicate promptly, and bring integrity and dedication to every task.",
+      "name": "Naveed Halavi",
+      "company": "Halavi Law"
+    },
+    {
+      "quote": "Hiring YVA was the best decision for my business. My bilingual assistant handles everything efficiently and frees up my time to focus on growth.",
+      "name": "Joshua Klugman",
+      "company": "Employees Work Right"
+    }
+  ],
+  "faq": [
+    {
+      "question": "How quickly can my intake specialist start?",
+      "answer": "Once we've had our consultation call and confirmed the match, your specialist will be fully onboarded and ready to handle intake within **72 business hours**. We handle all briefing and setup — you just introduce them to your tools."
+    },
+    {
+      "question": "How bilingual are they, really?",
+      "answer": "All YVA professionals are **fully fluent in English and Spanish** — not conversational, fully fluent. They can handle sensitive client conversations, explain legal procedures, and gather detailed case information in both languages without missing anything."
+    },
+    {
+      "question": "What CRM and tools do they use?",
+      "answer": "Your specialist adapts to **whatever tools your firm already uses** — Clio, MyCase, Salesforce, HubSpot, Google Workspace, Slack, and more. There's no switching, no disruption to your existing workflow."
+    },
+    {
+      "question": "Is there a contract or minimum commitment?",
+      "answer": "We have a service agreement but **no long-term lock-in**. You can exit at any time with no penalties. We believe our results should be the reason you stay — not a contract."
+    },
+    {
+      "question": "What if the specialist isn't a good fit?",
+      "answer": "Just let us know and we'll **match you with someone else at no extra cost**. We're committed to finding the right fit for your firm — not just filling a seat."
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "picture": {
+    "image": "/images/uploads/landing-employment-law.jpg",
+    "alt": "Employment Law Firm Virtual Staff",
+    "focus": "center"
+  },
+  "testimonials": [
+    {
+      "quote": "Our intake volume increased significantly within the first month. The bilingual capability is essential for our employment practice — many of our wage claim clients are Spanish-speaking, and YVA handles that flawlessly.",
+      "name": "Maria T.",
+      "company": "Employment Law · California"
+    },
+    {
+      "quote": "YVA's legal assistant tracks all our EEOC deadlines and handles the admin I used to do myself. I've reclaimed hours every week for actual legal work. The ROI was immediate.",
+      "name": "David R.",
+      "company": "Employment Attorney · New York"
+    }
+  ],
+  "faq": [
+    {
+      "question": "Do your VAs know employment law terminology and processes?",
+      "answer": "Yes. Our employment-focused staff are trained on common practice areas (discrimination, harassment, wage/hour, wrongful termination), EEOC and NLRB workflows, and the language and screening questions relevant to these cases."
+    },
+    {
+      "question": "Can I hire just one role to start?",
+      "answer": "Absolutely. Most employment firms start with an intake specialist or legal assistant, then scale from there. There are no minimums and no pressure to take more than you need."
+    },
+    {
+      "question": "Will my VA work during my firm's hours?",
+      "answer": "Yes — all YVA staff work U.S. time zones and align 100% with your firm's schedule. No time zone lag, no missed messages."
+    },
+    {
+      "question": "Is there a contract or long-term commitment?",
+      "answer": "No lock-ins. Exit anytime, no penalties. Our results should be the reason you stay, not a contract."
+    }
+  ]
+}

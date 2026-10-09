@@ -1,0 +1,34 @@
+{
+  "testimonials": [
+    {
+      "quote": "Our medical record turnaround went from 3 weeks to under 5 days. The case manager YVA placed just doesn't stop following up — exactly what we needed.",
+      "name": "Marcus T.",
+      "company": "Workers' Comp Attorney, Texas",
+      "photo": "/images/uploads/face-wc-1.jpg"
+    },
+    {
+      "quote": "Half my clients are Spanish-speaking and their bilingual intake specialist handled everything. No dropped calls, no lost clients. I saw the difference in 2 weeks.",
+      "name": "Sofia R.",
+      "company": "Managing Partner, Florida WC Firm",
+      "photo": "/images/uploads/face-wc-2.jpg"
+    }
+  ],
+  "faq": [
+    {
+      "question": "Can your staff handle communication with insurance adjusters?",
+      "answer": "Yes. Our legal assistants and case managers are trained to correspond with adjusters — sending demand letters, following up on pending approvals, and escalating when needed. They document everything in your CRM."
+    },
+    {
+      "question": "Are your staff bilingual in workers' comp terminology?",
+      "answer": "All of our staff are fluent in English and Spanish. For workers' comp specifically, we train on key terminology — IMEs, lien letters, compromise & release vs. stipulation, and state-specific processes — before placing anyone on your cases."
+    },
+    {
+      "question": "What software do your staff use?",
+      "answer": "Our team works within your existing systems — Filevine, Clio, MyCase, Litify, or any other CMS. We also use Google Workspace, Microsoft 365, and common communication tools. No new software required on your end."
+    },
+    {
+      "question": "Is there a contract or minimum commitment?",
+      "answer": "No long-term contracts. We work month-to-month and you can scale up or down based on your caseload. Most firms expand to additional staff within 60 days once they see the impact."
+    }
+  ]
+}

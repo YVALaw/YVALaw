@@ -616,13 +616,20 @@ collections:
                   - { label: "Left side", value: "left" }
                   - { label: "Right side", value: "right" }
 
-      - name: "pictures_landing"
-        label: "Landing Page Pictures"
-        file: "content/pictures-landing.json"
-        description: "The photo next to the headline on each ad landing page (Workers’ Comp has none). Each upload is resized automatically."
+  # Ad landing pages: photo + testimonials + FAQ per page (content/landing-*.json);
+  # build.js writes them into each page in its own design.
+  - name: "landing"
+    label: "Landing Pages"
+    description: "The paid-ad landing pages (not linked from the website or shown on Google). Each entry holds that page's photo, testimonials and FAQ."
+    files:
+      - name: "landing_intake"
+        label: "Legal Intake"
+        file: "content/landing-intake.json"
+        preview_path: "landing-intake.html"
+        description: "yvastaffing.agency/landing-intake.html"
         fields:
-          - label: "Legal Intake page"
-            name: "landing_intake"
+          - label: "Photo next to the headline"
+            name: "picture"
             widget: "object"
             collapsed: true
             summary: "{{fields.image}}"
@@ -631,7 +638,7 @@ collections:
                 name: "image"
                 widget: "image"
                 choose_url: false
-                hint: "Upload any size; the site resizes and compresses it automatically. Shown next to the headline."
+                hint: "Upload any size; the site resizes and compresses it automatically. The preview shows the crop on a computer and a phone."
               - label: "Description"
                 name: "alt"
                 widget: "string"
@@ -641,15 +648,48 @@ collections:
                 name: "focus"
                 widget: "select"
                 default: "center"
-                hint: "Which part of the photo stays in view when the spot crops it (the preview shows phone and computer)."
                 options:
                   - { label: "Center", value: "center" }
                   - { label: "Top (keeps heads in view)", value: "top" }
                   - { label: "Bottom", value: "bottom" }
                   - { label: "Left side", value: "left" }
                   - { label: "Right side", value: "right" }
-          - label: "Legal Assistants page"
-            name: "landing_assistants"
+          - label: "Testimonials"
+            label_singular: "Testimonial"
+            name: "testimonials"
+            widget: "list"
+            summary: "{{fields.name}} · {{fields.company}}"
+            hint: "Shown side by side; two work best."
+            fields:
+              - label: "Quote"
+                name: "quote"
+                widget: "text"
+                hint: "Quotation marks are added automatically."
+              - { label: "Name", name: "name", widget: "string" }
+              - { label: "Company / role", name: "company", widget: "string", required: false }
+          - label: "FAQ"
+            label_singular: "Question"
+            name: "faq"
+            widget: "list"
+            summary: "{{fields.question}}"
+            fields:
+              - { label: "Question", name: "question", widget: "string" }
+              - label: "Answer"
+                name: "answer"
+                widget: "markdown"
+                modes: ["rich_text"]
+                buttons: ["bold", "link"]
+                editor_components: []
+                hint: "Bold words are highlighted. Type {price} for the starting price, or {intake}, {assistants}, {demand}, {case} for a service's hourly rate (they follow the Prices form)."
+
+      - name: "landing_assistants"
+        label: "Legal Assistants"
+        file: "content/landing-assistants.json"
+        preview_path: "landing-assistants.html"
+        description: "yvastaffing.agency/landing-assistants.html"
+        fields:
+          - label: "Photo next to the headline"
+            name: "picture"
             widget: "object"
             collapsed: true
             summary: "{{fields.image}}"
@@ -658,7 +698,7 @@ collections:
                 name: "image"
                 widget: "image"
                 choose_url: false
-                hint: "Upload any size; the site resizes and compresses it automatically. Shown next to the headline."
+                hint: "Upload any size; the site resizes and compresses it automatically. The preview shows the crop on a computer and a phone."
               - label: "Description"
                 name: "alt"
                 widget: "string"
@@ -668,15 +708,48 @@ collections:
                 name: "focus"
                 widget: "select"
                 default: "center"
-                hint: "Which part of the photo stays in view when the spot crops it (the preview shows phone and computer)."
                 options:
                   - { label: "Center", value: "center" }
                   - { label: "Top (keeps heads in view)", value: "top" }
                   - { label: "Bottom", value: "bottom" }
                   - { label: "Left side", value: "left" }
                   - { label: "Right side", value: "right" }
-          - label: "Demand Writing page"
-            name: "landing_demand"
+          - label: "Testimonials"
+            label_singular: "Testimonial"
+            name: "testimonials"
+            widget: "list"
+            summary: "{{fields.name}} · {{fields.company}}"
+            hint: "Shown side by side; two work best."
+            fields:
+              - label: "Quote"
+                name: "quote"
+                widget: "text"
+                hint: "Quotation marks are added automatically."
+              - { label: "Name", name: "name", widget: "string" }
+              - { label: "Company / role", name: "company", widget: "string", required: false }
+          - label: "FAQ"
+            label_singular: "Question"
+            name: "faq"
+            widget: "list"
+            summary: "{{fields.question}}"
+            fields:
+              - { label: "Question", name: "question", widget: "string" }
+              - label: "Answer"
+                name: "answer"
+                widget: "markdown"
+                modes: ["rich_text"]
+                buttons: ["bold", "link"]
+                editor_components: []
+                hint: "Bold words are highlighted. Type {price} for the starting price, or {intake}, {assistants}, {demand}, {case} for a service's hourly rate (they follow the Prices form)."
+
+      - name: "landing_demand"
+        label: "Demand Writing"
+        file: "content/landing-demand.json"
+        preview_path: "landing-demand.html"
+        description: "yvastaffing.agency/landing-demand.html"
+        fields:
+          - label: "Photo next to the headline"
+            name: "picture"
             widget: "object"
             collapsed: true
             summary: "{{fields.image}}"
@@ -685,7 +758,7 @@ collections:
                 name: "image"
                 widget: "image"
                 choose_url: false
-                hint: "Upload any size; the site resizes and compresses it automatically. Shown next to the headline."
+                hint: "Upload any size; the site resizes and compresses it automatically. The preview shows the crop on a computer and a phone."
               - label: "Description"
                 name: "alt"
                 widget: "string"
@@ -695,15 +768,48 @@ collections:
                 name: "focus"
                 widget: "select"
                 default: "center"
-                hint: "Which part of the photo stays in view when the spot crops it (the preview shows phone and computer)."
                 options:
                   - { label: "Center", value: "center" }
                   - { label: "Top (keeps heads in view)", value: "top" }
                   - { label: "Bottom", value: "bottom" }
                   - { label: "Left side", value: "left" }
                   - { label: "Right side", value: "right" }
-          - label: "Case Managers page"
-            name: "landing_case_managers"
+          - label: "Testimonials"
+            label_singular: "Testimonial"
+            name: "testimonials"
+            widget: "list"
+            summary: "{{fields.name}} · {{fields.company}}"
+            hint: "Shown side by side; two work best."
+            fields:
+              - label: "Quote"
+                name: "quote"
+                widget: "text"
+                hint: "Quotation marks are added automatically."
+              - { label: "Name", name: "name", widget: "string" }
+              - { label: "Company / role", name: "company", widget: "string", required: false }
+          - label: "FAQ"
+            label_singular: "Question"
+            name: "faq"
+            widget: "list"
+            summary: "{{fields.question}}"
+            fields:
+              - { label: "Question", name: "question", widget: "string" }
+              - label: "Answer"
+                name: "answer"
+                widget: "markdown"
+                modes: ["rich_text"]
+                buttons: ["bold", "link"]
+                editor_components: []
+                hint: "Bold words are highlighted. Type {price} for the starting price, or {intake}, {assistants}, {demand}, {case} for a service's hourly rate (they follow the Prices form)."
+
+      - name: "landing_case_managers"
+        label: "Case Managers"
+        file: "content/landing-case-managers.json"
+        preview_path: "landing-case-managers.html"
+        description: "yvastaffing.agency/landing-case-managers.html"
+        fields:
+          - label: "Photo next to the headline"
+            name: "picture"
             widget: "object"
             collapsed: true
             summary: "{{fields.image}}"
@@ -712,7 +818,7 @@ collections:
                 name: "image"
                 widget: "image"
                 choose_url: false
-                hint: "Upload any size; the site resizes and compresses it automatically. Shown next to the headline."
+                hint: "Upload any size; the site resizes and compresses it automatically. The preview shows the crop on a computer and a phone."
               - label: "Description"
                 name: "alt"
                 widget: "string"
@@ -722,15 +828,48 @@ collections:
                 name: "focus"
                 widget: "select"
                 default: "center"
-                hint: "Which part of the photo stays in view when the spot crops it (the preview shows phone and computer)."
                 options:
                   - { label: "Center", value: "center" }
                   - { label: "Top (keeps heads in view)", value: "top" }
                   - { label: "Bottom", value: "bottom" }
                   - { label: "Left side", value: "left" }
                   - { label: "Right side", value: "right" }
-          - label: "Personal Injury page"
-            name: "landing_pi"
+          - label: "Testimonials"
+            label_singular: "Testimonial"
+            name: "testimonials"
+            widget: "list"
+            summary: "{{fields.name}} · {{fields.company}}"
+            hint: "Shown side by side; two work best."
+            fields:
+              - label: "Quote"
+                name: "quote"
+                widget: "text"
+                hint: "Quotation marks are added automatically."
+              - { label: "Name", name: "name", widget: "string" }
+              - { label: "Company / role", name: "company", widget: "string", required: false }
+          - label: "FAQ"
+            label_singular: "Question"
+            name: "faq"
+            widget: "list"
+            summary: "{{fields.question}}"
+            fields:
+              - { label: "Question", name: "question", widget: "string" }
+              - label: "Answer"
+                name: "answer"
+                widget: "markdown"
+                modes: ["rich_text"]
+                buttons: ["bold", "link"]
+                editor_components: []
+                hint: "Bold words are highlighted. Type {price} for the starting price, or {intake}, {assistants}, {demand}, {case} for a service's hourly rate (they follow the Prices form)."
+
+      - name: "landing_pi"
+        label: "Personal Injury"
+        file: "content/landing-pi.json"
+        preview_path: "landing-pi.html"
+        description: "yvastaffing.agency/landing-pi.html"
+        fields:
+          - label: "Photo next to the headline"
+            name: "picture"
             widget: "object"
             collapsed: true
             summary: "{{fields.image}}"
@@ -739,7 +878,7 @@ collections:
                 name: "image"
                 widget: "image"
                 choose_url: false
-                hint: "Upload any size; the site resizes and compresses it automatically. Shown next to the headline."
+                hint: "Upload any size; the site resizes and compresses it automatically. The preview shows the crop on a computer and a phone."
               - label: "Description"
                 name: "alt"
                 widget: "string"
@@ -749,15 +888,48 @@ collections:
                 name: "focus"
                 widget: "select"
                 default: "center"
-                hint: "Which part of the photo stays in view when the spot crops it (the preview shows phone and computer)."
                 options:
                   - { label: "Center", value: "center" }
                   - { label: "Top (keeps heads in view)", value: "top" }
                   - { label: "Bottom", value: "bottom" }
                   - { label: "Left side", value: "left" }
                   - { label: "Right side", value: "right" }
-          - label: "Employment Law page"
-            name: "landing_employment"
+          - label: "Testimonials"
+            label_singular: "Testimonial"
+            name: "testimonials"
+            widget: "list"
+            summary: "{{fields.name}} · {{fields.company}}"
+            hint: "Shown side by side; two work best."
+            fields:
+              - label: "Quote"
+                name: "quote"
+                widget: "text"
+                hint: "Quotation marks are added automatically."
+              - { label: "Name", name: "name", widget: "string" }
+              - { label: "Company / role", name: "company", widget: "string", required: false }
+          - label: "FAQ"
+            label_singular: "Question"
+            name: "faq"
+            widget: "list"
+            summary: "{{fields.question}}"
+            fields:
+              - { label: "Question", name: "question", widget: "string" }
+              - label: "Answer"
+                name: "answer"
+                widget: "markdown"
+                modes: ["rich_text"]
+                buttons: ["bold", "link"]
+                editor_components: []
+                hint: "Bold words are highlighted. Type {price} for the starting price, or {intake}, {assistants}, {demand}, {case} for a service's hourly rate (they follow the Prices form)."
+
+      - name: "landing_employment"
+        label: "Employment Law"
+        file: "content/landing-employment.json"
+        preview_path: "landing-employment.html"
+        description: "yvastaffing.agency/landing-employment.html"
+        fields:
+          - label: "Photo next to the headline"
+            name: "picture"
             widget: "object"
             collapsed: true
             summary: "{{fields.image}}"
@@ -766,7 +938,7 @@ collections:
                 name: "image"
                 widget: "image"
                 choose_url: false
-                hint: "Upload any size; the site resizes and compresses it automatically. Shown next to the headline."
+                hint: "Upload any size; the site resizes and compresses it automatically. The preview shows the crop on a computer and a phone."
               - label: "Description"
                 name: "alt"
                 widget: "string"
@@ -776,10 +948,76 @@ collections:
                 name: "focus"
                 widget: "select"
                 default: "center"
-                hint: "Which part of the photo stays in view when the spot crops it (the preview shows phone and computer)."
                 options:
                   - { label: "Center", value: "center" }
                   - { label: "Top (keeps heads in view)", value: "top" }
                   - { label: "Bottom", value: "bottom" }
                   - { label: "Left side", value: "left" }
                   - { label: "Right side", value: "right" }
+          - label: "Testimonials"
+            label_singular: "Testimonial"
+            name: "testimonials"
+            widget: "list"
+            summary: "{{fields.name}} · {{fields.company}}"
+            hint: "Shown side by side; two work best."
+            fields:
+              - label: "Quote"
+                name: "quote"
+                widget: "text"
+                hint: "Quotation marks are added automatically."
+              - { label: "Name", name: "name", widget: "string" }
+              - { label: "Company / role", name: "company", widget: "string", required: false }
+          - label: "FAQ"
+            label_singular: "Question"
+            name: "faq"
+            widget: "list"
+            summary: "{{fields.question}}"
+            fields:
+              - { label: "Question", name: "question", widget: "string" }
+              - label: "Answer"
+                name: "answer"
+                widget: "markdown"
+                modes: ["rich_text"]
+                buttons: ["bold", "link"]
+                editor_components: []
+                hint: "Bold words are highlighted. Type {price} for the starting price, or {intake}, {assistants}, {demand}, {case} for a service's hourly rate (they follow the Prices form)."
+
+      - name: "landing_workers_comp"
+        label: "Workers' Comp"
+        file: "content/landing-workers-comp.json"
+        preview_path: "landing-workers-comp.html"
+        description: "yvastaffing.agency/landing-workers-comp.html"
+        fields:
+          - label: "Testimonials"
+            label_singular: "Testimonial"
+            name: "testimonials"
+            widget: "list"
+            summary: "{{fields.name}} · {{fields.company}}"
+            hint: "Shown side by side; two work best."
+            fields:
+              - label: "Quote"
+                name: "quote"
+                widget: "text"
+                hint: "Quotation marks are added automatically."
+              - { label: "Name", name: "name", widget: "string" }
+              - { label: "Company / role", name: "company", widget: "string", required: false }
+              - label: "Photo"
+                name: "photo"
+                widget: "image"
+                required: false
+                choose_url: false
+                hint: "A small square photo of the person (shown as a circle). Leave empty to show their initial."
+          - label: "FAQ"
+            label_singular: "Question"
+            name: "faq"
+            widget: "list"
+            summary: "{{fields.question}}"
+            fields:
+              - { label: "Question", name: "question", widget: "string" }
+              - label: "Answer"
+                name: "answer"
+                widget: "markdown"
+                modes: ["rich_text"]
+                buttons: ["bold", "link"]
+                editor_components: []
+                hint: "Bold words are highlighted. Type {price} for the starting price, or {intake}, {assistants}, {demand}, {case} for a service's hourly rate (they follow the Prices form)."

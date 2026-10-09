@@ -1,0 +1,41 @@
+{
+  "picture": {
+    "image": "/images/uploads/home-hero.jpg",
+    "alt": "Legal case manager coordinating cases",
+    "focus": "center"
+  },
+  "testimonials": [
+    {
+      "quote": "YVA's Team has been outstanding — organized, reliable, and proactive. They handle everything with professionalism, communicate promptly, and bring integrity and dedication to every task.",
+      "name": "Naveed Halavi",
+      "company": "Halavi Law"
+    },
+    {
+      "quote": "Hiring YVA was the best decision for my business. My bilingual assistant handles everything efficiently and frees up my time to focus on growth.",
+      "name": "Joshua Klugman",
+      "company": "Employees Work Right"
+    }
+  ],
+  "faq": [
+    {
+      "question": "How is a case manager different from a legal assistant?",
+      "answer": "A legal assistant supports attorneys day-to-day with admin tasks. A case manager **owns the case itself** — they're responsible for driving it forward, coordinating all parties, and making sure nothing stalls between open and close. They think proactively, not reactively."
+    },
+    {
+      "question": "How many cases can one case manager handle?",
+      "answer": "It depends on case complexity and stage. A full-time case manager typically handles **30–60 active cases** comfortably in a PI environment. We set expectations during the consultation call based on your specific caseload."
+    },
+    {
+      "question": "How do they get access to case information?",
+      "answer": "Your case manager works directly in your case management system — Clio, Filevine, MyCase, or whatever you use. You **grant them access with appropriate permissions**, and they operate within your existing setup. No new tools, no parallel systems."
+    },
+    {
+      "question": "Is there a contract or minimum commitment?",
+      "answer": "We have a service agreement but **no long-term lock-in**. You can exit at any time with no penalties. Our results are what keeps clients with us — not the fine print."
+    },
+    {
+      "question": "What if they're not the right fit?",
+      "answer": "Tell us and we'll **rematch you at no extra cost**. A case manager needs to fit your firm's communication style and expectations — and finding that fit is part of what we guarantee."
+    }
+  ]
+}

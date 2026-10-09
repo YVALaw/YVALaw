@@ -1,0 +1,41 @@
+{
+  "picture": {
+    "image": "/images/uploads/service-demand-writing.jpg",
+    "alt": "Demand writing specialist reviewing documents",
+    "focus": "center"
+  },
+  "testimonials": [
+    {
+      "quote": "YVA's Team has been outstanding — organized, reliable, and proactive. They handle everything with professionalism, communicate promptly, and bring integrity and dedication to every task.",
+      "name": "Naveed Halavi",
+      "company": "Halavi Law"
+    },
+    {
+      "quote": "Hiring YVA was the best decision for my business. My bilingual assistant handles everything efficiently and frees up my time to focus on growth.",
+      "name": "Joshua Klugman",
+      "company": "Employees Work Right"
+    }
+  ],
+  "faq": [
+    {
+      "question": "How fast can they turn around a demand package?",
+      "answer": "Turnaround depends on case complexity and record volume, but most standard PI demand packages are completed within **3–5 business days** of receiving complete records. Complex cases with significant medical history may take longer — we set clear expectations upfront."
+    },
+    {
+      "question": "What do they need to get started on a case?",
+      "answer": "Typically: access to the case file in your case management system, complete medical records and bills, your demand letter template, and any specific instructions from the attorney. We make it easy — **just assign the case and they take it from there**."
+    },
+    {
+      "question": "Will the letters match my firm's voice and format?",
+      "answer": "Yes — your specialist is trained on your templates, formatting preferences, and tone during onboarding. Every draft is built to your standard so your attorneys only need to **review and approve, not rewrite**."
+    },
+    {
+      "question": "Is there a contract or minimum commitment?",
+      "answer": "We have a service agreement but **no long-term lock-in**. You can exit at any time with no penalties. Our results are what keeps clients with us — not the fine print."
+    },
+    {
+      "question": "What if the quality doesn't meet our standards?",
+      "answer": "Tell us and we'll address it immediately — either through additional training or by **matching you with a different specialist at no extra cost**. Quality that meets your firm's standard is the baseline, not the bonus."
+    }
+  ]
+}

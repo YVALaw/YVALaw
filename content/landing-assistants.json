@@ -1,0 +1,41 @@
+{
+  "picture": {
+    "image": "/images/uploads/service-case-managers.jpg",
+    "alt": "Legal Assistant working at desk",
+    "focus": "center"
+  },
+  "testimonials": [
+    {
+      "quote": "YVA's Team has been outstanding — organized, reliable, and proactive. They handle everything with professionalism, communicate promptly, and bring integrity and dedication to every task.",
+      "name": "Naveed Halavi",
+      "company": "Halavi Law"
+    },
+    {
+      "quote": "Hiring YVA was the best decision for my business. My bilingual assistant handles everything efficiently and frees up my time to focus on growth.",
+      "name": "Joshua Klugman",
+      "company": "Employees Work Right"
+    }
+  ],
+  "faq": [
+    {
+      "question": "How quickly can my legal assistant start?",
+      "answer": "Once we've had our consultation call and confirmed the match, your assistant will be onboarded and working within **72 business hours**. We brief them on your tools, workflow, and firm priorities — you just make the introduction."
+    },
+    {
+      "question": "What tools and systems do they work in?",
+      "answer": "Your assistant adapts to **whatever your firm already uses** — Clio, MyCase, Filevine, Google Workspace, Microsoft 365, Slack, and more. No new tools, no disruption to how your team works."
+    },
+    {
+      "question": "How bilingual are they?",
+      "answer": "All YVA professionals are **fully fluent in English and Spanish** — not conversational, fluent. They write client-facing correspondence and handle sensitive conversations in both languages at a professional level."
+    },
+    {
+      "question": "Is there a long-term contract?",
+      "answer": "We have a service agreement but **no long-term lock-in**. You can exit at any time with no penalties. Our results are what keeps clients with us — not the fine print."
+    },
+    {
+      "question": "What if they're not a good fit for my firm?",
+      "answer": "Tell us and we'll **rematch you at no extra cost**. We take fit seriously — finding the right person for your team's dynamic and workflow is part of what we do."
+    }
+  ]
+}

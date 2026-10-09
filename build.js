@@ -480,6 +480,97 @@ const heroEn = heroText('en');
 Object.assign(i18n.en, heroEn);
 Object.assign(i18n.es, heroText('es'));
 
+// Landing pages (content/landing-<page>.json, "Landing Pages" in /admin): each ad
+// page's testimonials and FAQ, written in that page's own design: the four service
+// pages, the practice-area pages (employment, PI: condensed markup) and Workers' Comp.
+const LANDING_STYLE = { 'landing-employment': 'practice', 'landing-pi': 'practice', 'landing-workers-comp': 'wc' };
+const LP_STAR = '<i data-lucide="star" class="w-4 h-4 text-yellow-400 fill-yellow-400"></i>';
+const initial = name => escapeText(String(name || '').trim().charAt(0).toUpperCase());
+
+function landingTestimonials(style, items) {
+  return items.filter(t => t.quote && t.name).flatMap(t => {
+    const quote = `"${escapeText(stripQuotes(t.quote))}"`;
+    if (style === 'wc') {
+      const photo = String(t.photo || '').trim();
+      return [
+        '<div class="bg-white rounded-xl p-6 shadow-sm">',
+        '  <div class="flex gap-1 text-yellow-400 mb-3">★★★★★</div>',
+        `  <p class="text-gray-700 italic mb-4">${quote}</p>`,
+        '  <div class="flex items-center gap-3">',
+        photo
+          ? `    <img src="${escapeHtml(photo)}" alt="" class="w-10 h-10 rounded-full object-cover" loading="lazy" />`
+          : `    <div class="w-10 h-10 rounded-full bg-yellow-400 flex items-center justify-center font-black text-sm text-[#1b1e2b]">${initial(t.name)}</div>`,
+        '    <div>',
+        `      <div class="font-semibold text-sm text-[#1b1e2b]">${escapeText(t.name)}</div>`,
+        `      <div class="text-xs text-gray-500">${escapeText(t.company)}</div>`,
+        '    </div>',
+        '  </div>',
+        '</div>'
+      ];
+    }
+    const person = style === 'practice'
+      ? [`        <div><p class="text-white font-black text-sm">${escapeText(t.name)}</p><p class="text-yellow-400 text-xs font-bold uppercase tracking-widest">${escapeText(t.company)}</p></div>`]
+      : ['        <div>',
+        `            <p class="text-white font-black text-sm">${escapeText(t.name)}</p>`,
+        `            <p class="text-yellow-400 text-xs font-bold uppercase tracking-widest">${escapeText(t.company)}</p>`,
+        '        </div>'];
+    return [
+      '<div class="bg-white/5 border border-white/10 rounded-[2rem] p-8 relative overflow-hidden">',
+      '    <div class="absolute top-0 right-0 w-40 h-40 bg-yellow-400/10 rounded-full blur-[60px]"></div>',
+      ...(style === 'practice'
+        ? [`    <div class="flex gap-1 mb-5">${LP_STAR.repeat(5)}</div>`]
+        : ['    <div class="flex gap-1 mb-5">', ...Array(5).fill('        ' + LP_STAR), '    </div>']),
+      `    <p class="text-white text-base font-bold leading-relaxed italic mb-6">${quote}</p>`,
+      '    <div class="flex items-center gap-3">',
+      `        <div class="w-10 h-10 rounded-2xl bg-yellow-400 flex items-center justify-center font-black text-[#1b1e2b]">${initial(t.name)}</div>`,
+      ...person,
+      '    </div>',
+      '</div>'
+    ];
+  });
+}
+
+function landingFaq(style, items) {
+  return items.filter(f => f.question && f.answer).flatMap(f => {
+    const question = escapeText(f.question);
+    const answer = faqAnswerHtml(f.answer);
+    if (style === 'wc') {
+      return [
+        '',
+        '<div class="faq-item bg-white rounded-xl border border-gray-200 overflow-hidden">',
+        '  <button class="faq-trigger w-full flex justify-between items-center p-5 text-left font-semibold text-[#1b1e2b]">',
+        `    ${question}`,
+        '    <span class="faq-icon text-xl leading-none flex-shrink-0 ml-4">+</span>',
+        '  </button>',
+        '  <div class="faq-answer px-5 pb-5 text-gray-600 text-sm">',
+        `    ${answer}`,
+        '  </div>',
+        '</div>'
+      ];
+    }
+    if (style === 'practice') {
+      return [
+        '<div class="faq-item bg-white border border-slate-200 rounded-2xl overflow-hidden">',
+        `    <button class="faq-trigger w-full flex items-center justify-between px-6 py-4 text-left hover:bg-slate-50 transition-colors"><span class="font-black text-[#1b1e2b] text-sm pr-4">${question}</span><i data-lucide="chevron-down" class="faq-chevron w-4 h-4 text-yellow-500 flex-shrink-0"></i></button>`,
+        `    <div class="faq-answer"><p class="px-6 pb-5 text-slate-600 text-sm font-medium leading-relaxed">${answer}</p></div>`,
+        '</div>'
+      ];
+    }
+    return [
+      '',
+      '<div class="faq-item bg-white border border-slate-200 rounded-2xl overflow-hidden">',
+      '    <button class="faq-trigger w-full flex items-center justify-between px-6 py-5 text-left hover:bg-slate-50 transition-colors">',
+      `        <span class="font-black text-[#1b1e2b] text-sm pr-4">${question}</span>`,
+      '        <i data-lucide="chevron-down" class="faq-chevron w-4 h-4 text-yellow-500 flex-shrink-0"></i>',
+      '    </button>',
+      '    <div class="faq-answer">',
+      `        <p class="px-6 pb-5 text-slate-600 text-sm font-medium leading-relaxed">${answer}</p>`,
+      '    </div>',
+      '</div>'
+    ];
+  });
+}
+
 // Contact email: each page records the address it currently shows in a
 // <!-- CMS:email … --> comment; when the admin's address differs, every occurrence
 // on that page (links included) is swapped, the comment too.
@@ -504,11 +595,13 @@ try {
   console.warn(`WARNING: resizing pictures failed (${error.message.split('\n')[0]}); using the original uploads`);
   const FOCUS_CSS = { center: '50% 50%', top: '50% 0%', bottom: '50% 100%', left: '0% 50%', right: '100% 50%' };
   pictures = {};
-  ['pictures-home', 'pictures-landing'].forEach(name => {
-    if (!fs.existsSync(path.join(contentDir, `${name}.json`))) return;
-    Object.entries(readContent(name)).forEach(([spot, entry]) => {
-      if (entry && entry.image) pictures[spot] = { src: entry.image, alt: String(entry.alt || '').trim(), position: FOCUS_CSS[entry.focus] || FOCUS_CSS.center };
-    });
+  const spots = fs.existsSync(path.join(contentDir, 'pictures-home.json')) ? { ...readContent('pictures-home') } : {};
+  fs.readdirSync(contentDir).filter(f => /^landing-.*\.json$/.test(f)).forEach(f => {
+    const picture = readContent(f.replace(/\.json$/, '')).picture;
+    if (picture) spots[f.replace(/\.json$/, '').replace(/-/g, '_')] = picture;
+  });
+  Object.entries(spots).forEach(([spot, entry]) => {
+    if (entry && entry.image) pictures[spot] = { src: entry.image, alt: String(entry.alt || '').trim(), position: FOCUS_CSS[entry.focus] || FOCUS_CSS.center };
   });
 }
 
@@ -559,6 +652,13 @@ fs.readdirSync(__dirname).filter(file => file.endsWith('.html')).forEach(file =>
   html = fillBlock(html, 'social', socialLinks);
   html = fillBlock(html, 'i18n', i18nLines);
   html = fillInline(html, 'hours', escapeText(contact.hours_en));
+  const page = file.replace(/\.html$/, '');
+  if (page.startsWith('landing-') && fs.existsSync(path.join(contentDir, `${page}.json`))) {
+    const landing = readContent(page);
+    const style = LANDING_STYLE[page] || 'service';
+    html = fillBlock(html, 'lp-testimonials', landingTestimonials(style, landing.testimonials || []));
+    html = fillBlock(html, 'lp-faq', landingFaq(style, landing.faq || []));
+  }
   html = fillInline(html, 'hero-badge', heroEn.heroBadge);
   html = fillInline(html, 'hero-h1', heroEn.heroH1);
   html = fillInline(html, 'hero-h2', heroEn.heroH2);
@@ -576,7 +676,7 @@ fs.readdirSync(__dirname).filter(file => file.endsWith('.html')).forEach(file =>
   html = fillPictures(html);
   if (html !== before) fs.writeFileSync(filePath, html);
 });
-['testimonials', 'testimonial-dots', 'faq', 'faq-jsonld', 'stats', 'contact', 'contact-compact', 'social', 'i18n', 'hours', 'img', 'imgurl', 'imgpos', 'email',
+['testimonials', 'testimonial-dots', 'faq', 'faq-jsonld', 'stats', 'contact', 'contact-compact', 'social', 'i18n', 'hours', 'img', 'imgurl', 'imgpos', 'email', 'lp-testimonials', 'lp-faq',
   'hero-badge', 'hero-h1', 'hero-h2', 'hero-cta', 'hero-count', 'hero-count-sub', 'hero-review', 'hero-review-name', 'hero-review-role'].forEach(name => {
   if (!filledBlocks.has(name)) throw new Error(`No page has the CMS:${name} markers — they were removed or renamed`);
 });

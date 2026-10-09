@@ -1,5 +1,6 @@
-// Resizes the pictures chosen in /admin (Website Content → Home / Landing Page Pictures,
-// saved in content/pictures-*.json) for the spots they fill on the site, and writes
+// Resizes the pictures chosen in /admin (Website Content → Home Page Pictures and each
+// Landing Pages entry; content/pictures-home.json, content/landing-*.json) for the
+// spots they fill on the site, and writes
 // assets/img/site/manifest.json for build.js, which puts them into the pages.
 // Run by build.js. Output goes to assets/img/site/ (generated, not committed).
 //
@@ -29,11 +30,15 @@ const FOCUS = {
   right: { css: '100% 50%', sharp: 'right' }
 };
 
+// Spots: the home page pictures, plus each landing page's `picture`
+// (content/landing-intake.json -> spot "landing_intake").
 function readSpots() {
-  const spots = {};
-  ['pictures-home.json', 'pictures-landing.json'].forEach(file => {
-    const full = path.join(ROOT, 'content', file);
-    if (fs.existsSync(full)) Object.assign(spots, JSON.parse(fs.readFileSync(full, 'utf8')));
+  const dir = path.join(ROOT, 'content');
+  const read = file => JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
+  const spots = fs.existsSync(path.join(dir, 'pictures-home.json')) ? { ...read('pictures-home.json') } : {};
+  fs.readdirSync(dir).filter(file => /^landing-.*\.json$/.test(file)).forEach(file => {
+    const picture = read(file).picture;
+    if (picture) spots[file.replace(/\.json$/, '').replace(/-/g, '_')] = picture;
   });
   return spots;
 }
