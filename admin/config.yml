@@ -77,7 +77,7 @@ collections:
   - name: "jobs"
     label: "Job Posts"
     label_singular: "Job Post"
-    description: "Roles on the Careers page. To stop taking applications, set Status to Closed instead of deleting the post."
+    description: "Roles on the Careers page. To stop taking applications, set Status to Closed instead of deleting the post. To open or close several roles at once, use the yellow “Open & close roles” button."
     folder: "jobs"
     create: true
     slug: "{{slug}}"

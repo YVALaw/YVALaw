@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow">
+  <title>Open &amp; Close Roles | YVA Law Staffing</title>
+  <link rel="icon" href="/favicon.ico" sizes="48x48">
+  <link rel="icon" type="image/png" sizes="192x192" href="/favicon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap">
+  <link rel="stylesheet" href="/assets/css/tailwind.css">
+  <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-slate-100 text-slate-900 min-h-screen pb-32">
+
+  <header class="bg-[#1b1e2b]">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+      <a href="/admin/" class="flex items-center gap-3 min-w-0">
+        <img src="/logo/img2.png" alt="" width="36" height="36" class="h-9 w-9 rounded-lg flex-shrink-0">
+        <span class="text-white font-black tracking-tight truncate">Content Manager</span>
+      </a>
+      <a href="/admin/#/collections/jobs" class="text-slate-300 text-sm font-bold hover:text-yellow-400 transition-colors whitespace-nowrap">&larr; Job Posts</a>
+    </div>
+  </header>
+
+  <main class="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
+    <h1 class="text-3xl sm:text-4xl font-black text-[#1b1e2b] tracking-tight mb-3">Open &amp; close roles</h1>
+    <p class="text-slate-600 font-medium leading-relaxed mb-8">
+      Switch each role to <span class="font-black text-emerald-700">Open</span> or <span class="font-black text-[#1b1e2b]">Closed</span>, then click
+      <span class="font-black text-[#1b1e2b]">Save changes</span>. The Careers page updates about a minute later.
+      Closed roles stay on the page with an “Applications Closed” button. To edit anything else about a role, open it in
+      <a href="/admin/#/collections/jobs" class="font-bold text-[#1b1e2b] underline decoration-yellow-400 underline-offset-2">Job Posts</a>.
+    </p>
+
+    <div id="message" class="hidden mb-6 rounded-2xl px-5 py-4 text-sm font-bold" role="status" aria-live="polite"></div>
+
+    <div id="login" class="hidden bg-white rounded-2xl border-2 border-slate-100 p-8 text-center">
+      <p class="font-black text-[#1b1e2b] mb-4">Log in to manage job openings.</p>
+      <button id="login-button" type="button" class="bg-[#1b1e2b] text-white px-6 py-3 rounded-xl font-black text-sm uppercase tracking-widest hover:bg-yellow-400 hover:text-[#1b1e2b] transition-colors">Log in</button>
+    </div>
+
+    <p id="loading" class="text-slate-500 font-bold">Loading roles…</p>
+    <ul id="jobs" class="space-y-3"></ul>
+  </main>
+
+  <div id="save-bar" class="hidden fixed inset-x-0 bottom-0 bg-white border-t border-slate-200 shadow-[0_-10px_30px_-15px_rgba(27,30,43,0.35)]">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between gap-3">
+      <p id="change-count" class="text-sm font-bold text-slate-600"></p>
+      <div class="flex items-center gap-2">
+        <button id="undo-button" type="button" class="px-4 py-3 rounded-xl text-sm font-bold text-slate-500 hover:text-[#1b1e2b] transition-colors">Undo</button>
+        <button id="save-button" type="button" class="bg-yellow-400 text-[#1b1e2b] px-4 sm:px-6 py-3 rounded-xl font-black text-sm uppercase tracking-wider sm:tracking-widest whitespace-nowrap hover:bg-yellow-300 transition-colors disabled:opacity-50">Save changes</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js"></script>
+  <script src="/admin/hiring.js"></script>
+</body>
+</html>

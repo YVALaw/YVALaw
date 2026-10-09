@@ -18,5 +18,15 @@
   <script src="https://cdn.jsdelivr.net/npm/marked@18.0.13/lib/marked.umd.js"></script>
   <script src="/admin/preview.js"></script>
   <script src="/admin/editor-blocks.js"></script>
+  <!-- Shortcut to the Open & close roles board (admin/hiring.html), shown on the Job Posts list only. -->
+  <a id="hiring-shortcut" href="/admin/hiring.html" style="display:none;position:fixed;right:24px;bottom:24px;z-index:50;align-items:center;gap:8px;padding:14px 20px;border-radius:14px;background:#facc15;color:#1b1e2b;font:800 14px/1 system-ui,sans-serif;text-decoration:none;box-shadow:0 12px 30px -10px rgba(27,30,43,.45)">Open &amp; close roles &rarr;</a>
+  <script>
+    (function () {
+      var link = document.getElementById('hiring-shortcut');
+      function update() { link.style.display = /^#\/collections\/jobs(\/filter\/[^/]*)?\/?$/.test(location.hash) ? 'inline-flex' : 'none'; }
+      window.addEventListener('hashchange', update);
+      update();
+    })();
+  </script>
 </body>
 </html>
