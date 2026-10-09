@@ -78,10 +78,6 @@
             {
               "@type": "Person",
               "name": "Hans Esmel"
-            },
-            {
-              "@type": "Person",
-              "name": "Sam Colas"
             }
           ],
           "address": {
@@ -1815,24 +1811,24 @@
                 </div>
             </div>
 
-            <!-- Meet the Founders -->
+            <!-- Meet the Founder -->
             <div class="border-t border-slate-100 pt-12 sm:pt-16">
 
                 <!-- Header + Toggle -->
                 <div class="text-center mb-4">
-                    <p class="text-yellow-500 font-black uppercase text-xs tracking-[0.3em] mb-3" data-i18n="founderSectionLabel">The Founders</p>
-                    <h3 class="text-3xl lg:text-4xl font-black text-[#1b1e2b] tracking-tight" data-i18n="founderSectionTitle">Meet the Founders</h3>
+                    <p class="text-yellow-500 font-black uppercase text-xs tracking-[0.3em] mb-3" data-i18n="founderSectionLabel">The Founder</p>
+                    <h3 class="text-3xl lg:text-4xl font-black text-[#1b1e2b] tracking-tight" data-i18n="founderSectionTitle">Meet the Founder</h3>
                 </div>
                 <div class="flex justify-center mt-6 mb-8">
-                    <button id="founders-toggle" onclick="toggleFounders()" class="inline-flex flex-col items-center gap-1 text-slate-400 hover:text-yellow-500 transition-colors cursor-pointer group" aria-label="Expand founders">
-                        <span class="text-[10px] font-black uppercase tracking-[0.2em] group-hover:text-yellow-500 transition-colors" data-i18n="meetFounder">Meet the Founders</span>
+                    <button id="founders-toggle" onclick="toggleFounders()" class="inline-flex flex-col items-center gap-1 text-slate-400 hover:text-yellow-500 transition-colors cursor-pointer group" aria-label="Expand founder">
+                        <span class="text-[10px] font-black uppercase tracking-[0.2em] group-hover:text-yellow-500 transition-colors" data-i18n="meetFounder">Meet the Founder</span>
                         <i data-lucide="chevron-down" id="founders-arrow" class="w-6 h-6 transition-transform duration-300"></i>
                     </button>
                 </div>
 
                 <!-- Founder Cards (hidden by default) -->
                 <div id="founders-cards" style="max-height: 0; overflow: hidden; transition: max-height 0.5s cubic-bezier(0.4,0,0.2,1);">
-                    <div class="grid md:grid-cols-2 gap-4 sm:gap-8 pb-8">
+                    <div class="max-w-2xl mx-auto pb-8">
 
                         <!-- Hans Esmel -->
                         <div class="bg-[#1b1e2b] rounded-[2rem] p-8 flex flex-col gap-6">
@@ -1846,20 +1842,6 @@
                                 </div>
                             </div>
                             <p class="text-slate-400 font-medium leading-relaxed" data-i18n="hansBio">Drives the vision and growth of YVA Law Staffing. Built the agency with a mission to connect U.S. law firms with elite bilingual talent — at a price that actually makes sense.</p>
-                        </div>
-
-                        <!-- Sam Colas -->
-                        <div class="bg-yellow-400 rounded-[2rem] p-8 flex flex-col gap-6">
-                            <div class="flex items-center gap-5">
-                                <div class="w-16 h-16 rounded-2xl bg-[#1b1e2b]/10 flex items-center justify-center flex-shrink-0">
-                                    <i data-lucide="user" class="w-8 h-8 text-[#1b1e2b]"></i>
-                                </div>
-                                <div>
-                                    <p class="text-xl font-black text-[#1b1e2b]">Sam Colas</p>
-                                    <p class="text-[#1b1e2b]/70 font-bold text-sm uppercase tracking-widest" data-i18n="samRole">CCO & Co-Founder</p>
-                                </div>
-                            </div>
-                            <p class="text-[#1b1e2b]/80 font-medium leading-relaxed" data-i18n="samBio">Leads client success and commercial strategy at YVA. Ensures every firm gets the right team, the right onboarding, and the results they were promised — from day one.</p>
                         </div>
 
                     </div>
@@ -3128,12 +3110,10 @@
                 stat4Label: 'Assistants Placed', stat4Hover: 'Over 100 bilingual virtual assistants placed and actively working inside U.S. law firms — all vetted and trained by YVA.',
                 stat5Label: 'Avg. Productivity Increase', stat5Hover: 'Attorneys and managers reclaim hours every week when admin, intake, and follow-ups are fully delegated.',
                 stat6Label: 'Avg. Profit Growth', stat6Hover: 'Lower overhead, more capacity, faster turnaround — our clients close more cases and keep more revenue.',
-                founderSectionLabel: 'The Founders', founderSectionTitle: 'Meet the Founders',
+                founderSectionLabel: 'The Founder', founderSectionTitle: 'Meet the Founder',
                 hansRole: 'CEO & Co-Founder',
                 hansBio: 'Drives the vision and growth of YVA Law Staffing. Built the agency with a mission to connect U.S. law firms with elite bilingual talent — at a price that actually makes sense.',
-                samRole: 'CCO & Co-Founder',
-                samBio: 'Leads client success and commercial strategy at YVA. Ensures every firm gets the right team, the right onboarding, and the results they were promised — from day one.',
-                meetFounder: 'Meet the Founders',
+                meetFounder: 'Meet the Founder',
                 footerDesc: 'Elite bilingual virtual staffing for law firms and professional services. Starting at <span class="text-yellow-400 font-bold">$7.50/hr</span>.',
                 footerQuickLinks: 'Quick Links', footerOurServices: 'Our Services', footerGetInTouch: 'Get In Touch',
                 footerTestimonials: 'Testimonials', footerFaq: 'FAQ', footerBlog: 'Blog',
@@ -3232,12 +3212,10 @@
                 stat4Label: 'Asistentes Colocados', stat4Hover: 'Más de 100 asistentes virtuales bilingües colocados y trabajando activamente en firmas de abogados en EE.UU. — todos evaluados y capacitados por YVA.',
                 stat5Label: 'Aumento Promedio de Productividad', stat5Hover: 'Los abogados y gerentes recuperan horas cada semana cuando la administración, el intake y los seguimientos están completamente delegados.',
                 stat6Label: 'Crecimiento Promedio de Rentabilidad', stat6Hover: 'Menos costos fijos, más capacidad, entregas más rápidas — nuestros clientes cierran más casos y retienen más ingresos.',
-                founderSectionLabel: 'Los Fundadores', founderSectionTitle: 'Conoce a los Fundadores',
+                founderSectionLabel: 'El Fundador', founderSectionTitle: 'Conoce al Fundador',
                 hansRole: 'CEO y Co-Fundador',
                 hansBio: 'Impulsa la visión y el crecimiento de YVA Law Staffing. Construyó la agencia con la misión de conectar firmas de abogados en EE.UU. con talento bilingüe de élite — a un precio que realmente tiene sentido.',
-                samRole: 'CCO y Co-Fundadora',
-                samBio: 'Lidera el éxito del cliente y la estrategia comercial en YVA. Se asegura de que cada firma obtenga el equipo adecuado, la incorporación correcta y los resultados prometidos — desde el primer día.',
-                meetFounder: 'Conoce a los Fundadores',
+                meetFounder: 'Conoce al Fundador',
                 footerDesc: 'Personal virtual bilingüe de élite para firmas de abogados y servicios profesionales. Desde <span class="text-yellow-400 font-bold">$7.50/hr</span>.',
                 footerQuickLinks: 'Accesos Directos', footerOurServices: 'Nuestros Servicios', footerGetInTouch: 'Contáctanos',
                 footerTestimonials: 'Testimonios', footerFaq: 'Preguntas Frecuentes', footerBlog: 'Blog',
