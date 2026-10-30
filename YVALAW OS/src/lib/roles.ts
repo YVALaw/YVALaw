@@ -40,4 +40,6 @@ export const can = {
   viewScreenshots:   (r: AppRole) => r === 'ceo' || r === 'admin',
   // Approve YVA Time hours / manual requests (matches yva_time_approve in the database)
   approveTime:       (r: AppRole) => r === 'ceo' || r === 'admin' || r === 'accounting',
+  // Disconnect a computer from YVA Time (matches the desktop-device-revoke function)
+  manageDevices:     (r: AppRole) => r === 'ceo' || r === 'admin' || r === 'accounting',
 }

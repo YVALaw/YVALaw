@@ -46,6 +46,8 @@ export type Snapshot = {
   lastSavedAt: number | null          // last successful upload
   pending: { blocks: number; screenshots: number }
   workTypes: string[]
+  todayActivity: number | null        // % of today's time with keyboard/mouse use (client team)
+  update: { version: string; ready: boolean } | null   // a new version downloading / ready to install
 }
 
 /** The API the preload script exposes to the UI as window.yva */
@@ -67,4 +69,5 @@ export type YvaApi = {
   deleteScreenshot(): Promise<void>
   openWorkspace(): Promise<void>
   openAddTime(): Promise<void>
+  installUpdate(): Promise<void>
 }

@@ -1,7 +1,8 @@
 // Runs YVA Time: counting, screenshots, uploads, the offline queue and the UI snapshot.
 // Everything is saved on this computer first and uploaded every minute, so a lost
 // connection or a crash never loses tracked time (time while the app isn't running
-// is never counted).
+// is never counted). Each upload starts with a check-in that confirms YVA hasn't
+// disconnected this computer.
 import { app, powerMonitor, shell } from 'electron'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
@@ -12,8 +13,9 @@ import * as api from './api'
 import { captureScreens } from './screenshots'
 import { reminderDue, type ReminderMemory } from './reminders'
 import { dataPath, readJson, writeJson } from './store'
+import type { UpdateState } from './updater'
 import {
-  PROFILE_EVERY_MS, SAVE_EVERY_MS, SCREENSHOT_DELETE_MS, SYNC_EVERY_MS,
+  CONSENT_VERSION, PROFILE_EVERY_MS, SAVE_EVERY_MS, SCREENSHOT_DELETE_MS, SYNC_EVERY_MS,
   TEST_IDLE_FILE, TEST_NO_BROWSER, TEST_SHOT_OFFSET_S, WORK_TYPES, WORKSPACE_URL,
 } from './config'
 
@@ -24,6 +26,7 @@ type Saved = {
   tracker: ReturnType<Tracker['serialize']> | null
   profile: Profile | null
   consentAt: number | null
+  consentVersion?: number             // missing = notice version 1 (screenshots only)
   consentSynced?: boolean
   reminders?: ReminderMemory
   lastTarget: Target | null
@@ -31,6 +34,7 @@ type Saved = {
 }
 
 const DAY_MS = 86_400_000
+const DISCONNECTED_MESSAGE = 'YVA disconnected this computer from your account. Sign in again to keep tracking — time not uploaded yet stays on this computer.'
 
 function startOfDay(ms: number): number {
   const d = new Date(ms); d.setHours(0, 0, 0, 0); return d.getTime()
@@ -44,7 +48,9 @@ export class Controller {
   private phase: Snapshot['phase'] = 'signed-out'
   private profile: Profile | null = null
   private consentAt: number | null = null
+  private consentVersion = 0
   private consentSynced = false
+  private update: UpdateState = null
   private reminders: ReminderMemory = { start: null, end: null }
   private notify: (title: string, body: string) => void = () => {}
   private lastTarget: Target | null = null
@@ -67,6 +73,7 @@ export class Controller {
     this.tracker.restore(saved?.tracker ?? null)
     this.profile    = saved?.profile ?? null
     this.consentAt  = saved?.consentAt ?? null
+    this.consentVersion = saved?.consentAt ? saved.consentVersion ?? 1 : 0
     this.consentSynced = saved?.consentSynced ?? false
     this.reminders  = saved?.reminders ?? { start: null, end: null }
     this.lastTarget = saved?.lastTarget ?? null
@@ -110,7 +117,7 @@ export class Controller {
   async redeemCode(code: string, state?: string) {
     this.message = null
     try {
-      await auth.redeem(code, state)
+      await auth.redeem(code, state, app.getVersion())
       this.phase = 'loading'
       this.emit()
       await this.refreshProfile()
@@ -128,6 +135,8 @@ export class Controller {
   async signOut() {
     if (this.tracker.status !== 'stopped') this.tracker.stop()
     await Promise.race([this.sync(), new Promise(r => setTimeout(r, 4000))])
+    const c = auth.getClient(), device = auth.deviceId()
+    if (c && device) await Promise.race([api.markSignedOut(c, device).catch(() => {}), new Promise(r => setTimeout(r, 3000))])
     await auth.signOut()
     this.phase = 'signed-out'
     this.message = null
@@ -141,6 +150,21 @@ export class Controller {
     this.message = message
     this.save()
   }
+
+  /** YVA disconnected this computer: its login was ended on the server, so just forget it */
+  private disconnected() {
+    if (this.tracker.status !== 'stopped') this.tracker.stop()
+    auth.forget()
+    this.phase = 'signed-out'
+    this.message = DISCONNECTED_MESSAGE
+    this.save()
+  }
+
+  private consentMissing(): boolean {
+    return !!this.profile && this.profile.worksFor === 'client' && (!this.consentAt || this.consentVersion < CONSENT_VERSION)
+  }
+
+  setUpdate(u: UpdateState) { this.update = u; this.emit() }
 
   private async refreshProfile() {
     const token = await auth.accessToken()
@@ -170,6 +194,7 @@ export class Controller {
     this.queue = []
     this.lastShot = null
     this.consentAt = null
+    this.consentVersion = 0
     this.consentSynced = false
     this.reminders = { start: null, end: null }
     this.lastTarget = null
@@ -186,7 +211,7 @@ export class Controller {
   async start(target: Target, note: string) {
     this.message = null
     if (this.phase !== 'ready' || !this.profile) return
-    if (this.profile.worksFor === 'client' && !this.consentAt) return
+    if (this.consentMissing()) return
     if (!this.allowedTarget(target)) { this.message = 'Pick one of your projects first.'; this.emit(); return }
     this.tracker.start(target, note.slice(0, 500), Date.now())
     this.lastTarget = target
@@ -213,6 +238,7 @@ export class Controller {
 
   async acceptConsent() {
     this.consentAt = Date.now()
+    this.consentVersion = CONSENT_VERSION
     this.consentSynced = false
     this.save(); this.emit()
     void this.sync()                       // records it in YVA OS (retried until it's saved)
@@ -248,7 +274,7 @@ export class Controller {
   private everySecond() {
     const now = Date.now()
     this.tracker.tick(now, this.idleSeconds())
-    if (this.consentAt && this.tracker.screenshotDue(now)) void this.takeScreenshot(now)
+    if (this.consentAt && !this.consentMissing() && this.tracker.screenshotDue(now)) void this.takeScreenshot(now)
     if (Math.floor(now / 1000) % 60 === 0) this.checkReminders(now)
     this.emit()
   }
@@ -344,19 +370,27 @@ export class Controller {
     if (this.syncing || !this.profile || !c || this.phase === 'signed-out') return
     this.syncing = true
     try {
-      const { saved, refused } = await api.upsertBlocks(c, this.profile.employeeId, this.tracker.dirtyRows())
+      const device = auth.deviceId()
+      if (!device) {                         // signed in with 0.2.0, before computers were recorded
+        await auth.signOut()
+        await this.toSignedOut('YVA Time was updated. Please sign in again — your time is kept on this computer.')
+        return
+      }
+      await api.checkDevice(c, device, app.getVersion())
+      const { saved, refused } = await api.upsertBlocks(c, this.profile.employeeId, this.tracker.dirtyRows(), this.profile.worksFor === 'client')
       this.tracker.markSynced(saved)
       for (const r of refused) this.tracker.markRejected(r)
       if (refused.length) this.message = "Some time couldn't be saved (are you still on that project?). Contact YVA."
       this.online = true
       this.lastSavedAt = Date.now()
       if (this.consentAt && !this.consentSynced) {
-        await api.recordConsent(c, this.profile.employeeId, app.getVersion())
+        await api.recordConsent(c, this.profile.employeeId, app.getVersion(), this.consentVersion)
         this.consentSynced = true
       }
       await this.uploadScreenshots()
     } catch (e) {
       if (e instanceof api.OfflineError) this.online = false
+      else if (e instanceof api.DisconnectedError) this.disconnected()
       else if (e instanceof api.SignedOutError) await this.toSignedOut('Your session ended. Sign in again — your time is kept on this computer.')
       else console.error('sync failed (will retry)', e)
     } finally {
@@ -374,6 +408,7 @@ export class Controller {
         tracker: this.tracker.serialize(Date.now()),
         profile: this.profile,
         consentAt: this.consentAt,
+        consentVersion: this.consentVersion,
         consentSynced: this.consentSynced,
         reminders: this.reminders,
         lastTarget: this.lastTarget,
@@ -388,18 +423,19 @@ export class Controller {
     const now = Date.now(), t = this.tracker
     const day = startOfDay(now), week = startOfWeek(now)
     const held = t.heldSeconds()
+    const today = t.totalBetween(day, day + DAY_MS)
     const g = this.lastShot
     return {
       phase:          this.phase,
       awaitingCode:   this.phase === 'signed-out' && auth.isAwaitingCode(),
       message:        this.message,
       profile:        this.profile,
-      consentNeeded:  !!this.profile && this.profile.worksFor === 'client' && !this.consentAt,
+      consentNeeded:  this.consentMissing(),
       status:         t.status,
       target:         t.target ?? this.lastTarget,
       note:           t.note,
       sessionSeconds: t.status === 'stopped' ? 0 : t.sessionSeconds + held,
-      todaySeconds:   t.totalBetween(day, day + DAY_MS) + held,
+      todaySeconds:   today + held,
       weekSeconds:    t.totalBetween(week, week + 7 * DAY_MS) + held,
       idleSince:      t.idleSince,
       idleReview:     t.idleReview,
@@ -408,6 +444,8 @@ export class Controller {
       lastSavedAt:    this.lastSavedAt,
       pending:        { blocks: t.dirtyRows().length, screenshots: this.queue.length },
       workTypes:      this.profile?.worksFor === 'yva' ? WORK_TYPES : [],
+      todayActivity:  this.profile?.worksFor === 'client' && today > 0 ? Math.round((t.activeBetween(day, day + DAY_MS) / today) * 100) : null,
+      update:         this.update,
     }
   }
 

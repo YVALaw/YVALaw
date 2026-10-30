@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Employee, Project } from '../../data/types'
 import { loadEmployees, loadProjects } from '../../services/storage'
 import {
-  deleteTrackerShot, loadTrackerBlocks, loadTrackerShots, signScreenshotUrls,
+  activityColor, activityPct, blocksActivity, deleteTrackerShot, loadTrackerBlocks, loadTrackerShots, signScreenshotUrls,
   type TrackerBlock, type TrackerShot,
 } from '../../services/trackerStorage'
 
@@ -15,7 +15,7 @@ function todayInput(): string {
 function clock(ms: number): string { return new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) }
 function hm(seconds: number): string { return `${Math.floor(seconds / 3600)}h ${String(Math.floor((seconds % 3600) / 60)).padStart(2, '0')}m` }
 
-type Cell = { blockStart: number; seconds: number; removed: boolean; labels: string[]; notes: string[]; shots: TrackerShot[] }
+type Cell = { blockStart: number; seconds: number; active: number; measured: number; removed: boolean; labels: string[]; notes: string[]; shots: TrackerShot[] }
 
 /** Time Tracking → Screenshots (CEO/Admin): one employee's day in 10-minute blocks */
 export default function ScreenshotDay() {
@@ -53,13 +53,14 @@ export default function ScreenshotDay() {
   const cells = new Map<number, Cell>()
   const cellAt = (bs: number) => {
     let c = cells.get(bs)
-    if (!c) { c = { blockStart: bs, seconds: 0, removed: false, labels: [], notes: [], shots: [] }; cells.set(bs, c) }
+    if (!c) { c = { blockStart: bs, seconds: 0, active: 0, measured: 0, removed: false, labels: [], notes: [], shots: [] }; cells.set(bs, c) }
     return c
   }
   for (const b of blocks) {
     const c = cellAt(b.blockStart)
     if (b.status === 'removed') { c.removed = true; continue }
     c.seconds += b.seconds
+    if (b.activeSeconds !== null) { c.active += b.activeSeconds; c.measured += b.seconds }
     if (!c.labels.includes(label(b))) c.labels.push(label(b))
     if (b.note && !c.notes.includes(b.note)) c.notes.push(b.note)
   }
@@ -68,6 +69,7 @@ export default function ScreenshotDay() {
   const hours = [...new Set([...cells.keys()].map(bs => new Date(bs).getHours()))].sort((a, b) => a - b)
   const dayStart = new Date(`${day}T00:00:00`).getTime()
   const total = [...cells.values()].reduce((s, c) => s + (c.removed ? 0 : c.seconds), 0)
+  const dayActivity = blocksActivity(blocks)
 
   async function removeShots(cell: Cell) {
     if (!window.confirm('Delete these screenshots? The tracked time is not changed.')) return
@@ -91,7 +93,11 @@ export default function ScreenshotDay() {
           <input className="form-input" type="date" value={day} onChange={e => setDay(e.target.value || todayInput())} />
         </div>
         <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--muted)' }}>
-          {loading ? 'Loading…' : <>Tracked <strong style={{ color: 'var(--text)' }}>{hm(total)}</strong> · {shots.length} screenshot{shots.length === 1 ? '' : 's'}</>}
+          {loading ? 'Loading…' : <>
+            Tracked <strong style={{ color: 'var(--text)' }}>{hm(total)}</strong>
+            {dayActivity !== null && <> · Activity <strong style={{ color: activityColor(dayActivity) }}>{dayActivity}%</strong></>}
+            {' '}· {shots.length} screenshot{shots.length === 1 ? '' : 's'}
+          </>}
         </div>
       </div>
 
@@ -122,6 +128,11 @@ export default function ScreenshotDay() {
                     {c && !c.removed && (
                       <div style={{ marginTop: 6 }}>
                         <strong>{Math.round(c.seconds / 60)} min</strong>
+                        {activityPct(c.active, c.measured) !== null && (
+                          <span title="Keyboard/mouse use in this block" style={{ marginLeft: 6, fontWeight: 600, color: activityColor(activityPct(c.active, c.measured)!) }}>
+                            {activityPct(c.active, c.measured)}%
+                          </span>
+                        )}
                         <div style={{ color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={[...c.labels, ...c.notes].join(' — ')}>
                           {c.labels.join(', ')}
                         </div>
@@ -140,7 +151,8 @@ export default function ScreenshotDay() {
           <div className="modal" style={{ maxWidth: 1100, width: '95vw' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title">
-                {clock(open.blockStart)} – {clock(open.blockStart + BLOCK_MS)} · {Math.round(open.seconds / 60)} min · {open.labels.join(', ')}
+                {clock(open.blockStart)} – {clock(open.blockStart + BLOCK_MS)} · {Math.round(open.seconds / 60)} min
+                {activityPct(open.active, open.measured) !== null && ` · ${activityPct(open.active, open.measured)}% active`} · {open.labels.join(', ')}
               </div>
               <button className="modal-close btn-icon" onClick={() => setOpen(null)}>✕</button>
             </div>

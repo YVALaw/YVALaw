@@ -83,7 +83,7 @@ test('break pauses counting', () => {
 
 test('a block never holds more than 600 seconds', () => {
   const t = new Tracker(); t.start(P1, '', T0)
-  t.mergeServer([{ blockStart: T0, targetKey: 'project:p2', seconds: 590, status: 'tracked', note: null }])
+  t.mergeServer([{ blockStart: T0, targetKey: 'project:p2', seconds: 590, status: 'tracked', note: null, active: null, first: null, last: null }])
   run(t, T0, 60)
   assert.equal(t.blockTotal(T0), 600)
 })
@@ -144,8 +144,8 @@ test('server rows merge without losing local time', () => {
   const t = new Tracker(); t.start(P1, '', T0)
   run(t, T0, 100)
   t.mergeServer([
-    { blockStart: T0, targetKey: 'project:p1', seconds: 40, status: 'tracked', note: null },   // older copy
-    { blockStart: T0 - BLOCK_MS, targetKey: 'work:Admin', seconds: 300, status: 'tracked', note: null },
+    { blockStart: T0, targetKey: 'project:p1', seconds: 40, status: 'tracked', note: null, active: 40, first: 0, last: 39 },   // older copy
+    { blockStart: T0 - BLOCK_MS, targetKey: 'work:Admin', seconds: 300, status: 'tracked', note: null, active: null, first: 100, last: 399 },
   ])
   assert.equal(t.totalBetween(T0, T0 + BLOCK_MS), 100)
   assert.equal(t.totalBetween(0, Infinity), 400)
@@ -158,4 +158,59 @@ test('state survives a restart', () => {
   assert.equal(t2.totalBetween(0, Infinity), 50)
   assert.equal(t2.status, 'stopped')
   assert.equal(t2.dirtyRows().length, 1)
+})
+
+// ── Phase 3: activity and first/last second ─────────────────────────────────
+
+test('activity: only seconds with keyboard/mouse input are active', () => {
+  const t = new Tracker(); t.start(P1, '', T0)
+  let now = run(t, T0, 60)                                      // typing for a minute
+  now = run(t, now, 120, i => i + 1)                            // reading for 2 minutes (held aside)
+  run(t, now, 30)                                               // mouse again
+  const [row] = t.dirtyRows()
+  assert.equal(row.seconds, 210)                                // the reading time counts…
+  assert.equal(row.active, 90)                                  // …but is not active
+  assert.equal(t.activeBetween(0, Infinity), 90)
+})
+
+test('activity: idle time kept with "Keep" is not active', () => {
+  const t = new Tracker(); t.start(P1, '', T0)
+  let now = run(t, T0, 30)
+  now = run(t, now, 400, i => i + 1)                            // away 6 min 40 s
+  run(t, now, 10)
+  t.resolveIdle(true)
+  assert.equal(t.totalBetween(0, Infinity), 440)
+  assert.equal(t.activeBetween(0, Infinity), 40)
+})
+
+test('first/last second inside each block', () => {
+  const t = new Tracker(); t.start(P1, '', T0 + 125_000)       // starts at 13:02:05
+  let now = run(t, T0 + 125_000, 600)                          // until 13:12:05
+  now = run(t, now, 30, i => i + 1)                            // quiet 30 s (held) …
+  run(t, now, 1)                                               // … then input: counted, ends 13:12:36
+  const rows = t.dirtyRows().sort((a, b) => a.blockStart - b.blockStart)
+  assert.deepEqual(rows.map(r => [r.first, r.last, r.seconds]), [[125, 599, 475], [0, 155, 156]])
+})
+
+test('first/last: a removed block is uploaded as empty', () => {
+  const t = new Tracker({ screenshots: true }); t.start(P1, '', T0)
+  run(t, T0, 100)
+  t.removeBlock(T0, false)
+  const [row] = t.dirtyRows()
+  assert.deepEqual([row.seconds, row.active, row.first, row.last], [0, 0, null, null])
+})
+
+test('server copy fills in first/last and activity it already had', () => {
+  const t = new Tracker(); t.start(P1, '', T0 + 300_000)
+  run(t, T0 + 300_000, 50)                                     // 13:05:00–13:05:50 on this computer
+  t.mergeServer([{ blockStart: T0, targetKey: 'project:p1', seconds: 120, status: 'tracked', note: null, active: 100, first: 10, last: 349 }])
+  const [row] = [...t.rows.values()]
+  assert.deepEqual([row.seconds, row.active, row.first, row.last], [120, 100, 10, 349])
+})
+
+test('rows saved by version 0.2.0 still load', () => {
+  const t = new Tracker()
+  t.restore({ rows: [{ blockStart: T0, targetKey: 'project:p1', projectId: 'p1', workType: null, seconds: 300, note: null, dirty: true, removed: false, rejected: false }] as never, removedBlocks: [], shotTaken: [] })
+  const [row] = t.dirtyRows()
+  assert.deepEqual([row.seconds, row.active, row.first, row.last], [300, 0, null, null])
 })

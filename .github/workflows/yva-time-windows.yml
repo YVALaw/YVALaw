@@ -1,9 +1,12 @@
 # Builds the YVA Time Windows installer (YVA-Time-Setup.exe).
 #  • Run it by hand: Actions → "YVA Time — Windows installer" → Run workflow → download the artifact
-#  • Push a tag like yva-time-v0.1.0 to also publish a GitHub Release; its download link is
+#  • Release a new version: set "version" in YVA Time/package.json (e.g. 0.3.1), commit, then push
+#    the tag yva-time-v0.3.1. This publishes a GitHub Release with the installer + latest.yml;
+#    installed apps find it there and update themselves. Permanent download link:
 #    https://github.com/YVALaw/YVALaw/releases/latest/download/YVA-Time-Setup.exe
-#    (set it as VITE_YVA_TIME_DOWNLOAD_URL in Netlify to show the button in My workspace)
-# The installer is not code-signed yet, so Windows SmartScreen shows "unknown publisher".
+#    (only YVA Time should publish Releases in this repository — the apps read the latest one)
+#  • Code signing turns on by itself once the signing secrets/variables below exist
+#    (see YVA Time/README.md → "Code signing"); until then Windows shows "unknown publisher".
 name: YVA Time — Windows installer
 
 on:
@@ -20,6 +23,7 @@ jobs:
     defaults:
       run:
         working-directory: YVA Time
+        shell: bash
     steps:
       - uses: actions/checkout@v4
 
@@ -29,18 +33,51 @@ jobs:
           cache: npm
           cache-dependency-path: YVA Time/package-lock.json
 
+      - name: Tag matches package.json version
+        if: startsWith(github.ref, 'refs/tags/yva-time-v')
+        run: |
+          want="yva-time-v$(node -p "require('./package.json').version")"
+          if [ "$GITHUB_REF_NAME" != "$want" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json (expected $want)"; exit 1
+          fi
+
       - run: npm ci
       - run: npm test
       - run: npm run typecheck
-      - run: npm run dist
+
+      - name: Build installer (signed when signing is set up)
+        run: |
+          if [ -n "$YVA_CSC_LINK" ]; then export CSC_LINK="$YVA_CSC_LINK" CSC_KEY_PASSWORD="$YVA_CSC_KEY_PASSWORD"; fi
+          npm run dist
+        env:
+          AZURE_TENANT_ID:     ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID:     ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          YVA_SIGN_ENDPOINT:   ${{ vars.YVA_SIGN_ENDPOINT }}
+          YVA_SIGN_ACCOUNT:    ${{ vars.YVA_SIGN_ACCOUNT }}
+          YVA_SIGN_PROFILE:    ${{ vars.YVA_SIGN_PROFILE }}
+          YVA_SIGN_PUBLISHER:  ${{ vars.YVA_SIGN_PUBLISHER }}
+          YVA_CSC_LINK:         ${{ secrets.WIN_CSC_LINK }}
+          YVA_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+
+      - name: Update files are there
+        run: |
+          test -f release/latest.yml || { echo "::error::release/latest.yml missing — installed apps could not update"; exit 1; }
+          cat release/latest.yml
 
       - uses: actions/upload-artifact@v4
         with:
           name: YVA-Time-Setup
-          path: YVA Time/release/YVA-Time-Setup.exe
+          path: |
+            YVA Time/release/YVA-Time-Setup.exe
+            YVA Time/release/YVA-Time-Setup.exe.blockmap
+            YVA Time/release/latest.yml
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/yva-time-v')
         uses: softprops/action-gh-release@v2
         with:
-          files: YVA Time/release/YVA-Time-Setup.exe
+          files: |
+            YVA Time/release/YVA-Time-Setup.exe
+            YVA Time/release/YVA-Time-Setup.exe.blockmap
+            YVA Time/release/latest.yml

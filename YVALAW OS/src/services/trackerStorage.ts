@@ -1,4 +1,4 @@
-// YVA Time data for the admin views (Time Tracking → Live / Screenshots).
+// YVA Time data for the admin views (Time Tracking → Live / Approve / Schedule / Screenshots).
 // RLS: staff read tracker_blocks; only CEO/Admin read screenshots (rows + private bucket).
 import { supabase } from '../lib/supabase'
 
@@ -9,9 +9,33 @@ export type TrackerBlock = {
   projectId: string | null
   workType: string | null
   seconds: number
+  activeSeconds: number | null   // keyboard/mouse seconds (client team, app 0.3+); null = not measured
+  firstOffset: number | null     // first counted second inside the block (0–599)
+  lastOffset: number | null      // last counted second inside the block
+  source: 'desktop' | 'manual'
   note: string | null
   status: 'tracked' | 'pending' | 'approved' | 'rejected' | 'removed'
   updatedAt: number           // ms — the app uploads about once a minute while tracking
+}
+
+/** Activity % from summed seconds (null when nothing was measured) */
+export function activityPct(active: number, measuredSeconds: number): number | null {
+  return measuredSeconds > 0 ? Math.round((active / measuredSeconds) * 100) : null
+}
+
+/** Sum activity over blocks that measured it (YVA team and manual time don't) */
+export function blocksActivity(blocks: TrackerBlock[]): number | null {
+  let active = 0, measured = 0
+  for (const b of blocks) {
+    if (b.activeSeconds === null || b.status === 'removed' || b.status === 'rejected') continue
+    active += b.activeSeconds; measured += b.seconds
+  }
+  return activityPct(active, measured)
+}
+
+/** Colour for an activity % badge: green 60%+, amber 30–59%, red under 30% */
+export function activityColor(pct: number): string {
+  return pct >= 60 ? '#047857' : pct >= 30 ? '#b45309' : '#b91c1c'
 }
 
 export type TrackerShot = {
@@ -25,7 +49,7 @@ export type TrackerShot = {
 
 export async function loadTrackerBlocks(fromMs: number, toMs: number, employeeId?: string): Promise<TrackerBlock[]> {
   let q = supabase.from('tracker_blocks')
-    .select('employee_id,block_start,target_key,project_id,work_type,seconds,note,status,updated_at')
+    .select('employee_id,block_start,target_key,project_id,work_type,seconds,active_seconds,first_offset,last_offset,source,note,status,updated_at')
     .gte('block_start', new Date(fromMs).toISOString())
     .lt('block_start', new Date(toMs).toISOString())
     .order('block_start')
@@ -39,6 +63,10 @@ export async function loadTrackerBlocks(fromMs: number, toMs: number, employeeId
     projectId:  r.project_id,
     workType:   r.work_type,
     seconds:    r.seconds,
+    activeSeconds: r.active_seconds ?? null,
+    firstOffset:   r.first_offset ?? null,
+    lastOffset:    r.last_offset ?? null,
+    source:     r.source ?? 'desktop',
     note:       r.note,
     status:     r.status,
     updatedAt:  Date.parse(r.updated_at),
@@ -125,6 +153,13 @@ export async function approveTime(employeeId: string, from: string, to: string):
   return data as { blocks: number; entries: number }
 }
 
+/** Undo an approval (approved by mistake): back to "waiting", removed from time log / portal / invoice import */
+export async function reopenTime(employeeId: string, from: string, to: string): Promise<{ blocks: number; entries: number }> {
+  const { data, error } = await supabase.rpc('yva_time_reopen', { p_employee: employeeId, p_from: from, p_to: to, p_tz: LOCAL_TZ })
+  if (error) throw new Error(error.message)
+  return data as { blocks: number; entries: number }
+}
+
 export async function decideRequest(id: string, approve: boolean, note?: string): Promise<{ status: string; seconds: number }> {
   const { data, error } = await supabase.rpc('yva_time_decide_request', { p_request: id, p_approve: approve, p_note: note ?? null, p_tz: LOCAL_TZ })
   if (error) throw new Error(error.message)
@@ -144,11 +179,49 @@ export async function cancelManualRequest(id: string) {
   if (error) throw new Error(error.message)
 }
 
-/** Latest screenshot-notice acceptance for an employee (null = never) */
-export async function loadLatestConsent(employeeId: string): Promise<number | null> {
-  const { data } = await supabase.from('tracker_consents').select('created_at')
+/** Latest screenshot-notice acceptance for an employee (null = never). Version 2 includes activity %. */
+export async function loadLatestConsent(employeeId: string): Promise<{ at: number; version: number } | null> {
+  const { data } = await supabase.from('tracker_consents').select('created_at,notice_version')
     .eq('employee_id', employeeId).order('created_at', { ascending: false }).limit(1)
-  return data?.[0] ? Date.parse(data[0].created_at as string) : null
+  return data?.[0] ? { at: Date.parse(data[0].created_at as string), version: (data[0].notice_version as number | null) ?? 1 } : null
+}
+
+// ── Phase 3: computers signed in to YVA Time ──────────────────────────────────
+
+export type DesktopDevice = {
+  id: string
+  name: string
+  platform: string | null
+  appVersion: string | null
+  createdAt: number
+  lastSeenAt: number
+  signedOutAt: number | null
+  revokedAt: number | null
+}
+
+export async function loadDevices(employeeId: string): Promise<DesktopDevice[]> {
+  const { data, error } = await supabase.from('desktop_devices')
+    .select('id,name,platform,app_version,created_at,last_seen_at,signed_out_at,revoked_at')
+    .eq('employee_id', employeeId).order('last_seen_at', { ascending: false }).limit(50)
+  if (error) { console.error('loadDevices', error); return [] }
+  const ms = (v: unknown) => (v ? Date.parse(v as string) : null)
+  return (data || []).map(r => ({
+    id: r.id, name: r.name, platform: r.platform, appVersion: r.app_version,
+    createdAt: ms(r.created_at)!, lastSeenAt: ms(r.last_seen_at)!, signedOutAt: ms(r.signed_out_at), revokedAt: ms(r.revoked_at),
+  }))
+}
+
+/** Disconnect a computer (CEO/Admin/Accounting): ends its login; the database refuses its time */
+export async function disconnectDevice(deviceId: string): Promise<void> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) throw new Error('You must be logged in.')
+  const res = await fetch('/.netlify/functions/desktop-device-revoke', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ deviceId }),
+  })
+  const data = await res.json().catch(() => ({})) as { error?: string }
+  if (!res.ok) throw new Error(data.error || 'Could not disconnect the computer')
 }
 
 /** Approved YVA Time hours for one project and date range (Invoice builder → Import YVA Time hours) */

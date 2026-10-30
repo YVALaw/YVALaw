@@ -10,6 +10,8 @@ import { API_BASE } from './config'
 export class OfflineError extends Error {}
 /** Thrown when the login is no longer valid — the person must sign in again */
 export class SignedOutError extends Error {}
+/** Thrown when YVA disconnected this computer (Employee profile → YVA Time Login → Computers) */
+export class DisconnectedError extends Error {}
 
 const OFFLINE_RE = /fetch failed|network|ENOTFOUND|ECONNRE|ETIMEDOUT|EAI_AGAIN|Failed to fetch/i
 
@@ -47,16 +49,21 @@ export async function fetchProfile(token: string): Promise<Profile> {
   }
 }
 
-function toServerRow(employeeId: string, r: BlockRow) {
+/** activity = client team only (the YVA team's activity is never sent) */
+function toServerRow(employeeId: string, r: BlockRow, activity: boolean) {
+  const empty = r.removed || r.seconds === 0
   return {
-    employee_id: employeeId,
-    block_start: new Date(r.blockStart).toISOString(),
-    target_key:  r.targetKey,
-    project_id:  r.projectId,
-    work_type:   r.workType,
-    seconds:     r.removed ? 0 : r.seconds,
-    note:        r.note,
-    source:      'desktop',
+    employee_id:    employeeId,
+    block_start:    new Date(r.blockStart).toISOString(),
+    target_key:     r.targetKey,
+    project_id:     r.projectId,
+    work_type:      r.workType,
+    seconds:        empty ? 0 : r.seconds,
+    active_seconds: activity ? (empty ? 0 : Math.min(r.active, r.seconds)) : null,
+    first_offset:   empty ? null : r.first,
+    last_offset:    empty ? null : r.last,
+    note:           r.note,
+    source:         'desktop',
   }
 }
 
@@ -64,10 +71,10 @@ function toServerRow(employeeId: string, r: BlockRow) {
  * Upload blocks (absolute seconds, so retrying is safe). If the batch is refused,
  * rows are retried one by one so a single bad row can't block everything else.
  */
-export async function upsertBlocks(c: SupabaseClient, employeeId: string, rows: BlockRow[]): Promise<{ saved: BlockRow[]; refused: BlockRow[] }> {
+export async function upsertBlocks(c: SupabaseClient, employeeId: string, rows: BlockRow[], activity: boolean): Promise<{ saved: BlockRow[]; refused: BlockRow[] }> {
   if (rows.length === 0) return { saved: [], refused: [] }
   const send = (batch: BlockRow[]) => c.from('tracker_blocks')
-    .upsert(batch.map(r => toServerRow(employeeId, r)), { onConflict: 'employee_id,block_start,target_key,source' })
+    .upsert(batch.map(r => toServerRow(employeeId, r, activity)), { onConflict: 'employee_id,block_start,target_key,source' })
 
   const { error, status } = await send(rows)
   if (!error) return { saved: rows, refused: [] }
@@ -86,7 +93,7 @@ export async function upsertBlocks(c: SupabaseClient, employeeId: string, rows: 
 
 export async function loadRecentBlocks(c: SupabaseClient, employeeId: string, sinceMs: number) {
   const { data, error, status } = await c.from('tracker_blocks')
-    .select('block_start,target_key,seconds,status,note')
+    .select('block_start,target_key,seconds,status,note,active_seconds,first_offset,last_offset')
     .eq('employee_id', employeeId)
     .eq('source', 'desktop')          // approved manual time lives in its own rows
     .gte('block_start', new Date(sinceMs).toISOString())
@@ -100,7 +107,37 @@ export async function loadRecentBlocks(c: SupabaseClient, employeeId: string, si
     seconds:    r.seconds as number,
     status:     r.status as string,
     note:       (r.note as string | null) ?? null,
+    active:     (r.active_seconds as number | null) ?? null,
+    first:      (r.first_offset as number | null) ?? null,
+    last:       (r.last_offset as number | null) ?? null,
   }))
+}
+
+/**
+ * Check-in (every sync, before uploading): records the app version and confirms this
+ * computer is still connected. The database only accepts time from a connected computer.
+ */
+export async function checkDevice(c: SupabaseClient, deviceId: string, appVersion: string) {
+  const { data, error, status } = await c.from('desktop_devices')
+    .update({ app_version: appVersion.slice(0, 40) }).eq('id', deviceId).select('id')
+  if (error) {
+    if (isNetworkFailure(status, error.message) || status >= 500) throw new OfflineError(error.message)
+    if (status === 401) throw new SignedOutError(error.message)
+    throw new Error(error.message)
+  }
+  if ((data || []).length === 1) return
+  // Nothing matched: disconnected by YVA, signed out, or the record is gone
+  const row = await c.from('desktop_devices').select('revoked_at,signed_out_at').eq('id', deviceId).maybeSingle()
+  if (row.error) {
+    if (isNetworkFailure(row.status, row.error.message) || row.status >= 500) throw new OfflineError(row.error.message)
+    throw new Error(row.error.message)
+  }
+  throw new DisconnectedError(row.data?.revoked_at || !row.data ? 'disconnected' : 'signed out')
+}
+
+/** Sign out: this computer stops being able to save time (best effort — the login ends anyway) */
+export async function markSignedOut(c: SupabaseClient, deviceId: string) {
+  await c.from('desktop_devices').update({ signed_out_at: new Date().toISOString() }).eq('id', deviceId)
 }
 
 export function screenshotPath(employeeId: string, takenAt: number, id: string, monitor: number): string {
@@ -140,8 +177,9 @@ export async function deleteScreenshots(c: SupabaseClient, paths: string[]) {
 }
 
 /** Record that the employee accepted the screenshot notice (shown to YVA on their profile) */
-export async function recordConsent(c: SupabaseClient, employeeId: string, appVersion: string) {
-  const { error, status } = await c.from('tracker_consents').insert({ employee_id: employeeId, app_version: appVersion.slice(0, 40) })
+export async function recordConsent(c: SupabaseClient, employeeId: string, appVersion: string, noticeVersion: number) {
+  const { error, status } = await c.from('tracker_consents')
+    .insert({ employee_id: employeeId, app_version: appVersion.slice(0, 40), notice_version: noticeVersion })
   if (error) {
     if (isNetworkFailure(status, error.message)) throw new OfflineError(error.message)
     throw new Error(error.message)

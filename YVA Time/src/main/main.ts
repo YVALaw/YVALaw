@@ -3,6 +3,7 @@ import { app, BrowserWindow, ipcMain, Menu, nativeImage, Notification, Tray, typ
 import path from 'node:path'
 import { Controller } from './controller'
 import { PROTOCOL } from './config'
+import { installNow, startUpdates } from './updater'
 import type { Snapshot, Target } from '../shared/types'
 
 if (process.env.YVA_USER_DATA) app.setPath('userData', process.env.YVA_USER_DATA)
@@ -83,6 +84,7 @@ if (!app.requestSingleInstanceLock()) {
     deleteScreenshot: () => controller.deleteScreenshot(),
     openWorkspace:    () => controller.openWorkspace(),
     openAddTime:      () => controller.openAddTime(),
+    installUpdate:    () => installNow(),       // quits (saving + uploading first, below) and installs
   }
   for (const [name, fn] of Object.entries(handlers)) {
     ipcMain.handle(`yva:${name}`, (e, ...args: unknown[]) => {
@@ -98,11 +100,13 @@ if (!app.requestSingleInstanceLock()) {
   })
   app.on('open-url', (e, url) => { e.preventDefault(); void controller.handleDeepLink(url) })
   app.on('window-all-closed', () => { /* keep running in the tray */ })
+  // Stop the timer, save and upload, then quit for real (a normal quit, so a downloaded
+  // update installs on the way out)
   app.on('before-quit', e => {
     if (quitting) return
     e.preventDefault()
     quitting = true
-    void controller.shutdown().finally(() => app.exit(0))
+    void controller.shutdown().finally(() => app.quit())
   })
 
   void app.whenReady().then(async () => {
@@ -130,6 +134,7 @@ if (!app.requestSingleInstanceLock()) {
       updateTray(s)
     })
     await controller.init()
+    startUpdates(u => controller.setUpdate(u))
     const link = deepLinkIn(process.argv)
     if (link) void controller.handleDeepLink(link)
   })

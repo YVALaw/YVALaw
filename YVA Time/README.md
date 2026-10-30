@@ -9,15 +9,45 @@ npm install
 npm test           # tracking-engine unit tests
 npm run typecheck
 npm start          # build + run (talks to https://yvastaffing.agency)
-npm run dist       # Windows installer → release/YVA-Time-Setup.exe (run on Windows / CI)
+npm run dist       # Windows installer → release/YVA-Time-Setup.exe + latest.yml (run on Windows / CI)
 ```
+
+## Releasing a new version (installed apps update themselves)
+
+1. Change `"version"` in `package.json` (e.g. `0.3.1`) and commit.
+2. Push the tag `yva-time-v0.3.1`. GitHub Actions ("YVA Time — Windows installer") builds the
+   installer and publishes a GitHub Release with `YVA-Time-Setup.exe`, its `.blockmap` and `latest.yml`.
+3. Installed apps check every 4 hours (and 30 s after starting), download it in the background and
+   show **Restart to update**; otherwise it installs the next time the app quits.
+
+Updates come from this repository's GitHub Releases, so the repository must stay public (or the app
+needs a token) and only YVA Time should publish Releases here. Download link for new staff:
+`https://github.com/YVALaw/YVALaw/releases/latest/download/YVA-Time-Setup.exe`.
+
+## Code signing (removes Windows' "unknown publisher" warning)
+
+Signing switches on by itself once these exist in GitHub → repository Settings → Secrets and
+variables → Actions (`electron-builder.config.cjs` reads them):
+
+- **Azure Trusted Signing** (recommended, about $10/month; YVA Staffing must pass Microsoft's
+  business identity check): secrets `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`
+  (an app registration with the "Trusted Signing Certificate Profile Signer" role) and variables
+  `YVA_SIGN_ENDPOINT` (e.g. `https://eus.codesigning.azure.net`), `YVA_SIGN_ACCOUNT`,
+  `YVA_SIGN_PROFILE`, `YVA_SIGN_PUBLISHER` (the certificate's name, e.g. `YVA Staffing LLC`).
+- **Or a certificate file** from a certificate authority: secrets `WIN_CSC_LINK` (the .pfx as base64)
+  and `WIN_CSC_KEY_PASSWORD`.
+
+Once signed, updates must keep the same publisher name (electron-updater checks it).
 
 Layout:
 
 - `src/main/tracker.ts` — tracking engine (10-minute blocks, idle Keep/Remove, break, removed blocks); pure logic, unit-tested
-- `src/main/controller.ts` — runs it: screenshots, uploads every minute, offline queue, UI snapshot
-- `src/main/auth.ts` — PKCE sign-in through YVA OS `/connect-app`, encrypted session (Windows DPAPI)
-- `src/main/api.ts` — `employee-me`, `tracker_blocks`, `tracker_screenshots`, private `screenshots` bucket
+- `src/main/controller.ts` — runs it: screenshots, check-in + uploads every minute, offline queue, UI snapshot
+- `src/main/auth.ts` — PKCE sign-in through YVA OS `/connect-app`; the sign-in records this computer
+  (`desktop_devices`) and returns the app's own session, stored encrypted (Windows DPAPI)
+- `src/main/api.ts` — `employee-me`, `tracker_blocks` (seconds, activity, first/last second),
+  `tracker_screenshots`, private `screenshots` bucket, computer check-in
+- `src/main/updater.ts` — automatic updates from GitHub Releases (installed app only)
 - `src/main/reminders.ts` — shift start/end reminders (pure logic, unit-tested)
 - `src/main/main.ts` — window, tray, `yvatime://` links, start with Windows, notifications
 - `src/renderer/` — React UI; `src/preload/` — the `window.yva` bridge

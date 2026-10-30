@@ -13,6 +13,9 @@ export const TEST_SHOT_OFFSET_S   = process.env.YVA_TEST_SHOT_OFFSET ? Number(pr
 export const TEST_NO_BROWSER      = process.env.YVA_TEST_NO_BROWSER === '1'
 export const TEST_IDLE_FILE       = process.env.YVA_TEST_IDLE_FILE || null   // file holding fake idle seconds
 export const PROFILE_EVERY_MS     = 30 * 60_000
+export const UPDATE_EVERY_MS      = 4 * 3_600_000
+/** Screenshot notice version: 2 = screenshots + activity %. Raising it shows the notice again. */
+export const CONSENT_VERSION      = 2
 
 /** What YVA team members (no client project) can track against */
 export const WORK_TYPES = [

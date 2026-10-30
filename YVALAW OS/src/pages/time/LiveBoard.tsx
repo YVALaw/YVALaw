@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Employee, Project } from '../../data/types'
 import { loadEmployees, loadProjects } from '../../services/storage'
-import { loadTrackerBlocks, type TrackerBlock } from '../../services/trackerStorage'
+import { activityColor, blocksActivity, loadTrackerBlocks, type TrackerBlock } from '../../services/trackerStorage'
 
 const DAY_MS = 86_400_000
 const LIVE_WINDOW_MS = 3 * 60_000     // the app uploads about once a minute while tracking
@@ -10,7 +10,7 @@ function startOfToday(): number { const d = new Date(); d.setHours(0, 0, 0, 0); 
 function hm(seconds: number): string { return `${Math.floor(seconds / 3600)}h ${String(Math.floor((seconds % 3600) / 60)).padStart(2, '0')}m` }
 function clock(ms: number): string { return new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) }
 
-type Row = { employee: Employee; seconds: number; latest: TrackerBlock | null; tracking: boolean }
+type Row = { employee: Employee; seconds: number; activity: number | null; latest: TrackerBlock | null; tracking: boolean }
 
 /** Time Tracking → Live: who is tracking right now and today's hours (YVA Time desktop app) */
 export default function LiveBoard() {
@@ -46,6 +46,7 @@ export default function LiveBoard() {
       return {
         employee,
         seconds: mine.reduce((s, b) => s + b.seconds, 0),
+        activity: blocksActivity(mine),
         latest,
         tracking: !!latest && loadedAt - latest.updatedAt < LIVE_WINDOW_MS,
       }
@@ -81,10 +82,14 @@ export default function LiveBoard() {
         <div className="table-wrap">
           <table className="data-table">
             <thead>
-              <tr><th>Employee</th><th>Status</th><th>Working on</th><th style={{ textAlign: 'right' }}>Today</th></tr>
+              <tr>
+                <th>Employee</th><th>Status</th><th>Working on</th>
+                <th style={{ textAlign: 'right' }} title="Share of today's tracked time with keyboard or mouse use (client team)">Activity</th>
+                <th style={{ textAlign: 'right' }}>Today</th>
+              </tr>
             </thead>
             <tbody>
-              {rows.map(({ employee, seconds, latest, tracking }) => (
+              {rows.map(({ employee, seconds, activity, latest, tracking }) => (
                 <tr key={employee.id}>
                   <td className="td-name">
                     {employee.name}
@@ -102,6 +107,9 @@ export default function LiveBoard() {
                     title={latest?.note ?? undefined}>
                     {latest ? (latest.projectId ? projectName(latest.projectId) : latest.workType) : '—'}
                     {latest?.note ? ` — ${latest.note}` : ''}
+                  </td>
+                  <td style={{ textAlign: 'right', fontWeight: 600, color: activity === null ? 'var(--muted)' : activityColor(activity) }}>
+                    {activity === null ? '—' : `${activity}%`}
                   </td>
                   <td style={{ textAlign: 'right', fontWeight: 700 }}>{hm(seconds)}</td>
                 </tr>

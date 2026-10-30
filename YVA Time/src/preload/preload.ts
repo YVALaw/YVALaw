@@ -26,6 +26,7 @@ const api: YvaApi = {
   deleteScreenshot: () => call('deleteScreenshot'),
   openWorkspace:    () => call('openWorkspace'),
   openAddTime:      () => call('openAddTime'),
+  installUpdate:    () => call('installUpdate'),
 }
 
 contextBridge.exposeInMainWorld('yva', api)

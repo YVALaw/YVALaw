@@ -32,6 +32,7 @@ export default function App() {
       {s.phase === 'signed-out' && <SignIn s={s} />}
       {s.phase === 'loading' && <div className="center muted">Loading your profile…</div>}
       {s.phase === 'ready' && s.profile && (s.consentNeeded ? <Consent /> : <TrackerScreen s={s} />)}
+      {s.update?.ready && <UpdateBar s={s} />}
       {s.idleReview && <IdleReview s={s} />}
     </div>
   )
@@ -62,17 +63,18 @@ function SignIn({ s }: { s: Snapshot }) {
   )
 }
 
-// ── Screenshot notice (client team, first run) ─────────────────────────────────
+// ── Screenshot + activity notice (client team; shown again when it changes) ────
 
 function Consent() {
   return (
     <div className="page">
       <h2>Before you start</h2>
-      <p>YVA Time takes screenshots while you track time for a client:</p>
+      <p>While you track time for a client, YVA Time records:</p>
       <ul className="consent">
-        <li>A picture of your screen(s) at a random moment about every 10 minutes — <b>only while the timer is running</b>. Nothing is taken when stopped or on break.</li>
+        <li><b>Screenshots</b> of your screen(s) at a random moment about every 10 minutes — <b>only while the timer is running</b>. Nothing is taken when stopped or on break.</li>
         <li>You'll see each screenshot here and can <b>delete it within 2 minutes</b>. That 10-minute block is then removed from your time.</li>
-        <li>Screenshots are seen only by YVA admins — never by clients — and are deleted after 90 days.</li>
+        <li><b>Activity %</b>: how much of each 10 minutes had keyboard or mouse use. Only <i>whether</i> you used them — never what you typed or clicked.</li>
+        <li>Screenshots and activity are seen only by YVA admins — never by clients. Screenshots are deleted after 90 days.</li>
         <li>If you stop using your keyboard and mouse for 5 minutes, YVA Time asks whether to keep that time.</li>
       </ul>
       <button className="btn primary wide" onClick={() => void window.yva.acceptConsent()}>I understand — continue</button>
@@ -129,7 +131,11 @@ function TrackerScreen({ s }: { s: Snapshot }) {
       </div>
 
       <div className="timer">{clock(s.sessionSeconds)}</div>
-      <div className="totals"><span>Today <b>{hm(s.todaySeconds)}</b></span><span>This week <b>{hm(s.weekSeconds)}</b></span></div>
+      <div className="totals">
+        <span>Today <b>{hm(s.todaySeconds)}</b></span>
+        <span>This week <b>{hm(s.weekSeconds)}</b></span>
+        {s.todayActivity !== null && <span title="Share of today's time with keyboard or mouse use">Activity <b>{s.todayActivity}%</b></span>}
+      </div>
 
       {options.length === 0 ? (
         <div className="notice">You're not assigned to a project yet. Ask YVA to add you.</div>
@@ -188,6 +194,17 @@ function ScreenshotCard({ s }: { s: Snapshot }) {
           </button>
         )}
       </div>
+    </div>
+  )
+}
+
+// ── New version downloaded ─────────────────────────────────────────────────────
+
+function UpdateBar({ s }: { s: Snapshot }) {
+  return (
+    <div className="update-bar">
+      <span className="grow">YVA Time {s.update!.version} is ready.{s.status !== 'stopped' && ' Restarting stops the timer — start it again after.'}</span>
+      <button className="btn primary small-btn" onClick={() => void window.yva.installUpdate()}>Restart to update</button>
     </div>
   )
 }

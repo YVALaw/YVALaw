@@ -7,6 +7,7 @@ import { sendEmail } from '../services/gmail'
 import { buildStatementHTML } from '../utils/statementHtml'
 import { trackedHoursOf, trackedPayEntries } from '../utils/trackedPay'
 import { loadLatestConsent } from '../services/trackerStorage'
+import EmployeeDevices from './time/EmployeeDevices'
 import {
   IconImage, IconMusic, IconFile, IconX, IconTrash, IconCheck,
   IconMail, IconPrinter, IconCamera, IconPlay, IconLink, IconLock,
@@ -176,8 +177,8 @@ export default function EmployeeProfilePage() {
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [inviteLoading, setInviteLoading] = useState<'email' | 'link' | null>(null)
   const [inviteMsg,     setInviteMsg]     = useState<{ ok: boolean; text: string } | null>(null)
-  const [consentAt,     setConsentAt]     = useState<number | null>(null)
-  useEffect(() => { if (id) void loadLatestConsent(id).then(setConsentAt) }, [id])
+  const [consent,       setConsent]       = useState<{ at: number; version: number } | null>(null)
+  useEffect(() => { if (id) void loadLatestConsent(id).then(setConsent) }, [id])
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined)
 
   // Sync form/attachments/photo from emp once data loads
@@ -642,11 +643,15 @@ export default function EmployeeProfilePage() {
                 This employee can sign in to My workspace and the YVA Time app.
                 {empNN.worksFor !== 'yva' && (
                   <div style={{ marginTop: 6 }}>
-                    Screenshot notice: {consentAt
-                      ? <strong style={{ color: 'var(--text)' }}>accepted {new Date(consentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</strong>
+                    Screenshot &amp; activity notice: {consent
+                      ? <>
+                          <strong style={{ color: 'var(--text)' }}>accepted {new Date(consent.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</strong>
+                          {consent.version < 2 && ' (older notice without activity % — the app asks again after updating)'}
+                        </>
                       : 'not accepted yet (the app asks on first use)'}
                   </div>
                 )}
+                <EmployeeDevices employeeId={empNN.id} firstName={empNN.name.split(' ')[0]} />
               </div>
             ) : (
               <>

@@ -1,15 +1,16 @@
 // "Sign in with YVA OS": the app never sees a password.
 //  1. beginSignIn() makes a PKCE verifier/challenge and opens YVA OS /connect-app in the browser
 //  2. the person clicks Connect; YVA OS opens yvatime://auth?code=…&state=… (or they paste the code)
-//  3. redeem() sends code + verifier to desktop-link-redeem and gets a magic-link token hash
-//  4. verifyOtp() turns it into this app's own Supabase session (refreshed automatically,
-//     stored encrypted on this computer)
+//  3. redeem() sends code + verifier (+ this computer's name) to desktop-link-redeem, which
+//     records the computer and returns this app's own Supabase session (refreshed
+//     automatically, stored encrypted on this computer) and the computer's id
 import crypto from 'node:crypto'
+import os from 'node:os'
 import { createClient, type SupabaseClient, type SupportedStorage } from '@supabase/supabase-js'
 import { API_BASE, CONNECT_URL, SIGN_IN_TIMEOUT_MS } from './config'
 import { readJson, readSecret, removeFile, writeJson, writeSecret } from './store'
 
-type Connection = { supabaseUrl: string; anonKey: string }
+type Connection = { supabaseUrl: string; anonKey: string; deviceId?: string }
 
 const SESSION_FILE = 'session.bin'
 let client: SupabaseClient | null = null
@@ -41,6 +42,11 @@ export function getClient(): SupabaseClient | null {
     auth: { storage: secureStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
   })
   return client
+}
+
+/** This computer's record in YVA OS (desktop_devices), set at sign-in */
+export function deviceId(): string | null {
+  return readJson<Connection | null>('connection.json', null)?.deviceId ?? null
 }
 
 export async function accessToken(): Promise<string | null> {
@@ -76,27 +82,40 @@ export function parseDeepLink(url: string): { code: string; state: string } | nu
   }
 }
 
-export async function redeem(code: string, state?: string) {
+export async function redeem(code: string, state: string | undefined, appVersion: string) {
   if (!pending || !isAwaitingCode()) throw new Error('Click "Sign in with YVA OS" first, then connect in your browser.')
   if (state !== undefined && state !== pending.state) throw new Error('That sign-in link was for a different attempt. Try again.')
   const res = await fetch(`${API_BASE}/.netlify/functions/desktop-link-redeem`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code: code.trim(), verifier: pending.verifier }),
+    body: JSON.stringify({
+      code: code.trim(), verifier: pending.verifier,
+      device: { name: os.hostname(), platform: process.platform, appVersion },
+    }),
   })
-  const data = await res.json().catch(() => ({})) as { tokenHash?: string; supabaseUrl?: string; anonKey?: string; error?: string }
-  if (!res.ok || !data.tokenHash || !data.supabaseUrl || !data.anonKey) throw new Error(data.error || 'Sign-in failed. Try again.')
+  const data = await res.json().catch(() => ({})) as {
+    session?: { access_token: string; refresh_token: string }
+    deviceId?: string; supabaseUrl?: string; anonKey?: string; error?: string
+  }
+  if (!res.ok || !data.session || !data.deviceId || !data.supabaseUrl || !data.anonKey) throw new Error(data.error || 'Sign-in failed. Try again.')
 
-  writeJson('connection.json', { supabaseUrl: data.supabaseUrl, anonKey: data.anonKey })
+  writeJson('connection.json', { supabaseUrl: data.supabaseUrl, anonKey: data.anonKey, deviceId: data.deviceId } satisfies Connection)
   removeFile(SESSION_FILE)
   client = null
-  const { error } = await getClient()!.auth.verifyOtp({ token_hash: data.tokenHash, type: 'magiclink' })
+  const { error } = await getClient()!.auth.setSession(data.session)
   if (error) throw new Error(error.message)
   pending = null
 }
 
+/** Sign out (ends this computer's login on the server when online) */
 export async function signOut() {
   await client?.auth.signOut({ scope: 'local' }).catch(() => {})
+  forget()
+}
+
+/** Forget the login on this computer without contacting the server (it was ended there) */
+export function forget() {
+  client?.auth.stopAutoRefresh().catch(() => {})
   client = null
   removeFile(SESSION_FILE)
   removeFile('connection.json')

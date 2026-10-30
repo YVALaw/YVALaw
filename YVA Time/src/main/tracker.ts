@@ -8,6 +8,9 @@
 //   • no input for 5+ minutes           → idle: the whole quiet stretch since the last
 //                                          input waits for Keep or Remove on return
 // Gaps longer than 5 s between ticks (sleep, hibernate) are never counted.
+// Each row also keeps its "active" seconds (keyboard/mouse used during that second — only
+// whether there was input, never what it was) and the first/last second counted inside the
+// block (0–599), used for activity % and the schedule report.
 import type { IdleReview, Target, TrackerStatus } from '../shared/types'
 
 export const BLOCK_MS = 600_000
@@ -19,6 +22,9 @@ export type BlockRow = {
   projectId: string | null
   workType: string | null
   seconds: number
+  active: number              // seconds with keyboard/mouse input
+  first: number | null        // first counted second inside the block (0–599)
+  last: number | null         // last counted second inside the block
   note: string | null
   dirty: boolean              // changed since the last successful upload
   removed: boolean            // the person deleted this block's screenshot
@@ -43,14 +49,36 @@ export function blockStartOf(ms: number): number {
 
 const rowKey = (blockStart: number, key: string) => `${blockStart}|${key}`
 
-function addTo(map: Map<string, number>, key: string, n: number) {
-  map.set(key, (map.get(key) ?? 0) + n)
+/** Seconds held aside for one row: how many, and the first/last of them inside the block */
+type Span = { n: number; first: number; last: number }
+
+function addTo(map: Map<string, Span>, key: string, offset: number) {
+  const s = map.get(key)
+  if (s) { s.n += 1; s.first = Math.min(s.first, offset); s.last = Math.max(s.last, offset) }
+  else map.set(key, { n: 1, first: offset, last: offset })
 }
 
-function total(map: Map<string, number>): number {
+function mergeInto(map: Map<string, Span>, key: string, span: Span) {
+  const s = map.get(key)
+  if (s) { s.n += span.n; s.first = Math.min(s.first, span.first); s.last = Math.max(s.last, span.last) }
+  else map.set(key, { ...span })
+}
+
+function total(map: Map<string, Span>): number {
   let s = 0
-  for (const n of map.values()) s += n
+  for (const span of map.values()) s += span.n
   return s
+}
+
+const offsetIn = (at: number, blockStart: number) => Math.min(BLOCK_SECONDS - 1, Math.max(0, Math.floor((at - blockStart) / 1000)))
+
+function emptyRow(blockStart: number, tk: string): BlockRow {
+  return {
+    blockStart, targetKey: tk,
+    projectId: tk.startsWith('project:') ? tk.slice(8) : null,
+    workType:  tk.startsWith('work:') ? tk.slice(5) : null,
+    seconds: 0, active: 0, first: null, last: null, note: null, dirty: true, removed: false, rejected: false,
+  }
 }
 
 export class Tracker {
@@ -62,8 +90,8 @@ export class Tracker {
   idleReview: IdleReview | null = null
   readonly rows = new Map<string, BlockRow>()
 
-  private tentative = new Map<string, number>()   // quiet since the last input, under 5 min
-  private awaiting = new Map<string, number>()    // idle time waiting for Keep/Remove
+  private tentative = new Map<string, Span>()     // quiet since the last input, under 5 min
+  private awaiting = new Map<string, Span>()      // idle time waiting for Keep/Remove
   private removedBlocks = new Set<number>()
   private lastTick: number | null = null
   private carryMs = 0
@@ -156,19 +184,20 @@ export class Tracker {
     const bs = blockStartOf(at)
     const removed = this.removedBlocks.has(bs)     // still track idle state, just don't count
     const key = rowKey(bs, targetKey(this.target))
+    const offset = offsetIn(at, bs)
 
     if (idleSeconds >= this.opts.idleAfterS) {
       if (this.status !== 'idle') {
         this.status = 'idle'
         this.idleSince = at - idleSeconds * 1000
-        for (const [k, n] of this.tentative) addTo(this.awaiting, k, n)
+        for (const [k, span] of this.tentative) mergeInto(this.awaiting, k, span)
         this.tentative.clear()
       }
-      if (!removed) addTo(this.awaiting, key, 1)
+      if (!removed) addTo(this.awaiting, key, offset)
       return
     }
     if (idleSeconds >= this.opts.tentativeAfterS) {
-      if (!removed) addTo(this.tentative, key, 1)
+      if (!removed) addTo(this.tentative, key, offset)
       return
     }
     if (this.status === 'idle') {
@@ -181,32 +210,31 @@ export class Tracker {
       this.idleSince = null
     }
     if (this.tentative.size) this.commit(this.tentative)
-    if (!removed) this.addSeconds(key, 1)
+    if (!removed) this.addSeconds(key, { n: 1, first: offset, last: offset }, true)
   }
 
-  private commit(map: Map<string, number>) {
-    for (const [key, n] of map) this.addSeconds(key, n)
+  /** Time held aside (quiet stretch) counts, but not as active */
+  private commit(map: Map<string, Span>) {
+    for (const [key, span] of map) this.addSeconds(key, span, false)
     map.clear()
   }
 
-  private addSeconds(key: string, n: number) {
+  private addSeconds(key: string, span: Span, active: boolean) {
     const cut = key.indexOf('|')
     const bs = Number(key.slice(0, cut))
     const tk = key.slice(cut + 1)
     if (this.removedBlocks.has(bs)) return
-    const add = Math.min(n, BLOCK_SECONDS - this.blockTotal(bs))
+    const add = Math.min(span.n, BLOCK_SECONDS - this.blockTotal(bs))
     if (add <= 0) return
     let row = this.rows.get(key)
     if (!row) {
-      row = {
-        blockStart: bs, targetKey: tk,
-        projectId: tk.startsWith('project:') ? tk.slice(8) : null,
-        workType:  tk.startsWith('work:') ? tk.slice(5) : null,
-        seconds: 0, note: null, dirty: true, removed: false, rejected: false,
-      }
+      row = emptyRow(bs, tk)
       this.rows.set(key, row)
     }
     row.seconds += add
+    if (active) row.active = Math.min(row.seconds, row.active + add)
+    row.first = row.first === null ? span.first : Math.min(row.first, span.first)
+    row.last  = row.last === null ? span.last : Math.max(row.last, span.last)
     row.note = this.note.trim() || null
     row.dirty = true
     this.sessionSeconds += add
@@ -223,6 +251,15 @@ export class Tracker {
     let s = 0
     for (const r of this.rows.values()) {
       if (r.blockStart >= from && r.blockStart < to && !r.removed && !r.rejected) s += r.seconds
+    }
+    return s
+  }
+
+  /** Active seconds in the same range (activity % = active / total) */
+  activeBetween(from: number, to: number): number {
+    let s = 0
+    for (const r of this.rows.values()) {
+      if (r.blockStart >= from && r.blockStart < to && !r.removed && !r.rejected) s += r.active
     }
     return s
   }
@@ -262,6 +299,8 @@ export class Tracker {
         r.dirty = false
       } else {
         r.seconds = 0
+        r.active = 0
+        r.first = r.last = null
         r.dirty = true
       }
     }
@@ -287,7 +326,10 @@ export class Tracker {
   }
 
   /** Merge rows from the server (after a restart or on another computer) */
-  mergeServer(rows: { blockStart: number; targetKey: string; seconds: number; status: string; note: string | null }[]) {
+  mergeServer(rows: {
+    blockStart: number; targetKey: string; seconds: number; status: string; note: string | null
+    active: number | null; first: number | null; last: number | null
+  }[]) {
     for (const s of rows) {
       const key = rowKey(s.blockStart, s.targetKey)
       if (s.status === 'removed') {
@@ -298,13 +340,17 @@ export class Tracker {
       }
       const local = this.rows.get(key)
       if (local) {
-        if (s.seconds >= local.seconds) { local.seconds = s.seconds; local.dirty = false }
+        if (s.seconds >= local.seconds) {
+          local.seconds = s.seconds
+          local.active = Math.min(s.seconds, Math.max(local.active, s.active ?? 0))
+          if (s.first !== null) local.first = local.first === null ? s.first : Math.min(local.first, s.first)
+          if (s.last !== null)  local.last  = local.last === null ? s.last : Math.max(local.last, s.last)
+          local.dirty = false
+        }
       } else {
         this.rows.set(key, {
-          blockStart: s.blockStart, targetKey: s.targetKey,
-          projectId: s.targetKey.startsWith('project:') ? s.targetKey.slice(8) : null,
-          workType:  s.targetKey.startsWith('work:') ? s.targetKey.slice(5) : null,
-          seconds: s.seconds, note: s.note, dirty: false, removed: false, rejected: false,
+          ...emptyRow(s.blockStart, s.targetKey),
+          seconds: s.seconds, active: s.active ?? 0, first: s.first, last: s.last, note: s.note, dirty: false,
         })
       }
     }
@@ -323,7 +369,9 @@ export class Tracker {
 
   restore(data: ReturnType<Tracker['serialize']> | null) {
     if (!data) return
-    for (const r of data.rows ?? []) this.rows.set(rowKey(r.blockStart, r.targetKey), { ...r })
+    for (const r of data.rows ?? []) {   // rows saved by 0.2.0 have no active/first/last
+      this.rows.set(rowKey(r.blockStart, r.targetKey), { ...r, active: r.active ?? 0, first: r.first ?? null, last: r.last ?? null })
+    }
     for (const b of data.removedBlocks ?? []) this.removedBlocks.add(b)
     for (const b of data.shotTaken ?? []) this.shotTaken.add(b)
   }

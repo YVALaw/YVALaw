@@ -8,6 +8,7 @@ import { can } from '../lib/roles'
 import LiveBoard from './time/LiveBoard'
 import ScreenshotDay from './time/ScreenshotDay'
 import ApproveTime from './time/ApproveTime'
+import ScheduleReport from './time/ScheduleReport'
 
 function uid() { return crypto.randomUUID() }
 function getToday() { return new Date().toISOString().slice(0, 10) }
@@ -60,7 +61,7 @@ export default function TimeTrackingPage() {
 
   // YVA Time views
   const { role } = useRole()
-  const [tab, setTab] = useState<'log' | 'live' | 'approve' | 'screens'>('log')
+  const [tab, setTab] = useState<'log' | 'live' | 'approve' | 'schedule' | 'screens'>('log')
 
   // Approvals add YVA Time entries server-side: reload the log when coming back to it
   useEffect(() => { if (tab === 'log') void loadTimeEntries().then(setEntries) }, [tab])
@@ -211,6 +212,7 @@ export default function TimeTrackingPage() {
           {tab === 'live' && <p className="page-sub">Live from the YVA Time desktop app · refreshes every minute</p>}
           {tab === 'screens' && <p className="page-sub">Client-team screenshots · kept 90 days · never shown to clients</p>}
           {tab === 'approve' && <p className="page-sub">Approve YVA Time hours and manual time requests</p>}
+          {tab === 'schedule' && <p className="page-sub">Shift vs. when people actually started and stopped (YVA Time)</p>}
         </div>
         {tab === 'log' && (
           <div className="page-actions">
@@ -225,6 +227,7 @@ export default function TimeTrackingPage() {
           {can.approveTime(role) && (
             <button className={`filter-tab${tab === 'approve' ? ' active' : ''}`} onClick={() => setTab('approve')}>Approve</button>
           )}
+          <button className={`filter-tab${tab === 'schedule' ? ' active' : ''}`} onClick={() => setTab('schedule')}>Schedule</button>
           {can.viewScreenshots(role) && (
             <button className={`filter-tab${tab === 'screens' ? ' active' : ''}`} onClick={() => setTab('screens')}>Screenshots</button>
           )}
@@ -237,7 +240,7 @@ export default function TimeTrackingPage() {
     return (
       <div className="page-wrap">
         {header}
-        {tab === 'live' ? <LiveBoard /> : tab === 'approve' ? <ApproveTime /> : <ScreenshotDay />}
+        {tab === 'live' ? <LiveBoard /> : tab === 'approve' ? <ApproveTime /> : tab === 'schedule' ? <ScheduleReport /> : <ScreenshotDay />}
       </div>
     )
   }

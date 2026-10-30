@@ -21,7 +21,8 @@ type MyEmployee = {
 }
 type MyProject = { id: string; name: string; clientName: string | null; status: string | null }
 
-// Set VITE_YVA_TIME_DOWNLOAD_URL in Netlify once an installer is published (GitHub release asset)
+// Set VITE_YVA_TIME_DOWNLOAD_URL in Netlify once an installer is published:
+// https://github.com/YVALaw/YVALaw/releases/latest/download/YVA-Time-Setup.exe (always the newest version)
 const DOWNLOAD_URL = import.meta.env.VITE_YVA_TIME_DOWNLOAD_URL as string | undefined
 
 /** My workspace — the only YVA OS area an invited employee can open */
@@ -89,7 +90,7 @@ export default function EmployeeWorkspace() {
                   : "The YVA Time app for Windows is coming soon. You'll download it here and sign in with this same account."}
                 {isYva
                   ? ' As part of the YVA team, screenshots are off for you.'
-                  : ' While you track time, the app takes a screenshot at a random moment about every 10 minutes. You can see each one and delete it within 2 minutes (that 10-minute block is then removed from your time).'}
+                  : ' While you track time, the app takes a screenshot at a random moment about every 10 minutes. You can see each one and delete it within 2 minutes (that 10-minute block is then removed from your time). It also records activity % — how much of each 10 minutes had keyboard or mouse use, never what you typed.'}
               </p>
               <div style={{ marginTop: 14, fontSize: 13, color: 'var(--muted)' }}>
                 Adding time by hand: <strong style={{ color: 'var(--text)' }}>
