@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
-import type { AppRole, UserRole } from '../lib/roles'
+import type { AppRole } from '../lib/roles'
 import { auditPortalActivity } from '../services/portalStorage'
 
 type RoleCtx = {
@@ -63,8 +63,8 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         .single()
 
       if (roleRow?.role && roleRow.role !== 'client') {
-        // Internal OS user
-        setRole(roleRow.role as UserRole)
+        // Internal OS user — or 'pending' (no access until a CEO picks a role)
+        setRole(roleRow.role as AppRole)
         setIsClient(false)
         setClientId(null)
         sessionStorage.setItem(ROLE_CACHE_KEY, roleRow.role)
@@ -94,10 +94,11 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         return
       }
 
-      // ── Step 3: Unknown user — auto-assign recruiter (internal signup path) ──
-      // IMPORTANT: never auto-assign recruiter to users who were invited as clients.
-      // If client_users is missing for an invited client, keep them as client in
-      // memory (no DB write) so they don't accidentally gain OS access.
+      // ── Step 3: Unknown user — register as 'pending' (internal signup path) ──
+      // A pending account has no access (the database only allows a self-insert
+      // of 'pending'); a CEO picks the real role in Settings → Team Access.
+      // Invited clients whose client_users row is missing stay clients in
+      // memory (no DB write) so they never land in the staff queue.
       if (meta.role === 'client' || meta.client_id) {
         setRole('client')
         setIsClient(true)
@@ -109,11 +110,11 @@ export function RoleProvider({ children }: { children: ReactNode }) {
 
       await supabase
         .from('user_roles')
-        .insert({ user_id: user.id, email: user.email, role: 'recruiter' })
-      setRole('recruiter')
+        .insert({ user_id: user.id, email: user.email, role: 'pending' })
+      setRole('pending')
       setIsClient(false)
       setClientId(null)
-      sessionStorage.setItem(ROLE_CACHE_KEY, 'recruiter')
+      sessionStorage.setItem(ROLE_CACHE_KEY, 'pending')
       setLoading(false)
     })()
 

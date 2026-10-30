@@ -75,16 +75,21 @@ CREATE POLICY "settings_write" ON settings
 
 
 -- ── Step 5: User roles table ──────────────────────────────────────────────────
--- Everyone can read the roles list (needed for team access page + role context).
--- Users can insert their own initial role (first login auto-assign).
--- Only CEO can change or remove any role.
+-- Users read their own row; staff read all (team access page).
+-- New accounts may only add themselves as 'pending' (no access) — a CEO
+-- picks the real role. Only CEO can change or remove any role.
+-- (see migrate-role-lockdown.sql — never allow self-insert of any other role)
 
 CREATE POLICY "user_roles_read" ON user_roles
-  FOR SELECT TO authenticated USING (true);
+  FOR SELECT TO authenticated
+  USING (
+    user_id::text = (SELECT auth.uid())::text
+    OR private.current_user_role() IN ('ceo', 'admin', 'accounting', 'recruiter', 'lead_gen')
+  );
 
-CREATE POLICY "user_roles_self_insert" ON user_roles
+CREATE POLICY "user_roles_self_insert_pending" ON user_roles
   FOR INSERT TO authenticated
-  WITH CHECK (user_id = auth.uid());
+  WITH CHECK (user_id::text = (SELECT auth.uid())::text AND role = 'pending');
 
 CREATE POLICY "user_roles_ceo_update" ON user_roles
   FOR UPDATE TO authenticated

@@ -35,7 +35,7 @@ AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.user_roles
     WHERE user_id::text = auth.uid()::text
-    AND   role   != 'client'
+    AND   role IN ('ceo', 'admin', 'accounting', 'recruiter', 'lead_gen')
   )
 $$;
 

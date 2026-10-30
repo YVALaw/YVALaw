@@ -749,7 +749,8 @@ When the new Supabase project is set up, create these tables in addition to exis
   ```
 
 ### Role system (`src/lib/roles.ts`)
-- Roles: `ceo` | `admin` | `accounting` | `recruiter` | `lead_gen`
+- Roles: `ceo` | `admin` | `accounting` | `recruiter` | `lead_gen` (staff, `isStaff()`), plus `client` (portal) and `pending`
+- **New accounts start as `pending`** (no access, "waiting for approval" screen) — a CEO picks the real role in Settings → Team Access. The database only allows a self-insert of `pending` (`user_roles_self_insert_pending`); `private.is_internal()` is an explicit list of the 5 staff roles, so `pending`/`client`/future roles never get internal data. Run `supabase/migrate-role-lockdown.sql` on existing databases. **Never** re-add a self-insert policy without the `role = 'pending'` check (before 2026-10-30 any signup could make itself CEO).
 - `can.viewOwnerStats(role)` → CEO only — gates all revenue/financial data
 - `can.manageRoles(role)` → CEO only
 - Role stored in `user_roles` table; cached in `sessionStorage` to prevent flicker; cleared on `SIGNED_OUT` auth event

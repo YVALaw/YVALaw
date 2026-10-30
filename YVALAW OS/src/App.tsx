@@ -36,7 +36,7 @@ import { loadSettings, saveSettings, loadInvoices, loadEmployees, saveEmployees 
 import { RoleProvider, useRole } from './context/RoleContext'
 import { ToastProvider } from './context/ToastContext'
 import type { UserRole } from './lib/roles'
-import { can } from './lib/roles'
+import { can, isStaff } from './lib/roles'
 
 // ── Shared loading screen ────────────────────────────────────────────────────
 
@@ -45,6 +45,18 @@ function LoadingScreen() {
     <div className="loading-screen">
       <div className="loading-spinner" />
       <div className="loading-text">Loading YVA LawOS…</div>
+    </div>
+  )
+}
+
+// ── Waiting for access (new account without a staff role yet) ───────────────
+
+function PendingAccess() {
+  return (
+    <div className="loading-screen">
+      <div className="loading-text">Your account is waiting for approval.</div>
+      <div className="loading-text">A YVA admin needs to give you access before you can use YVA LawOS.</div>
+      <button className="btn-ghost" onClick={() => void supabase.auth.signOut()}>Sign out</button>
     </div>
   )
 }
@@ -79,6 +91,9 @@ function AuthenticatedRouter() {
   const location = useLocation()
 
   if (loading) return <LoadingScreen />
+
+  // ── Pending / unknown role — no OS or portal until a CEO assigns a role ────
+  if (!isStaff(role) && role !== 'client') return <PendingAccess />
 
   // ── Preview portal — internal user viewing as a client ─────────────────────
   const previewClientId = new URLSearchParams(location.search).get('preview')

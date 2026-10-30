@@ -848,13 +848,16 @@ export default function SettingsPage() {
                             setUserRoles(prev => prev.map(r => r.user_id === u.user_id ? { ...r, role: newRole } : r))
                           }}
                         >
+                          {u.role === 'pending' && <option value="pending" disabled>Choose a role…</option>}
                           {ROLE_OPTIONS.map(r => (
                             <option key={r} value={r}>{ROLE_LABELS[r]}</option>
                           ))}
                         </select>
                       </td>
                       <td>
-                        <span className="badge badge-blue" style={{ fontSize: 10 }}>{ROLE_LABELS[u.role as keyof typeof ROLE_LABELS] || u.role}</span>
+                        {u.role === 'pending'
+                          ? <span className="badge badge-yellow" style={{ fontSize: 10 }}>Waiting for approval</span>
+                          : <span className="badge badge-blue" style={{ fontSize: 10 }}>{ROLE_LABELS[u.role as keyof typeof ROLE_LABELS] || u.role}</span>}
                       </td>
                     </tr>
                   ))}
