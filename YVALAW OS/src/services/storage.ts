@@ -49,7 +49,7 @@ function toSnake(obj: Record<string, unknown>): Record<string, unknown> {
 
 async function fetchAll<T>(table: string): Promise<T[]> {
   const { data, error } = await supabase.from(table).select('*').order('created_at')
-  if (error) { console.error(`fetchAll(${table})`, error); return [] }
+  if (error) { console.error('fetchAll(%s)', table, error); return [] }
   return (data || []).map(row => toCamel<T>(row as Record<string, unknown>))
 }
 

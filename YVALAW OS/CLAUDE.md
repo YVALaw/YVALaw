@@ -765,6 +765,9 @@ When the new Supabase project is set up, create these tables in addition to exis
 - **Team size:** ~100 members
 
 ## Key Constraints
+- HTML built as a string (`invoiceHtml.ts`, `statementHtml.ts`, print windows, previews, email attachments) must pass every stored/typed value through `escapeHtml()` from `src/utils/html.ts` — names, notes and addresses must never become tags or scripts. The invoice preview `<iframe>` is `sandbox=""`.
+- `stripe-webhook.cjs` rejects events whose signature timestamp is more than 5 minutes old (replay protection, same as Stripe's libraries).
+- React Router stays on 6.30.x for now: its two remaining advisories are fixed only in v7 and don't apply here (no SSR, no navigation targets taken from the URL). Upgrade to v7 as its own task.
 - No npm UI libraries — keep CSS self-contained
 - Logo at `/public/yva-logo.png`
 - Legacy builder at `/public/legacy/` — kept for reference but no longer used in app

@@ -818,6 +818,7 @@ export default function InvoicePage() {
             </div>
             <iframe
               srcDoc={buildInvoiceHTML(previewInv, 0, settings, false)}
+              sandbox=""
               style={{ flex: 1, border: 'none', background: '#fff', minHeight: 500 }}
               title="Invoice Preview"
             />

@@ -1,4 +1,5 @@
 import type { Employee, Invoice } from '../data/types'
+import { escapeHtml as esc } from './html'
 import { employeePremiumConfig, payrollFromInvoiceItem } from './payroll'
 
 function getEmployeeInvoiceItems(emp: Employee, inv: Invoice) {
@@ -70,7 +71,7 @@ export function buildStatementHTML(
         allDates = Object.keys(daily).filter(d => ph(daily[d]) > 0).sort()
       }
     }
-    const label = '<div style="font-size:11px;margin-bottom:6px"><strong style="font-size:13px">' + inv.number + '</strong>&nbsp;&middot;&nbsp;' + (inv.projectName||'—') + '&nbsp;&middot;&nbsp;<span style="color:#999">' + invPeriod + '</span></div>'
+    const label = '<div style="font-size:11px;margin-bottom:6px"><strong style="font-size:13px">' + esc(inv.number) + '</strong>&nbsp;&middot;&nbsp;' + esc(inv.projectName||'—') + '&nbsp;&middot;&nbsp;<span style="color:#999">' + esc(invPeriod) + '</span></div>'
     if (allDates.length > 0 && daily) {
       const dateHeaders = allDates.map(d => { const dt = new Date(d + 'T12:00:00'); return '<th style="text-align:center;font-size:9px;padding:5px 3px;min-width:22px;color:#999;border-bottom:2px solid #eee;white-space:nowrap">' + DA[dt.getDay()] + '<br>' + (dt.getMonth()+1) + '/' + dt.getDate() + '</th>' }).join('')
       const dayCells   = allDates.map(d => { const h = ph(daily[d]||''); return '<td style="text-align:center;padding:7px 4px;font-size:12px;color:' + (h>0?'#111':'#ccc') + '">' + (h>0?(h%1===0?String(h):h.toFixed(1)):'—') + '</td>' }).join('')
@@ -83,7 +84,7 @@ export function buildStatementHTML(
   const period = dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : dateFrom || dateTo || 'All time'
 
   return `<!DOCTYPE html><html><head>
-  <title>Statement — ${emp.name}</title>
+  <title>Statement — ${esc(emp.name)}</title>
   <style>
     body{font-family:Arial,sans-serif;max-width:700px;margin:40px auto;color:#111}
     .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;border-bottom:2px solid #f5b533;padding-bottom:16px}
@@ -104,8 +105,8 @@ export function buildStatementHTML(
     <img src="${window.location.origin}${import.meta.env.BASE_URL}yva-logo.png" class="logo" onerror="this.style.display='none'" />
     <div style="text-align:right">
       <h2>EARNINGS STATEMENT</h2>
-      <div class="meta">${emp.name}${emp.employeeNumber ? ` · ${emp.employeeNumber}` : ''}</div>
-      <div class="meta">Period: ${period}</div>
+      <div class="meta">${esc(emp.name)}${emp.employeeNumber ? ` · ${esc(emp.employeeNumber)}` : ''}</div>
+      <div class="meta">Period: ${esc(period)}</div>
       <div class="meta">Generated: ${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
     </div>
   </div>

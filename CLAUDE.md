@@ -170,6 +170,12 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 
 ## Things Completed
 
+### Session 12 (security audit — YVA LawOS)
+- Audited `YVALAW OS/` with Semgrep (incl. Pro + Supply Chain), vibescan, TruffleHog (full git history: no secrets), Trivy and OSV-Scanner.
+- Invoice and earnings-statement HTML now escapes every value (`YVALAW OS/src/utils/html.ts`); before, a name or note containing HTML could run script in print windows/previews/attachments.
+- Stripe webhook: 5-minute signature timestamp window (replay protection) and header parsing that crafted headers can't crash.
+- Dependencies: OS `react-router-dom` 6.30.6, `vite` 6.4.5 (esbuild 0.25), transitive updates; site `sharp` 0.35.5 + build-tool updates (`npm audit` clean). React Router v7 left for later (see `YVALAW OS/CLAUDE.md`).
+
 ### Session 11 (content manager)
 - About section: Sam Colas removed (story, founder card, JSON-LD); Hans Henriquez → **Hans Esmel**, described as sole founder ("CEO & Founder"). Headings now "The Founder" / "Meet the Founder".
 - `/admin` round 3: scheduled blog posts; swappable pictures with automatic resizing (`build-images.js`, sharp); Home Page Top, Prices, contact email, Spanish testimonials/FAQ; Landing Pages collection (photo, testimonials, FAQ per ad page). Fixed the PI page's 4-role total ($5,990 → $6,080).

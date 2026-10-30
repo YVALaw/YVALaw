@@ -17,8 +17,6 @@
  *   STRIPE_SECRET_KEY         — Stripe secret key (sk_live_xxx or sk_test_xxx)
  */
 
-const crypto = require('crypto')
-
 const PAYABLE_STATUSES = new Set(['sent', 'viewed', 'overdue', 'partial'])
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -22,21 +22,28 @@ const crypto = require('crypto')
 
 // ── Stripe signature verification (uses built-in crypto — no stripe npm pkg) ──
 
+// Same default as Stripe's own libraries: reject events signed more than 5 min ago
+const SIGNATURE_TOLERANCE_SECONDS = 300
+
 function verifyStripeSignature(rawBody, sigHeader, secret) {
   if (!sigHeader || !secret) return false
 
-  const pairs = {}
-  sigHeader.split(',').forEach(part => {
+  // Header format: t=<unix time>,v1=<sig>[,v1=<sig>...] — read only the keys we need
+  let timestamp = ''
+  const signatures = []
+  for (const part of sigHeader.split(',')) {
     const eq = part.indexOf('=')
-    const k  = part.slice(0, eq).trim()
-    const v  = part.slice(eq + 1).trim()
-    if (!pairs[k]) pairs[k] = []
-    pairs[k].push(v)
-  })
-
-  const timestamp  = pairs.t?.[0]
-  const signatures = pairs.v1 || []
+    if (eq === -1) continue
+    const k = part.slice(0, eq).trim()
+    const v = part.slice(eq + 1).trim()
+    if (k === 't' && !timestamp) timestamp = v
+    else if (k === 'v1') signatures.push(v)
+  }
   if (!timestamp || signatures.length === 0) return false
+
+  // Blocks replays of an old, captured request
+  const age = Math.abs(Date.now() / 1000 - Number(timestamp))
+  if (!Number.isFinite(age) || age > SIGNATURE_TOLERANCE_SECONDS) return false
 
   const signedPayload = `${timestamp}.${rawBody}`
   const expected = crypto
