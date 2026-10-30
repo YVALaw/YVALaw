@@ -8,6 +8,7 @@ import {
 } from '../services/storage'
 import { computePayrollBreakdown, computePremiumAdjustedAmount, employeePremiumConfig } from '../utils/payroll'
 import { IconTrash, IconX } from './Icon'
+import { hoursToHM, loadTrackerEntriesForProject } from '../services/trackerStorage'
 
 function projectPrefix(name: string): string {
   return name.split(/\s+/).map(w => w[0] || '').join('').toUpperCase().slice(0, 5)
@@ -295,6 +296,50 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
     })
   }
 
+  // ── Import approved YVA Time hours into the daily grid ──
+  const [importMsg, setImportMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  async function importTrackerHours() {
+    if (!projectId || dates.length === 0) return
+    const entries = await loadTrackerEntriesForProject(projectId, dates[0], dates[dates.length - 1])
+    if (entries.length === 0) {
+      setImportMsg({ ok: false, text: 'No approved YVA Time hours for this project in this period (approve them in Time Tracking → Approve).' })
+      return
+    }
+    const byEmployee = new Map<string, { name: string; daily: Record<string, number> }>()
+    for (const e of entries) {
+      const g = byEmployee.get(e.employeeId) ?? { name: e.employeeName, daily: {} }
+      g.daily[e.date] = (g.daily[e.date] ?? 0) + e.hours
+      byEmployee.set(e.employeeId, g)
+    }
+    const overwrites = rows.some(r => r.employeeId && byEmployee.has(r.employeeId) &&
+      Object.keys(byEmployee.get(r.employeeId)!.daily).some(d => (r.daily[d] || '').trim() !== ''))
+    if (overwrites && !window.confirm('Some of these days already have hours typed in. Replace them with the approved YVA Time hours?')) return
+
+    setRows(prev => {
+      const next = prev.filter(r => r.employeeId || r.employeeName.trim())
+      for (const [employeeId, g] of byEmployee) {
+        let row = next.find(r => r.employeeId === employeeId)
+        if (!row) {
+          const emp = employees.find(e => e.id === employeeId)
+          row = {
+            ...emptyRow(), employeeId, employeeName: emp?.name ?? g.name, position: emp?.role ?? '',
+            rate: selectedProject?.rate != null && selectedProject.rate !== '' ? String(selectedProject.rate)
+              : emp?.payRate != null ? String(emp.payRate) : '',
+            shiftStart: emp?.defaultShiftStart || '', shiftEnd: emp?.defaultShiftEnd || '',
+          }
+          next.push(row)
+        }
+        const daily = { ...row.daily }
+        for (const [day, h] of Object.entries(g.daily)) daily[day] = hoursToHM(h)
+        const idx = next.findIndex(r => r._id === row!._id)
+        next[idx] = { ...row, daily }
+      }
+      return next.length ? next : [emptyRow()]
+    })
+    const total = entries.reduce((s, e) => s + e.hours, 0)
+    setImportMsg({ ok: true, text: `Imported ${total.toFixed(2)} approved hours for ${byEmployee.size} team member${byEmployee.size === 1 ? '' : 's'}. Check the grid before creating the invoice.` })
+  }
+
   function addRow() { setRows(prev => [...prev, emptyRow()]) }
   function removeRow(id: string) { setRows(prev => prev.filter(r => r._id !== id)) }
 
@@ -528,6 +573,15 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
           <div className="settings-notice settings-notice-success" style={{ marginTop: 8 }}>
             {dates.length}-day billing period · Enter hours per day in the grid below. (Formats: 8, 8.5, 8:30)
           </div>
+        )}
+        {dates.length > 0 && projectId && (
+          <div style={{ marginTop: 10, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <button className="btn-ghost btn-sm" onClick={() => void importTrackerHours()}>Import YVA Time hours</button>
+            <span style={{ fontSize: 12, color: 'var(--muted)' }}>Fills the grid with approved hours for this project and period.</span>
+          </div>
+        )}
+        {importMsg && (
+          <div className={`settings-notice ${importMsg.ok ? 'settings-notice-success' : 'settings-notice-error'}`} style={{ marginTop: 8 }}>{importMsg.text}</div>
         )}
       </div>
 

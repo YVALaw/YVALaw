@@ -5,10 +5,14 @@ import { loadSnapshot, saveEmployees, saveInvoices, loadSettings, loadTimeEntrie
 import { uploadFile, deleteFile } from '../services/fileStorage'
 import { sendEmail } from '../services/gmail'
 import { buildStatementHTML } from '../utils/statementHtml'
+import { trackedHoursOf, trackedPayEntries } from '../utils/trackedPay'
+import { loadLatestConsent } from '../services/trackerStorage'
+import EmployeeDevices from './time/EmployeeDevices'
 import {
   IconImage, IconMusic, IconFile, IconX, IconTrash, IconCheck,
-  IconMail, IconPrinter, IconCamera, IconPlay,
+  IconMail, IconPrinter, IconCamera, IconPlay, IconLink, IconLock,
 } from '../components/Icon'
+import { supabase } from '../lib/supabase'
 import { formatMoney, fmtHoursHM } from '../utils/money'
 import { employeePremiumConfig, normalizeClockInput, payrollFromInvoiceItem } from '../utils/payroll'
 
@@ -100,13 +104,13 @@ function summarizeEmployeeInvoices(emp: Employee, invoices: Invoice[]) {
   }, { hours: 0, regularHours: 0, premiumHours: 0, totalPay: 0 })
 }
 
-async function emailStatement(emp: Employee, empInvoices: Invoice[], dateFrom: string, dateTo: string) {
+async function emailStatement(emp: Employee, empInvoices: Invoice[], dateFrom: string, dateTo: string, tracked: TimeEntry[] = []) {
   const settings = await loadSettings()
   const payRate  = Number(emp.payRate) || 0
   const dopRate  = settings.usdToDop || 0
   const summary = summarizeEmployeeInvoices(emp, empInvoices)
-  const totalHours = summary.hours
-  const totalUSD = summary.totalPay
+  const totalHours = summary.hours + trackedHoursOf(tracked)
+  const totalUSD = summary.totalPay + trackedHoursOf(tracked) * payRate
   const totalDOP = dopRate > 0 ? totalUSD * dopRate : 0
   const period   = dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : dateFrom || dateTo || 'All time'
   const companyName = settings.companyName || 'YVA Staffing'
@@ -126,7 +130,7 @@ async function emailStatement(emp: Employee, empInvoices: Invoice[], dateFrom: s
       `  Invoices: ${empInvoices.length}\n\n` +
       `Please reach out if you have any questions.\n\n${settings.emailSignature || companyName}`
   }
-  const statementHtml = buildStatementHTML(emp, empInvoices, dateFrom, dateTo, dopRate, false)
+  const statementHtml = buildStatementHTML(emp, empInvoices, dateFrom, dateTo, dopRate, false, tracked)
   const safeName   = emp.name.replace(/\s+/g, '-').toLowerCase()
   const periodSlug = period.replace(/\s/g, '').replace(/[^a-zA-Z0-9-]/g, '-')
   await sendEmail(emp.email || '', subject, bodyText, {
@@ -136,9 +140,9 @@ async function emailStatement(emp: Employee, empInvoices: Invoice[], dateFrom: s
   })
 }
 
-async function printPayslip(emp: Employee, empInvoices: Invoice[], dateFrom: string, dateTo: string) {
+async function printPayslip(emp: Employee, empInvoices: Invoice[], dateFrom: string, dateTo: string, tracked: TimeEntry[] = []) {
   const settings = await loadSettings()
-  const html = buildStatementHTML(emp, empInvoices, dateFrom, dateTo, settings.usdToDop || 0, true)
+  const html = buildStatementHTML(emp, empInvoices, dateFrom, dateTo, settings.usdToDop || 0, true, tracked)
   const win = window.open('', '_blank', 'width=800,height=600')
   if (!win) return
   win.document.write(html)
@@ -168,8 +172,13 @@ export default function EmployeeProfilePage() {
   const [form, setForm] = useState({
     name: '', email: '', phone: '', payRate: '', defaultShiftStart: '', defaultShiftEnd: '', premiumEnabled: false, premiumStartTime: '21:00', premiumPercent: '15', role: '',
     employmentType: '', location: '', timezone: '', startYear: '', status: 'Active', notes: '',
+    worksFor: 'client' as 'client' | 'yva', manualTimeAllowed: false,
   })
   const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [inviteLoading, setInviteLoading] = useState<'email' | 'link' | null>(null)
+  const [inviteMsg,     setInviteMsg]     = useState<{ ok: boolean; text: string } | null>(null)
+  const [consent,       setConsent]       = useState<{ at: number; version: number } | null>(null)
+  useEffect(() => { if (id) void loadLatestConsent(id).then(setConsent) }, [id])
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined)
 
   // Sync form/attachments/photo from emp once data loads
@@ -192,6 +201,8 @@ export default function EmployeeProfilePage() {
         startYear:      emp.startYear != null ? String(emp.startYear) : '',
         status:         emp.status ?? 'Active',
         notes:          emp.notes ?? '',
+        worksFor:       emp.worksFor === 'yva' ? 'yva' : 'client',
+        manualTimeAllowed: emp.manualTimeAllowed === true,
       })
       setAttachments(emp.attachments ?? [])
       setPhotoUrl(emp.photoUrl)
@@ -234,8 +245,10 @@ export default function EmployeeProfilePage() {
   const payRate     = Number(empNN.payRate) || 0
   const premiumConfig = employeePremiumConfig(empNN)
   const summary = summarizeEmployeeInvoices(empNN, empInvoices)
-  const totalHours  = summary.hours
-  const totalEarned  = summary.totalPay
+  const empTracked   = trackedPayEntries(empNN, timeEntries, dateFrom || undefined, dateTo || undefined)
+  const trackedHours = trackedHoursOf(empTracked)
+  const totalHours  = summary.hours + trackedHours
+  const totalEarned  = summary.totalPay + trackedHours * payRate
   const paidCount    = empInvoices.filter(inv => (inv.employeePayments?.[empNN.id] || inv.employeePayments?.[empNN.name])?.status === 'paid').length
   const pendingCount = empInvoices.length - paidCount
   const totalPaid    = empInvoices.reduce((s, inv) => {
@@ -298,11 +311,49 @@ export default function EmployeeProfilePage() {
       startYear: form.startYear ? Number(form.startYear) : undefined,
       status: form.status,
       notes: form.notes || undefined,
+      worksFor: form.worksFor,
+      manualTimeAllowed: form.manualTimeAllowed,
       photoUrl,
       attachments,
     }
     persistUpdate(updated)
     setEditing(false)
+  }
+
+  // YVA Time / My workspace login — created server-side by invite-employee
+  async function sendEmployeeInvite(mode: 'email' | 'link') {
+    if (!empNN.email) { setInviteMsg({ ok: false, text: 'Add an email address to this employee before inviting.' }); return }
+    setInviteLoading(mode)
+    setInviteMsg(null)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) { setInviteLoading(null); setInviteMsg({ ok: false, text: 'You must be logged in.' }); return }
+    try {
+      const base = `${window.location.origin}${import.meta.env.BASE_URL}`.replace(/\/+$/, '/')
+      const res = await fetch('/.netlify/functions/invite-employee', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ employeeId: empNN.id, mode, redirectTo: `${base}me/set-password` }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setInviteMsg({ ok: false, text: data.error || 'Failed to create the invitation.' }); return }
+      // The server linked the login; mirror it locally (whole-table saves never write userId)
+      setEmployeesState(prev => prev.map(e => e.id === empNN.id ? { ...e, userId: data.userId } : e))
+      if (mode === 'link') {
+        try {
+          await navigator.clipboard.writeText(data.inviteLink)
+          setInviteMsg({ ok: true, text: `Invite link copied for ${data.email}. Paste it into your own email or message.` })
+        } catch {
+          window.prompt('Copy this invite link:', data.inviteLink)
+          setInviteMsg({ ok: true, text: `Invite link created for ${data.email}.` })
+        }
+      } else {
+        setInviteMsg({ ok: true, text: `Invitation email sent to ${data.email}` })
+      }
+    } catch {
+      setInviteMsg({ ok: false, text: 'Network error — could not create the invitation.' })
+    } finally {
+      setInviteLoading(null)
+    }
   }
 
   function handlePhotoUpload(file: File) {
@@ -335,6 +386,8 @@ export default function EmployeeProfilePage() {
       startYear: empNN.startYear != null ? String(empNN.startYear) : '',
       status: empNN.status ?? 'Active',
       notes: empNN.notes ?? '',
+      worksFor: empNN.worksFor === 'yva' ? 'yva' : 'client',
+      manualTimeAllowed: empNN.manualTimeAllowed === true,
     })
     setAttachments(empNN.attachments ?? [])
     setEditing(false)
@@ -475,6 +528,20 @@ export default function EmployeeProfilePage() {
                     </select>
                   </div>
                   <div className="profile-field">
+                    <span className="profile-field-label">Works For</span>
+                    <select className="form-select form-input-sm" value={form.worksFor} onChange={e => setForm(f => ({...f, worksFor: e.target.value === 'yva' ? 'yva' : 'client'}))}>
+                      <option value="client">Client project (screenshots on)</option>
+                      <option value="yva">YVA team (screenshots off)</option>
+                    </select>
+                  </div>
+                  <div className="profile-field">
+                    <span className="profile-field-label">Manual Time</span>
+                    <select className="form-select form-input-sm" value={form.manualTimeAllowed ? 'on' : 'off'} onChange={e => setForm(f => ({...f, manualTimeAllowed: e.target.value === 'on'}))}>
+                      <option value="off">Off</option>
+                      <option value="on">On — can add time by hand (admin approves)</option>
+                    </select>
+                  </div>
+                  <div className="profile-field">
                     <span className="profile-field-label">Email</span>
                     <input className="form-input form-input-sm" type="email" value={form.email} onChange={e => setForm(f => ({...f, email: e.target.value}))} placeholder="email@example.com" />
                   </div>
@@ -536,6 +603,8 @@ export default function EmployeeProfilePage() {
                     { label: 'Role',            value: empNN.role },
                     { label: 'Status',          value: empNN.status || 'Active' },
                     { label: 'Employment Type', value: empNN.employmentType },
+                    { label: 'Works For',       value: empNN.worksFor === 'yva' ? 'YVA team' : 'Client project' },
+                    { label: 'Manual Time',     value: empNN.manualTimeAllowed ? 'On (admin approves)' : 'Off' },
                     { label: 'Email',           value: empNN.email },
                     { label: 'Phone',           value: empNN.phone },
                     { label: 'Pay Rate',        value: empNN.payRate ? `$${empNN.payRate}/hr` : undefined },
@@ -559,6 +628,50 @@ export default function EmployeeProfilePage() {
                 </>
               )}
             </div>
+          </div>
+
+          {/* YVA Time login */}
+          <div className="data-card">
+            <div className="data-card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              YVA Time Login
+              <span className={`badge ${empNN.userId ? 'badge-green' : 'badge-gray'}`} style={{ fontSize: 11 }}>
+                {empNN.userId ? 'Has a login' : 'Not invited'}
+              </span>
+            </div>
+            {empNN.userId ? (
+              <div style={{ color: 'var(--muted)', fontSize: 13, paddingTop: 4 }}>
+                This employee can sign in to My workspace and the YVA Time app.
+                {empNN.worksFor !== 'yva' && (
+                  <div style={{ marginTop: 6 }}>
+                    Screenshot &amp; activity notice: {consent
+                      ? <>
+                          <strong style={{ color: 'var(--text)' }}>accepted {new Date(consent.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</strong>
+                          {consent.version < 2 && ' (older notice without activity % — the app asks again after updating)'}
+                        </>
+                      : 'not accepted yet (the app asks on first use)'}
+                  </div>
+                )}
+                <EmployeeDevices employeeId={empNN.id} firstName={empNN.name.split(' ')[0]} />
+              </div>
+            ) : (
+              <>
+                <div style={{ color: 'var(--muted)', fontSize: 13, padding: '4px 0 10px' }}>
+                  Send an invitation so {empNN.name.split(' ')[0]} can set a password and use My workspace and YVA Time.
+                  {!empNN.email && ' Add an email address first.'}
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button className="btn-primary btn-sm" disabled={!empNN.email || inviteLoading !== null} onClick={() => void sendEmployeeInvite('email')}>
+                    {inviteLoading === 'email' ? 'Sending…' : <><IconLock size={12} /> Email Invite</>}
+                  </button>
+                  <button className="btn-ghost btn-sm" disabled={!empNN.email || inviteLoading !== null} onClick={() => void sendEmployeeInvite('link')}>
+                    {inviteLoading === 'link' ? 'Creating…' : <><IconLink size={12} /> Copy Invite Link</>}
+                  </button>
+                </div>
+              </>
+            )}
+            {inviteMsg && (
+              <div className={`portal-message ${inviteMsg.ok ? 'portal-message-success' : 'portal-message-error'}`} style={{ marginTop: 10 }}>{inviteMsg.text}</div>
+            )}
           </div>
 
           {/* Assigned Projects */}
@@ -659,12 +772,12 @@ export default function EmployeeProfilePage() {
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
             <button
               className="btn-ghost btn-sm"
-              disabled={empInvoices.length === 0 || !empNN.email || sending}
+              disabled={(empInvoices.length === 0 && empTracked.length === 0) || !empNN.email || sending}
               title={!empNN.email ? 'No email on file' : ''}
               onClick={async () => {
                 setSending(true)
                 try {
-                  await emailStatement(emp, empInvoices, dateFrom, dateTo)
+                  await emailStatement(emp, empInvoices, dateFrom, dateTo, empTracked)
                   showToast(`Statement sent to ${empNN.email}`)
                 } catch {
                   showToast('Failed to send — check Gmail connection in Settings')
@@ -675,11 +788,17 @@ export default function EmployeeProfilePage() {
             >
               {sending ? 'Sending…' : <><span style={{ marginRight: 5, display: 'inline-flex', verticalAlign: 'middle' }}><IconMail size={13} /></span> Email Statement</>}
             </button>
-            <button className="btn-ghost btn-sm" onClick={() => printPayslip(emp, empInvoices, dateFrom, dateTo)}
-              disabled={empInvoices.length === 0}>
+            <button className="btn-ghost btn-sm" onClick={() => printPayslip(emp, empInvoices, dateFrom, dateTo, empTracked)}
+              disabled={empInvoices.length === 0 && empTracked.length === 0}>
               <span style={{ marginRight: 5, display: 'inline-flex', verticalAlign: 'middle' }}><IconPrinter size={13} /></span> PDF Payslip
             </button>
           </div>
+
+          {trackedHours > 0 && (
+            <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 10 }}>
+              Includes <strong style={{ color: 'var(--text)' }}>{trackedHours.toFixed(2)} h</strong> of approved YVA Time work (not on client invoices).
+            </div>
+          )}
 
           {/* Invoice sections */}
           {empInvoices.length === 0 ? (

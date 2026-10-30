@@ -170,6 +170,19 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 
 ## Things Completed
 
+### Session 12 (security audit — YVA LawOS)
+- Audited `YVALAW OS/` with Semgrep (incl. Pro + Supply Chain), vibescan, TruffleHog (full git history: no secrets), Trivy and OSV-Scanner.
+- Invoice and earnings-statement HTML now escapes every value (`YVALAW OS/src/utils/html.ts`); before, a name or note containing HTML could run script in print windows/previews/attachments.
+- Stripe webhook: 5-minute signature timestamp window (replay protection) and header parsing that crafted headers can't crash.
+- Dependencies: OS `react-router-dom` 6.30.6, `vite` 6.4.5 (esbuild 0.25), transitive updates; site `sharp` 0.35.5 + build-tool updates (`npm audit` clean). React Router v7 left for later (see `YVALAW OS/CLAUDE.md`).
+- **Role lockdown:** any signup could insert its own `user_roles` row as CEO (sign-ups are on). New accounts are now `pending` until a CEO approves them in Team Access; `is_internal()` is an explicit staff-role list. Needs `YVALAW OS/supabase/migrate-role-lockdown.sql` run in Supabase.
+- `invite-client` / `create-payment-intent` check an explicit staff-role list (a `pending` account could otherwise invite clients or pay on their behalf).
+- **YVA Time Phase 0** (employee logins, see `YVALAW OS/CLAUDE.md`): employee Works For / Manual Time fields, Invite to YVA Time (`invite-employee`), employee-only **My workspace** at `/os/me` (`employee-me`), YVA OS web timer removed. Needs `YVALAW OS/supabase/migrate-yva-time-phase0.sql` run before deploy. Next: Phase 1, the Windows desktop app.
+- Portal clients could read all columns of their placed staff's employee rows via the API (pay rate, notes). The portal team now comes from the `portal-team` function (safe fields only); run `YVALAW OS/supabase/migrate-portal-employees-lockdown.sql` after deploying.
+- **YVA Time Phase 1**: Windows desktop app in `YVA Time/` (Electron), "Sign in with YVA OS" (`/os/connect-app`, `desktop-link-create` / `desktop-link-redeem`), tracker tables + private screenshots bucket (`migrate-yva-time-phase1.sql`), Time Tracking → Live / Screenshots, daily 90-day screenshot cleanup, Windows installer workflow in `.github/workflows/`. Details: `YVALAW OS/CLAUDE.md` → "YVA Time — Phase 1".
+- **YVA Time Phase 2** (`migrate-yva-time-phase2.sql`): Time Tracking → Approve (weekly approval rolls tracker time into `time_entries` → client portal hours, time log, invoices, payslips), manual time requests (My workspace ↔ Approve tab), "Import YVA Time hours" in the invoice builder, YVA-team payslips from approved hours, My workspace → My hours, app 0.2.0 (consent record, Add missing time, shift reminders). Details: `YVALAW OS/CLAUDE.md` → "YVA Time — Phase 2".
+- **YVA Time Phase 3** (`migrate-yva-time-phase3.sql`, app 0.3.0): activity % (keyboard/mouse use per 10 minutes, client team, notice shown again), Time Tracking → **Schedule** (late / left early / no time vs. profile shift), **Reopen week** on Approve, employee profile → **Computers** with Disconnect (database refuses time from a disconnected computer), automatic app updates from GitHub Releases, code signing ready to switch on. Details: `YVALAW OS/CLAUDE.md` → "YVA Time — Phase 3".
+
 ### Session 11 (content manager)
 - About section: Sam Colas removed (story, founder card, JSON-LD); Hans Henriquez → **Hans Esmel**, described as sole founder ("CEO & Founder"). Headings now "The Founder" / "Meet the Founder".
 - `/admin` round 3: scheduled blog posts; swappable pictures with automatic resizing (`build-images.js`, sharp); Home Page Top, Prices, contact email, Spanish testimonials/FAQ; Landing Pages collection (photo, testimonials, FAQ per ad page). Fixed the PI page's 4-role total ($5,990 → $6,080).

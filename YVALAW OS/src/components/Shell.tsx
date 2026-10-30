@@ -3,7 +3,6 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { loadSnapshot, loadCandidates, countPendingStaffRequests } from '../services/storage'
 import { useRole } from '../context/RoleContext'
 import { can, ROLE_LABELS } from '../lib/roles'
-import { useActiveTimer, formatElapsed, elapsedSeconds } from '../hooks/useActiveTimer'
 
 type Props = { children: ReactNode }
 
@@ -206,10 +205,8 @@ function PageTitle({ pathname }: { pathname: string }) {
 
 export default function Shell({ children }: Props) {
   const location = useLocation()
-  const navigate = useNavigate()
   const { role, email } = useRole()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const { timer, elapsed, stop } = useActiveTimer()
   const linkedEmployeeId = sessionStorage.getItem('linkedEmployeeId')
   const [pendingRequests, setPendingRequests] = useState(0)
 
@@ -322,28 +319,6 @@ export default function Shell({ children }: Props) {
           </div>
         </div>
         <div className="topbar-actions">
-          {/* Running timer pill */}
-          {timer && (
-            <div className="timer-pill">
-              <span className="timer-dot" />
-              <span className="timer-text">{formatElapsed(elapsed)}</span>
-              {timer.projectName && (
-                <span className="timer-project">· {timer.projectName}</span>
-              )}
-              <button
-                className="timer-stop-btn"
-                onClick={() => {
-                  const finished = stop()
-                  if (finished) {
-                    const hours = Math.round((elapsedSeconds(finished.startedAt) / 3600) * 100) / 100
-                    if (hours > 0) navigate('/time')
-                  }
-                }}
-              >
-                Stop
-              </button>
-            </div>
-          )}
           <GlobalSearch />
           <div className="topbar-badge">Live</div>
         </div>

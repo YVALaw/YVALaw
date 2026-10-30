@@ -95,8 +95,70 @@ CREATE POLICY "client_update_prefs" ON working_hour_prefs FOR UPDATE TO authenti
 - `client_users` table RLS: client can only read/update own row
 - `private.is_internal()` helper gates all OS data from client users at DB level
 - Separate portal-scoped read policies per table (clients, projects, invoices, employees, time_entries, client_documents, staff_requests)
-- Invite function validates caller is internal staff before creating accounts
+- Invite functions validate the caller against an explicit staff-role list (`STAFF_ROLES` / `INVITER_ROLES`), never "anything but client"
 - Service role key lives in Netlify env only — never in frontend
+- **Portal clients have no direct read on `employees`** (a row policy can't hide columns, so the old `portal_client_employees` policy exposed pay rate, notes and attachments through the API). `loadPortalEmployees(clientId)` calls `netlify/functions/portal-team.cjs`, which picks the client server-side (portal clients always get their own; staff preview may pass `clientId`), takes employee IDs from that client's projects and returns client-safe fields only. Run `supabase/migrate-portal-employees-lockdown.sql` **after** deploying this. Never re-add a client SELECT policy on `employees`.
+
+---
+
+## YVA Time — Phase 0 (employee logins) ✅ built, needs SQL + deploy
+
+Groundwork for the YVA Time Windows desktop tracker (Electron, Phase 1). Plan decisions: Windows only; clients see hours only (never screenshots); screenshots for **client-placed** staff only, about 1 per 10 min at a random moment, employee can delete within 2 min (the 10-min block is removed); YVA team screenshots off; manual time per employee with admin approval; activity % later; the YVA OS web timer is removed (desktop app is the only live tracker).
+
+- **Run `supabase/migrate-yva-time-phase0.sql` before deploying** — adds `employees.works_for` (`'client'` | `'yva'`, default `'client'`) and `employees.manual_time_allowed` (default false); marks employees linked to staff logins as `'yva'`.
+- Employee form (EmployeesPage + EmployeeProfilePage): **Works For** (Client project / YVA team) and **Manual Time** (Off / On).
+- **Employee logins:** Employee profile → **YVA Time Login** card → Email Invite / Copy Invite Link → `netlify/functions/invite-employee.cjs` (staff in `INVITER_ROLES` only; email taken from the employee record; sets `employees.user_id`; deletes the login if linking fails; user_metadata `{ role: 'employee', employee_id, must_change_password }`).
+- `AppRole` `'employee'`: RoleContext uses the metadata hint (routing only) → App routes to `/me/set-password` on first login, then **My workspace** (`src/pages/me/EmployeeWorkspace.tsx`, route `/me`). Employees never reach the internal OS, the portal or the pending queue.
+- Employees have **no direct table access** (RLS stays staff-only). Their data comes from `netlify/functions/employee-me.cjs` (GET, finds the employee by `employees.user_id` server-side, returns safe fields + assigned projects with client names — no pay rate, premium, notes or attachments). The desktop app will reuse it.
+- `employees.user_id` is written only by `linkEmployeeLogin()` (staff auto-link, only if unlinked) and `invite-employee` — `saveEmployees()` strips `userId` so a stale whole-table save can't unlink a login.
+- Web timer removed: `useActiveTimer`, top-bar timer pill and Start/Stop on Time Tracking are gone; "+ Log Manual" stays for admins.
+
+## YVA Time — Phase 1 (desktop app) ✅ built, needs SQL + deploy + first installer
+
+- **Run `supabase/migrate-yva-time-phase1.sql`** (after phase0). Adds:
+  - `tracker_blocks` — one row per employee + 10-minute block + target (`target_key` = `project:<id>` or `work:<type>`); the app upserts **absolute** seconds (retries are safe). Trigger: server timestamps + **max 600 s per employee per block** across targets.
+  - `tracker_screenshots` — one row per screen; `created_at` forced to server time. When the **employee** deletes their own screenshot (allowed **2 minutes after upload**), a trigger marks that block's rows `status = 'removed'`. Staff deletes don't change hours.
+  - private bucket **`screenshots`** (`<employee_id>/<yyyy-mm-dd>/<id>-<monitor>.jpg`, JPEG, 3 MB max).
+  - `desktop_link_codes` — sign-in codes; RLS on, no policies (service role only).
+  - Helpers `private.current_employee_id()`, `current_employee_is_yva()`, `employee_on_project(uuid)`, `can_view_screenshots()` (CEO/Admin).
+- **RLS rules:** employees write only their own blocks, for projects they're on (client team) or YVA work types (YVA team), `source='desktop'`, `status='tracked'`, block within the last 7 days and not in the future; they can't approve/remove. Staff (`is_internal`) read/write all blocks. **Screenshots (rows + files): CEO/Admin only**, plus the employee's own. Clients: nothing (hours only — Phase 2 rollup into `time_entries`). Tested on a local Postgres with Supabase stand-ins (35 checks).
+- **Sign in with YVA OS** (no password in the app): app makes a PKCE verifier/challenge → opens `/os/connect-app?challenge&state` → person clicks Connect → `desktop-link-create` (logins linked to an employee only) returns a 5-minute one-time code (only its sha256 is stored) → page opens `yvatime://auth?code&state` (or shows the code to paste) → app calls `desktop-link-redeem` with code + verifier → gets a magic-link `token_hash` + Supabase URL/anon key → `verifyOtp` gives the app **its own** session (encrypted with Windows DPAPI). `/connect-app` survives the login screen (`src/lib/connectApp.ts`). Functions need `VITE_SUPABASE_ANON_KEY` (or `SUPABASE_ANON_KEY`) in Netlify env.
+- **Desktop app:** `../YVA Time/` (Electron 44 + React; see its README). Client team: projects + screenshots at a random moment in each 10-minute block (all monitors, ≤1600 px JPEG), shown in the app with a 2-minute Delete. YVA team: work types (`WORK_TYPES` in `src/main/config.ts`) + any assigned projects, no screenshots. Idle: every second without input is held aside; input within 5 min counts it, 5+ min asks Keep/Remove. Break, offline queue (saved locally, uploaded every minute), tray icon (green/orange/grey), starts with Windows, closes to tray. First-run notice for the client team (consent stored locally; server record = Phase 2). Verified: 15 engine unit tests + an Electron end-to-end run under Xvfb against a fake backend (27 checks: sign-in incl. wrong-state refusal, screenshot capture/upload/delete, idle, offline, YVA team).
+- **Admin:** Time Tracking → **Live** (CEO/Admin/Accounting: who is tracking now — a block updated in the last 3 min — today's hours, current project + note) and **Screenshots** (CEO/Admin: employee + day, hour rows of six 10-minute cells, signed URLs, full-size view, delete).
+- **Retention:** `purge-old-screenshots.mjs` runs daily (netlify.toml) and deletes screenshots older than 90 days (files, then rows). The app's notice promises this.
+- **Installer:** `.github/workflows/yva-time-windows.yml` builds `YVA-Time-Setup.exe` on windows-latest (Run workflow → artifact; tag `yva-time-v*` → GitHub Release). Then set Netlify `VITE_YVA_TIME_DOWNLOAD_URL=https://github.com/YVALaw/YVALaw/releases/latest/download/YVA-Time-Setup.exe` to show the Download button in My workspace. Code signing + auto-updates: Phase 3.
+
+## YVA Time — Phase 2 (approvals → money flow) ✅ built, needs SQL + deploy
+
+- **Run `supabase/migrate-yva-time-phase2.sql`** (after phase1). Adds:
+  - `time_entries.source` (`manual` | `tracker`), `tracker_key` (unique), `approved_by`, `approved_at`. **Approved tracker time is rolled up into `time_entries`** — one row per employee + day + project/work type (`tracker_key = employee|day|target_key`), `billable = true` for client projects. So the client portal (hours only, via the existing portal policy), the time log, invoices and payslips all read the same numbers.
+  - `tracker_blocks` unique key is now `(employee_id, block_start, target_key, source)` (desktop and manual rows side by side; the app upserts with that key and only reads back `source = 'desktop'`). The 600 s cap counts tracked + pending + approved.
+  - `manual_time_requests` — employees with `manual_time_allowed` request missing time (last 14 days, ≤ 12 h, their projects or YVA work types); they can cancel while pending.
+  - `tracker_consents` — the app records when the screenshot notice was accepted (shown on the employee profile).
+  - **Functions (SECURITY INVOKER, CEO/Admin/Accounting only):** `yva_time_approve(employee, from, to, tz)` marks tracked blocks approved (finished days only — not today) and calls `yva_time_rollup` (rebuilds the day totals; idempotent). `yva_time_decide_request(request, approve, note, tz)` splits approved manual time into 10-minute blocks, **clipped to the room left in each block** (never double-counts tracked time), then rolls up. Tested on local Postgres (36 checks).
+- **Time Tracking → Approve** (CEO/Admin/Accounting): week grid per employee (hours/day, ● = not approved yet), **Approve** = Monday → yesterday of that week; manual requests with Approve / Reject (reject asks for a reason the employee sees). Days are counted in the admin's browser time zone (`LOCAL_TZ`).
+- **Time log:** YVA Time rows are read-only (badge, no edit/delete) and the page saves **one entry at a time** (`upsertTimeEntry` / `deleteTimeEntry`, never the whole-table `syncAll`, which could delete server-written rows). It reloads when you come back from another tab.
+- **Invoice builder → "Import YVA Time hours"** (needs a project + billing period): fills the daily grid from approved hours, written as `h:mm` (`hoursToHM`) because the grid reads `7.25` as 7 h 25 min; asks before overwriting typed hours.
+- **Payslips:** `trackedPayEntries()` (`src/utils/trackedPay.ts`) adds approved **non-billable** tracker hours (YVA team work types) × pay rate to statements/payslips on both the Team page and the employee profile. Client-project hours stay paid through invoices (no double pay). No premium split for these hours yet.
+- **My workspace:** **My hours** (this/last week by day, approved vs not) and **Add missing time** (form + my requests with status / YVA's note / Cancel) when Manual Time is on. Work types: `src/lib/yvaTime.ts` — keep identical to `YVA Time/src/main/config.ts`.
+- **Desktop app 0.2.0:** records consent (retried until saved), "Add missing time" menu item (opens `/os/me#manual`, only when allowed), Windows shift reminders from the profile's shift times (start: not tracking 10–60 min after a weekday shift starts; end: still tracking 30 min – 6 h after it ends; once per shift; overnight shifts supported — `src/main/reminders.ts`, unit-tested). App ID set for Windows notifications.
+- Phase 3 (below) added activity %, the schedule report, computers/disconnect, reopen and auto-updates.
+
+## YVA Time — Phase 3 (activity, schedule, computers, updates) ✅ built, needs SQL + deploy + installer
+
+- **Run `supabase/migrate-yva-time-phase3.sql`** (after phase2). **YVA Time 0.2.0 can no longer save time after this** — install 0.3.0+. Adds:
+  - `tracker_blocks.active_seconds` (seconds with keyboard/mouse use — only *whether* there was input, never what; client team only, `NULL` for the YVA team and manual time), `first_offset` / `last_offset` (first/last counted second inside the block, 0–599). Checks: active ≤ seconds, first ≤ last.
+  - `tracker_consents.notice_version` (2 = screenshots + activity; `NULL` = 1). The app shows the notice again to anyone who accepted version 1.
+  - `desktop_devices` — one row per computer sign-in, created by `desktop-link-redeem` with the app's login **session id** (JWT claim `session_id`). Employees can only read their own and update `app_version` / `signed_out_at` (column grants + trigger keep `last_seen_at` / `signed_out_at` on server time); staff read all. **`private.current_desktop_session_ok()`** — the request's session belongs to a connected, not-signed-out computer of this login — is now required for employee inserts/updates of `tracker_blocks`, `tracker_screenshots` rows and `screenshots` bucket uploads.
+  - `public.yva_time_disconnect_device(device, by)` — **service role only**: sets `revoked_at/by` and deletes that `auth.sessions` row (refresh token dies).
+  - `public.yva_time_reopen(employee, from, to, tz)` — CEO/Admin/Accounting: approved blocks → `tracked`, removes the rolled-up `time_entries` (refused if any are `invoiced`). Re-approving works as before.
+  - `yva_time_decide_request` now also writes first/last second for approved manual time.
+  - Tested on local Postgres with Supabase stand-ins (`auth.jwt()`, `auth.sessions`, service role): 55 checks.
+- **Sign-in change:** `desktop-link-redeem` now verifies the magic-link token **server-side** (`POST /auth/v1/verify`), records the computer (name, platform, app version) and returns the session + `deviceId`; the app calls `setSession`. If the computer can't be recorded, that session is ended again. **`desktop-device-revoke`** (CEO/Admin/Accounting) calls the disconnect function. 21 function checks against a fake Supabase.
+- **Desktop app 0.3.0:** counts active seconds and first/last second per block (unit-tested, 27 engine tests); every sync starts with a **check-in** (update its `desktop_devices` row) — if YVA disconnected the computer the app signs itself out ("YVA disconnected this computer…", local time kept), if it was signed in by 0.2.0 it asks to sign in again; Sign out marks the computer signed out. Shows the employee their own **Activity %** today (client team). **Automatic updates** (`src/main/updater.ts`, electron-updater from this repo's GitHub Releases: checks 30 s after start and every 4 h, downloads in the background, "Restart to update" banner, otherwise installs on quit; the quit path now ends with `app.quit()` so that works). Electron 44.9.3 (fixes the eMudhra certificate advisory). Installer settings moved to `electron-builder.config.cjs`; **code signing switches on by itself** once Azure Trusted Signing (or a certificate file) secrets/variables exist — see `YVA Time/README.md`. Workflow checks the tag matches `package.json` and publishes `latest.yml` + `.blockmap` with the installer. End-to-end run under Xvfb against a fake backend: 50 checks.
+- **Time Tracking:** **Schedule** tab (CEO/Admin/Accounting) — per person per weekday: first–last tracked moment, hours, and On time / Late Xm / Left Xm early / No time / Only outside shift hours / On shift, using the profile's Default shift (Mon–Fri, viewer's time zone, "Allow 0/5/10/15 min" grace; overnight shifts grouped into one work day starting 4 h before the shift; logic in `src/utils/schedule.ts`, 8 tests incl. DST). Weekend columns only when someone worked them. **Activity %** on Live (today), Approve (week, under the hours) and Screenshots (day + each 10-minute cell): green 60%+, amber 30–59%, red under 30%. **Approve → Reopen week** for approved hours.
+- **Employee profile → YVA Time Login:** notice version, and **Computers** (name, app version, online now / last seen / signed out / disconnected) with **Disconnect** (CEO/Admin/Accounting, `can.manageDevices`).
+- **Release:** bump `YVA Time/package.json` version, push tag `yva-time-v<version>`; installed apps update themselves.
 
 ---
 
@@ -426,6 +488,7 @@ All data is scoped to the authenticated user via Supabase RLS.
 | `/portal` | PortalPage | Read-only client-facing invoice view (outside Shell, no nav) |
 | `/oauth-callback` | OAuthCallbackPage | Handles Google OAuth2 redirect after Gmail authorization (outside Shell) |
 | `/login` | LoginPage | Email/password login + sign-up toggle + Remember Me |
+| `/me` | EmployeeWorkspace | Invited employees only (outside Shell): YVA Time info, assigned projects, own details — via `employee-me` |
 
 ## Profile Page Architecture
 - All entity list pages (Clients, Employees, Projects, Candidates) navigate to profile routes on card click
@@ -690,7 +753,7 @@ Also shows: Employee Performance table, Revenue by Client/Project, All-Time Clie
 - [x] **Estimates page** — full estimates pipeline at `/estimates`; line-item builder with qty/unit price; status lifecycle (draft→sent→accepted/declined/expired); right-side slide panel; convert-to-invoice button (accepted estimates); KPI summary cards
 - [x] **Time Tracking page** — time log at `/time`; per-employee/project entry; billable toggle; date range + employee + project filters; KPI cards (total/billable/unbillable hours + billable %); right-side slide panel
 - [x] **Recurring Invoices tab** — tab in InvoicePage at `/invoice`; create/edit recurring schedules (weekly/biweekly/monthly); active/pause/delete; linked to client + project; right-side slide panel
-- [x] **Live Timer (Time Tracking)** — global start/stop punch clock stored in localStorage; runs across all pages in the topbar; auto-creates time entry on stop; pre-fills logged-in employee; `src/hooks/useActiveTimer.ts`
+- [x] ~~**Live Timer (Time Tracking)**~~ — removed 2026-10-30; live tracking moves to the YVA Time desktop app (see "YVA Time — Phase 0")
 - [x] **Employee auto-link** — on login, matches user email to Employee record → writes `userId` → shows "My Profile" link in sidebar; auto-clears on sign-out
 - [x] **Employee profile — Time Log section** — shows time entries for that employee (KPI cards + table), loaded from `time_entries` table
 - [x] **Tags/Labels** — `Client.tags: string[]`, `Project.tags: string[]`, `Invoice.tags: string[]`; `TagBadge` + `TagInput` components; `tagStorage.ts`; shown on client/project cards and forms
@@ -749,7 +812,8 @@ When the new Supabase project is set up, create these tables in addition to exis
   ```
 
 ### Role system (`src/lib/roles.ts`)
-- Roles: `ceo` | `admin` | `accounting` | `recruiter` | `lead_gen`
+- Roles: `ceo` | `admin` | `accounting` | `recruiter` | `lead_gen` (staff, `isStaff()`), plus `client` (portal) and `pending`
+- **New accounts start as `pending`** (no access, "waiting for approval" screen) — a CEO picks the real role in Settings → Team Access. The database only allows a self-insert of `pending` (`user_roles_self_insert_pending`); `private.is_internal()` is an explicit list of the 5 staff roles, so `pending`/`client`/future roles never get internal data. Run `supabase/migrate-role-lockdown.sql` on existing databases. **Never** re-add a self-insert policy without the `role = 'pending'` check (before 2026-10-30 any signup could make itself CEO).
 - `can.viewOwnerStats(role)` → CEO only — gates all revenue/financial data
 - `can.manageRoles(role)` → CEO only
 - Role stored in `user_roles` table; cached in `sessionStorage` to prevent flicker; cleared on `SIGNED_OUT` auth event
@@ -765,6 +829,9 @@ When the new Supabase project is set up, create these tables in addition to exis
 - **Team size:** ~100 members
 
 ## Key Constraints
+- HTML built as a string (`invoiceHtml.ts`, `statementHtml.ts`, print windows, previews, email attachments) must pass every stored/typed value through `escapeHtml()` from `src/utils/html.ts` — names, notes and addresses must never become tags or scripts. The invoice preview `<iframe>` is `sandbox=""`.
+- `stripe-webhook.cjs` rejects events whose signature timestamp is more than 5 minutes old (replay protection, same as Stripe's libraries).
+- React Router stays on 6.30.x for now: its two remaining advisories are fixed only in v7 and don't apply here (no SSR, no navigation targets taken from the URL). Upgrade to v7 as its own task.
 - No npm UI libraries — keep CSS self-contained
 - Logo at `/public/yva-logo.png`
 - Legacy builder at `/public/legacy/` — kept for reference but no longer used in app

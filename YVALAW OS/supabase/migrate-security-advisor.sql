@@ -35,7 +35,7 @@ AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.user_roles
     WHERE user_id::text = auth.uid()::text
-    AND   role   != 'client'
+    AND   role IN ('ceo', 'admin', 'accounting', 'recruiter', 'lead_gen')
   )
 $$;
 
@@ -180,16 +180,9 @@ CREATE POLICY "portal_client_invoices" ON invoices
   );
 
 DROP POLICY IF EXISTS "portal_client_employees" ON employees;
-CREATE POLICY "portal_client_employees" ON employees
-  FOR SELECT TO authenticated
-  USING (
-    private.is_portal_client()
-    AND id::text IN (
-      SELECT jsonb_array_elements_text(COALESCE(employee_ids, '[]'::jsonb))
-      FROM   public.projects
-      WHERE  client_id::uuid = private.portal_client_id()
-    )
-  );
+-- No portal read policy on employees: a row policy can't hide columns, so clients
+-- could read pay rate / notes / attachments. The portal gets its team (safe fields)
+-- from the portal-team Netlify function instead. See migrate-portal-employees-lockdown.sql.
 
 -- time_entries
 DROP POLICY IF EXISTS "internal_all" ON time_entries;

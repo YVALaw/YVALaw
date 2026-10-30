@@ -5,6 +5,7 @@
  */
 
 import type { Invoice } from '../data/types'
+import { escapeHtml as esc } from './html'
 import { formatMoney } from './money'
 
 export interface InvoiceHtmlOptions {
@@ -78,11 +79,11 @@ export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): s
         return '<td style="text-align:center;font-size:11px;color:' + (h > 0 ? '#111' : '#ccc') + '">' +
           (h > 0 ? (h % 1 === 0 ? String(h) : h.toFixed(1)) : '—') + '</td>'
       }).join('')
-      return '<tr><td style="white-space:nowrap"><strong>' + it.employeeName + '</strong>' +
-        (it.position ? '<br><span style="font-size:10px;color:#888">' + it.position + '</span>' : '') +
+      return '<tr><td style="white-space:nowrap"><strong>' + esc(it.employeeName) + '</strong>' +
+        (it.position ? '<br><span style="font-size:10px;color:#888">' + esc(it.position) + '</span>' : '') +
         '</td>' + dayCells +
-        '<td style="text-align:right;font-weight:700;white-space:nowrap">' + it.hoursTotal + 'h</td>' +
-        '<td style="text-align:right;white-space:nowrap">$' + it.rate + '/hr</td>' +
+        '<td style="text-align:right;font-weight:700;white-space:nowrap">' + esc(it.hoursTotal) + 'h</td>' +
+        '<td style="text-align:right;white-space:nowrap">$' + esc(it.rate) + '/hr</td>' +
         '<td style="text-align:right;font-weight:700;white-space:nowrap">$' + (it.hoursTotal * it.rate).toFixed(2) + '</td></tr>'
     }).join('')
     const colSpan = allDates.length + 3
@@ -98,10 +99,10 @@ export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): s
     ${dop ? `<div class="dop">${dop}</div>` : ''}`
   } else {
     const bodyRows = (inv.items || []).map(it =>
-      '<tr><td><strong>' + it.employeeName + '</strong>' +
-      (it.position ? '<br><span style="font-size:11px;color:#888">' + it.position + '</span>' : '') +
-      '</td><td style="text-align:right">' + it.hoursTotal + 'h</td>' +
-      '<td style="text-align:right">$' + it.rate + '/hr</td>' +
+      '<tr><td><strong>' + esc(it.employeeName) + '</strong>' +
+      (it.position ? '<br><span style="font-size:11px;color:#888">' + esc(it.position) + '</span>' : '') +
+      '</td><td style="text-align:right">' + esc(it.hoursTotal) + 'h</td>' +
+      '<td style="text-align:right">$' + esc(it.rate) + '/hr</td>' +
       '<td style="text-align:right"><strong>$' + (it.hoursTotal * it.rate).toFixed(2) + '</strong></td></tr>'
     ).join('')
     itemsSection = `
@@ -115,7 +116,7 @@ export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): s
   }
 
   return `<!DOCTYPE html><html><head>
-    <title>${inv.number}</title>
+    <title>${esc(inv.number)}</title>
     <style>
       body { font-family: Arial, sans-serif; max-width: 720px; margin: 40px auto; color: #111; }
       .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; }
@@ -141,35 +142,35 @@ export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): s
       <div>
         <img src="${window.location.origin}${import.meta.env.BASE_URL}yva-logo.png" class="logo" onerror="this.style.display='none'" />
         <div class="from-info">
-          <div><strong>${companyName}</strong></div>
-          <div>${companyAddress}</div>
-          <div>${companyEmail}</div>
-          <div>${companyPhone}</div>
+          <div><strong>${esc(companyName)}</strong></div>
+          <div>${esc(companyAddress)}</div>
+          <div>${esc(companyEmail)}</div>
+          <div>${esc(companyPhone)}</div>
         </div>
       </div>
       <div style="text-align:right">
         <div class="inv-title">INVOICE</div>
-        <div class="inv-num">${inv.number}</div>
+        <div class="inv-num">${esc(inv.number)}</div>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-bottom:32px">
       <div class="section">
         <div class="label">Bill To</div>
-        <div class="value">${inv.clientName || '—'}</div>
-        ${inv.clientEmail  ? `<div style="font-size:13px;color:#666">${inv.clientEmail}</div>`  : ''}
-        ${inv.clientAddress ? `<div style="font-size:13px;color:#666;white-space:pre-line">${inv.clientAddress}</div>` : ''}
+        <div class="value">${esc(inv.clientName || '—')}</div>
+        ${inv.clientEmail  ? `<div style="font-size:13px;color:#666">${esc(inv.clientEmail)}</div>`  : ''}
+        ${inv.clientAddress ? `<div style="font-size:13px;color:#666;white-space:pre-line">${esc(inv.clientAddress)}</div>` : ''}
       </div>
       <div class="section">
         <div class="label">Invoice Details</div>
-        <div class="value">${inv.date || '—'}</div>
-        ${inv.dueDate     ? `<div style="font-size:13px;color:#c00"><strong>Due: ${inv.dueDate}</strong></div>` : ''}
-        ${inv.billingStart ? `<div style="font-size:13px;color:#666">Period: ${inv.billingStart} – ${inv.billingEnd || ''}</div>` : ''}
-        ${inv.projectName  ? `<div style="font-size:13px;color:#666">Project: ${inv.projectName}</div>` : ''}
+        <div class="value">${esc(inv.date || '—')}</div>
+        ${inv.dueDate     ? `<div style="font-size:13px;color:#c00"><strong>Due: ${esc(inv.dueDate)}</strong></div>` : ''}
+        ${inv.billingStart ? `<div style="font-size:13px;color:#666">Period: ${esc(inv.billingStart)} – ${esc(inv.billingEnd || '')}</div>` : ''}
+        ${inv.projectName  ? `<div style="font-size:13px;color:#666">Project: ${esc(inv.projectName)}</div>` : ''}
       </div>
     </div>
     ${itemsSection}
-    ${inv.notes ? `<div class="notes-box">${inv.notes}</div>` : ''}
-    <div class="footer">${companyName} · yvastaffing.net</div>
+    ${inv.notes ? `<div class="notes-box">${esc(inv.notes)}</div>` : ''}
+    <div class="footer">${esc(companyName)} · yvastaffing.net</div>
     ${autoPrint ? '<script>window.onload = function(){ window.print(); }</script>' : ''}
     </body></html>`
 }

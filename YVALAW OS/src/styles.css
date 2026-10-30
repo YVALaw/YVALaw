@@ -1703,6 +1703,10 @@ input, select, textarea { font-family: inherit; }
   overflow: hidden;
 }
 
+/* ── YVA Time: one hour = six 10-minute blocks (Time Tracking → Screenshots) ── */
+.tracker-hour-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 900px) { .tracker-hour-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+
 /* ── Layout utilities ── */
 .flex { display: flex; }
 .flex-col { display: flex; flex-direction: column; }

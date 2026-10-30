@@ -4,3 +4,8 @@ os/
 node_modules/
 blog/
 assets/img/site/
+
+# YVA Time desktop app
+YVA Time/node_modules/
+YVA Time/dist/
+YVA Time/release/

@@ -32,11 +32,14 @@ import PortalDocuments from './pages/portal/PortalDocuments'
 import PortalSettings from './pages/portal/PortalSettings'
 import RequestsPage from './pages/RequestsPage'
 import PortalSetPassword from './pages/portal/PortalSetPassword'
-import { loadSettings, saveSettings, loadInvoices, loadEmployees, saveEmployees } from './services/storage'
+import EmployeeWorkspace from './pages/me/EmployeeWorkspace'
+import ConnectAppPage from './pages/ConnectAppPage'
+import { afterLoginPath, rememberConnectReturn } from './lib/connectApp'
+import { loadSettings, saveSettings, loadInvoices, loadEmployees, linkEmployeeLogin } from './services/storage'
 import { RoleProvider, useRole } from './context/RoleContext'
 import { ToastProvider } from './context/ToastContext'
 import type { UserRole } from './lib/roles'
-import { can } from './lib/roles'
+import { can, isStaff } from './lib/roles'
 
 // ── Shared loading screen ────────────────────────────────────────────────────
 
@@ -45,6 +48,26 @@ function LoadingScreen() {
     <div className="loading-screen">
       <div className="loading-spinner" />
       <div className="loading-text">Loading YVA LawOS…</div>
+    </div>
+  )
+}
+
+// ── Not logged in: go to /login, remembering a desktop-app connect request ────
+
+function LoginRedirect() {
+  const location = useLocation()
+  rememberConnectReturn(location.pathname, location.search)
+  return <Navigate to="/login" replace />
+}
+
+// ── Waiting for access (new account without a staff role yet) ───────────────
+
+function PendingAccess() {
+  return (
+    <div className="loading-screen">
+      <div className="loading-text">Your account is waiting for approval.</div>
+      <div className="loading-text">A YVA admin needs to give you access before you can use YVA LawOS.</div>
+      <button className="btn-ghost" onClick={() => void supabase.auth.signOut()}>Sign out</button>
     </div>
   )
 }
@@ -79,6 +102,33 @@ function AuthenticatedRouter() {
   const location = useLocation()
 
   if (loading) return <LoadingScreen />
+
+  // ── YVA Time desktop sign-in — employees and staff (the code is only issued
+  //    to logins linked to an employee record; desktop-link-create checks) ──────
+  if (location.pathname === '/connect-app' && !mustChangePassword && (role === 'employee' || isStaff(role))) {
+    return <ConnectAppPage />
+  }
+
+  // ── Employee workspace — invited employees never see the internal OS ───────
+  if (role === 'employee') {
+    if (mustChangePassword) {
+      return (
+        <Routes>
+          <Route path="/me/set-password" element={<PortalSetPassword title="Welcome to YVA" next="/me" />} />
+          <Route path="*" element={<Navigate to="/me/set-password" replace />} />
+        </Routes>
+      )
+    }
+    return (
+      <Routes>
+        <Route path="/me" element={<EmployeeWorkspace />} />
+        <Route path="*"   element={<Navigate to="/me" replace />} />
+      </Routes>
+    )
+  }
+
+  // ── Pending / unknown role — no OS or portal until a CEO assigns a role ────
+  if (!isStaff(role) && role !== 'client') return <PendingAccess />
 
   // ── Preview portal — internal user viewing as a client ─────────────────────
   const previewClientId = new URLSearchParams(location.search).get('preview')
@@ -164,9 +214,9 @@ async function autoLinkEmployee(userId: string, userEmail: string) {
     if (linked) sessionStorage.setItem('linkedEmployeeId', linked.id)
     return
   }
-  const match = employees.find(e => e.email?.toLowerCase() === email)
+  const match = employees.find(e => e.email?.toLowerCase() === email && !e.userId)
   if (match) {
-    await saveEmployees(employees.map(e => e.id === match.id ? { ...e, userId } : e))
+    await linkEmployeeLogin(match.id, userId)
     sessionStorage.setItem('linkedEmployeeId', match.id)
   } else {
     sessionStorage.removeItem('linkedEmployeeId')
@@ -232,13 +282,13 @@ export default function App() {
         <Route path="/oauth-callback" element={<OAuthCallbackPage />} />
 
         {/* ── Auth pages: redirect away if already logged in ── */}
-        <Route path="/login"          element={session ? <Navigate to="/"   replace /> : <LoginPage />} />
+        <Route path="/login"          element={session ? <Navigate to={afterLoginPath()} replace /> : <LoginPage />} />
         <Route path="/xDdasQwd24zaQ"  element={session ? <Navigate to="/"   replace /> : <SignupPage />} />
 
         {/* ── Protected: all authenticated routes ── */}
         <Route path="/*" element={
           !session
-            ? <Navigate to="/login" replace />
+            ? <LoginRedirect />
             : (
               <RoleProvider>
                 <AuthenticatedRouter />

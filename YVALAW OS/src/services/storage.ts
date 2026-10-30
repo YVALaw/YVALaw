@@ -49,7 +49,7 @@ function toSnake(obj: Record<string, unknown>): Record<string, unknown> {
 
 async function fetchAll<T>(table: string): Promise<T[]> {
   const { data, error } = await supabase.from(table).select('*').order('created_at')
-  if (error) { console.error(`fetchAll(${table})`, error); return [] }
+  if (error) { console.error('fetchAll(%s)', table, error); return [] }
   return (data || []).map(row => toCamel<T>(row as Record<string, unknown>))
 }
 
@@ -96,7 +96,17 @@ export async function loadEmployees(): Promise<Employee[]> {
   return fetchAll<Employee>('employees')
 }
 export async function saveEmployees(employees: Employee[]): Promise<void> {
-  invalidateSnapshotCache(); return syncAll('employees', employees)
+  // userId (the login link) is never written by a whole-table save — a stale list
+  // must not unlink a login. It is set by linkEmployeeLogin or the invite-employee function.
+  const rows = employees.map(e => { const row = { ...e }; delete row.userId; return row })
+  invalidateSnapshotCache(); return syncAll('employees', rows)
+}
+
+/** Link an employee record to a login, only if it is not linked yet */
+export async function linkEmployeeLogin(employeeId: string, userId: string): Promise<void> {
+  invalidateSnapshotCache()
+  const { error } = await supabase.from('employees').update({ user_id: userId }).eq('id', employeeId).is('user_id', null)
+  if (error) console.error('linkEmployeeLogin failed', error)
 }
 
 // ─── Clients ──────────────────────────────────────────────────────────────────
@@ -343,8 +353,19 @@ export async function saveEstimates(estimates: Estimate[]): Promise<void> {
 export async function loadTimeEntries(): Promise<TimeEntry[]> {
   return fetchAll<TimeEntry>('time_entries')
 }
-export async function saveTimeEntries(entries: TimeEntry[]): Promise<void> {
-  return syncAll('time_entries', entries)
+// One entry at a time — never a whole-table sync: approved YVA Time hours are written
+// server-side (yva_time_approve), and a stale list must not delete them.
+export async function upsertTimeEntry(entry: TimeEntry): Promise<void> {
+  const row = toSnake(entry as unknown as Record<string, unknown>)
+  delete row['created_at']
+  for (const key of Object.keys(row)) if (row[key] === '') row[key] = null
+  const { error } = await supabase.from('time_entries').upsert(row)
+  if (error) throw new Error(`upsertTimeEntry failed: ${error.message}`)
+}
+
+export async function deleteTimeEntry(id: string): Promise<void> {
+  const { error } = await supabase.from('time_entries').delete().eq('id', id).neq('source', 'tracker')
+  if (error) throw new Error(`deleteTimeEntry failed: ${error.message}`)
 }
 
 // ─── Recurring Invoices ───────────────────────────────────────────────────────

@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { IconCheck } from '../../components/Icon'
 
-export default function PortalSetPassword() {
+/** First-login password screen — used by portal clients and invited employees */
+export default function PortalSetPassword({ title = 'Welcome to YVA Portal', next = '/portal/dashboard' }: { title?: string; next?: string }) {
   const navigate              = useNavigate()
   const [password, setPass]   = useState('')
   const [confirm,  setConf]   = useState('')
@@ -37,7 +38,7 @@ export default function PortalSetPassword() {
       return
     }
 
-    navigate('/portal/dashboard', { replace: true })
+    navigate(next, { replace: true })
   }
 
   function strengthBar() {
@@ -89,7 +90,7 @@ export default function PortalSetPassword() {
             <span style={{ fontSize: 22, fontWeight: 900, color: '#1b1e2b' }}>Y</span>
           </div>
           <div style={{ fontSize: 26, fontWeight: 900, color: 'var(--text)', letterSpacing: '-.02em' }}>
-            Welcome to YVA Portal
+            {title}
           </div>
           <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 5 }}>
             Set your password to activate your account

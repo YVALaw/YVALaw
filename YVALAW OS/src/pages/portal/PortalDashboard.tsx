@@ -84,7 +84,7 @@ export default function PortalDashboard() {
       setInvoices(invs)
 
       const [emps, entries] = await Promise.all([
-        loadPortalEmployees(projs),
+        loadPortalEmployees(clientId),
         loadPortalTimeEntries(projs.map(p => p.id)),
       ])
       setEmployees(emps)

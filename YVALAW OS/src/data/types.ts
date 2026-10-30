@@ -12,7 +12,9 @@ export type Attachment = {
 export type Employee = {
   id: string
   name: string
-  userId?: string          // Supabase auth user ID — set when employee signs up
+  userId?: string          // Supabase auth user ID — set by linkEmployeeLogin / invite-employee only
+  worksFor?: 'client' | 'yva'   // YVA Time: placed under a client project (screenshots) or YVA team; missing = 'client'
+  manualTimeAllowed?: boolean   // YVA Time: may add time by hand (needs admin approval)
   employeeNumber?: string
   email?: string
   phone?: string
@@ -272,6 +274,9 @@ export type TimeEntry = {
   billable: boolean
   invoiced?: boolean
   createdAt?: number
+  source?: 'manual' | 'tracker'  // tracker = approved YVA Time hours (read-only in the time log)
+  trackerKey?: string
+  approvedAt?: string
 }
 
 // ─── Recurring Invoices ───────────────────────────────────────────────────────

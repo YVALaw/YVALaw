@@ -14,10 +14,13 @@
  *
  * Security:
  *   - Caller must provide a valid Supabase session token (Authorization header)
- *   - Caller must be an internal user (in user_roles with a non-client role)
+ *   - Caller must be internal staff (user_roles role in STAFF_ROLES — not client/pending)
  *   - Client account is created with must_change_password: true in user_metadata
  *   - client_users row is inserted linking the new auth user to the client record
  */
+
+// Same list as private.is_internal() — 'client', 'pending' and anything else are not staff
+const STAFF_ROLES = new Set(['ceo', 'admin', 'accounting', 'recruiter', 'lead_gen'])
 
 function json(statusCode, body) {
   return {
@@ -94,7 +97,7 @@ exports.handler = async function handler(event) {
     return json(401, { error: 'Could not identify caller' })
   }
 
-  // Check caller is an internal staff member (in user_roles with non-client role)
+  // Check caller is an internal staff member
   const roleCheckRes = await fetch(
     `${supabaseUrl}/rest/v1/user_roles?user_id=eq.${callerId}&select=role`,
     {
@@ -113,7 +116,7 @@ exports.handler = async function handler(event) {
   const roleRows = await roleCheckRes.json()
   const callerRole = roleRows?.[0]?.role
 
-  if (!callerRole || callerRole === 'client') {
+  if (!STAFF_ROLES.has(callerRole)) {
     return json(403, { error: 'Only internal staff can invite clients' })
   }
 

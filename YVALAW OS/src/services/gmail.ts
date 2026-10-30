@@ -184,8 +184,9 @@ function encodeMimeHeader(value: string): string {
   return `=?UTF-8?B?${utf8ToBase64(value)}?=`
 }
 
-function wrapBase64(value: string, width = 76): string {
-  return value.match(new RegExp(`.{1,${width}}`, 'g'))?.join('\r\n') ?? value
+// RFC 2045: base64 lines of at most 76 characters
+function wrapBase64(value: string): string {
+  return value.match(/.{1,76}/g)?.join('\r\n') ?? value
 }
 
 function buildRaw(to: string, subject: string, body: string, from: string): string {

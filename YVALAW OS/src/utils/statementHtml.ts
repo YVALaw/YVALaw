@@ -1,4 +1,5 @@
-import type { Employee, Invoice } from '../data/types'
+import type { Employee, Invoice, TimeEntry } from '../data/types'
+import { escapeHtml as esc } from './html'
 import { employeePremiumConfig, payrollFromInvoiceItem } from './payroll'
 
 function getEmployeeInvoiceItems(emp: Employee, inv: Invoice) {
@@ -28,12 +29,14 @@ export function buildStatementHTML(
   dateTo: string,
   dopRate: number,
   autoPrint = false,
+  tracked: TimeEntry[] = [],   // approved YVA Time hours not billed on client invoices (YVA team)
 ): string {
   const payRate   = Number(emp.payRate) || 0
   const premiumConfig = employeePremiumConfig(emp)
   const summary = summarizeEmployeeInvoices(emp, empInvoices)
-  const totalHours = summary.hours
-  const totalUSD  = summary.totalPay
+  const trackedHours = tracked.reduce((s, t) => s + (Number(t.hours) || 0), 0)
+  const totalHours = summary.hours + trackedHours
+  const totalUSD  = summary.totalPay + trackedHours * payRate
   const totalDOP  = dopRate > 0 ? totalUSD * dopRate : 0
 
   function ph(v: string): number {
@@ -70,7 +73,7 @@ export function buildStatementHTML(
         allDates = Object.keys(daily).filter(d => ph(daily[d]) > 0).sort()
       }
     }
-    const label = '<div style="font-size:11px;margin-bottom:6px"><strong style="font-size:13px">' + inv.number + '</strong>&nbsp;&middot;&nbsp;' + (inv.projectName||'—') + '&nbsp;&middot;&nbsp;<span style="color:#999">' + invPeriod + '</span></div>'
+    const label = '<div style="font-size:11px;margin-bottom:6px"><strong style="font-size:13px">' + esc(inv.number) + '</strong>&nbsp;&middot;&nbsp;' + esc(inv.projectName||'—') + '&nbsp;&middot;&nbsp;<span style="color:#999">' + esc(invPeriod) + '</span></div>'
     if (allDates.length > 0 && daily) {
       const dateHeaders = allDates.map(d => { const dt = new Date(d + 'T12:00:00'); return '<th style="text-align:center;font-size:9px;padding:5px 3px;min-width:22px;color:#999;border-bottom:2px solid #eee;white-space:nowrap">' + DA[dt.getDay()] + '<br>' + (dt.getMonth()+1) + '/' + dt.getDate() + '</th>' }).join('')
       const dayCells   = allDates.map(d => { const h = ph(daily[d]||''); return '<td style="text-align:center;padding:7px 4px;font-size:12px;color:' + (h>0?'#111':'#ccc') + '">' + (h>0?(h%1===0?String(h):h.toFixed(1)):'—') + '</td>' }).join('')
@@ -80,10 +83,25 @@ export function buildStatementHTML(
     }
   }).join('<hr style="border:none;border-top:1px solid #eee;margin:0 0 16px">')
 
+  const th = 'font-size:9px;padding:5px 6px;color:#999;border-bottom:2px solid #eee'
+  const trackedSection = tracked.length === 0 ? '' :
+    '<div style="font-size:11px;margin-bottom:6px"><strong style="font-size:13px">YVA Time</strong>&nbsp;&middot;&nbsp;<span style="color:#999">approved hours (not on client invoices)</span></div>' +
+    '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px"><thead><tr>' +
+    `<th style="${th}">DATE</th><th style="${th}">WORK</th><th style="text-align:right;${th}">HOURS</th><th style="text-align:right;${th}">EARNED</th>` +
+    '</tr></thead><tbody>' +
+    [...tracked].sort((a, b) => a.date.localeCompare(b.date)).map(t => {
+      const h = Number(t.hours) || 0
+      return '<tr><td style="padding:7px 6px">' + esc(t.date) + '</td><td style="padding:7px 6px">' + esc(t.description || 'YVA work') +
+        '</td><td style="text-align:right;padding:7px 6px">' + h.toFixed(2) + 'h</td><td style="text-align:right;font-weight:700;color:#f5b533;padding:7px 6px">' +
+        (payRate > 0 ? '$' + (h * payRate).toFixed(2) : '—') + '</td></tr>'
+    }).join('') +
+    '</tbody></table>'
+  const body = [sections, trackedSection].filter(Boolean).join('<hr style="border:none;border-top:1px solid #eee;margin:0 0 16px">')
+
   const period = dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : dateFrom || dateTo || 'All time'
 
   return `<!DOCTYPE html><html><head>
-  <title>Statement — ${emp.name}</title>
+  <title>Statement — ${esc(emp.name)}</title>
   <style>
     body{font-family:Arial,sans-serif;max-width:700px;margin:40px auto;color:#111}
     .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;border-bottom:2px solid #f5b533;padding-bottom:16px}
@@ -104,8 +122,8 @@ export function buildStatementHTML(
     <img src="${window.location.origin}${import.meta.env.BASE_URL}yva-logo.png" class="logo" onerror="this.style.display='none'" />
     <div style="text-align:right">
       <h2>EARNINGS STATEMENT</h2>
-      <div class="meta">${emp.name}${emp.employeeNumber ? ` · ${emp.employeeNumber}` : ''}</div>
-      <div class="meta">Period: ${period}</div>
+      <div class="meta">${esc(emp.name)}${emp.employeeNumber ? ` · ${esc(emp.employeeNumber)}` : ''}</div>
+      <div class="meta">Period: ${esc(period)}</div>
       <div class="meta">Generated: ${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}</div>
     </div>
   </div>
@@ -117,7 +135,7 @@ export function buildStatementHTML(
     <div class="kpi"><div class="kpi-v">${payRate>0?'$'+totalUSD.toFixed(2):'—'}</div><div class="kpi-l">Total Earned (USD)</div></div>
     ${totalDOP>0?`<div class="kpi"><div class="kpi-v">RD$${totalDOP.toLocaleString('en-US',{maximumFractionDigits:0})}</div><div class="kpi-l">Total Earned (DOP @ ${dopRate})</div></div>`:''}
   </div>
-  ${sections ? sections + '<div style="text-align:right;font-weight:800;font-size:13px;padding:10px 0;border-top:2px solid #111;margin-top:4px">Total &nbsp;&nbsp; ' + totalHours.toFixed(1) + 'h &nbsp;&nbsp; ' + (payRate>0?'$'+totalUSD.toFixed(2):'—') + '</div>' + (summary.premiumHours>0?'<div style="text-align:right;font-size:11px;color:#666">Regular: ' + summary.regularHours.toFixed(2) + 'h · Premium: ' + summary.premiumHours.toFixed(2) + 'h at +' + premiumConfig.percent + '%</div>':'') : '<p style="color:#999;text-align:center;padding:24px">No invoice data for this period.</p>'}
+  ${body ? body + '<div style="text-align:right;font-weight:800;font-size:13px;padding:10px 0;border-top:2px solid #111;margin-top:4px">Total &nbsp;&nbsp; ' + totalHours.toFixed(1) + 'h &nbsp;&nbsp; ' + (payRate>0?'$'+totalUSD.toFixed(2):'—') + '</div>' + (summary.premiumHours>0?'<div style="text-align:right;font-size:11px;color:#666">Regular: ' + summary.regularHours.toFixed(2) + 'h · Premium: ' + summary.premiumHours.toFixed(2) + 'h at +' + premiumConfig.percent + '%</div>':'') : '<p style="color:#999;text-align:center;padding:24px">No hours for this period.</p>'}
   <div class="footer">YVA Staffing · Bilingual Virtual Professionals · yvastaffing.net</div>
   ${autoPrint ? '<script>window.onload=function(){window.print()}</script>' : ''}
   </body></html>`

@@ -1,15 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { Attachment, Employee, Invoice } from '../data/types'
+import type { Attachment, Employee, Invoice, TimeEntry } from '../data/types'
 import {
   loadSnapshot, saveEmployees, saveInvoices,
-  loadEmployeeCounter, saveEmployeeCounter, loadSettings,
+  loadEmployeeCounter, saveEmployeeCounter, loadSettings, loadTimeEntries,
 } from '../services/storage'
 import { formatMoney, fmtHoursHM } from '../utils/money'
 import { useRole } from '../context/RoleContext'
 import { can } from '../lib/roles'
 import { sendEmail } from '../services/gmail'
 import { buildStatementHTML } from '../utils/statementHtml'
+import { trackedHoursOf, trackedPayEntries } from '../utils/trackedPay'
 import {
   IconMail, IconPrinter, IconX, IconTrash, IconCheck,
   IconImage, IconFile, IconMusic, IconPaperclip,
@@ -62,10 +63,11 @@ type FormData = {
   premiumEnabled: boolean; premiumStartTime: string; premiumPercent: string
   role: string; employmentType: string; location: string
   timezone: string; startYear: string; status: string; notes: string
+  worksFor: 'client' | 'yva'; manualTimeAllowed: boolean
 }
 const EMPTY: FormData = {
   name: '', email: '', phone: '', payRate: '', defaultShiftStart: '', defaultShiftEnd: '', premiumEnabled: false, premiumStartTime: '21:00', premiumPercent: '15', role: '', employmentType: '',
-  location: '', timezone: '', startYear: '', status: 'Active', notes: '',
+  location: '', timezone: '', startYear: '', status: 'Active', notes: '', worksFor: 'client', manualTimeAllowed: false,
 }
 
 function getEmployeeInvoices(empName: string, invoices: Invoice[], from?: string, to?: string) {
@@ -102,22 +104,22 @@ function summarizeEmployeeInvoices(emp: Employee, invoices: Invoice[]) {
 }
 
 
-async function printPayslip(emp: Employee, empInvoices: Invoice[], dateFrom: string, dateTo: string) {
+async function printPayslip(emp: Employee, empInvoices: Invoice[], dateFrom: string, dateTo: string, tracked: TimeEntry[] = []) {
   const settings = await loadSettings()
-  const html = buildStatementHTML(emp, empInvoices, dateFrom, dateTo, settings.usdToDop || 0, true)
+  const html = buildStatementHTML(emp, empInvoices, dateFrom, dateTo, settings.usdToDop || 0, true, tracked)
   const win = window.open('', '_blank', 'width=800,height=600')
   if (!win) return
   win.document.write(html)
   win.document.close()
 }
 
-async function emailStatement(emp: Employee, empInvoices: Invoice[], dateFrom: string, dateTo: string) {
+async function emailStatement(emp: Employee, empInvoices: Invoice[], dateFrom: string, dateTo: string, tracked: TimeEntry[] = []) {
   const settings = await loadSettings()
   const payRate = Number(emp.payRate) || 0
   const dopRate = settings.usdToDop || 0
   const summary = summarizeEmployeeInvoices(emp, empInvoices)
-  const totalHours = summary.hours
-  const totalUSD = summary.totalPay
+  const totalHours = summary.hours + trackedHoursOf(tracked)
+  const totalUSD = summary.totalPay + trackedHoursOf(tracked) * payRate
   const totalDOP = dopRate > 0 ? totalUSD * dopRate : 0
   const period = dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : dateFrom || dateTo || 'All time'
   const companyName = settings.companyName || 'YVA Staffing'
@@ -139,7 +141,7 @@ async function emailStatement(emp: Employee, empInvoices: Invoice[], dateFrom: s
       `Please reach out if you have any questions.\n\n${settings.emailSignature || companyName}`
   }
 
-  const statementHtml = buildStatementHTML(emp, empInvoices, dateFrom, dateTo, dopRate, false)
+  const statementHtml = buildStatementHTML(emp, empInvoices, dateFrom, dateTo, dopRate, false, tracked)
   const safeName = emp.name.replace(/\s+/g, '-').toLowerCase()
   const periodSlug = period.replace(/\s/g, '').replace(/[^a-zA-Z0-9-]/g, '-')
   await sendEmail(emp.email || '', subject, bodyText, {
@@ -161,6 +163,8 @@ function EmployeeStatementsPanel({ emp, invoices, onInvoicesChange }: {
   const [payNotes,  setPayNotes]  = useState('')
   const [toast,     setToast]     = useState<string | null>(null)
   const [sending,   setSending]   = useState(false)
+  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
+  useEffect(() => { void loadTimeEntries().then(setTimeEntries) }, [])
 
   function showToast(msg: string) {
     setToast(msg)
@@ -172,8 +176,9 @@ function EmployeeStatementsPanel({ emp, invoices, onInvoicesChange }: {
 
   const premiumConfig = employeePremiumConfig(emp)
   const summary = summarizeEmployeeInvoices(emp, empInvoices)
-  const totalHours = summary.hours
-  const totalEarned = summary.totalPay
+  const empTracked = trackedPayEntries(emp, timeEntries, dateFrom || undefined, dateTo || undefined)
+  const totalHours = summary.hours + trackedHoursOf(empTracked)
+  const totalEarned = summary.totalPay + trackedHoursOf(empTracked) * payRate
 
   const paidCount   = empInvoices.filter(inv => (inv.employeePayments?.[emp.id] || inv.employeePayments?.[emp.name])?.status === 'paid').length
   const pendingCount = empInvoices.length - paidCount
@@ -255,12 +260,12 @@ function EmployeeStatementsPanel({ emp, invoices, onInvoicesChange }: {
         <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
           <button
             className="btn-ghost btn-sm"
-            disabled={empInvoices.length === 0 || !emp.email || sending}
+            disabled={(empInvoices.length === 0 && empTracked.length === 0) || !emp.email || sending}
             title={!emp.email ? 'No email address on file — add one in the employee profile' : ''}
             onClick={async () => {
               setSending(true)
               try {
-                await emailStatement(emp, empInvoices, dateFrom, dateTo)
+                await emailStatement(emp, empInvoices, dateFrom, dateTo, empTracked)
                 showToast(`Statement sent to ${emp.email}`)
               } catch {
                 showToast('Failed to send — check Gmail connection in Settings')
@@ -271,7 +276,7 @@ function EmployeeStatementsPanel({ emp, invoices, onInvoicesChange }: {
           >
             {sending ? 'Sending…' : <><span style={{ marginRight: 5, display: 'inline-flex', verticalAlign: 'middle' }}><IconMail size={13} /></span> Email Statement</>}
           </button>
-          <button className="btn-ghost btn-sm" onClick={() => printPayslip(emp, empInvoices, dateFrom, dateTo)} disabled={empInvoices.length === 0}>
+          <button className="btn-ghost btn-sm" onClick={() => printPayslip(emp, empInvoices, dateFrom, dateTo, empTracked)} disabled={empInvoices.length === 0 && empTracked.length === 0}>
             <span style={{ marginRight: 5, display: 'inline-flex', verticalAlign: 'middle' }}><IconPrinter size={13} /></span> PDF Payslip
           </button>
         </div>
@@ -500,6 +505,8 @@ export default function EmployeesPage() {
       startYear: e.startYear != null ? String(e.startYear) : '',
       status: e.status ?? 'Active',
       notes: (e as { notes?: string }).notes ?? '',
+      worksFor: e.worksFor === 'yva' ? 'yva' : 'client',
+      manualTimeAllowed: e.manualTimeAllowed === true,
     })
     setAttachments(e.attachments || [])
     setEditId(e.id); setModal('edit')
@@ -844,6 +851,20 @@ export default function EmployeesPage() {
                   <label className="form-label">Employment Type</label>
                   <select className="form-select" value={form.employmentType} onChange={(e) => setForm({ ...form, employmentType: e.target.value })}>
                     {TYPE_OPTIONS.map(t => <option key={t} value={t}>{t || '— Not set —'}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Works For</label>
+                  <select className="form-select" value={form.worksFor} onChange={(e) => setForm({ ...form, worksFor: e.target.value === 'yva' ? 'yva' : 'client' })}>
+                    <option value="client">Client project (screenshots on)</option>
+                    <option value="yva">YVA team (screenshots off)</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Manual Time</label>
+                  <select className="form-select" value={form.manualTimeAllowed ? 'on' : 'off'} onChange={(e) => setForm({ ...form, manualTimeAllowed: e.target.value === 'on' })}>
+                    <option value="off">Off</option>
+                    <option value="on">On — can add time by hand (admin approves)</option>
                   </select>
                 </div>
                 {showPayRates && (
