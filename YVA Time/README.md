@@ -14,9 +14,10 @@ npm run dist       # Windows installer → release/YVA-Time-Setup.exe + latest.y
 
 ## Releasing a new version (installed apps update themselves)
 
-1. Change `"version"` in `package.json` (e.g. `0.3.1`) and commit.
-2. Push the tag `yva-time-v0.3.1`. GitHub Actions ("YVA Time — Windows installer") builds the
-   installer and publishes a GitHub Release with `YVA-Time-Setup.exe`, its `.blockmap` and `latest.yml`.
+1. Change `"version"` in `package.json` (e.g. `0.3.1`) and merge it to `main`.
+2. GitHub → Actions → "YVA Time — Windows installer" → **Run workflow** with **Publish** ticked
+   (or push the tag `yva-time-v0.3.1`). It builds the installer and publishes a GitHub Release with
+   `YVA-Time-Setup.exe`, its `.blockmap` and `latest.yml`. Each version can be published only once.
 3. Installed apps check every 4 hours (and 30 s after starting), download it in the background and
    show **Restart to update**; otherwise it installs the next time the app quits.
 

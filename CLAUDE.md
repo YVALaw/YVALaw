@@ -117,7 +117,7 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 - `#navbar` is `sticky` at every width with a fixed height (64px phones, 80px desktop). On scroll it only gains a shadow (`.nav-scrolled`) — changing its height caused layout jumps.
 - Brand lockup everywhere: `logo/img2.png` + the text **YVA Law Staffing** (header, drawer, footer, all pages).
 - Full desktop nav from `lg` (1024px); below that the hamburger + `#mobile-menu` drawer (hidden with `visibility` when closed, scrolls on short screens).
-- **Staff Login is hidden for now** (YVA LawOS is a work in progress): the `/os/login` links in the desktop nav and the mobile drawer are wrapped in HTML comments. To bring them back, remove the comment wrappers — then check the nav still fits at 1024px (hide "Home" at `lg` with `hidden xl:inline` if it doesn't).
+- **Staff Login** (`/os/login`) is in the desktop nav (icon only below `xl`, "Login" from 1280px) and the mobile drawer ("Staff Login"). Checked to fit at 1024/1100/1280/1440px; if the nav grows, hide "Home" at `lg` with `hidden xl:inline`.
 - The active-section highlight uses `#desktop-nav a[href^="#"]`.
 
 ### Mobile layout notes
@@ -181,6 +181,7 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 - Portal clients could read all columns of their placed staff's employee rows via the API (pay rate, notes). The portal team now comes from the `portal-team` function (safe fields only); run `YVALAW OS/supabase/migrate-portal-employees-lockdown.sql` after deploying.
 - **YVA Time Phase 1**: Windows desktop app in `YVA Time/` (Electron), "Sign in with YVA OS" (`/os/connect-app`, `desktop-link-create` / `desktop-link-redeem`), tracker tables + private screenshots bucket (`migrate-yva-time-phase1.sql`), Time Tracking → Live / Screenshots, daily 90-day screenshot cleanup, Windows installer workflow in `.github/workflows/`. Details: `YVALAW OS/CLAUDE.md` → "YVA Time — Phase 1".
 - **YVA Time Phase 2** (`migrate-yva-time-phase2.sql`): Time Tracking → Approve (weekly approval rolls tracker time into `time_entries` → client portal hours, time log, invoices, payslips), manual time requests (My workspace ↔ Approve tab), "Import YVA Time hours" in the invoice builder, YVA-team payslips from approved hours, My workspace → My hours, app 0.2.0 (consent record, Add missing time, shift reminders). Details: `YVALAW OS/CLAUDE.md` → "YVA Time — Phase 2".
+- Staff Login link back on the home page (desktop nav + phone menu). YVA Time releases can be published from GitHub Actions → Run workflow → **Publish**.
 - **YVA Time Phase 3** (`migrate-yva-time-phase3.sql`, app 0.3.0): activity % (keyboard/mouse use per 10 minutes, client team, notice shown again), Time Tracking → **Schedule** (late / left early / no time vs. profile shift), **Reopen week** on Approve, employee profile → **Computers** with Disconnect (database refuses time from a disconnected computer), automatic app updates from GitHub Releases, code signing ready to switch on. Details: `YVALAW OS/CLAUDE.md` → "YVA Time — Phase 3".
 
 ### Session 11 (content manager)
@@ -201,7 +202,7 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 - `/os/*` (internal YVA LawOS app) is `noindex` (meta tag + `X-Robots-Tag` header in `netlify.toml`).
 - Performance: Tailwind compiled at build time; Lucide subset served from the site; fonts via `<link>` + preconnect.
 - Mobile: see "Mobile layout notes" above. All pages checked for horizontal overflow at 320/360/390/768/1024px.
-- About stat "100x Assistants Placed" → "100+"; Staff Login links hidden until YVA LawOS is ready.
+- About stat "100x Assistants Placed" → "100+"; Staff Login links hidden until YVA LawOS is ready (shown again in session 12).
 
 ### Session 9 (SEO / indexing fixes)
 - Fixed `blog-post.html`, which had been truncated mid-script since the logo update commit (posts never loaded)
