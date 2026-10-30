@@ -32,7 +32,8 @@ import PortalDocuments from './pages/portal/PortalDocuments'
 import PortalSettings from './pages/portal/PortalSettings'
 import RequestsPage from './pages/RequestsPage'
 import PortalSetPassword from './pages/portal/PortalSetPassword'
-import { loadSettings, saveSettings, loadInvoices, loadEmployees, saveEmployees } from './services/storage'
+import EmployeeWorkspace from './pages/me/EmployeeWorkspace'
+import { loadSettings, saveSettings, loadInvoices, loadEmployees, linkEmployeeLogin } from './services/storage'
 import { RoleProvider, useRole } from './context/RoleContext'
 import { ToastProvider } from './context/ToastContext'
 import type { UserRole } from './lib/roles'
@@ -91,6 +92,24 @@ function AuthenticatedRouter() {
   const location = useLocation()
 
   if (loading) return <LoadingScreen />
+
+  // ── Employee workspace — invited employees never see the internal OS ───────
+  if (role === 'employee') {
+    if (mustChangePassword) {
+      return (
+        <Routes>
+          <Route path="/me/set-password" element={<PortalSetPassword title="Welcome to YVA" next="/me" />} />
+          <Route path="*" element={<Navigate to="/me/set-password" replace />} />
+        </Routes>
+      )
+    }
+    return (
+      <Routes>
+        <Route path="/me" element={<EmployeeWorkspace />} />
+        <Route path="*"   element={<Navigate to="/me" replace />} />
+      </Routes>
+    )
+  }
 
   // ── Pending / unknown role — no OS or portal until a CEO assigns a role ────
   if (!isStaff(role) && role !== 'client') return <PendingAccess />
@@ -179,9 +198,9 @@ async function autoLinkEmployee(userId: string, userEmail: string) {
     if (linked) sessionStorage.setItem('linkedEmployeeId', linked.id)
     return
   }
-  const match = employees.find(e => e.email?.toLowerCase() === email)
+  const match = employees.find(e => e.email?.toLowerCase() === email && !e.userId)
   if (match) {
-    await saveEmployees(employees.map(e => e.id === match.id ? { ...e, userId } : e))
+    await linkEmployeeLogin(match.id, userId)
     sessionStorage.setItem('linkedEmployeeId', match.id)
   } else {
     sessionStorage.removeItem('linkedEmployeeId')

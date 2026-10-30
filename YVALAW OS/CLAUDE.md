@@ -95,8 +95,24 @@ CREATE POLICY "client_update_prefs" ON working_hour_prefs FOR UPDATE TO authenti
 - `client_users` table RLS: client can only read/update own row
 - `private.is_internal()` helper gates all OS data from client users at DB level
 - Separate portal-scoped read policies per table (clients, projects, invoices, employees, time_entries, client_documents, staff_requests)
-- Invite function validates caller is internal staff before creating accounts
+- Invite functions validate the caller against an explicit staff-role list (`STAFF_ROLES` / `INVITER_ROLES`), never "anything but client"
 - Service role key lives in Netlify env only — never in frontend
+- **Known issue (not fixed yet):** the `portal_client_employees` RLS policy lets a portal client SELECT *every* column of their placed staff's `employees` rows (pay rate, notes, attachments) through the API, even though the portal UI only asks for safe columns. Fix by serving the portal team list through a server function (like `employee-me`) or a safe-column view, then dropping that policy.
+
+---
+
+## YVA Time — Phase 0 (employee logins) ✅ built, needs SQL + deploy
+
+Groundwork for the YVA Time Windows desktop tracker (Electron, Phase 1). Plan decisions: Windows only; clients see hours only (never screenshots); screenshots for **client-placed** staff only, about 1 per 10 min at a random moment, employee can delete within 2 min (the 10-min block is removed); YVA team screenshots off; manual time per employee with admin approval; activity % later; the YVA OS web timer is removed (desktop app is the only live tracker).
+
+- **Run `supabase/migrate-yva-time-phase0.sql` before deploying** — adds `employees.works_for` (`'client'` | `'yva'`, default `'client'`) and `employees.manual_time_allowed` (default false); marks employees linked to staff logins as `'yva'`.
+- Employee form (EmployeesPage + EmployeeProfilePage): **Works For** (Client project / YVA team) and **Manual Time** (Off / On).
+- **Employee logins:** Employee profile → **YVA Time Login** card → Email Invite / Copy Invite Link → `netlify/functions/invite-employee.cjs` (staff in `INVITER_ROLES` only; email taken from the employee record; sets `employees.user_id`; deletes the login if linking fails; user_metadata `{ role: 'employee', employee_id, must_change_password }`).
+- `AppRole` `'employee'`: RoleContext uses the metadata hint (routing only) → App routes to `/me/set-password` on first login, then **My workspace** (`src/pages/me/EmployeeWorkspace.tsx`, route `/me`). Employees never reach the internal OS, the portal or the pending queue.
+- Employees have **no direct table access** (RLS stays staff-only). Their data comes from `netlify/functions/employee-me.cjs` (GET, finds the employee by `employees.user_id` server-side, returns safe fields + assigned projects with client names — no pay rate, premium, notes or attachments). The desktop app will reuse it.
+- `employees.user_id` is written only by `linkEmployeeLogin()` (staff auto-link, only if unlinked) and `invite-employee` — `saveEmployees()` strips `userId` so a stale whole-table save can't unlink a login.
+- Web timer removed: `useActiveTimer`, top-bar timer pill and Start/Stop on Time Tracking are gone; "+ Log Manual" stays for admins.
+- Next (Phase 1): desktop app (sign in through YVA OS in the browser → one-time code → its own session), tracker tables (10-minute blocks + screenshots, private bucket, RLS by `employees.user_id`), admin live board + screenshot day view.
 
 ---
 
@@ -426,6 +442,7 @@ All data is scoped to the authenticated user via Supabase RLS.
 | `/portal` | PortalPage | Read-only client-facing invoice view (outside Shell, no nav) |
 | `/oauth-callback` | OAuthCallbackPage | Handles Google OAuth2 redirect after Gmail authorization (outside Shell) |
 | `/login` | LoginPage | Email/password login + sign-up toggle + Remember Me |
+| `/me` | EmployeeWorkspace | Invited employees only (outside Shell): YVA Time info, assigned projects, own details — via `employee-me` |
 
 ## Profile Page Architecture
 - All entity list pages (Clients, Employees, Projects, Candidates) navigate to profile routes on card click
@@ -690,7 +707,7 @@ Also shows: Employee Performance table, Revenue by Client/Project, All-Time Clie
 - [x] **Estimates page** — full estimates pipeline at `/estimates`; line-item builder with qty/unit price; status lifecycle (draft→sent→accepted/declined/expired); right-side slide panel; convert-to-invoice button (accepted estimates); KPI summary cards
 - [x] **Time Tracking page** — time log at `/time`; per-employee/project entry; billable toggle; date range + employee + project filters; KPI cards (total/billable/unbillable hours + billable %); right-side slide panel
 - [x] **Recurring Invoices tab** — tab in InvoicePage at `/invoice`; create/edit recurring schedules (weekly/biweekly/monthly); active/pause/delete; linked to client + project; right-side slide panel
-- [x] **Live Timer (Time Tracking)** — global start/stop punch clock stored in localStorage; runs across all pages in the topbar; auto-creates time entry on stop; pre-fills logged-in employee; `src/hooks/useActiveTimer.ts`
+- [x] ~~**Live Timer (Time Tracking)**~~ — removed 2026-10-30; live tracking moves to the YVA Time desktop app (see "YVA Time — Phase 0")
 - [x] **Employee auto-link** — on login, matches user email to Employee record → writes `userId` → shows "My Profile" link in sidebar; auto-clears on sign-out
 - [x] **Employee profile — Time Log section** — shows time entries for that employee (KPI cards + table), loaded from `time_entries` table
 - [x] **Tags/Labels** — `Client.tags: string[]`, `Project.tags: string[]`, `Invoice.tags: string[]`; `TagBadge` + `TagInput` components; `tagStorage.ts`; shown on client/project cards and forms

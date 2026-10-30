@@ -108,6 +108,17 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         return
       }
 
+      // Invited employees (set by invite-employee). Routing hint only: their data
+      // comes from the employee-me function, which checks employees.user_id server-side.
+      if (meta.role === 'employee' || meta.employee_id) {
+        setRole('employee')
+        setIsClient(false)
+        setClientId(null)
+        sessionStorage.setItem(ROLE_CACHE_KEY, 'employee')
+        setLoading(false)
+        return
+      }
+
       await supabase
         .from('user_roles')
         .insert({ user_id: user.id, email: user.email, role: 'pending' })

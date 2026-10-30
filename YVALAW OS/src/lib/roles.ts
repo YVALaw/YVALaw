@@ -2,9 +2,10 @@ export type UserRole = 'ceo' | 'admin' | 'accounting' | 'recruiter' | 'lead_gen'
 
 /**
  * All roles in the system — UserRole covers internal staff, 'client' covers portal users,
+ * 'employee' covers invited employees (My workspace / YVA Time only, never the internal OS),
  * 'pending' is a new account with no access until a CEO picks its role in Team Access.
  */
-export type AppRole = UserRole | 'client' | 'pending'
+export type AppRole = UserRole | 'client' | 'employee' | 'pending'
 
 export const ROLE_LABELS: Record<UserRole, string> = {
   ceo:        'CEO',
@@ -20,7 +21,7 @@ export const ROLE_OPTIONS: UserRole[] = ['ceo', 'admin', 'accounting', 'recruite
 export const isStaff = (r: AppRole): r is UserRole => (ROLE_OPTIONS as AppRole[]).includes(r)
 
 // All can.* functions accept AppRole so OS pages don't need casts.
-// 'client' and 'pending' never match an internal-role check, so they return false safely.
+// 'client', 'employee' and 'pending' never match an internal-role check, so they return false safely.
 export const can = {
   viewInvoices:      (r: AppRole) => r === 'ceo' || r === 'admin' || r === 'accounting',
   viewFinancials:    (r: AppRole) => r === 'ceo' || r === 'admin' || r === 'accounting',

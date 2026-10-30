@@ -96,7 +96,17 @@ export async function loadEmployees(): Promise<Employee[]> {
   return fetchAll<Employee>('employees')
 }
 export async function saveEmployees(employees: Employee[]): Promise<void> {
-  invalidateSnapshotCache(); return syncAll('employees', employees)
+  // userId (the login link) is never written by a whole-table save — a stale list
+  // must not unlink a login. It is set by linkEmployeeLogin or the invite-employee function.
+  const rows = employees.map(e => { const row = { ...e }; delete row.userId; return row })
+  invalidateSnapshotCache(); return syncAll('employees', rows)
+}
+
+/** Link an employee record to a login, only if it is not linked yet */
+export async function linkEmployeeLogin(employeeId: string, userId: string): Promise<void> {
+  invalidateSnapshotCache()
+  const { error } = await supabase.from('employees').update({ user_id: userId }).eq('id', employeeId).is('user_id', null)
+  if (error) console.error('linkEmployeeLogin failed', error)
 }
 
 // ─── Clients ──────────────────────────────────────────────────────────────────

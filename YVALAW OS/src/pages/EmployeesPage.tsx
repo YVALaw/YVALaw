@@ -62,10 +62,11 @@ type FormData = {
   premiumEnabled: boolean; premiumStartTime: string; premiumPercent: string
   role: string; employmentType: string; location: string
   timezone: string; startYear: string; status: string; notes: string
+  worksFor: 'client' | 'yva'; manualTimeAllowed: boolean
 }
 const EMPTY: FormData = {
   name: '', email: '', phone: '', payRate: '', defaultShiftStart: '', defaultShiftEnd: '', premiumEnabled: false, premiumStartTime: '21:00', premiumPercent: '15', role: '', employmentType: '',
-  location: '', timezone: '', startYear: '', status: 'Active', notes: '',
+  location: '', timezone: '', startYear: '', status: 'Active', notes: '', worksFor: 'client', manualTimeAllowed: false,
 }
 
 function getEmployeeInvoices(empName: string, invoices: Invoice[], from?: string, to?: string) {
@@ -500,6 +501,8 @@ export default function EmployeesPage() {
       startYear: e.startYear != null ? String(e.startYear) : '',
       status: e.status ?? 'Active',
       notes: (e as { notes?: string }).notes ?? '',
+      worksFor: e.worksFor === 'yva' ? 'yva' : 'client',
+      manualTimeAllowed: e.manualTimeAllowed === true,
     })
     setAttachments(e.attachments || [])
     setEditId(e.id); setModal('edit')
@@ -844,6 +847,20 @@ export default function EmployeesPage() {
                   <label className="form-label">Employment Type</label>
                   <select className="form-select" value={form.employmentType} onChange={(e) => setForm({ ...form, employmentType: e.target.value })}>
                     {TYPE_OPTIONS.map(t => <option key={t} value={t}>{t || '— Not set —'}</option>)}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Works For</label>
+                  <select className="form-select" value={form.worksFor} onChange={(e) => setForm({ ...form, worksFor: e.target.value === 'yva' ? 'yva' : 'client' })}>
+                    <option value="client">Client project (screenshots on)</option>
+                    <option value="yva">YVA team (screenshots off)</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Manual Time</label>
+                  <select className="form-select" value={form.manualTimeAllowed ? 'on' : 'off'} onChange={(e) => setForm({ ...form, manualTimeAllowed: e.target.value === 'on' })}>
+                    <option value="off">Off</option>
+                    <option value="on">On — can add time by hand (admin approves)</option>
                   </select>
                 </div>
                 {showPayRates && (
