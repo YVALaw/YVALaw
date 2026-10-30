@@ -1,0 +1,46 @@
+# Builds the YVA Time Windows installer (YVA-Time-Setup.exe).
+#  • Run it by hand: Actions → "YVA Time — Windows installer" → Run workflow → download the artifact
+#  • Push a tag like yva-time-v0.1.0 to also publish a GitHub Release; its download link is
+#    https://github.com/YVALaw/YVALaw/releases/latest/download/YVA-Time-Setup.exe
+#    (set it as VITE_YVA_TIME_DOWNLOAD_URL in Netlify to show the button in My workspace)
+# The installer is not code-signed yet, so Windows SmartScreen shows "unknown publisher".
+name: YVA Time — Windows installer
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['yva-time-v*']
+
+permissions:
+  contents: write   # only used to create the release on yva-time-v* tags
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: YVA Time
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: YVA Time/package-lock.json
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: YVA-Time-Setup
+          path: YVA Time/release/YVA-Time-Setup.exe
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/yva-time-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: YVA Time/release/YVA-Time-Setup.exe

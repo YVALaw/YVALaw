@@ -3,6 +3,10 @@ import type { Client, Employee, Project, TimeEntry } from '../data/types'
 import { loadTimeEntries, saveTimeEntries, loadEmployees, loadProjects, loadClients } from '../services/storage'
 import { supabase } from '../lib/supabase'
 import { IconCheck, IconEdit, IconTrash } from '../components/Icon'
+import { useRole } from '../context/RoleContext'
+import { can } from '../lib/roles'
+import LiveBoard from './time/LiveBoard'
+import ScreenshotDay from './time/ScreenshotDay'
 
 function uid() { return crypto.randomUUID() }
 function getToday() { return new Date().toISOString().slice(0, 10) }
@@ -52,6 +56,10 @@ export default function TimeTrackingPage() {
 
   // Delete confirm
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+
+  // YVA Time views
+  const { role } = useRole()
+  const [tab, setTab] = useState<'log' | 'live' | 'screens'>('log')
 
   useEffect(() => {
     void (async () => {
@@ -186,19 +194,46 @@ export default function TimeTrackingPage() {
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
-  return (
-    <div className="page-wrap">
-
-      {/* Header */}
+  const header = (
+    <>
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-title">Time Tracking</h1>
-          {currentName && <p className="page-sub">Manual entries are logged as <strong>{currentName}</strong></p>}
+          {tab === 'log' && currentName && <p className="page-sub">Manual entries are logged as <strong>{currentName}</strong></p>}
+          {tab === 'live' && <p className="page-sub">Live from the YVA Time desktop app · refreshes every minute</p>}
+          {tab === 'screens' && <p className="page-sub">Client-team screenshots · kept 90 days · never shown to clients</p>}
         </div>
-        <div className="page-actions">
-          <button className="btn-primary btn-sm" onClick={openCreate}>+ Log Manual</button>
-        </div>
+        {tab === 'log' && (
+          <div className="page-actions">
+            <button className="btn-primary btn-sm" onClick={openCreate}>+ Log Manual</button>
+          </div>
+        )}
       </div>
+      {can.viewTracker(role) && (
+        <div className="filter-tabs">
+          <button className={`filter-tab${tab === 'log' ? ' active' : ''}`} onClick={() => setTab('log')}>Time log</button>
+          <button className={`filter-tab${tab === 'live' ? ' active' : ''}`} onClick={() => setTab('live')}>Live</button>
+          {can.viewScreenshots(role) && (
+            <button className={`filter-tab${tab === 'screens' ? ' active' : ''}`} onClick={() => setTab('screens')}>Screenshots</button>
+          )}
+        </div>
+      )}
+    </>
+  )
+
+  if (tab !== 'log') {
+    return (
+      <div className="page-wrap">
+        {header}
+        {tab === 'live' ? <LiveBoard /> : <ScreenshotDay />}
+      </div>
+    )
+  }
+
+  return (
+    <div className="page-wrap">
+
+      {header}
 
       {/* KPI Cards */}
       <div className="kpi-grid" style={{ marginBottom: 20 }}>

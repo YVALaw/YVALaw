@@ -179,6 +179,7 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 - `invite-client` / `create-payment-intent` check an explicit staff-role list (a `pending` account could otherwise invite clients or pay on their behalf).
 - **YVA Time Phase 0** (employee logins, see `YVALAW OS/CLAUDE.md`): employee Works For / Manual Time fields, Invite to YVA Time (`invite-employee`), employee-only **My workspace** at `/os/me` (`employee-me`), YVA OS web timer removed. Needs `YVALAW OS/supabase/migrate-yva-time-phase0.sql` run before deploy. Next: Phase 1, the Windows desktop app.
 - Portal clients could read all columns of their placed staff's employee rows via the API (pay rate, notes). The portal team now comes from the `portal-team` function (safe fields only); run `YVALAW OS/supabase/migrate-portal-employees-lockdown.sql` after deploying.
+- **YVA Time Phase 1**: Windows desktop app in `YVA Time/` (Electron), "Sign in with YVA OS" (`/os/connect-app`, `desktop-link-create` / `desktop-link-redeem`), tracker tables + private screenshots bucket (`migrate-yva-time-phase1.sql`), Time Tracking → Live / Screenshots, daily 90-day screenshot cleanup, Windows installer workflow in `.github/workflows/`. Details: `YVALAW OS/CLAUDE.md` → "YVA Time — Phase 1".
 
 ### Session 11 (content manager)
 - About section: Sam Colas removed (story, founder card, JSON-LD); Hans Henriquez → **Hans Esmel**, described as sole founder ("CEO & Founder"). Headings now "The Founder" / "Meet the Founder".

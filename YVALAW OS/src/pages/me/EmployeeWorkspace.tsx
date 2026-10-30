@@ -19,6 +19,9 @@ type MyEmployee = {
 }
 type MyProject = { id: string; name: string; clientName: string | null; status: string | null }
 
+// Set VITE_YVA_TIME_DOWNLOAD_URL in Netlify once an installer is published (GitHub release asset)
+const DOWNLOAD_URL = import.meta.env.VITE_YVA_TIME_DOWNLOAD_URL as string | undefined
+
 /** My workspace — the only YVA OS area an invited employee can open */
 export default function EmployeeWorkspace() {
   const [employee, setEmployee] = useState<MyEmployee | null>(null)
@@ -72,8 +75,16 @@ export default function EmployeeWorkspace() {
         {employee && (
           <>
             <Section icon={<IconClock size={20} />} title="YVA Time" sub="Track your hours from your computer">
+              {DOWNLOAD_URL && (
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
+                  <a className="btn-primary" href={DOWNLOAD_URL}>Download YVA Time for Windows</a>
+                  <span style={{ fontSize: 13, color: 'var(--muted)' }}>Install it, open it and click <strong>Sign in with YVA OS</strong>.</span>
+                </div>
+              )}
               <p style={{ margin: 0, fontSize: 14, color: 'var(--text2)', lineHeight: 1.6 }}>
-                The YVA Time app for Windows is coming soon. You'll download it here and sign in with this same account.
+                {DOWNLOAD_URL
+                  ? 'YVA Time runs in the corner of your screen while you work.'
+                  : "The YVA Time app for Windows is coming soon. You'll download it here and sign in with this same account."}
                 {isYva
                   ? ' As part of the YVA team, screenshots are off for you.'
                   : ' While you track time, the app takes a screenshot at a random moment about every 10 minutes. You can see each one and delete it within 2 minutes (that 10-minute block is then removed from your time).'}

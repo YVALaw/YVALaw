@@ -35,4 +35,7 @@ export const can = {
   manageRoles:       (r: AppRole) => r === 'ceo',
   // CEO-only: revenue totals, payroll, net earnings
   viewOwnerStats:    (r: AppRole) => r === 'ceo',
+  // YVA Time: who is tracking + hours (Live), and screenshots (CEO/Admin only — matches RLS)
+  viewTracker:       (r: AppRole) => r === 'ceo' || r === 'admin' || r === 'accounting',
+  viewScreenshots:   (r: AppRole) => r === 'ceo' || r === 'admin',
 }
