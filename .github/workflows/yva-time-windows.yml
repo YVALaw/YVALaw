@@ -1,8 +1,9 @@
 # Builds the YVA Time Windows installer (YVA-Time-Setup.exe).
-#  • Run it by hand: Actions → "YVA Time — Windows installer" → Run workflow → download the artifact
-#  • Release a new version: set "version" in YVA Time/package.json (e.g. 0.3.1), commit, then push
-#    the tag yva-time-v0.3.1. This publishes a GitHub Release with the installer + latest.yml;
-#    installed apps find it there and update themselves. Permanent download link:
+#  • Test build: Actions → "YVA Time — Windows installer" → Run workflow → download the artifact
+#  • Release a new version: set "version" in YVA Time/package.json (e.g. 0.3.1) and merge it to main,
+#    then Run workflow with "Publish" ticked (or push the tag yva-time-v0.3.1). This publishes a
+#    GitHub Release with the installer + latest.yml; installed apps find it there and update
+#    themselves. A version can only be published once. Permanent download link:
 #    https://github.com/YVALaw/YVALaw/releases/latest/download/YVA-Time-Setup.exe
 #    (only YVA Time should publish Releases in this repository — the apps read the latest one)
 #  • Code signing turns on by itself once the signing secrets/variables below exist
@@ -11,11 +12,16 @@ name: YVA Time — Windows installer
 
 on:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Publish this version (the one in YVA Time/package.json) — installed apps update to it'
+        type: boolean
+        default: false
   push:
     tags: ['yva-time-v*']
 
 permissions:
-  contents: write   # only used to create the release on yva-time-v* tags
+  contents: write   # only used to create the release (tag push or "Publish" ticked)
 
 jobs:
   build:
@@ -33,12 +39,25 @@ jobs:
           cache: npm
           cache-dependency-path: YVA Time/package-lock.json
 
+      - name: Version
+        id: version
+        run: |
+          v="$(node -p "require('./package.json').version")"
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "tag=yva-time-v$v" >> "$GITHUB_OUTPUT"
+
       - name: Tag matches package.json version
         if: startsWith(github.ref, 'refs/tags/yva-time-v')
         run: |
-          want="yva-time-v$(node -p "require('./package.json').version")"
-          if [ "$GITHUB_REF_NAME" != "$want" ]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match package.json (expected $want)"; exit 1
+          if [ "$GITHUB_REF_NAME" != "${{ steps.version.outputs.tag }}" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json (expected ${{ steps.version.outputs.tag }})"; exit 1
+          fi
+
+      - name: This version isn't published yet
+        if: github.event_name == 'workflow_dispatch' && inputs.publish
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/${{ steps.version.outputs.tag }}" > /dev/null; then
+            echo "::error::${{ steps.version.outputs.tag }} is already published — raise the version in YVA Time/package.json first"; exit 1
           fi
 
       - run: npm ci
@@ -74,9 +93,12 @@ jobs:
             YVA Time/release/latest.yml
 
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/yva-time-v')
+        if: startsWith(github.ref, 'refs/tags/yva-time-v') || (github.event_name == 'workflow_dispatch' && inputs.publish)
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          name: YVA Time ${{ steps.version.outputs.version }}
           files: |
             YVA Time/release/YVA-Time-Setup.exe
             YVA Time/release/YVA-Time-Setup.exe.blockmap
