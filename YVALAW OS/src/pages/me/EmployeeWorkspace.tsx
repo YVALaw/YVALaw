@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../../lib/supabase'
-import { IconBriefcase, IconClock, IconLogOut, IconUser } from '../../components/Icon'
+import { IconBarChart, IconBriefcase, IconClock, IconLogOut, IconPlus, IconUser } from '../../components/Icon'
+import MyHours from './MyHours'
+import ManualTime from './ManualTime'
 
 // Shape returned by /.netlify/functions/employee-me (safe fields only)
 type MyEmployee = {
@@ -91,10 +93,20 @@ export default function EmployeeWorkspace() {
               </p>
               <div style={{ marginTop: 14, fontSize: 13, color: 'var(--muted)' }}>
                 Adding time by hand: <strong style={{ color: 'var(--text)' }}>
-                  {employee.manualTimeAllowed ? 'allowed — an admin approves each entry' : 'not enabled for your account'}
+                  {employee.manualTimeAllowed ? 'allowed — use “Add missing time” below; YVA approves each request' : 'not enabled for your account'}
                 </strong>
               </div>
             </Section>
+
+            <Section icon={<IconBarChart size={20} />} title="My hours" sub="From the YVA Time app — YVA approves them each week">
+              <MyHours employeeId={employee.id} />
+            </Section>
+
+            {employee.manualTimeAllowed && (
+              <Section icon={<IconPlus size={20} />} title="Add missing time" sub="Forgot to start the timer, or worked offline? Ask YVA to add it">
+                <ManualTime employeeId={employee.id} isYva={isYva} projects={projects} />
+              </Section>
+            )}
 
             <Section icon={<IconBriefcase size={20} />} title={isYva ? 'YVA team' : 'My projects'}
               sub={isYva ? 'You work for YVA directly' : 'The client projects you are assigned to'}>

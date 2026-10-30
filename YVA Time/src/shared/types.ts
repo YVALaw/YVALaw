@@ -15,6 +15,8 @@ export type Profile = {
   email: string | null
   worksFor: 'client' | 'yva'          // client = screenshots on, yva = YVA team (screenshots off)
   manualTimeAllowed: boolean
+  shiftStart: string | null           // e.g. "9:00 am" (from the employee profile)
+  shiftEnd: string | null
   projects: { id: string; name: string; clientName: string | null }[]
 }
 
@@ -64,4 +66,5 @@ export type YvaApi = {
   resolveIdle(keep: boolean): Promise<void>
   deleteScreenshot(): Promise<void>
   openWorkspace(): Promise<void>
+  openAddTime(): Promise<void>
 }

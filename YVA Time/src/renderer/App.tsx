@@ -114,6 +114,7 @@ function TrackerScreen({ s }: { s: Snapshot }) {
         {menu && (
           <div className="menu" onMouseLeave={() => setMenu(false)}>
             <button onClick={() => { setMenu(false); void window.yva.openWorkspace() }}>Open My workspace</button>
+            {p.manualTimeAllowed && <button onClick={() => { setMenu(false); void window.yva.openAddTime() }}>Add missing time</button>}
             <button onClick={() => { setMenu(false); void window.yva.signOut() }}>Sign out</button>
           </div>
         )}

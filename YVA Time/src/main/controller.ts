@@ -2,7 +2,7 @@
 // Everything is saved on this computer first and uploaded every minute, so a lost
 // connection or a crash never loses tracked time (time while the app isn't running
 // is never counted).
-import { powerMonitor, shell } from 'electron'
+import { app, powerMonitor, shell } from 'electron'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import type { Profile, Snapshot, Target } from '../shared/types'
@@ -10,6 +10,7 @@ import { Tracker, blockStartOf } from './tracker'
 import * as auth from './auth'
 import * as api from './api'
 import { captureScreens } from './screenshots'
+import { reminderDue, type ReminderMemory } from './reminders'
 import { dataPath, readJson, writeJson } from './store'
 import {
   PROFILE_EVERY_MS, SAVE_EVERY_MS, SCREENSHOT_DELETE_MS, SYNC_EVERY_MS,
@@ -23,6 +24,8 @@ type Saved = {
   tracker: ReturnType<Tracker['serialize']> | null
   profile: Profile | null
   consentAt: number | null
+  consentSynced?: boolean
+  reminders?: ReminderMemory
   lastTarget: Target | null
   queue: QueuedShot[]
 }
@@ -41,6 +44,9 @@ export class Controller {
   private phase: Snapshot['phase'] = 'signed-out'
   private profile: Profile | null = null
   private consentAt: number | null = null
+  private consentSynced = false
+  private reminders: ReminderMemory = { start: null, end: null }
+  private notify: (title: string, body: string) => void = () => {}
   private lastTarget: Target | null = null
   private queue: QueuedShot[] = []
   private lastShot: ShotGroup | null = null
@@ -54,12 +60,15 @@ export class Controller {
   private timers: NodeJS.Timeout[] = []
 
   onSnapshot(cb: (s: Snapshot) => void) { this.listeners.add(cb) }
+  onNotify(cb: (title: string, body: string) => void) { this.notify = cb }
 
   async init() {
     const saved = readJson<Saved | null>('state.json', null)
     this.tracker.restore(saved?.tracker ?? null)
     this.profile    = saved?.profile ?? null
     this.consentAt  = saved?.consentAt ?? null
+    this.consentSynced = saved?.consentSynced ?? false
+    this.reminders  = saved?.reminders ?? { start: null, end: null }
     this.lastTarget = saved?.lastTarget ?? null
     this.queue      = (saved?.queue ?? []).filter(q => fs.existsSync(q.file))
     if (this.profile) this.tracker.setScreenshots(this.profile.worksFor === 'client')
@@ -161,6 +170,8 @@ export class Controller {
     this.queue = []
     this.lastShot = null
     this.consentAt = null
+    this.consentSynced = false
+    this.reminders = { start: null, end: null }
     this.lastTarget = null
   }
 
@@ -200,9 +211,32 @@ export class Controller {
   async endBreak() { this.tracker.endBreak(Date.now()); this.emit() }
   async resolveIdle(keep: boolean) { this.tracker.resolveIdle(keep); this.save(); this.emit() }
 
-  async acceptConsent() { this.consentAt = Date.now(); this.save(); this.emit() }
+  async acceptConsent() {
+    this.consentAt = Date.now()
+    this.consentSynced = false
+    this.save(); this.emit()
+    void this.sync()                       // records it in YVA OS (retried until it's saved)
+  }
 
   async openWorkspace() { if (!TEST_NO_BROWSER) await shell.openExternal(WORKSPACE_URL) }
+
+  /** Manual time requests live in My workspace (only when Manual Time is on for this person) */
+  async openAddTime() {
+    if (!this.profile?.manualTimeAllowed) return
+    const url = `${WORKSPACE_URL}#manual`
+    if (TEST_NO_BROWSER) fs.writeFileSync(dataPath('last-opened-url.txt'), url)
+    else await shell.openExternal(url)
+  }
+
+  private checkReminders(now: number) {
+    if (this.phase !== 'ready' || !this.profile) return
+    const due = reminderDue(new Date(now), this.profile.shiftStart, this.profile.shiftEnd, this.tracker.status, this.reminders)
+    if (!due) return
+    this.reminders = { ...this.reminders, [due.kind]: due.shiftKey }
+    this.save()
+    if (due.kind === 'start') this.notify('Your shift started', `Your shift started at ${due.clock}. Start tracking in YVA Time?`)
+    else this.notify('Still tracking?', `Your shift ended at ${due.clock} and YVA Time is still tracking. Stop it if you're done.`)
+  }
 
   // ── Every second ───────────────────────────────────────────────────────────
 
@@ -215,6 +249,7 @@ export class Controller {
     const now = Date.now()
     this.tracker.tick(now, this.idleSeconds())
     if (this.consentAt && this.tracker.screenshotDue(now)) void this.takeScreenshot(now)
+    if (Math.floor(now / 1000) % 60 === 0) this.checkReminders(now)
     this.emit()
   }
 
@@ -315,6 +350,10 @@ export class Controller {
       if (refused.length) this.message = "Some time couldn't be saved (are you still on that project?). Contact YVA."
       this.online = true
       this.lastSavedAt = Date.now()
+      if (this.consentAt && !this.consentSynced) {
+        await api.recordConsent(c, this.profile.employeeId, app.getVersion())
+        this.consentSynced = true
+      }
       await this.uploadScreenshots()
     } catch (e) {
       if (e instanceof api.OfflineError) this.online = false
@@ -335,6 +374,8 @@ export class Controller {
         tracker: this.tracker.serialize(Date.now()),
         profile: this.profile,
         consentAt: this.consentAt,
+        consentSynced: this.consentSynced,
+        reminders: this.reminders,
         lastTarget: this.lastTarget,
         queue: this.queue,
       } satisfies Saved)

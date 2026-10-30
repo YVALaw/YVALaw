@@ -1,7 +1,7 @@
 {
   "name": "yva-time",
   "productName": "YVA Time",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "YVA Time \u2014 time tracker for YVA Staffing employees",
   "author": "YVA Staffing",
   "private": true,

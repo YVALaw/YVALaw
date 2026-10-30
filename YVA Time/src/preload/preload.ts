@@ -25,6 +25,7 @@ const api: YvaApi = {
   resolveIdle:      (keep: boolean) => call('resolveIdle', keep),
   deleteScreenshot: () => call('deleteScreenshot'),
   openWorkspace:    () => call('openWorkspace'),
+  openAddTime:      () => call('openAddTime'),
 }
 
 contextBridge.exposeInMainWorld('yva', api)

@@ -27,7 +27,8 @@ export async function fetchProfile(token: string): Promise<Profile> {
   }
   if (res.status === 401) throw new SignedOutError('signed out')
   const data = await res.json().catch(() => ({})) as {
-    employee?: { id: string; name: string; email: string | null; worksFor: 'client' | 'yva'; manualTimeAllowed: boolean }
+    employee?: { id: string; name: string; email: string | null; worksFor: 'client' | 'yva'; manualTimeAllowed: boolean
+                 defaultShiftStart: string | null; defaultShiftEnd: string | null }
     projects?: { id: string; name: string; clientName: string | null; status: string | null }[]
     error?: string
   }
@@ -38,6 +39,8 @@ export async function fetchProfile(token: string): Promise<Profile> {
     email:             data.employee.email,
     worksFor:          data.employee.worksFor,
     manualTimeAllowed: data.employee.manualTimeAllowed,
+    shiftStart:        data.employee.defaultShiftStart ?? null,
+    shiftEnd:          data.employee.defaultShiftEnd ?? null,
     projects: (data.projects || [])
       .filter(p => !p.status || !/^(completed|closed|cancel)/i.test(p.status))
       .map(p => ({ id: p.id, name: p.name, clientName: p.clientName })),
@@ -53,6 +56,7 @@ function toServerRow(employeeId: string, r: BlockRow) {
     work_type:   r.workType,
     seconds:     r.removed ? 0 : r.seconds,
     note:        r.note,
+    source:      'desktop',
   }
 }
 
@@ -63,7 +67,7 @@ function toServerRow(employeeId: string, r: BlockRow) {
 export async function upsertBlocks(c: SupabaseClient, employeeId: string, rows: BlockRow[]): Promise<{ saved: BlockRow[]; refused: BlockRow[] }> {
   if (rows.length === 0) return { saved: [], refused: [] }
   const send = (batch: BlockRow[]) => c.from('tracker_blocks')
-    .upsert(batch.map(r => toServerRow(employeeId, r)), { onConflict: 'employee_id,block_start,target_key' })
+    .upsert(batch.map(r => toServerRow(employeeId, r)), { onConflict: 'employee_id,block_start,target_key,source' })
 
   const { error, status } = await send(rows)
   if (!error) return { saved: rows, refused: [] }
@@ -84,6 +88,7 @@ export async function loadRecentBlocks(c: SupabaseClient, employeeId: string, si
   const { data, error, status } = await c.from('tracker_blocks')
     .select('block_start,target_key,seconds,status,note')
     .eq('employee_id', employeeId)
+    .eq('source', 'desktop')          // approved manual time lives in its own rows
     .gte('block_start', new Date(sinceMs).toISOString())
   if (error) {
     if (isNetworkFailure(status, error.message)) throw new OfflineError(error.message)
@@ -132,4 +137,13 @@ export async function deleteScreenshots(c: SupabaseClient, paths: string[]) {
   }
   if ((rows.data || []).length !== paths.length) throw new Error('Too late — screenshots can only be deleted within 2 minutes.')
   await c.storage.from('screenshots').remove(paths)
+}
+
+/** Record that the employee accepted the screenshot notice (shown to YVA on their profile) */
+export async function recordConsent(c: SupabaseClient, employeeId: string, appVersion: string) {
+  const { error, status } = await c.from('tracker_consents').insert({ employee_id: employeeId, app_version: appVersion.slice(0, 40) })
+  if (error) {
+    if (isNetworkFailure(status, error.message)) throw new OfflineError(error.message)
+    throw new Error(error.message)
+  }
 }

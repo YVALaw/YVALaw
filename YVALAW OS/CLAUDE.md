@@ -127,7 +127,22 @@ Groundwork for the YVA Time Windows desktop tracker (Electron, Phase 1). Plan de
 - **Admin:** Time Tracking → **Live** (CEO/Admin/Accounting: who is tracking now — a block updated in the last 3 min — today's hours, current project + note) and **Screenshots** (CEO/Admin: employee + day, hour rows of six 10-minute cells, signed URLs, full-size view, delete).
 - **Retention:** `purge-old-screenshots.mjs` runs daily (netlify.toml) and deletes screenshots older than 90 days (files, then rows). The app's notice promises this.
 - **Installer:** `.github/workflows/yva-time-windows.yml` builds `YVA-Time-Setup.exe` on windows-latest (Run workflow → artifact; tag `yva-time-v*` → GitHub Release). Then set Netlify `VITE_YVA_TIME_DOWNLOAD_URL=https://github.com/YVALaw/YVALaw/releases/latest/download/YVA-Time-Setup.exe` to show the Download button in My workspace. Not code-signed yet (SmartScreen warning) — Phase 3.
-- **Next (Phase 2):** approve timesheets and roll approved tracker time into `time_entries` (client portal hours, invoice import, payslips); manual time requests (only when `manual_time_allowed`); store consent server-side; shift reminders; disconnect a computer from YVA OS.
+
+## YVA Time — Phase 2 (approvals → money flow) ✅ built, needs SQL + deploy
+
+- **Run `supabase/migrate-yva-time-phase2.sql`** (after phase1). Adds:
+  - `time_entries.source` (`manual` | `tracker`), `tracker_key` (unique), `approved_by`, `approved_at`. **Approved tracker time is rolled up into `time_entries`** — one row per employee + day + project/work type (`tracker_key = employee|day|target_key`), `billable = true` for client projects. So the client portal (hours only, via the existing portal policy), the time log, invoices and payslips all read the same numbers.
+  - `tracker_blocks` unique key is now `(employee_id, block_start, target_key, source)` (desktop and manual rows side by side; the app upserts with that key and only reads back `source = 'desktop'`). The 600 s cap counts tracked + pending + approved.
+  - `manual_time_requests` — employees with `manual_time_allowed` request missing time (last 14 days, ≤ 12 h, their projects or YVA work types); they can cancel while pending.
+  - `tracker_consents` — the app records when the screenshot notice was accepted (shown on the employee profile).
+  - **Functions (SECURITY INVOKER, CEO/Admin/Accounting only):** `yva_time_approve(employee, from, to, tz)` marks tracked blocks approved (finished days only — not today) and calls `yva_time_rollup` (rebuilds the day totals; idempotent). `yva_time_decide_request(request, approve, note, tz)` splits approved manual time into 10-minute blocks, **clipped to the room left in each block** (never double-counts tracked time), then rolls up. Tested on local Postgres (36 checks).
+- **Time Tracking → Approve** (CEO/Admin/Accounting): week grid per employee (hours/day, ● = not approved yet), **Approve** = Monday → yesterday of that week; manual requests with Approve / Reject (reject asks for a reason the employee sees). Days are counted in the admin's browser time zone (`LOCAL_TZ`).
+- **Time log:** YVA Time rows are read-only (badge, no edit/delete) and the page saves **one entry at a time** (`upsertTimeEntry` / `deleteTimeEntry`, never the whole-table `syncAll`, which could delete server-written rows). It reloads when you come back from another tab.
+- **Invoice builder → "Import YVA Time hours"** (needs a project + billing period): fills the daily grid from approved hours, written as `h:mm` (`hoursToHM`) because the grid reads `7.25` as 7 h 25 min; asks before overwriting typed hours.
+- **Payslips:** `trackedPayEntries()` (`src/utils/trackedPay.ts`) adds approved **non-billable** tracker hours (YVA team work types) × pay rate to statements/payslips on both the Team page and the employee profile. Client-project hours stay paid through invoices (no double pay). No premium split for these hours yet.
+- **My workspace:** **My hours** (this/last week by day, approved vs not) and **Add missing time** (form + my requests with status / YVA's note / Cancel) when Manual Time is on. Work types: `src/lib/yvaTime.ts` — keep identical to `YVA Time/src/main/config.ts`.
+- **Desktop app 0.2.0:** records consent (retried until saved), "Add missing time" menu item (opens `/os/me#manual`, only when allowed), Windows shift reminders from the profile's shift times (start: not tracking 10–60 min after a weekday shift starts; end: still tracking 30 min – 6 h after it ends; once per shift; overnight shifts supported — `src/main/reminders.ts`, unit-tested). App ID set for Windows notifications.
+- **Next (Phase 3):** code signing + auto-updates, activity %, lateness/schedule reports, disconnect a computer from YVA OS, reopen an approved day.
 
 ---
 

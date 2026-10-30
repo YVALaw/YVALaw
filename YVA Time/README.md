@@ -18,7 +18,8 @@ Layout:
 - `src/main/controller.ts` — runs it: screenshots, uploads every minute, offline queue, UI snapshot
 - `src/main/auth.ts` — PKCE sign-in through YVA OS `/connect-app`, encrypted session (Windows DPAPI)
 - `src/main/api.ts` — `employee-me`, `tracker_blocks`, `tracker_screenshots`, private `screenshots` bucket
-- `src/main/main.ts` — window, tray, `yvatime://` links, start with Windows
+- `src/main/reminders.ts` — shift start/end reminders (pure logic, unit-tested)
+- `src/main/main.ts` — window, tray, `yvatime://` links, start with Windows, notifications
 - `src/renderer/` — React UI; `src/preload/` — the `window.yva` bridge
 
 Testing hooks (environment variables, never set in the installed app): `YVA_API_BASE`,

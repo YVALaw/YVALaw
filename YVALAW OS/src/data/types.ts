@@ -274,6 +274,9 @@ export type TimeEntry = {
   billable: boolean
   invoiced?: boolean
   createdAt?: number
+  source?: 'manual' | 'tracker'  // tracker = approved YVA Time hours (read-only in the time log)
+  trackerKey?: string
+  approvedAt?: string
 }
 
 // ─── Recurring Invoices ───────────────────────────────────────────────────────

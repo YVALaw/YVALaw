@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import type { Client, Employee, Project, TimeEntry } from '../data/types'
-import { loadTimeEntries, saveTimeEntries, loadEmployees, loadProjects, loadClients } from '../services/storage'
+import { loadTimeEntries, upsertTimeEntry, deleteTimeEntry, loadEmployees, loadProjects, loadClients } from '../services/storage'
 import { supabase } from '../lib/supabase'
 import { IconCheck, IconEdit, IconTrash } from '../components/Icon'
 import { useRole } from '../context/RoleContext'
 import { can } from '../lib/roles'
 import LiveBoard from './time/LiveBoard'
 import ScreenshotDay from './time/ScreenshotDay'
+import ApproveTime from './time/ApproveTime'
 
 function uid() { return crypto.randomUUID() }
 function getToday() { return new Date().toISOString().slice(0, 10) }
@@ -59,7 +60,10 @@ export default function TimeTrackingPage() {
 
   // YVA Time views
   const { role } = useRole()
-  const [tab, setTab] = useState<'log' | 'live' | 'screens'>('log')
+  const [tab, setTab] = useState<'log' | 'live' | 'approve' | 'screens'>('log')
+
+  // Approvals add YVA Time entries server-side: reload the log when coming back to it
+  useEffect(() => { if (tab === 'log') void loadTimeEntries().then(setEntries) }, [tab])
 
   useEffect(() => {
     void (async () => {
@@ -105,9 +109,9 @@ export default function TimeTrackingPage() {
   // Current user's display name (linked employee takes priority over auth name)
   const currentName = linkedEmployee?.name ?? authDisplayName
 
-  function persist(next: TimeEntry[]) {
+  function persistOne(entry: TimeEntry, next: TimeEntry[]) {
     setEntries(next)
-    void saveTimeEntries(next)
+    void upsertTimeEntry(entry).catch(err => console.error(err))
   }
 
   // ─── Filtering ─────────────────────────────────────────────────────────────
@@ -168,25 +172,29 @@ export default function TimeTrackingPage() {
   function saveEntry() {
     const hoursNum = parseFloat(form.hours)
     if (!form.employeeName.trim() || isNaN(hoursNum) || hoursNum <= 0) return
-    if (editingId) {
-      persist(entries.map(e => e.id === editingId
-        ? { ...e, date: form.date, employeeId: form.employeeId || undefined, employeeName: form.employeeName.trim(),
-            projectId: form.projectId || undefined, projectName: form.projectName || undefined,
-            clientName: form.clientName || undefined, hours: hoursNum,
-            description: form.description.trim() || undefined, billable: form.billable }
-        : e))
+    const existing = editingId ? entries.find(e => e.id === editingId) : undefined
+    if (existing?.source === 'tracker') { closePanel(); return }   // approved YVA Time hours are read-only
+    if (existing) {
+      const updated: TimeEntry = { ...existing, date: form.date, employeeId: form.employeeId || undefined, employeeName: form.employeeName.trim(),
+        projectId: form.projectId || undefined, projectName: form.projectName || undefined,
+        clientName: form.clientName || undefined, hours: hoursNum,
+        description: form.description.trim() || undefined, billable: form.billable }
+      persistOne(updated, entries.map(e => e.id === existing.id ? updated : e))
     } else {
-      persist([{ id: uid(), date: form.date, employeeId: form.employeeId || undefined,
+      const created: TimeEntry = { id: uid(), date: form.date, employeeId: form.employeeId || undefined,
         employeeName: form.employeeName.trim(), projectId: form.projectId || undefined,
         projectName: form.projectName || undefined, clientName: form.clientName || undefined,
         hours: hoursNum, description: form.description.trim() || undefined,
-        billable: form.billable, createdAt: Date.now() }, ...entries])
+        billable: form.billable, source: 'manual', createdAt: Date.now() }
+      persistOne(created, [created, ...entries])
     }
     closePanel()
   }
 
   function doDelete(id: string) {
-    persist(entries.filter(e => e.id !== id))
+    if (entries.find(e => e.id === id)?.source === 'tracker') { setConfirmDelete(null); return }
+    setEntries(entries.filter(e => e.id !== id))
+    void deleteTimeEntry(id).catch(err => console.error(err))
     setConfirmDelete(null)
   }
 
@@ -202,6 +210,7 @@ export default function TimeTrackingPage() {
           {tab === 'log' && currentName && <p className="page-sub">Manual entries are logged as <strong>{currentName}</strong></p>}
           {tab === 'live' && <p className="page-sub">Live from the YVA Time desktop app · refreshes every minute</p>}
           {tab === 'screens' && <p className="page-sub">Client-team screenshots · kept 90 days · never shown to clients</p>}
+          {tab === 'approve' && <p className="page-sub">Approve YVA Time hours and manual time requests</p>}
         </div>
         {tab === 'log' && (
           <div className="page-actions">
@@ -213,6 +222,9 @@ export default function TimeTrackingPage() {
         <div className="filter-tabs">
           <button className={`filter-tab${tab === 'log' ? ' active' : ''}`} onClick={() => setTab('log')}>Time log</button>
           <button className={`filter-tab${tab === 'live' ? ' active' : ''}`} onClick={() => setTab('live')}>Live</button>
+          {can.approveTime(role) && (
+            <button className={`filter-tab${tab === 'approve' ? ' active' : ''}`} onClick={() => setTab('approve')}>Approve</button>
+          )}
           {can.viewScreenshots(role) && (
             <button className={`filter-tab${tab === 'screens' ? ' active' : ''}`} onClick={() => setTab('screens')}>Screenshots</button>
           )}
@@ -225,7 +237,7 @@ export default function TimeTrackingPage() {
     return (
       <div className="page-wrap">
         {header}
-        {tab === 'live' ? <LiveBoard /> : <ScreenshotDay />}
+        {tab === 'live' ? <LiveBoard /> : tab === 'approve' ? <ApproveTime /> : <ScreenshotDay />}
       </div>
     )
   }
@@ -345,8 +357,14 @@ export default function TimeTrackingPage() {
                     </td>
                     <td>
                       <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                        <button className="btn-ghost btn-sm" onClick={() => openEdit(entry)} style={{ padding: '3px 7px', fontSize: 13 }}><IconEdit size={13} /></button>
-                        <button className="btn-ghost btn-sm" onClick={() => setConfirmDelete(entry.id)} style={{ padding: '3px 7px', fontSize: 13, color: '#ef4444' }}><IconTrash size={13} /></button>
+                        {entry.source === 'tracker' ? (
+                          <span className="badge badge-blue" style={{ fontSize: 10 }} title="Approved hours from the YVA Time app — read-only">YVA Time</span>
+                        ) : (
+                          <>
+                            <button className="btn-ghost btn-sm" onClick={() => openEdit(entry)} style={{ padding: '3px 7px', fontSize: 13 }}><IconEdit size={13} /></button>
+                            <button className="btn-ghost btn-sm" onClick={() => setConfirmDelete(entry.id)} style={{ padding: '3px 7px', fontSize: 13, color: '#ef4444' }}><IconTrash size={13} /></button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

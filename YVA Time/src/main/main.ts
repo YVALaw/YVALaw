@@ -1,5 +1,5 @@
 // YVA Time — Electron main process: window, tray icon, yvatime:// links, start with Windows.
-import { app, BrowserWindow, ipcMain, Menu, nativeImage, Tray, type IpcMainInvokeEvent } from 'electron'
+import { app, BrowserWindow, ipcMain, Menu, nativeImage, Notification, Tray, type IpcMainInvokeEvent } from 'electron'
 import path from 'node:path'
 import { Controller } from './controller'
 import { PROTOCOL } from './config'
@@ -82,6 +82,7 @@ if (!app.requestSingleInstanceLock()) {
     resolveIdle:      (keep: boolean) => controller.resolveIdle(keep === true),
     deleteScreenshot: () => controller.deleteScreenshot(),
     openWorkspace:    () => controller.openWorkspace(),
+    openAddTime:      () => controller.openAddTime(),
   }
   for (const [name, fn] of Object.entries(handlers)) {
     ipcMain.handle(`yva:${name}`, (e, ...args: unknown[]) => {
@@ -110,13 +111,20 @@ if (!app.requestSingleInstanceLock()) {
     } else {
       app.setAsDefaultProtocolClient(PROTOCOL)
     }
-    if (app.isPackaged && process.platform === 'win32') {
-      app.setLoginItemSettings({ openAtLogin: true, args: ['--hidden'] })
+    if (process.platform === 'win32') {
+      app.setAppUserModelId('agency.yvastaffing.time')   // same as build.appId; Windows needs it for notifications
+      if (app.isPackaged) app.setLoginItemSettings({ openAtLogin: true, args: ['--hidden'] })
     }
     Menu.setApplicationMenu(null)
     createWindow(!process.argv.includes('--hidden'))
     tray = new Tray(nativeImage.createFromPath(resource('tray-stopped.png')))
     tray.on('click', showWindow)
+    controller.onNotify((title, body) => {
+      if (!Notification.isSupported()) return
+      const n = new Notification({ title, body, icon: resource('icon.png') })
+      n.on('click', showWindow)
+      n.show()
+    })
     controller.onSnapshot(s => {
       if (win && !win.isDestroyed()) win.webContents.send('yva:snapshot', s)
       updateTray(s)

@@ -38,4 +38,6 @@ export const can = {
   // YVA Time: who is tracking + hours (Live), and screenshots (CEO/Admin only — matches RLS)
   viewTracker:       (r: AppRole) => r === 'ceo' || r === 'admin' || r === 'accounting',
   viewScreenshots:   (r: AppRole) => r === 'ceo' || r === 'admin',
+  // Approve YVA Time hours / manual requests (matches yva_time_approve in the database)
+  approveTime:       (r: AppRole) => r === 'ceo' || r === 'admin' || r === 'accounting',
 }

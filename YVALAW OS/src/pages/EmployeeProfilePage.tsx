@@ -5,6 +5,8 @@ import { loadSnapshot, saveEmployees, saveInvoices, loadSettings, loadTimeEntrie
 import { uploadFile, deleteFile } from '../services/fileStorage'
 import { sendEmail } from '../services/gmail'
 import { buildStatementHTML } from '../utils/statementHtml'
+import { trackedHoursOf, trackedPayEntries } from '../utils/trackedPay'
+import { loadLatestConsent } from '../services/trackerStorage'
 import {
   IconImage, IconMusic, IconFile, IconX, IconTrash, IconCheck,
   IconMail, IconPrinter, IconCamera, IconPlay, IconLink, IconLock,
@@ -101,13 +103,13 @@ function summarizeEmployeeInvoices(emp: Employee, invoices: Invoice[]) {
   }, { hours: 0, regularHours: 0, premiumHours: 0, totalPay: 0 })
 }
 
-async function emailStatement(emp: Employee, empInvoices: Invoice[], dateFrom: string, dateTo: string) {
+async function emailStatement(emp: Employee, empInvoices: Invoice[], dateFrom: string, dateTo: string, tracked: TimeEntry[] = []) {
   const settings = await loadSettings()
   const payRate  = Number(emp.payRate) || 0
   const dopRate  = settings.usdToDop || 0
   const summary = summarizeEmployeeInvoices(emp, empInvoices)
-  const totalHours = summary.hours
-  const totalUSD = summary.totalPay
+  const totalHours = summary.hours + trackedHoursOf(tracked)
+  const totalUSD = summary.totalPay + trackedHoursOf(tracked) * payRate
   const totalDOP = dopRate > 0 ? totalUSD * dopRate : 0
   const period   = dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : dateFrom || dateTo || 'All time'
   const companyName = settings.companyName || 'YVA Staffing'
@@ -127,7 +129,7 @@ async function emailStatement(emp: Employee, empInvoices: Invoice[], dateFrom: s
       `  Invoices: ${empInvoices.length}\n\n` +
       `Please reach out if you have any questions.\n\n${settings.emailSignature || companyName}`
   }
-  const statementHtml = buildStatementHTML(emp, empInvoices, dateFrom, dateTo, dopRate, false)
+  const statementHtml = buildStatementHTML(emp, empInvoices, dateFrom, dateTo, dopRate, false, tracked)
   const safeName   = emp.name.replace(/\s+/g, '-').toLowerCase()
   const periodSlug = period.replace(/\s/g, '').replace(/[^a-zA-Z0-9-]/g, '-')
   await sendEmail(emp.email || '', subject, bodyText, {
@@ -137,9 +139,9 @@ async function emailStatement(emp: Employee, empInvoices: Invoice[], dateFrom: s
   })
 }
 
-async function printPayslip(emp: Employee, empInvoices: Invoice[], dateFrom: string, dateTo: string) {
+async function printPayslip(emp: Employee, empInvoices: Invoice[], dateFrom: string, dateTo: string, tracked: TimeEntry[] = []) {
   const settings = await loadSettings()
-  const html = buildStatementHTML(emp, empInvoices, dateFrom, dateTo, settings.usdToDop || 0, true)
+  const html = buildStatementHTML(emp, empInvoices, dateFrom, dateTo, settings.usdToDop || 0, true, tracked)
   const win = window.open('', '_blank', 'width=800,height=600')
   if (!win) return
   win.document.write(html)
@@ -174,6 +176,8 @@ export default function EmployeeProfilePage() {
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [inviteLoading, setInviteLoading] = useState<'email' | 'link' | null>(null)
   const [inviteMsg,     setInviteMsg]     = useState<{ ok: boolean; text: string } | null>(null)
+  const [consentAt,     setConsentAt]     = useState<number | null>(null)
+  useEffect(() => { if (id) void loadLatestConsent(id).then(setConsentAt) }, [id])
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined)
 
   // Sync form/attachments/photo from emp once data loads
@@ -240,8 +244,10 @@ export default function EmployeeProfilePage() {
   const payRate     = Number(empNN.payRate) || 0
   const premiumConfig = employeePremiumConfig(empNN)
   const summary = summarizeEmployeeInvoices(empNN, empInvoices)
-  const totalHours  = summary.hours
-  const totalEarned  = summary.totalPay
+  const empTracked   = trackedPayEntries(empNN, timeEntries, dateFrom || undefined, dateTo || undefined)
+  const trackedHours = trackedHoursOf(empTracked)
+  const totalHours  = summary.hours + trackedHours
+  const totalEarned  = summary.totalPay + trackedHours * payRate
   const paidCount    = empInvoices.filter(inv => (inv.employeePayments?.[empNN.id] || inv.employeePayments?.[empNN.name])?.status === 'paid').length
   const pendingCount = empInvoices.length - paidCount
   const totalPaid    = empInvoices.reduce((s, inv) => {
@@ -633,7 +639,14 @@ export default function EmployeeProfilePage() {
             </div>
             {empNN.userId ? (
               <div style={{ color: 'var(--muted)', fontSize: 13, paddingTop: 4 }}>
-                This employee can sign in to My workspace (and the YVA Time app once it's released).
+                This employee can sign in to My workspace and the YVA Time app.
+                {empNN.worksFor !== 'yva' && (
+                  <div style={{ marginTop: 6 }}>
+                    Screenshot notice: {consentAt
+                      ? <strong style={{ color: 'var(--text)' }}>accepted {new Date(consentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</strong>
+                      : 'not accepted yet (the app asks on first use)'}
+                  </div>
+                )}
               </div>
             ) : (
               <>
@@ -754,12 +767,12 @@ export default function EmployeeProfilePage() {
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
             <button
               className="btn-ghost btn-sm"
-              disabled={empInvoices.length === 0 || !empNN.email || sending}
+              disabled={(empInvoices.length === 0 && empTracked.length === 0) || !empNN.email || sending}
               title={!empNN.email ? 'No email on file' : ''}
               onClick={async () => {
                 setSending(true)
                 try {
-                  await emailStatement(emp, empInvoices, dateFrom, dateTo)
+                  await emailStatement(emp, empInvoices, dateFrom, dateTo, empTracked)
                   showToast(`Statement sent to ${empNN.email}`)
                 } catch {
                   showToast('Failed to send — check Gmail connection in Settings')
@@ -770,11 +783,17 @@ export default function EmployeeProfilePage() {
             >
               {sending ? 'Sending…' : <><span style={{ marginRight: 5, display: 'inline-flex', verticalAlign: 'middle' }}><IconMail size={13} /></span> Email Statement</>}
             </button>
-            <button className="btn-ghost btn-sm" onClick={() => printPayslip(emp, empInvoices, dateFrom, dateTo)}
-              disabled={empInvoices.length === 0}>
+            <button className="btn-ghost btn-sm" onClick={() => printPayslip(emp, empInvoices, dateFrom, dateTo, empTracked)}
+              disabled={empInvoices.length === 0 && empTracked.length === 0}>
               <span style={{ marginRight: 5, display: 'inline-flex', verticalAlign: 'middle' }}><IconPrinter size={13} /></span> PDF Payslip
             </button>
           </div>
+
+          {trackedHours > 0 && (
+            <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 10 }}>
+              Includes <strong style={{ color: 'var(--text)' }}>{trackedHours.toFixed(2)} h</strong> of approved YVA Time work (not on client invoices).
+            </div>
+          )}
 
           {/* Invoice sections */}
           {empInvoices.length === 0 ? (
