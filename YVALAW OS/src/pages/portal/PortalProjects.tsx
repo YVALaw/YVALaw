@@ -85,7 +85,7 @@ export default function PortalProjects() {
       setProjects(projs)
       setInvoices(invs)
 
-      const emps = await loadPortalEmployees(projs)
+      const emps = await loadPortalEmployees(clientId)
       setEmployees(emps)
       setLoading(false)
     })()

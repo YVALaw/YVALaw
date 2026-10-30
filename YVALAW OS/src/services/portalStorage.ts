@@ -109,20 +109,23 @@ export async function loadPortalInvoices(clientName: string): Promise<Invoice[]>
 }
 
 /**
- * Load employees assigned to any of the client's projects.
- * Deduplicates across multiple projects.
+ * Load employees assigned to any of the client's projects (client-safe fields only).
+ * Served by the portal-team function — clients have no direct read on `employees`,
+ * so pay rates, notes and attachments stay private.
  */
-export async function loadPortalEmployees(projects: Project[]): Promise<Employee[]> {
-  const allIds = [...new Set(projects.flatMap(p => p.employeeIds ?? []))]
-  if (allIds.length === 0) return []
-
-  const { data, error } = await supabase
-    .from('employees')
-    .select('id, name, role, photo_url, email, timezone, status, employment_type, default_shift_start, default_shift_end, location')
-    .in('id', allIds)
-
-  if (error || !data) return []
-  return rowsToEmployees(data as Record<string, unknown>[])
+export async function loadPortalEmployees(clientId: string): Promise<Employee[]> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return []
+  try {
+    const res = await fetch(`/.netlify/functions/portal-team?clientId=${encodeURIComponent(clientId)}`, {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+    if (!res.ok) return []
+    const { employees } = await res.json()
+    return rowsToEmployees((employees || []) as Record<string, unknown>[])
+  } catch {
+    return []
+  }
 }
 
 /**

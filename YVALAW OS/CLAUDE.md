@@ -97,7 +97,7 @@ CREATE POLICY "client_update_prefs" ON working_hour_prefs FOR UPDATE TO authenti
 - Separate portal-scoped read policies per table (clients, projects, invoices, employees, time_entries, client_documents, staff_requests)
 - Invite functions validate the caller against an explicit staff-role list (`STAFF_ROLES` / `INVITER_ROLES`), never "anything but client"
 - Service role key lives in Netlify env only — never in frontend
-- **Known issue (not fixed yet):** the `portal_client_employees` RLS policy lets a portal client SELECT *every* column of their placed staff's `employees` rows (pay rate, notes, attachments) through the API, even though the portal UI only asks for safe columns. Fix by serving the portal team list through a server function (like `employee-me`) or a safe-column view, then dropping that policy.
+- **Portal clients have no direct read on `employees`** (a row policy can't hide columns, so the old `portal_client_employees` policy exposed pay rate, notes and attachments through the API). `loadPortalEmployees(clientId)` calls `netlify/functions/portal-team.cjs`, which picks the client server-side (portal clients always get their own; staff preview may pass `clientId`), takes employee IDs from that client's projects and returns client-safe fields only. Run `supabase/migrate-portal-employees-lockdown.sql` **after** deploying this. Never re-add a client SELECT policy on `employees`.
 
 ---
 

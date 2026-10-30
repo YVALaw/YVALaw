@@ -284,7 +284,7 @@ export default function PortalTeam() {
       const projs = await loadPortalProjects(clientId)
       setProjects(projs)
       const [emps, entries] = await Promise.all([
-        loadPortalEmployees(projs),
+        loadPortalEmployees(clientId),
         loadPortalTimeEntries(projs.map(p => p.id)),
       ])
       setEmployees(emps)

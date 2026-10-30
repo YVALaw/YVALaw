@@ -178,7 +178,7 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 - **Role lockdown:** any signup could insert its own `user_roles` row as CEO (sign-ups are on). New accounts are now `pending` until a CEO approves them in Team Access; `is_internal()` is an explicit staff-role list. Needs `YVALAW OS/supabase/migrate-role-lockdown.sql` run in Supabase.
 - `invite-client` / `create-payment-intent` check an explicit staff-role list (a `pending` account could otherwise invite clients or pay on their behalf).
 - **YVA Time Phase 0** (employee logins, see `YVALAW OS/CLAUDE.md`): employee Works For / Manual Time fields, Invite to YVA Time (`invite-employee`), employee-only **My workspace** at `/os/me` (`employee-me`), YVA OS web timer removed. Needs `YVALAW OS/supabase/migrate-yva-time-phase0.sql` run before deploy. Next: Phase 1, the Windows desktop app.
-- Known issue: portal clients can read all columns of their placed staff's employee rows via the API (`portal_client_employees` policy) — see `YVALAW OS/CLAUDE.md` → Security.
+- Portal clients could read all columns of their placed staff's employee rows via the API (pay rate, notes). The portal team now comes from the `portal-team` function (safe fields only); run `YVALAW OS/supabase/migrate-portal-employees-lockdown.sql` after deploying.
 
 ### Session 11 (content manager)
 - About section: Sam Colas removed (story, founder card, JSON-LD); Hans Henriquez → **Hans Esmel**, described as sole founder ("CEO & Founder"). Headings now "The Founder" / "Meet the Founder".
