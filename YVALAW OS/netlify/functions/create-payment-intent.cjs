@@ -18,6 +18,8 @@
  */
 
 const PAYABLE_STATUSES = new Set(['sent', 'viewed', 'overdue', 'partial'])
+// Same list as private.is_internal() — 'client', 'pending' and anything else are not staff
+const STAFF_ROLES = new Set(['ceo', 'admin', 'accounting', 'recruiter', 'lead_gen'])
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -180,7 +182,7 @@ exports.handler = async function handler(event) {
   if (!isClient) {
     // Allow internal users (preview mode) — check user_roles
     const roleRows = await supabaseGet(`user_roles?user_id=eq.${user.id}&select=role`)
-    const isInternal = Array.isArray(roleRows) && roleRows.length > 0 && roleRows[0].role !== 'client'
+    const isInternal = Array.isArray(roleRows) && STAFF_ROLES.has(roleRows[0]?.role)
     if (!isInternal) return json(403, { error: 'Access denied' })
   }
 
