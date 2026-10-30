@@ -14,7 +14,7 @@ import type { Client, Employee, Project, TimeEntry } from '../../data/types'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-const AVATAR_COLORS = ['#f5b533','#3b82f6','#22c55e','#a855f7','#14b8a6','#f97316','#ec4899']
+const AVATAR_COLORS = ['#a16207','#3b82f6','#22c55e','#a855f7','#14b8a6','#f97316','#ec4899']
 function avatarColor(name: string) {
   let h = 0
   for (const c of name) h = (h * 31 + c.charCodeAt(0)) % AVATAR_COLORS.length
@@ -343,7 +343,7 @@ export default function PortalTeam() {
       {/* KPI cards */}
       <div className="kpi-grid">
         <div className="kpi-card">
-          <div className="kpi-icon-wrap" style={{ color: '#8b5cf6', borderColor: 'rgba(139,92,246,.15)' }}>
+          <div className="kpi-icon-wrap">
             <IconUsers size={20} />
           </div>
           <div className="kpi-body">
@@ -353,7 +353,7 @@ export default function PortalTeam() {
           </div>
         </div>
         <div className="kpi-card">
-          <div className="kpi-icon-wrap" style={{ color: '#22c55e', borderColor: 'rgba(34,197,94,.15)' }}>
+          <div className="kpi-icon-wrap">
             <IconActivity size={20} />
           </div>
           <div className="kpi-body">
@@ -363,7 +363,7 @@ export default function PortalTeam() {
           </div>
         </div>
         <div className="kpi-card">
-          <div className="kpi-icon-wrap" style={{ color: '#3b82f6', borderColor: 'rgba(59,130,246,.15)' }}>
+          <div className="kpi-icon-wrap">
             <IconClock size={20} />
           </div>
           <div className="kpi-body">
@@ -373,7 +373,7 @@ export default function PortalTeam() {
           </div>
         </div>
         <div className="kpi-card">
-          <div className="kpi-icon-wrap" style={{ color: '#a855f7', borderColor: 'rgba(168,85,247,.15)' }}>
+          <div className="kpi-icon-wrap">
             <IconFolder size={20} />
           </div>
           <div className="kpi-body">

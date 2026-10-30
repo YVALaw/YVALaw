@@ -172,7 +172,7 @@ export default function PortalBilling() {
       {/* KPI cards */}
       <div className="kpi-grid">
         <div className="kpi-card">
-          <div className="kpi-icon-wrap" style={{ color: outstanding > 0 ? '#ef4444' : 'var(--success)', borderColor: outstanding > 0 ? '#ef444425' : 'rgba(5,150,105,.15)' }}>
+          <div className="kpi-icon-wrap">
             {outstanding > 0 ? <IconAlert size={20} /> : <IconCheck size={20} />}
           </div>
           <div className="kpi-body">
@@ -185,7 +185,7 @@ export default function PortalBilling() {
         </div>
 
         <div className="kpi-card">
-          <div className="kpi-icon-wrap" style={{ color: '#22c55e', borderColor: 'rgba(34,197,94,.15)' }}>
+          <div className="kpi-icon-wrap">
             <IconCheck size={20} />
           </div>
           <div className="kpi-body">
@@ -196,7 +196,7 @@ export default function PortalBilling() {
         </div>
 
         <div className="kpi-card">
-          <div className="kpi-icon-wrap" style={{ color: 'var(--gold)', borderColor: 'rgba(212,168,67,.15)' }}>
+          <div className="kpi-icon-wrap">
             <IconReceipt size={20} />
           </div>
           <div className="kpi-body">
@@ -207,7 +207,7 @@ export default function PortalBilling() {
         </div>
 
         <div className="kpi-card">
-          <div className="kpi-icon-wrap" style={{ color: nextDue ? '#f97316' : 'var(--muted)', borderColor: nextDue ? 'rgba(249,115,22,.15)' : 'var(--border)' }}>
+          <div className="kpi-icon-wrap">
             <IconCalendar size={20} />
           </div>
           <div className="kpi-body">

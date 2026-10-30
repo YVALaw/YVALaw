@@ -402,7 +402,7 @@ export default function InvoicePage() {
           }}>
             {tab === 'invoices' ? 'Invoices' : 'Recurring'}
             {tab === 'recurring' && recurring.filter(r => r.active).length > 0 && (
-              <span style={{ marginLeft: 6, background: 'var(--gold)', color: '#1b1e2b', borderRadius: 999, padding: '1px 7px', fontSize: 11, fontWeight: 800 }}>
+              <span style={{ marginLeft: 6, background: 'var(--brand)', color: '#1b1e2b', borderRadius: 999, padding: '1px 7px', fontSize: 11, fontWeight: 800 }}>
                 {recurring.filter(r => r.active).length}
               </span>
             )}
@@ -584,7 +584,7 @@ export default function InvoicePage() {
                               <td className="td-name" style={{ fontWeight: 700, fontSize: 13 }}>{inv.number}</td>
                               <td className="td-muted">{inv.clientName || '—'}</td>
                               <td className="td-muted">{inv.date || '—'}</td>
-                              <td className="td-muted" style={{ color: overdue ? '#f87171' : undefined }}>{inv.dueDate || '—'}</td>
+                              <td className="td-muted" style={{ color: overdue ? '#dc2626' : undefined }}>{inv.dueDate || '—'}</td>
                               <td><span className={`badge ${statusBadge(inv.status)}`} style={{ fontSize: 10 }}>{inv.status || 'draft'}</span>
                                 {inv.status === 'partial' && inv.amountPaid != null && (
                                   <span style={{ fontSize: 10, color: '#f97316', marginLeft: 4 }}>({formatMoney(inv.amountPaid)} paid)</span>

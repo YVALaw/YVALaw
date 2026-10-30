@@ -498,10 +498,12 @@ All data is scoped to the authenticated user via Supabase RLS.
 - `GlobalSearch` in Shell topbar searches all entities and navigates to profile routes
 
 ## Design System
-- Dark theme: `--bg: #020617`, `--surface: #0b1428`, `--surf2: #0e1a35`
-- Gold accent: `--gold: #f5b533`, `--goldl: #ffd57e`
-- Font: Inter (system fallback)
-- Card-heavy layout: `.entity-card`, `.card-grid`, `.avatar`
+- **Navy & gold (v9, matches yvastaffing.agency):** navy `--primary` / `--sidebar-bg` `#1b1e2b`, background `--bg #f6f7f9`, white cards with 1px borders (shadows only on hover), radii 8–12px, Inter.
+- **Two yellows:** `--brand #facc15` (website yellow) for **fills** — active menu item, current-month chart bar, avatars/badges with navy text, settings tab. `--gold #a16207` (and `--goldl` / `--goldd`) for **text, borders and focus rings** — bright yellow text on white is unreadable.
+- Dashboard numbers (`.kpi-value`) are navy; red only for a real problem (overdue/unpaid > 0, negative earnings). KPI icons are neutral (`.kpi-icon-wrap`, top-right) — don't colour them inline. Cards without a `.kpi-body` stack vertically.
+- Titles: `.page-title` 26px/700, card titles sentence case 15px/600 (no uppercase). Tabs (`.filter-tab`, `.view-toggle`) are quiet; the active one is white with a border.
+- Phones: top bar hides the page name (≤640px), dashboard cards two per row without icons (≤480px). Client portal phone bottom bar: `.portal-bottom-nav-item`.
+- Colours from the old dark theme (`#f87171`, `#4ade80`, `#f5b533`…) were replaced with readable ones; on white use `#dc2626` / `#059669` / `var(--gold)`.
 - All kanban boards use `.kanban-board` + `.kanban-col-{stage}` color classes
 
 ## Invoice System

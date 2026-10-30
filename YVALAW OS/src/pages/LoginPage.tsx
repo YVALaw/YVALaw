@@ -200,20 +200,20 @@ export default function LoginPage() {
                 background: resetState === 'sent' ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)',
                 border: `1px solid ${resetState === 'sent' ? 'rgba(34,197,94,.2)' : 'rgba(239,68,68,.2)'}`,
                 borderRadius: 12, padding: '10px 14px', fontSize: 13,
-                color: resetState === 'sent' ? '#4ade80' : '#f87171',
+                color: resetState === 'sent' ? '#059669' : '#dc2626',
               }}>
                 {resetMsg}
               </div>
             )}
 
             {lockRemaining > 0 && (
-              <div style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 12, padding: '10px 14px', fontSize: 13, color: '#f87171' }}>
+              <div style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 12, padding: '10px 14px', fontSize: 13, color: '#dc2626' }}>
                 Too many failed attempts. Try again in {Math.ceil(lockRemaining / 60000)}m {Math.ceil((lockRemaining % 60000) / 1000)}s.
               </div>
             )}
 
             {error && (
-              <div style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 12, padding: '10px 14px', fontSize: 13, color: '#f87171' }}>
+              <div style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 12, padding: '10px 14px', fontSize: 13, color: '#dc2626' }}>
                 {error}
               </div>
             )}

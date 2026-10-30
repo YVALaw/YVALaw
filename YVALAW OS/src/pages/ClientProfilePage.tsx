@@ -9,7 +9,7 @@ import { IconMail, IconLink, IconEye, IconX, IconTrash, IconLock, IconMessage, I
 
 function uid() { return crypto.randomUUID() }
 
-const AVATAR_COLORS = ['#f5b533','#3b82f6','#22c55e','#a855f7','#14b8a6','#f97316','#ec4899']
+const AVATAR_COLORS = ['#a16207','#3b82f6','#22c55e','#a855f7','#14b8a6','#f97316','#ec4899']
 function avatarColor(name: string) {
   let h = 0
   for (const c of name) h = (h * 31 + c.charCodeAt(0)) % AVATAR_COLORS.length
@@ -560,7 +560,7 @@ export default function ClientProfilePage() {
                 </span>
               )}
               {outstanding > 0 && clientNN.email && (
-                <button className="btn-ghost btn-sm" style={{ color: '#fb923c' }} onClick={sendReminder}><IconMail size={12} /> Remind</button>
+                <button className="btn-ghost btn-sm" style={{ color: '#ea580c' }} onClick={sendReminder}><IconMail size={12} /> Remind</button>
               )}
               <button
                 className="btn-ghost btn-sm"
@@ -584,7 +584,7 @@ export default function ClientProfilePage() {
                 className="btn-ghost btn-sm"
                 onClick={() => window.open(`${import.meta.env.BASE_URL}portal/dashboard?preview=${clientNN.id}`, '_blank')}
                 title="Preview this client's portal view"
-                style={{ color: '#60a5fa', borderColor: 'rgba(96,165,250,0.3)' }}
+                style={{ color: '#2563eb', borderColor: 'rgba(96,165,250,0.3)' }}
               >
                 <><IconEye size={12} /> Preview Portal</>
               </button>
@@ -610,8 +610,8 @@ export default function ClientProfilePage() {
           {[
             { label: 'Total Revenue', value: `$${(totalRevenue/1000).toFixed(1)}k`, color: 'var(--gold)' },
             { label: 'Invoices', value: String(clientInvoices.length), color: 'var(--text)' },
-            { label: 'Outstanding', value: outstanding > 0 ? `$${outstanding.toFixed(2)}` : '$0', color: outstanding > 0 ? '#f87171' : 'var(--success)' },
-            { label: 'Projects', value: String(clientProjects.length), color: '#60a5fa' },
+            { label: 'Outstanding', value: outstanding > 0 ? `$${outstanding.toFixed(2)}` : '$0', color: outstanding > 0 ? '#dc2626' : 'var(--success)' },
+            { label: 'Projects', value: String(clientProjects.length), color: '#2563eb' },
           ].map(({ label, value, color: c }) => (
             <div key={label} className="settings-stat-card">
               <div className="settings-stat-count" style={{ color: c, fontSize: 18 }}>{value}</div>

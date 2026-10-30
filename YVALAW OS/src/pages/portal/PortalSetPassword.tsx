@@ -82,7 +82,7 @@ export default function PortalSetPassword({ title = 'Welcome to YVA Portal', nex
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <div style={{
             width: 56, height: 56, borderRadius: 16,
-            background: 'var(--gold)',
+            background: 'var(--brand)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             margin: '0 auto 16px',
             boxShadow: '0 8px 32px rgba(250,204,21,0.3)',

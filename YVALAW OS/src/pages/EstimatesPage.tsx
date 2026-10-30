@@ -271,7 +271,7 @@ export default function EstimatesPage() {
         </div>
         <div className="kpi-card">
           <div className="kpi-label">Accepted</div>
-          <div className="kpi-value" style={{ color: '#15803d' }}>{acceptedCount}</div>
+          <div className="kpi-value">{acceptedCount}</div>
         </div>
       </div>
 

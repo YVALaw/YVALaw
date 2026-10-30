@@ -26,7 +26,7 @@ async function generateEmployeeNumber(): Promise<string> {
   return `YVA${year}${String(counter).padStart(3, '0')}`
 }
 
-const AVATAR_COLORS = ['#f5b533','#3b82f6','#22c55e','#a855f7','#14b8a6','#f97316','#ec4899']
+const AVATAR_COLORS = ['#a16207','#3b82f6','#22c55e','#a855f7','#14b8a6','#f97316','#ec4899']
 function avatarColor(name: string) {
   let h = 0
   for (const c of name) h = (h * 31 + c.charCodeAt(0)) % AVATAR_COLORS.length
@@ -47,7 +47,7 @@ function statusBadge(s?: string) {
 function statusColor(s?: string): string {
   switch ((s || '').toLowerCase()) {
     case 'inactive': return '#ef4444'
-    case 'on hold': return '#f5b533'
+    case 'on hold': return '#a16207'
     case 'onboarding': return '#3b82f6'
     case 'trial': return '#a855f7'
     default: return '#22c55e'

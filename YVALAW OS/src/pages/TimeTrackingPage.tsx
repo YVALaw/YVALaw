@@ -259,7 +259,7 @@ export default function TimeTrackingPage() {
         </div>
         <div className="kpi-card">
           <div className="kpi-label">Billable Hours</div>
-          <div className="kpi-value" style={{ color: 'var(--gold)' }}>{fmtHours(billableHours)}</div>
+          <div className="kpi-value">{fmtHours(billableHours)}</div>
           <div className="kpi-sub">{entries.filter(e => e.billable).length} entries</div>
         </div>
         <div className="kpi-card">
@@ -269,7 +269,7 @@ export default function TimeTrackingPage() {
         </div>
         <div className="kpi-card">
           <div className="kpi-label">Billable %</div>
-          <div className="kpi-value" style={{ color: billablePct >= 70 ? '#4ade80' : billablePct >= 40 ? 'var(--gold)' : '#f87171' }}>
+          <div className="kpi-value" style={{ color: totalHours === 0 ? 'var(--muted)' : billablePct >= 70 ? 'var(--success)' : billablePct >= 40 ? 'var(--gold)' : 'var(--danger)' }}>
             {billablePct}%
           </div>
           <div className="kpi-sub">of all logged hours</div>
@@ -308,7 +308,7 @@ export default function TimeTrackingPage() {
                 <button key={val} onClick={() => setFilterBillable(val)} style={{
                   padding: '5px 10px', fontSize: 12, border: 'none',
                   borderRight: val !== 'unbillable' ? '1px solid var(--border, #e5e7eb)' : 'none',
-                  background: filterBillable === val ? 'var(--gold, #f5b533)' : '#fff',
+                  background: filterBillable === val ? 'var(--brand)' : '#fff',
                   color: filterBillable === val ? '#1a1a1a' : 'var(--muted, #6b7280)',
                   cursor: 'pointer', fontWeight: filterBillable === val ? 600 : 400,
                 }}>

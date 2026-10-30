@@ -392,7 +392,7 @@ export default function SettingsPage() {
         <div className="page-header-right">
           <button
             className="btn-ghost btn-sm"
-            style={{ color: '#f87171' }}
+            style={{ color: '#dc2626' }}
             onClick={() => void supabase.auth.signOut()}
           >
             Sign Out
@@ -578,7 +578,7 @@ export default function SettingsPage() {
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconCheck size={12} /> Emails sent via Gmail as <strong>{gmailEmail}</strong></span>
                 </div>
               </div>
-              <button className="btn-ghost btn-sm" style={{ color: '#f87171' }}
+              <button className="btn-ghost btn-sm" style={{ color: '#dc2626' }}
                 onClick={() => void disconnectGmail().then(() => { setGmailConnected(false); setGmailEmail(undefined) })}>
                 Disconnect
               </button>
@@ -617,7 +617,7 @@ export default function SettingsPage() {
                   Connect Gmail →
                 </button>
               </div>
-              <div style={{ background: 'rgba(245,181,51,.05)', borderRadius: 8, padding: '12px 16px', marginTop: 8, fontSize: 12, color: 'var(--muted)', lineHeight: 1.7 }}>
+              <div style={{ background: 'rgba(161,98,7,.05)', borderRadius: 8, padding: '12px 16px', marginTop: 8, fontSize: 12, color: 'var(--muted)', lineHeight: 1.7 }}>
                 <strong style={{ color: 'var(--gold)' }}>Setup guide:</strong>{' '}
                 Go to <strong>console.cloud.google.com</strong> → New Project → Enable <strong>Gmail API</strong> →
                 Create <strong>OAuth 2.0 Client ID</strong> (Web application) → add the redirect URI above →

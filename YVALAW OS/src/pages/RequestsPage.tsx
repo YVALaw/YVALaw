@@ -93,7 +93,7 @@ export default function RequestsPage() {
             style={{ cursor: 'pointer' }}
             onClick={() => setFilter(filter === s ? 'all' : s)}
           >
-            <div className="kpi-icon-wrap" style={{ color: STATUS_META[s].color, borderColor: STATUS_META[s].color + '25' }}>
+            <div className="kpi-icon-wrap">
               {icon}
             </div>
             <div className="kpi-body">

@@ -11,7 +11,7 @@ import {
 } from '../../services/portalStorage'
 import type { Client, Employee, Invoice, Project } from '../../data/types'
 
-const AVATAR_COLORS = ['#f5b533','#3b82f6','#22c55e','#a855f7','#14b8a6','#f97316','#ec4899']
+const AVATAR_COLORS = ['#a16207','#3b82f6','#22c55e','#a855f7','#14b8a6','#f97316','#ec4899']
 function avatarColor(name: string) {
   let h = 0
   for (const c of name) h = (h * 31 + c.charCodeAt(0)) % AVATAR_COLORS.length
@@ -126,7 +126,7 @@ export default function PortalProjects() {
       {/* Summary KPIs */}
       <div className="kpi-grid portal-kpi-3">
         <div className="kpi-card">
-          <div className="kpi-icon-wrap" style={{ color: '#3b82f6', borderColor: 'rgba(59,130,246,.15)' }}>
+          <div className="kpi-icon-wrap">
             <IconFolder size={20} />
           </div>
           <div className="kpi-body">
@@ -136,7 +136,7 @@ export default function PortalProjects() {
           </div>
         </div>
         <div className="kpi-card">
-          <div className="kpi-icon-wrap" style={{ color: '#22c55e', borderColor: 'rgba(34,197,94,.15)' }}>
+          <div className="kpi-icon-wrap">
             <IconActivity size={20} />
           </div>
           <div className="kpi-body">
@@ -146,7 +146,7 @@ export default function PortalProjects() {
           </div>
         </div>
         <div className="kpi-card">
-          <div className="kpi-icon-wrap" style={{ color: 'var(--gold)', borderColor: 'rgba(212,168,67,.15)' }}>
+          <div className="kpi-icon-wrap">
             <IconDollar size={20} />
           </div>
           <div className="kpi-body">
