@@ -130,7 +130,7 @@ Groundwork for the YVA Time Windows desktop tracker (Electron, Phase 1). Plan de
 - **Sign in with YVA OS** (no password in the app): app makes a PKCE verifier/challenge → opens `/os/connect-app?challenge&state` → person clicks Connect → `desktop-link-create` (logins linked to an employee only) returns a 5-minute one-time code (only its sha256 is stored) → page opens `yvatime://auth?code&state` (or shows the code to paste) → app calls `desktop-link-redeem` with code + verifier → gets a magic-link `token_hash` + Supabase URL/anon key → `verifyOtp` gives the app **its own** session (encrypted with Windows DPAPI). `/connect-app` survives the login screen (`src/lib/connectApp.ts`). Functions need `VITE_SUPABASE_ANON_KEY` (or `SUPABASE_ANON_KEY`) in Netlify env.
 - **Desktop app:** `../YVA Time/` (Electron 44 + React; see its README). Client team: projects + screenshots at a random moment in each 10-minute block (all monitors, ≤1600 px JPEG), shown in the app with a 2-minute Delete. YVA team: work types (`WORK_TYPES` in `src/main/config.ts`) + any assigned projects, no screenshots. Idle: every second without input is held aside; input within 5 min counts it, 5+ min asks Keep/Remove. Break, offline queue (saved locally, uploaded every minute), tray icon (green/orange/grey), starts with Windows, closes to tray. First-run notice for the client team (consent stored locally; server record = Phase 2). Verified: 15 engine unit tests + an Electron end-to-end run under Xvfb against a fake backend (27 checks: sign-in incl. wrong-state refusal, screenshot capture/upload/delete, idle, offline, YVA team).
 - **Admin:** Time Tracking → **Live** (CEO/Admin/Accounting: who is tracking now — a block updated in the last 3 min — today's hours, current project + note) and **Screenshots** (CEO/Admin: employee + day, hour rows of six 10-minute cells, signed URLs, full-size view, delete).
-- **Retention:** `purge-old-screenshots.mjs` runs daily (netlify.toml) and deletes screenshots older than 90 days (files, then rows). The app's notice promises this.
+- **Retention:** `purge-old-screenshots.mjs` runs daily (netlify.toml) and deletes screenshots older than **60 days** (files, then rows; was 90 until Step 0 of PLAN.md). The app's notice promises this.
 - **Installer:** `.github/workflows/yva-time-windows.yml` builds `YVA-Time-Setup.exe` on windows-latest (Run workflow → artifact; tag `yva-time-v*` → GitHub Release). Then set Netlify `VITE_YVA_TIME_DOWNLOAD_URL=https://github.com/YVALaw/YVALaw/releases/latest/download/YVA-Time-Setup.exe` to show the Download button in My workspace. Code signing + auto-updates: Phase 3.
 
 ## YVA Time — Phase 2 (approvals → money flow) ✅ built, needs SQL + deploy
@@ -166,6 +166,14 @@ Groundwork for the YVA Time Windows desktop tracker (Electron, Phase 1). Plan de
 - **Release:** bump `YVA Time/package.json` version and merge, then Actions → "YVA Time — Windows installer" → Run workflow with **Publish** ticked (or push tag `yva-time-v<version>`); installed apps update themselves. 0.3.0 was the first published release.
 
 ---
+
+## Automation & growth plan — build log (see `PLAN.md`)
+
+### Step 0 — Screenshots ✅ built, not merged
+- **Desktop app 0.4.0** (version bumped, **not published**): the latest screenshot is also written full size to `userData/last-screenshot/screen-N.jpg` (replaced by each new screenshot, removed when deleted / another person signs in); clicking the thumbnail opens it (`shell.openPath`, IPC `openLastShot(screen)`), "Open screen 1 2" for several monitors. Upload failures that aren't "offline" are kept as `uploadProblem` in the snapshot → "N screenshots waiting to upload — reason". **Log file** `src/main/logfile.ts`: `console.warn/error` of the main process mirrored to `userData/logs/yva-time.log` (rotates at 1 MB → `yva-time.old.log`); ⋯ menu → **Show log file (for YVA support)** reveals it in Explorer. E2E: 57 checks.
+- **YVA OS:** `/time?tab=screens&employee=ID&day=YYYY-MM-DD` opens a person's screenshots (TimeTrackingPage reads the query; `ScreenshotDay` takes `initialEmployee` / `initialDay`). **View screenshots** on the employee profile (YVA Time Login card) and on Live rows (client team, time today) for `can.viewScreenshots`.
+- **My workspace → My screenshots:** `ScreenshotDay` with `self={ employeeId, projectNames }` — no picker, no delete, project names from `employee-me`; uses the existing employee read policies on `tracker_screenshots`, `tracker_blocks` and the `screenshots` bucket (no SQL).
+- Retention 60 days (`purge-old-screenshots.mjs` `KEEP_DAYS`, app notice, Time Tracking subtitle).
 
 ## Session Progress — Client Portal
 

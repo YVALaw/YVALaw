@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../../lib/supabase'
-import { IconBarChart, IconBriefcase, IconClock, IconLogOut, IconPlus, IconUser } from '../../components/Icon'
+import { IconBarChart, IconBriefcase, IconClock, IconImage, IconLogOut, IconPlus, IconUser } from '../../components/Icon'
 import MyHours from './MyHours'
 import ManualTime from './ManualTime'
+import ScreenshotDay from '../time/ScreenshotDay'
 
 // Shape returned by /.netlify/functions/employee-me (safe fields only)
 type MyEmployee = {
@@ -102,6 +103,12 @@ export default function EmployeeWorkspace() {
             <Section icon={<IconBarChart size={20} />} title="My hours" sub="From the YVA Time app — YVA approves them each week">
               <MyHours employeeId={employee.id} />
             </Section>
+
+            {!isYva && (
+              <Section icon={<IconImage size={20} />} title="My screenshots" sub="What YVA sees — your screenshots and activity, by day (kept 60 days)">
+                <ScreenshotDay self={{ employeeId: employee.id, projectNames: Object.fromEntries(projects.map(p => [p.id, p.name])) }} />
+              </Section>
+            )}
 
             {employee.manualTimeAllowed && (
               <Section icon={<IconPlus size={20} />} title="Add missing time" sub="Forgot to start the timer, or worked offline? Ask YVA to add it">

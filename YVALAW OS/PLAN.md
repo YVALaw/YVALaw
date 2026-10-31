@@ -1,7 +1,7 @@
 # YVA OS — Automation & Growth Plan
 
-Agreed with Hans on 2026-10-31. **Planning only so far — nothing in this file is built yet.**
-Each step is built, tested, put on a Netlify preview site, and only then merged (same as YVA Time).
+Agreed with Hans on 2026-10-31. Being built on branch `claude/charming-turing-ue7mxi` — see **Build progress** at the end.
+Each step is built and tested; nothing is merged to the live site or published as a new YVA Time version until Hans has checked it.
 
 The goal: **time tracking, employee earnings, payroll and client invoicing all connected and automatic.**
 The system prepares everything; Hans only reviews and approves before invoices are sent or employees are paid.
@@ -36,8 +36,7 @@ No more Hubstaff, Excel exports or hand-calculated invoices.
 | Invoice builder on phones | **Review and approve** on the phone; building stays on the computer |
 | Sales | Only Hans today — built so a future lead-gen hire can own leads |
 | Build order | Left to Claude (below) |
-
-**Open:** how long to keep screenshots (today 90 days; the employee notice says so — changing it means updating the notice).
+| Screenshots | Kept **60 days** (was 90) |
 
 ---
 
@@ -59,7 +58,7 @@ They are just hard to find and can't be opened from the app or seen by the emplo
 - **Desktop app:** click the latest screenshot to open it full size · "N screenshots waiting to upload — reason" when uploads fail · a log file to send when something goes wrong.
 - **YVA OS:** "View screenshots" on the employee profile and on the Live tab (opens the Screenshots tab on that person and day).
 - **My workspace:** "My screenshots" — the employee's own screenshots by day, with activity %.
-- **Retention:** set once Hans decides (see Open above).
+- **Retention:** 60 days (daily clean-up job + the notice in the app and My workspace).
 
 ## Step 1 — Foundation
 
@@ -154,3 +153,14 @@ Sketch of new data (names indicative):
 - Premium split from tracked time: blocks carry first/last second, so night-premium minutes can be allocated per 10-minute block.
 - Portal invoice policy: add `status <> 'draft'`.
 - PWA: `manifest.webmanifest` (name "YVA OS", scope `/os/`, standalone), square icons, service worker for push; `viewport-fit=cover` + safe-area insets.
+
+---
+
+## Build progress
+
+Hans asked (2026-10-31) for all steps to be built in one go and checked together when he's back.
+Nothing below is live until the branch is merged; the YVA Time app version is bumped but **not published**.
+
+| Step | Status | Notes |
+|---|---|---|
+| 0 — Screenshots | ✅ Built + tested | Desktop app 0.4.0 (not published): click the screenshot → opens full size (one file per screen), "N screenshots waiting to upload — reason", log file (`%APPDATA%\YVA Time\logs\yva-time.log`, ⋯ → *Show log file*). YVA OS: *View screenshots* on the employee profile and on Live (deep link `/time?tab=screens&employee=ID&day=YYYY-MM-DD`). My workspace → *My screenshots* (own only, no delete; uses the existing employee-read policies, no SQL). Retention 60 days. |

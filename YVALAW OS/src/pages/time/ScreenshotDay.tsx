@@ -17,12 +17,20 @@ function hm(seconds: number): string { return `${Math.floor(seconds / 3600)}h ${
 
 type Cell = { blockStart: number; seconds: number; active: number; measured: number; removed: boolean; labels: string[]; notes: string[]; shots: TrackerShot[] }
 
-/** Time Tracking → Screenshots (CEO/Admin): one employee's day in 10-minute blocks */
-export default function ScreenshotDay() {
+type Props = {
+  /** Open on this person / day (links from the employee profile and the Live tab) */
+  initialEmployee?: string
+  initialDay?: string
+  /** My workspace: the signed-in employee's own screenshots (no picker, no delete) */
+  self?: { employeeId: string; projectNames: Record<string, string> }
+}
+
+/** Time Tracking → Screenshots (CEO/Admin), and My workspace → My screenshots: one person's day in 10-minute blocks */
+export default function ScreenshotDay({ initialEmployee, initialDay, self }: Props = {}) {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [projects,  setProjects]  = useState<Project[]>([])
-  const [employeeId, setEmployeeId] = useState('')
-  const [day, setDay] = useState(todayInput())
+  const [employeeId, setEmployeeId] = useState(self?.employeeId ?? initialEmployee ?? '')
+  const [day, setDay] = useState(initialDay && /^\d{4}-\d{2}-\d{2}$/.test(initialDay) ? initialDay : todayInput())
   const [blocks, setBlocks] = useState<TrackerBlock[]>([])
   const [shots,  setShots]  = useState<TrackerShot[]>([])
   const [urls,   setUrls]   = useState<Record<string, string>>({})
@@ -30,6 +38,7 @@ export default function ScreenshotDay() {
   const [open, setOpen] = useState<Cell | null>(null)
 
   useEffect(() => {
+    if (self) return                                     // employees can't (and needn't) list other people
     void loadEmployees().then(list => {
       const tracked = list.filter(e => e.userId && e.worksFor !== 'yva')
       setEmployees(tracked)
@@ -49,7 +58,9 @@ export default function ScreenshotDay() {
   }
   useEffect(() => { void load() }, [employeeId, day])   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const label = (b: TrackerBlock) => (b.projectId ? projects.find(p => p.id === b.projectId)?.name ?? 'Project' : b.workType ?? '')
+  const label = (b: TrackerBlock) => (b.projectId
+    ? (self ? self.projectNames[b.projectId] : projects.find(p => p.id === b.projectId)?.name) ?? 'Project'
+    : b.workType ?? '')
   const cells = new Map<number, Cell>()
   const cellAt = (bs: number) => {
     let c = cells.get(bs)
@@ -81,13 +92,16 @@ export default function ScreenshotDay() {
   return (
     <>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 16 }}>
-        <div className="form-group" style={{ minWidth: 220, margin: 0 }}>
-          <label className="form-label">Employee (client team)</label>
-          <select className="form-select" value={employeeId} onChange={e => setEmployeeId(e.target.value)}>
-            {employees.length === 0 && <option value="">No client-team employees with a login</option>}
-            {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-          </select>
-        </div>
+        {!self && (
+          <div className="form-group" style={{ minWidth: 220, margin: 0 }}>
+            <label className="form-label">Employee (client team)</label>
+            <select className="form-select" value={employeeId} onChange={e => setEmployeeId(e.target.value)}>
+              {employees.length === 0 && <option value="">No client-team employees with a login</option>}
+              {employees.length > 0 && !employees.some(e => e.id === employeeId) && <option value={employeeId}>Pick an employee</option>}
+              {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+            </select>
+          </div>
+        )}
         <div className="form-group" style={{ margin: 0 }}>
           <label className="form-label">Day</label>
           <input className="form-input" type="date" value={day} onChange={e => setDay(e.target.value || todayInput())} />
@@ -166,7 +180,7 @@ export default function ScreenshotDay() {
               ))}
             </div>
             <div className="modal-footer">
-              <button className="btn-danger btn-sm" onClick={() => void removeShots(open)}>Delete screenshots</button>
+              {!self && <button className="btn-danger btn-sm" onClick={() => void removeShots(open)}>Delete screenshots</button>}
               <button className="btn-ghost btn-sm" onClick={() => setOpen(null)}>Close</button>
             </div>
           </div>
