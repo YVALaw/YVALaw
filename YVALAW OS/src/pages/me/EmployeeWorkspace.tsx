@@ -1,200 +1,109 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { IconBarChart, IconBriefcase, IconClock, IconBell, IconDollar, IconEdit, IconImage, IconLogOut, IconPlus, IconUser } from '../../components/Icon'
+import { IconBriefcase, IconClock, IconDollar, IconFileText, IconHome, IconImage, IconInbox, IconMegaphone, IconMoreHorizontal, IconUser } from '../../components/Icon'
+import NotificationBell from '../../components/NotificationBell'
+import ScreenshotDay from '../time/ScreenshotDay'
 import MyHours from './MyHours'
 import MyPay from './MyPay'
 import MyPayslips from './MyPayslips'
 import MyAdjustments from './MyAdjustments'
-import ManualTime from './ManualTime'
-import ScreenshotDay from '../time/ScreenshotDay'
-import NotificationBell from '../../components/NotificationBell'
-import NotificationSettings from '../../components/NotificationSettings'
-import { EMPLOYEE_KINDS } from '../../lib/notifications'
+import { DICT, useMeLang } from './i18n'
+import { Card, MeClient, MeCompany, MeDocuments, MeHome, MeProfile, MeRequests, type MyEmployee, type MyProject } from './MeSections'
 
-// Shape returned by /.netlify/functions/employee-me (safe fields only)
-type MyEmployee = {
-  id: string
-  name: string
-  employeeNumber: string | null
-  email: string | null
-  phone: string | null
-  role: string | null
-  timezone: string | null
-  defaultShiftStart: string | null
-  defaultShiftEnd: string | null
-  photoUrl: string | null
-  worksFor: 'client' | 'yva'
-  manualTimeAllowed: boolean
+type Section = 'home' | 'time' | 'pay' | 'screenshots' | 'requests' | 'client' | 'documents' | 'company' | 'profile'
+const ICON: Record<Section, (p: { size?: number }) => JSX.Element> = {
+  home: IconHome, time: IconClock, pay: IconDollar, screenshots: IconImage, requests: IconInbox, client: IconBriefcase, documents: IconFileText, company: IconMegaphone, profile: IconUser,
 }
-type MyProject = { id: string; name: string; clientName: string | null; status: string | null }
+const PHONE_TABS: Section[] = ['home', 'time', 'pay', 'requests']
 
-// Set VITE_YVA_TIME_DOWNLOAD_URL in Netlify once an installer is published:
-// https://github.com/YVALaw/YVALaw/releases/latest/download/YVA-Time-Setup.exe (always the newest version)
-const DOWNLOAD_URL = import.meta.env.VITE_YVA_TIME_DOWNLOAD_URL as string | undefined
-
-/** My workspace — the only YVA OS area an invited employee can open */
+/** My workspace — the only area an invited employee can open (PLAN.md Step 7: Spanish / English, phone-first) */
 export default function EmployeeWorkspace() {
+  const [lang, setLang] = useMeLang()
+  const t = DICT[lang]
+  const [params, setParams] = useSearchParams()
   const [employee, setEmployee] = useState<MyEmployee | null>(null)
   const [projects, setProjects] = useState<MyProject[]>([])
-  const [error,    setError]    = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [moreOpen, setMoreOpen] = useState(false)
 
   useEffect(() => {
     void (async () => {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) return
       try {
-        const res  = await fetch('/.netlify/functions/employee-me', {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        })
+        const res = await fetch('/.netlify/functions/employee-me', { headers: { Authorization: `Bearer ${session.access_token}` } })
         const data = await res.json()
         if (!res.ok) { setError(data.error || 'Could not load your profile.'); return }
-        setEmployee(data.employee)
-        setProjects(data.projects || [])
-      } catch {
-        setError('Network error — could not load your profile.')
-      }
+        setEmployee(data.employee); setProjects(data.projects || [])
+      } catch { setError('Network error — could not load your profile.') }
     })()
   }, [])
+  // The desktop app's "Add missing time" opens /me#manual
+  useEffect(() => { if (window.location.hash === '#manual') setParams({ s: 'requests' }, { replace: true }) }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const isYva = employee?.worksFor === 'yva'
-  const shift = employee?.defaultShiftStart && employee?.defaultShiftEnd
-    ? `${employee.defaultShiftStart} – ${employee.defaultShiftEnd}`
-    : '—'
+  const sections: Section[] = ['home', 'time', 'pay', ...(isYva ? [] : ['screenshots' as Section]), 'requests', 'client', 'documents', 'company', 'profile']
+  const raw = params.get('s') as Section | null
+  const section: Section = raw && sections.includes(raw) ? raw : 'home'
+  const go = (s: string) => { setParams(s === 'home' ? {} : { s }); setMoreOpen(false); window.scrollTo({ top: 0 }) }
+  const projectNames = Object.fromEntries(projects.map(p => [p.id, p.name]))
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', padding: '24px 16px 48px' }}>
-      <div style={{ maxWidth: 760, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
-
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <img src={`${import.meta.env.BASE_URL}yva-logo.png`} alt="YVA" style={{ height: 40 }} />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)', overflowWrap: 'anywhere' }}>
-              {employee ? `Hi, ${employee.name.split(' ')[0]}` : 'My workspace'}
-            </div>
-            <div style={{ fontSize: 13, color: 'var(--muted)' }}>YVA Staffing · My workspace</div>
+    <div className="me-shell">
+      <aside className="me-side">
+        <div className="me-brand"><img src={`${import.meta.env.BASE_URL}icons/icon-192.png`} alt="" /><div><strong>YVA OS</strong><span>{t.workspace}</span></div></div>
+        <nav>{sections.map(s => { const I = ICON[s]; return <button key={s} className={section === s ? 'active' : ''} onClick={() => go(s)}><I size={17} />{t.nav[s]}</button> })}</nav>
+      </aside>
+      <div className="me-main">
+        <header className="me-top">
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div className="me-hello">{employee ? `${t.hi}, ${employee.name.split(' ')[0]}` : t.workspace}</div>
+            <div className="me-muted">{t.nav[section]}</div>
           </div>
-          <NotificationBell />
-          <button className="btn-ghost btn-sm" onClick={() => void supabase.auth.signOut()}>
-            <IconLogOut size={14} /> Sign out
-          </button>
-        </div>
-
-        {error && <div className="portal-message portal-message-error">{error}</div>}
-        {!employee && !error && <div className="loading-text">Loading your workspace…</div>}
-
-        {employee && (
-          <>
-            <Section icon={<IconClock size={20} />} title="YVA Time" sub="Track your hours from your computer">
-              {DOWNLOAD_URL && (
-                <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
-                  <a className="btn-primary" href={DOWNLOAD_URL}>Download YVA Time for Windows</a>
-                  <span style={{ fontSize: 13, color: 'var(--muted)' }}>Install it, open it and click <strong>Sign in with YVA OS</strong>.</span>
+          <button className="me-lang-pill" onClick={() => setLang(lang === 'es' ? 'en' : 'es')} aria-label="Language">{lang === 'es' ? 'EN' : 'ES'}</button>
+          <NotificationBell lang={lang} />
+        </header>
+        <main className="me-content">
+          {error && <div className="portal-message portal-message-error">{error}</div>}
+          {!employee && !error && <div className="loading-text">{t.loading}</div>}
+          {employee && (
+            <>
+              {section === 'home' && <MeHome e={employee} lang={lang} go={go} />}
+              {section === 'time' && (
+                <div className="me-stack">
+                  <Card title={t.time.title} sub={t.time.sub}><MyHours employeeId={employee.id} lang={lang} /></Card>
+                  <Card title={t.time.changes} sub={t.time.changesSub}><MyAdjustments projectNames={projectNames} lang={lang} /></Card>
                 </div>
               )}
-              <p style={{ margin: 0, fontSize: 14, color: 'var(--text2)', lineHeight: 1.6 }}>
-                {DOWNLOAD_URL
-                  ? 'YVA Time runs in the corner of your screen while you work.'
-                  : "The YVA Time app for Windows is coming soon. You'll download it here and sign in with this same account."}
-                {isYva
-                  ? ' As part of the YVA team, screenshots are off for you.'
-                  : ' While you track time, the app takes a screenshot at a random moment about every 10 minutes. You can see each one and delete it within 2 minutes (that 10-minute block is then removed from your time). It also records activity % — how much of each 10 minutes had keyboard or mouse use, never what you typed.'}
-              </p>
-              <div style={{ marginTop: 14, fontSize: 13, color: 'var(--muted)' }}>
-                Adding time by hand: <strong style={{ color: 'var(--text)' }}>
-                  {employee.manualTimeAllowed ? 'allowed — use “Add missing time” below; YVA approves each request' : 'not enabled for your account'}
-                </strong>
-              </div>
-            </Section>
-
-            <Section icon={<IconDollar size={20} />} title="My pay" sub="Live earnings — updates every minute while you track">
-              <MyPay />
-              <div style={{ marginTop: 16 }}><MyPayslips employeeName={employee.name} employeeNumber={employee.employeeNumber} /></div>
-            </Section>
-
-            <Section icon={<IconBarChart size={20} />} title="My hours" sub="From the YVA Time app — YVA approves them each week">
-              <MyHours employeeId={employee.id} />
-            </Section>
-
-            {!isYva && (
-              <Section icon={<IconImage size={20} />} title="My screenshots" sub="What YVA sees — your screenshots and activity, by day (kept 60 days)">
-                <ScreenshotDay self={{ employeeId: employee.id, projectNames: Object.fromEntries(projects.map(p => [p.id, p.name])) }} />
-              </Section>
-            )}
-
-            <Section icon={<IconEdit size={20} />} title="Changes made by YVA" sub="When YVA adjusts your time, you see it here with the reason">
-              <MyAdjustments projectNames={Object.fromEntries(projects.map(p => [p.id, p.name]))} />
-            </Section>
-
-            {employee.manualTimeAllowed && (
-              <Section icon={<IconPlus size={20} />} title="Add missing time" sub="Forgot to start the timer, or worked offline? Ask YVA to add it">
-                <ManualTime employeeId={employee.id} isYva={isYva} projects={projects} />
-              </Section>
-            )}
-
-            <Section icon={<IconBriefcase size={20} />} title={isYva ? 'YVA team' : 'My projects'}
-              sub={isYva ? 'You work for YVA directly' : 'The client projects you are assigned to'}>
-              {projects.length === 0 ? (
-                <div style={{ fontSize: 14, color: 'var(--muted)' }}>
-                  {isYva ? 'No client projects assigned.' : "You're not assigned to a project yet."}
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  {projects.map(p => (
-                    <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 10 }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontWeight: 700, color: 'var(--text)', overflowWrap: 'anywhere' }}>{p.name}</div>
-                        {p.clientName && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{p.clientName}</div>}
-                      </div>
-                      {p.status && <span className="badge badge-gray" style={{ alignSelf: 'center', textTransform: 'capitalize' }}>{p.status}</span>}
-                    </div>
-                  ))}
+              {section === 'pay' && (
+                <div className="me-stack">
+                  <Card title={t.pay.title} sub={t.pay.sub}><MyPay lang={lang} /></Card>
+                  <Card title={t.pay.payslips}><MyPayslips employeeName={employee.name} employeeNumber={employee.employeeNumber} lang={lang} /></Card>
                 </div>
               )}
-            </Section>
-
-            <Section icon={<IconBell size={20} />} title="Notifications" sub="Phone notifications and emails from YVA">
-              <NotificationSettings kinds={EMPLOYEE_KINDS} />
-            </Section>
-
-            <Section icon={<IconUser size={20} />} title="My details" sub="Ask YVA to update anything that's wrong">
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
-                <Row label="Name"            value={employee.name} />
-                <Row label="Employee number" value={employee.employeeNumber || '—'} />
-                <Row label="Position"        value={employee.role || '—'} />
-                <Row label="Email"           value={employee.email || '—'} />
-                <Row label="Phone"           value={employee.phone || '—'} />
-                <Row label="Timezone"        value={employee.timezone || '—'} />
-                <Row label="Shift"           value={shift} />
-              </div>
-            </Section>
-          </>
-        )}
+              {section === 'screenshots' && !isYva && <Card title={t.shots.title} sub={t.shots.sub}><ScreenshotDay self={{ employeeId: employee.id, projectNames }} lang={lang} /></Card>}
+              {section === 'requests' && <MeRequests e={employee} projects={projects} lang={lang} />}
+              {section === 'client' && <MeClient e={employee} projects={projects} lang={lang} />}
+              {section === 'documents' && <MeDocuments lang={lang} />}
+              {section === 'company' && <MeCompany lang={lang} />}
+              {section === 'profile' && <MeProfile e={employee} lang={lang} setLang={setLang} />}
+            </>
+          )}
+        </main>
       </div>
-    </div>
-  )
-}
 
-function Section({ icon, title, sub, children }: { icon: ReactNode; title: string; sub: string; children: ReactNode }) {
-  return (
-    <div className="portal-section">
-      <div className="portal-section-header" style={{ justifyContent: 'flex-start', gap: 12 }}>
-        <span style={{ fontSize: 20 }}>{icon}</span>
-        <div>
-          <div className="portal-section-title">{title}</div>
-          <div className="portal-section-sub">{sub}</div>
+      <nav className="me-tabs">
+        {PHONE_TABS.map(s => { const I = ICON[s]; return <button key={s} className={section === s ? 'active' : ''} onClick={() => go(s)}><I size={20} /><span>{t.nav[s]}</span></button> })}
+        <button className={!PHONE_TABS.includes(section) ? 'active' : ''} onClick={() => setMoreOpen(o => !o)}><IconMoreHorizontal size={20} /><span>{t.more}</span></button>
+      </nav>
+      {moreOpen && (
+        <div className="me-sheet-backdrop" onClick={() => setMoreOpen(false)}>
+          <div className="me-sheet" onClick={ev => ev.stopPropagation()}>
+            {sections.filter(s => !PHONE_TABS.includes(s)).map(s => { const I = ICON[s]; return <button key={s} className={section === s ? 'active' : ''} onClick={() => go(s)}><I size={18} />{t.nav[s]}</button> })}
+          </div>
         </div>
-      </div>
-      <div className="portal-section-body">{children}</div>
-    </div>
-  )
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="settings-row-item">
-      <div className="settings-row-label">{label}</div>
-      <div className="settings-row-value">{value}</div>
+      )}
     </div>
   )
 }

@@ -66,6 +66,10 @@ export type Project = {
   nextInvoiceSeq?: number
   paySchedule?: 'weekly' | 'biweekly' | 'semimonthly' | 'monthly'   // PLAN Step 6 (default weekly)
   payAnchor?: string | null                                       // biweekly: a Monday that starts a period
+  supervisorName?: string | null                                  // My workspace → My client (Step 7)
+  supervisorEmail?: string | null
+  supervisorPhone?: string | null
+  employeeInstructions?: string | null
   status?: string
   billingModel?: string
   startDate?: string

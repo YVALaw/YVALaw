@@ -208,6 +208,14 @@ Groundwork for the YVA Time Windows desktop tracker (Electron, Phase 1). Plan de
 - **UI:** `pages/PayrollPage.tsx` (`/payroll`, Finance menu, payroll.view/manage), `services/payroll.ts`, `utils/payslipHtml.ts` (escaped; EN/ES), `components/EmployeePayoutMethod.tsx` (employee profile), `pages/me/MyPayslips.tsx` (My pay). BHD helper fills BHD's **buy** rate (Settings keeps using sell for its own field).
 - Tests: 36 SQL, 21 engine/function, 21 browser checks.
 
+### Steps 7 + 8 — My workspace redesign, phone pass ✅ built, not merged — run `supabase/migrate-step7-workspace.sql`
+- **SQL:** `time_off_requests` (employee inserts own pending / cancels pending; staff read; `timeoff.approve` decides; BEFORE trigger stamps decided_by/at and freezes the request fields; AFTER trigger notifies approvers on insert and the employee on a decision, EN/ES title), `announcements` (audience all/client/yva, pinned, `published_at` NULL = draft / future = scheduled; employees read published ones for their team; publishing notifies those employees), `holidays`, `employee_documents` + private bucket `employee-documents` (employee reads own folder; `documents.manage` all), `projects` + `supervisor_name/email/phone`, `employee_instructions`. Helper `private.current_employee_works_for()`.
+- **Functions:** `employee-me` also returns each project's `supervisor` + `instructions` (falls back if the columns don't exist yet); `employee-earnings` returns `trackingNow` / `lastActivityAt`.
+- **My workspace** (`pages/me/`): `EmployeeWorkspace.tsx` shell (sections via `?s=`, `/me#manual` → Requests; sidebar ≥860 px, bottom tabs + More sheet below), `MeSections.tsx` (Home, Requests, My client, Documents, Company, Profile), `i18n.ts` (EN/ES dictionary + `useMeLang`, saved in `localStorage yva_me_lang`, first visit follows `navigator.language`). MyHours / ManualTime / MyPay / MyPayslips / MyAdjustments / NotificationSettings / NotificationBell / ScreenshotDay take `lang`. Styles: `.me-*` in styles.css.
+- **YVA OS:** `pages/ApprovalsPage.tsx` (`/approvals`; time off needs `timeoff.approve`, missing time uses `yva_time_decide_request`), `pages/AnnouncementsPage.tsx` (`/announcements`, `announcements.manage`), `components/EmployeeDocuments.tsx` (employee profile), project edit → supervisor + instructions, `ScheduleReport` shows approved time off / holidays as days off. `services/workspace.ts`.
+- **Phones (Step 8):** `.staff-tabs` bottom bar in `Shell` (≤768 px), safe-area padding, wrapping headers, invoice group headers; `InvoicePage` blocks the builder on phones with an explanation.
+- Tests: 35 SQL, 24 + 8 browser checks (16 staff pages at 390 px).
+
 ## Session Progress — Client Portal
 
 ### Completed This Session

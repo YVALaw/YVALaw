@@ -36,7 +36,7 @@ exports.handler = async function handler(event) {
     // Earliest possible period start: monthly / semimonthly / biweekly go back at most ~31 days
     const from = M.addDays(today, -32)
     const blocks = await rest(`tracker_blocks?employee_id=eq.${employee.id}&block_start=gte.${enc(new Date(M.zonedMidnight(from, tz)).toISOString())}` +
-      '&select=block_start,project_id,work_type,seconds,first_offset,last_offset,status&order=block_start&limit=20000')
+      '&select=block_start,project_id,work_type,seconds,first_offset,last_offset,status,updated_at&order=block_start&limit=20000')
     const adjustments = await optional(`time_adjustments?employee_id=eq.${employee.id}&day=gte.${from}&select=day,project_id,seconds_delta,status`)
     const rates = await optional(`placement_rates?employee_id=eq.${employee.id}&select=employee_id,project_id,position,pay_rate,effective_from`)
     const [settings] = await rest('settings?id=eq.1&select=usd_to_dop')
@@ -84,6 +84,9 @@ exports.handler = async function handler(event) {
       currency: 'USD',
       dopRate: Number(settings?.usd_to_dop) || null,
       today: { date: today, seconds: todayMoney.seconds, amount: todayMoney.amount },
+      // the desktop app uploads about once a minute while tracking
+      lastActivityAt: blocks.reduce((m, b) => (b.updated_at && b.updated_at > m ? b.updated_at : m), '') || null,
+      trackingNow: blocks.some(b => b.updated_at && now - Date.parse(b.updated_at) < 3 * 60_000),
       periods,
       totals: { seconds: periods.reduce((s, p) => s + p.seconds, 0), amount: M.round2(periods.reduce((s, p) => s + p.amount, 0)), approvedAmount: M.round2(periods.reduce((s, p) => s + p.approvedAmount, 0)) },
       paid: paid.map(p => ({ payday: p.payday, netUsd: Number(p.net_usd), netDop: p.net_dop == null ? null : Number(p.net_dop), paidAt: p.paid_at })),

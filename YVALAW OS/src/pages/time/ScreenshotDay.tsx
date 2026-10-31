@@ -23,10 +23,17 @@ type Props = {
   initialDay?: string
   /** My workspace: the signed-in employee's own screenshots (no picker, no delete) */
   self?: { employeeId: string; projectNames: Record<string, string> }
+  /** My workspace language */
+  lang?: 'en' | 'es'
+}
+const L = {
+  en: { day: 'Day', tracked: 'Tracked', activity: 'Activity', shot: 'screenshot', shots: 'screenshots', none: 'No tracked time on this day.', noShot: 'No screenshot', deleted: 'Deleted by employee', removed: '(time removed)', active: 'active', screen: 'Screen', taken: 'taken', close: 'Close', loading: 'Loading…' },
+  es: { day: 'Día', tracked: 'Registrado', activity: 'Actividad', shot: 'captura', shots: 'capturas', none: 'No hay tiempo registrado este día.', noShot: 'Sin captura', deleted: 'Borrada por ti', removed: '(tiempo quitado)', active: 'activo', screen: 'Pantalla', taken: 'tomada', close: 'Cerrar', loading: 'Cargando…' },
 }
 
 /** Time Tracking → Screenshots (CEO/Admin), and My workspace → My screenshots: one person's day in 10-minute blocks */
-export default function ScreenshotDay({ initialEmployee, initialDay, self }: Props = {}) {
+export default function ScreenshotDay({ initialEmployee, initialDay, self, lang = 'en' }: Props = {}) {
+  const tx = L[lang]
   const [employees, setEmployees] = useState<Employee[]>([])
   const [projects,  setProjects]  = useState<Project[]>([])
   const [employeeId, setEmployeeId] = useState(self?.employeeId ?? initialEmployee ?? '')
@@ -103,20 +110,20 @@ export default function ScreenshotDay({ initialEmployee, initialDay, self }: Pro
           </div>
         )}
         <div className="form-group" style={{ margin: 0 }}>
-          <label className="form-label">Day</label>
+          <label className="form-label">{tx.day}</label>
           <input className="form-input" type="date" value={day} onChange={e => setDay(e.target.value || todayInput())} />
         </div>
         <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--muted)' }}>
-          {loading ? 'Loading…' : <>
-            Tracked <strong style={{ color: 'var(--text)' }}>{hm(total)}</strong>
-            {dayActivity !== null && <> · Activity <strong style={{ color: activityColor(dayActivity) }}>{dayActivity}%</strong></>}
-            {' '}· {shots.length} screenshot{shots.length === 1 ? '' : 's'}
+          {loading ? tx.loading : <>
+            {tx.tracked} <strong style={{ color: 'var(--text)' }}>{hm(total)}</strong>
+            {dayActivity !== null && <> · {tx.activity} <strong style={{ color: activityColor(dayActivity) }}>{dayActivity}%</strong></>}
+            {' '}· {shots.length} {shots.length === 1 ? tx.shot : tx.shots}
           </>}
         </div>
       </div>
 
       {!loading && hours.length === 0 && (
-        <div className="data-card" style={{ color: 'var(--muted)', fontSize: 14 }}>No tracked time on this day.</div>
+        <div className="data-card" style={{ color: 'var(--muted)', fontSize: 14 }}>{tx.none}</div>
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -132,12 +139,12 @@ export default function ScreenshotDay({ initialEmployee, initialDay, self }: Pro
                   <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 8, fontSize: 12, background: c ? 'var(--surface)' : 'var(--surf2)', opacity: c ? 1 : 0.6 }}>
                     <div style={{ color: 'var(--muted)', marginBottom: 6 }}>{clock(bs)}</div>
                     {c?.removed ? (
-                      <div style={{ height: 84, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', textAlign: 'center' }}>Deleted by employee<br />(time removed)</div>
+                      <div style={{ height: 84, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', textAlign: 'center' }}>{tx.deleted}<br />{tx.removed}</div>
                     ) : first && urls[first.storagePath] ? (
                       <img src={urls[first.storagePath]} alt={`Screenshot ${clock(first.takenAt)}`} onClick={() => setOpen(c!)}
                         style={{ width: '100%', height: 84, objectFit: 'cover', borderRadius: 6, cursor: 'zoom-in', background: '#111' }} />
                     ) : (
-                      <div style={{ height: 84, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)' }}>{c ? 'No screenshot' : '—'}</div>
+                      <div style={{ height: 84, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)' }}>{c ? tx.noShot : '—'}</div>
                     )}
                     {c && !c.removed && (
                       <div style={{ marginTop: 6 }}>
@@ -166,7 +173,7 @@ export default function ScreenshotDay({ initialEmployee, initialDay, self }: Pro
             <div className="modal-header">
               <div className="modal-title">
                 {clock(open.blockStart)} – {clock(open.blockStart + BLOCK_MS)} · {Math.round(open.seconds / 60)} min
-                {activityPct(open.active, open.measured) !== null && ` · ${activityPct(open.active, open.measured)}% active`} · {open.labels.join(', ')}
+                {activityPct(open.active, open.measured) !== null && ` · ${activityPct(open.active, open.measured)}% ${tx.active}`} · {open.labels.join(', ')}
               </div>
               <button className="modal-close btn-icon" onClick={() => setOpen(null)}>✕</button>
             </div>
@@ -174,14 +181,14 @@ export default function ScreenshotDay({ initialEmployee, initialDay, self }: Pro
               {open.notes.length > 0 && <div style={{ fontSize: 13, color: 'var(--muted)' }}>{open.notes.join(' — ')}</div>}
               {open.shots.map(s => urls[s.storagePath] && (
                 <div key={s.id}>
-                  <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>Screen {s.monitor + 1} · taken {clock(s.takenAt)}</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>{tx.screen} {s.monitor + 1} · {tx.taken} {clock(s.takenAt)}</div>
                   <img src={urls[s.storagePath]} alt={`Screen ${s.monitor + 1}`} style={{ width: '100%', borderRadius: 8, border: '1px solid var(--border)' }} />
                 </div>
               ))}
             </div>
             <div className="modal-footer">
               {!self && <button className="btn-danger btn-sm" onClick={() => void removeShots(open)}>Delete screenshots</button>}
-              <button className="btn-ghost btn-sm" onClick={() => setOpen(null)}>Close</button>
+              <button className="btn-ghost btn-sm" onClick={() => setOpen(null)}>{tx.close}</button>
             </div>
           </div>
         </div>

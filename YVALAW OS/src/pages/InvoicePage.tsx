@@ -167,8 +167,11 @@ export default function InvoicePage() {
     setTimeout(() => setToast(null), 3500)
   }
 
-  function openBuilder(projectId?: string) { setBuilderProjectId(projectId); setBuilderOpen(true) }
-  function openEditInvoice(inv: Invoice) { setEditingInvoice(inv); setBuilderProjectId(inv.projectId || undefined); setBuilderOpen(true) }
+  // Phones: review / send / record payments only — building and editing invoices stays on the computer (PLAN Step 8)
+  const onPhone = () => window.matchMedia?.('(max-width: 768px)').matches
+  const PHONE_NOTE = 'Building and editing invoices works on a computer. On the phone you can review, send, change status and record payments.'
+  function openBuilder(projectId?: string) { if (onPhone()) { showToast(PHONE_NOTE); return } setBuilderProjectId(projectId); setBuilderOpen(true) }
+  function openEditInvoice(inv: Invoice) { if (onPhone()) { showToast(PHONE_NOTE); return } setEditingInvoice(inv); setBuilderProjectId(inv.projectId || undefined); setBuilderOpen(true) }
   async function closeBuilder(inv?: Invoice) {
     const fresh = await loadInvoices()
     setInvoices(fresh)
