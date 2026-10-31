@@ -1,4 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
+import EmployeePayRates from '../components/EmployeePayRates'
+import EmployeePayoutMethod from '../components/EmployeePayoutMethod'
+import EmployeeDocuments from '../components/EmployeeDocuments'
+import RecordHistory from '../components/RecordHistory'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { Attachment, Employee, Invoice, Project, TimeEntry } from '../data/types'
 import { loadSnapshot, saveEmployees, saveInvoices, loadSettings, loadTimeEntries } from '../services/storage'
@@ -8,6 +12,8 @@ import { buildStatementHTML } from '../utils/statementHtml'
 import { trackedHoursOf, trackedPayEntries } from '../utils/trackedPay'
 import { loadLatestConsent } from '../services/trackerStorage'
 import EmployeeDevices from './time/EmployeeDevices'
+import { useRole } from '../context/RoleContext'
+import { can } from '../lib/roles'
 import {
   IconImage, IconMusic, IconFile, IconX, IconTrash, IconCheck,
   IconMail, IconPrinter, IconCamera, IconPlay, IconLink, IconLock,
@@ -153,6 +159,7 @@ async function printPayslip(emp: Employee, empInvoices: Invoice[], dateFrom: str
 export default function EmployeeProfilePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { role: myRole } = useRole()
 
   const [employees,   setEmployeesState] = useState<Employee[]>([])
   const [invoices,    setInvoices]       = useState<Invoice[]>([])
@@ -648,6 +655,11 @@ export default function EmployeeProfilePage() {
                     title="For an expired invite or a forgotten password: a one-time link that lets them choose a new password">
                     {inviteLoading === 'reset' ? 'Creating…' : <><IconLink size={12} /> Copy new sign-in link</>}
                   </button>
+                  {empNN.worksFor !== 'yva' && can.viewScreenshots(myRole) && (
+                    <button className="btn-ghost btn-sm" style={{ marginLeft: 8 }} onClick={() => navigate(`/time?tab=screens&employee=${empNN.id}`)}>
+                      View screenshots
+                    </button>
+                  )}
                 </div>
                 {empNN.worksFor !== 'yva' && (
                   <div style={{ marginTop: 6 }}>
@@ -1009,6 +1021,10 @@ export default function EmployeeProfilePage() {
           </div>
         </div>
       )}
+      <div style={{ marginTop: 20 }}><EmployeePayRates employee={empNN} /></div>
+      <div style={{ marginTop: 20 }}><EmployeePayoutMethod employeeId={empNN.id} employeeName={empNN.name} /></div>
+      <div style={{ marginTop: 20 }}><EmployeeDocuments employeeId={empNN.id} /></div>
+      <RecordHistory table="employees" recordId={empNN.id} />
     </div>
   )
 }

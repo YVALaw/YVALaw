@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import PlacementRates from '../components/PlacementRates'
+import { PAY_SCHEDULES, type PaySchedule } from '../utils/moneyRules'
+import RecordHistory from '../components/RecordHistory'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { Client, Contract, ContractStatus, Employee, Expense, Invoice, Project, Task, TaskStatus } from '../data/types'
 import { loadSnapshot, saveProjects, loadTasks, saveTasks, loadExpenses, saveExpenses } from '../services/storage'
@@ -68,6 +71,8 @@ export default function ProjectProfilePage() {
     billingModel: 'hourly', startDate: '', endDate: '', notes: '',
     description: '', projectNeeds: '',
     links: [] as LinkEntry[], employeeIds: [] as string[],
+    paySchedule: 'weekly' as PaySchedule, payAnchor: '',
+    supervisorName: '', supervisorEmail: '', supervisorPhone: '', employeeInstructions: '',
   })
   const [newLinkLabel, setNewLinkLabel] = useState('')
   const [newLinkUrl,   setNewLinkUrl]   = useState('')
@@ -90,6 +95,10 @@ export default function ProjectProfilePage() {
         projectNeeds: project.projectNeeds ?? '',
         links:        (project.links ?? []) as LinkEntry[],
         employeeIds:  project.employeeIds ?? [],
+        paySchedule:  project.paySchedule ?? 'weekly',
+        payAnchor:    project.payAnchor ?? '',
+        supervisorName: project.supervisorName ?? '', supervisorEmail: project.supervisorEmail ?? '',
+        supervisorPhone: project.supervisorPhone ?? '', employeeInstructions: project.employeeInstructions ?? '',
       })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -154,6 +163,10 @@ export default function ProjectProfilePage() {
       notes: form.notes || undefined,
       links: form.links.length > 0 ? form.links : undefined,
       employeeIds: form.employeeIds,
+      paySchedule: form.paySchedule,
+      payAnchor: form.paySchedule === 'biweekly' && form.payAnchor ? form.payAnchor : null,
+      supervisorName: form.supervisorName.trim() || null, supervisorEmail: form.supervisorEmail.trim() || null,
+      supervisorPhone: form.supervisorPhone.trim() || null, employeeInstructions: form.employeeInstructions.trim() || null,
     }
     persistProject(updated)
     setEditing(false)
@@ -174,6 +187,10 @@ export default function ProjectProfilePage() {
       projectNeeds: projectNN.projectNeeds ?? '',
       links: projectNN.links ?? [],
       employeeIds: projectNN.employeeIds ?? [],
+      paySchedule: projectNN.paySchedule ?? 'weekly',
+      payAnchor: projectNN.payAnchor ?? '',
+      supervisorName: projectNN.supervisorName ?? '', supervisorEmail: projectNN.supervisorEmail ?? '',
+      supervisorPhone: projectNN.supervisorPhone ?? '', employeeInstructions: projectNN.employeeInstructions ?? '',
     })
     setEditing(false)
   }
@@ -439,6 +456,33 @@ export default function ProjectProfilePage() {
                     <input className="form-input form-input-sm" type="number" value={form.rate} onChange={e => setForm(f => ({...f, rate: e.target.value}))} placeholder="8.50" />
                   </div>
                   <div className="profile-field">
+                    <span className="profile-field-label">Pay schedule</span>
+                    <select className="form-select form-input-sm" value={form.paySchedule} onChange={e => setForm(f => ({...f, paySchedule: e.target.value as PaySchedule}))}>
+                      {PAY_SCHEDULES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                    </select>
+                  </div>
+                  {form.paySchedule === 'biweekly' && (
+                    <div className="profile-field">
+                      <span className="profile-field-label">First period starts (Monday)</span>
+                      <input className="form-input form-input-sm" type="date" value={form.payAnchor} onChange={e => setForm(f => ({...f, payAnchor: e.target.value}))} />
+                    </div>
+                  )}
+                  <div className="profile-field">
+                    <span className="profile-field-label">Client supervisor</span>
+                    <input className="form-input form-input-sm" value={form.supervisorName} placeholder="Name" onChange={e => setForm(f => ({...f, supervisorName: e.target.value}))} />
+                  </div>
+                  <div className="profile-field">
+                    <span className="profile-field-label">Supervisor email / phone</span>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <input className="form-input form-input-sm" value={form.supervisorEmail} placeholder="email" onChange={e => setForm(f => ({...f, supervisorEmail: e.target.value}))} />
+                      <input className="form-input form-input-sm" value={form.supervisorPhone} placeholder="phone / WhatsApp" onChange={e => setForm(f => ({...f, supervisorPhone: e.target.value}))} />
+                    </div>
+                  </div>
+                  <div className="profile-field" style={{ gridColumn: '1 / -1' }}>
+                    <span className="profile-field-label">Instructions for the team (shown in My workspace → My client)</span>
+                    <textarea className="form-input form-input-sm" rows={3} value={form.employeeInstructions} onChange={e => setForm(f => ({...f, employeeInstructions: e.target.value}))} placeholder="e.g. Answer calls with: Thank you for calling Halavi Law…" />
+                  </div>
+                  <div className="profile-field">
                     <span className="profile-field-label">Budget ($)</span>
                     <input className="form-input form-input-sm" type="number" value={form.budget} onChange={e => setForm(f => ({...f, budget: e.target.value}))} placeholder="5000" />
                   </div>
@@ -500,6 +544,8 @@ export default function ProjectProfilePage() {
                     { label: 'Status',         value: projectNN.status || 'Planning' },
                     { label: 'Billing Model',  value: projectNN.billingModel || 'hourly' },
                     { label: 'Rate',           value: projectNN.rate ? `$${projectNN.rate}/hr` : undefined },
+                    { label: 'Pay schedule',   value: PAY_SCHEDULES.find(x => x.value === (projectNN.paySchedule ?? 'weekly'))?.label },
+                    { label: 'Client supervisor', value: [projectNN.supervisorName, projectNN.supervisorEmail, projectNN.supervisorPhone].filter(Boolean).join(' · ') || undefined },
                     { label: 'Budget',         value: projectNN.budget ? formatMoney(projectNN.budget) : undefined },
                     { label: 'Start Date',     value: projectNN.startDate },
                     { label: 'End Date',       value: projectNN.endDate },
@@ -557,6 +603,8 @@ export default function ProjectProfilePage() {
               </div>
             </div>
           )}
+
+          {!editing && <PlacementRates project={projectNN} members={assignedEmps} client={clients.find(c => c.id === projectNN.clientId) ?? null} />}
 
           {/* Invoice history */}
           {projectInvoices.length > 0 && (
@@ -874,6 +922,7 @@ export default function ProjectProfilePage() {
           </div>
         </div>
       )}
+      <RecordHistory table="projects" recordId={projectNN.id} />
     </div>
   )
 }

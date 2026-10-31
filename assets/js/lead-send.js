@@ -47,8 +47,37 @@
         });
     }
 
+    // Also save the lead in YVA OS → Leads (CRM). Runs in the background and never changes
+    // what the visitor sees; if it fails, the email / Netlify Forms routes above still deliver it.
+    function toCrm(params, source) {
+        try {
+            var p = params || {};
+            var utm = {};
+            new URLSearchParams(location.search).forEach(function (v, k) { if (/^utm_|^gclid$|^fbclid$/.test(k)) utm[k] = v; });
+            fetch('/.netlify/functions/lead-intake', {
+                method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: p.name || [p.first_name, p.last_name].filter(Boolean).join(' '), email: p.email, phone: p.phone,
+                    company: p.company || p.firm_name, website: p.website, service: p.service, message: p.message, sms_consent: p.sms_consent,
+                    source: source || p.source || location.pathname, utm: utm, hp: p.hp || '' })
+            }).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+                if (d && d.id) { try { sessionStorage.setItem('yva_lead', JSON.stringify({ id: d.id, token: d.token })); } catch (e) { /* private mode */ } }
+            }).catch(function () { /* the email routes still deliver the lead */ });
+        } catch (e) { /* never break the form */ }
+    }
+    // When the visitor books on Calendly (embedded after the form), mark the lead as booked
+    window.addEventListener('message', function (e) {
+        if (!e.data || e.data.event !== 'calendly.event_scheduled' || !/^https:\/\/([a-z0-9-]+\.)?calendly\.com$/.test(String(e.origin))) return;
+        try {
+            var lead = JSON.parse(sessionStorage.getItem('yva_lead') || 'null');
+            if (!lead) return;
+            fetch('/.netlify/functions/lead-intake', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ kind: 'calendly', id: lead.id, token: lead.token }) }).catch(function () {});
+        } catch (err) { /* ignore */ }
+    });
+
     window.yvaSendLead = async function (params, opts) {
         opts = opts || {};
+        toCrm(params, opts.source);
         try {
             if (!window.emailjs) throw new Error('EmailJS script did not load (likely blocked)');
             await emailjs.send(SERVICE, TO_YVA, params);

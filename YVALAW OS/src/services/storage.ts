@@ -1,10 +1,12 @@
 import { supabase } from '../lib/supabase'
+import { fetchAllPages } from '../lib/pages'
 import type {
   ActivityLogEntry, AppSettings, Candidate, CommEntryType, DataSnapshot,
   Employee, Client, Expense, Invoice, InvoiceTemplate, Project, Task,
   Estimate, TimeEntry, RecurringInvoice, StaffRequest, ClientDocument,
   PaymentAttempt,
 } from '../data/types'
+import { LoadTracker, applyPlan, normalizeRow, planSync, toSnakeRow as toSnake, type Row } from '../utils/syncPlan'
 
 export type ClientPortalBillingStatus = {
   hasPortalAccount: boolean
@@ -37,57 +39,74 @@ function toCamel<T>(row: Record<string, unknown>): T {
   ) as T
 }
 
-/** camelCase TS object → snake_case DB row */
-function toSnake(obj: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(obj).map(([k, v]) => [
-      k.replace(/([A-Z])/g, c => `_${c.toLowerCase()}`),
-      v,
-    ])
-  )
+// What this browser last loaded from each table (id → row as stored). Saves compare against
+// it so only real changes are written — see src/utils/syncPlan.ts.
+const baselines = new Map<string, Map<string, Row>>()
+// Which load each list a page saves came from, so a save only deletes rows that page had
+const loads = new LoadTracker()
+
+/** Record loaded rows. A full load replaces the table's baseline; a scoped load only the rows in that scope. */
+function remember(table: string, items: object[], scope?: (row: Row) => boolean) {
+  let base = baselines.get(table)
+  if (!base || !scope) { base = new Map(); baselines.set(table, base) }
+  else for (const [id, row] of base) if (scope(row)) base.delete(id)
+  for (const item of items) {
+    const row = normalizeRow(item as Record<string, unknown>)
+    if (row.id) base.set(row.id, row)
+  }
+  loads.record(table, items)
 }
 
 async function fetchAll<T>(table: string): Promise<T[]> {
-  const { data, error } = await supabase.from(table).select('*').order('created_at')
+  const { data, error } = await fetchAllPages<Record<string, unknown>>((from, to) => supabase.from(table).select('*').order('created_at').order('id').range(from, to))
   if (error) { console.error('fetchAll(%s)', table, error); return [] }
-  return (data || []).map(row => toCamel<T>(row as Record<string, unknown>))
+  const items = (data || []).map(row => toCamel<T>(row as Record<string, unknown>))
+  remember(table, items as object[])
+  return items
 }
 
-/** Upsert all rows and delete rows whose IDs are no longer present */
+/**
+ * Save a page's list safely: insert new records, update only the changed columns of each
+ * record, delete only records this browser loaded and the page removed. Records created or
+ * changed by someone else since the page loaded are left alone.
+ * @param scope limit deletions to part of the table (e.g. general expenses only)
+ */
 async function syncAll<T extends { id: string }>(
   table: string,
-  items: T[]
+  items: T[],
+  scope?: (row: Row) => boolean,
 ): Promise<void> {
-  // Fetch existing IDs
-  const { data: existing } = await supabase.from(table).select('id')
-  const existingIds: string[] = (existing || []).map((r: { id: string }) => r.id)
-  const newIds = new Set(items.map(i => i.id))
+  // One save per table at a time: a second quick save is planned after the first one is written,
+  // so it compares with what the first one saved (two fast toggles both stick)
+  const prev = saving.get(table) ?? Promise.resolve()
+  const run = prev.catch(() => undefined).then(() => syncNow(table, items, scope))
+  saving.set(table, run)
+  try { await run } finally { if (saving.get(table) === run) saving.delete(table) }
+}
+const saving = new Map<string, Promise<void>>()
 
-  // Delete removed rows
-  const toDelete = existingIds.filter(id => !newIds.has(id))
-  if (toDelete.length > 0) {
-    const { error: deleteError } = await supabase.from(table).delete().in('id', toDelete)
-    if (deleteError) {
-      throw new Error(`syncAll(${table}) delete failed: ${deleteError.message}`)
-    }
-  }
+async function syncNow<T extends { id: string }>(table: string, items: T[], scope?: (row: Row) => boolean): Promise<void> {
+  const rows = items.map(i => normalizeRow(i as unknown as Record<string, unknown>))
+  const base = baselines.get(table) ?? null
+  // Each row is compared with the copy it was made from (not a newer copy another screen loaded)
+  const pageBase = loads.baseline(table, items, base)
+  const plan = planSync(pageBase, rows, scope, loads.deletable(table, items) ?? undefined)
 
-  // Upsert current rows
-  if (items.length > 0) {
-    const rows = items.map(i => {
-      const row = toSnake(i as unknown as Record<string, unknown>)
-      delete row['created_at']  // let DB manage this column
-      // Convert empty strings to null for all values (numeric columns reject "")
-      for (const key of Object.keys(row)) {
-        if (row[key] === '') row[key] = null
-      }
-      return row
-    })
-    const { error } = await supabase.from(table).upsert(rows)
-    if (error) {
-      throw new Error(`syncAll(${table}) upsert failed: ${error.message}`)
-    }
+  if (plan.deletes.length > 0) {
+    const { error } = await supabase.from(table).delete().in('id', plan.deletes)
+    if (error) throw new Error(`save(${table}) delete failed: ${error.message}`)
   }
+  for (const group of plan.inserts) {
+    const { error } = await supabase.from(table).upsert(group)
+    if (error) throw new Error(`save(${table}) insert failed: ${error.message}`)
+  }
+  for (const u of plan.updates) {
+    const { error } = await supabase.from(table).update(u.patch).in('id', u.ids)
+    if (error) throw new Error(`save(${table}) update failed: ${error.message}`)
+  }
+  if (base) applyPlan(base, plan, rows)
+  else baselines.set(table, new Map(rows.map(r => [r.id, r])))
+  loads.recordSave(table, items, plan)
 }
 
 // ─── Employees ────────────────────────────────────────────────────────────────
@@ -130,12 +149,14 @@ export async function saveProjects(projects: Project[]): Promise<void> {
 // ─── Invoices ─────────────────────────────────────────────────────────────────
 
 export async function loadInvoices(): Promise<Invoice[]> {
-  const { data, error } = await supabase
+  const { data, error } = await fetchAllPages<Record<string, unknown>>((from, to) => supabase
     .from('invoices')
     .select('*')
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: false }).order('id').range(from, to))
   if (error) { console.error('loadInvoices', error); return [] }
-  return (data || []).map(row => toCamel<Invoice>(row as Record<string, unknown>))
+  const items = (data || []).map(row => toCamel<Invoice>(row as Record<string, unknown>))
+  remember('invoices', items)
+  return items
 }
 export async function saveInvoices(invoices: Invoice[]): Promise<void> {
   invalidateSnapshotCache(); return syncAll('invoices', invoices)
@@ -175,10 +196,14 @@ export async function loadGeneralExpenses(): Promise<Expense[]> {
     .is('project_id', null)
     .order('created_at')
   if (error) { console.error('loadGeneralExpenses', error); return [] }
-  return (data || []).map(row => toCamel<Expense>(row as Record<string, unknown>))
+  const items = (data || []).map(row => toCamel<Expense>(row as Record<string, unknown>))
+  remember('expenses', items, isGeneralExpense)
+  return items
 }
+const isGeneralExpense = (row: Row) => row.project_id == null
 export async function saveGeneralExpenses(expenses: Expense[]): Promise<void> {
-  return syncAll('expenses', expenses)
+  // Only general (no project) expenses can be removed from this page — it never loads project expenses
+  return syncAll('expenses', expenses, isGeneralExpense)
 }
 
 // ─── Activity Log ─────────────────────────────────────────────────────────────

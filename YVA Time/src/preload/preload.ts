@@ -26,6 +26,8 @@ const api: YvaApi = {
   deleteScreenshot: () => call('deleteScreenshot'),
   openWorkspace:    () => call('openWorkspace'),
   openAddTime:      () => call('openAddTime'),
+  openLastShot:     (screen: number) => call('openLastShot', screen),
+  openLogFile:      () => call('openLogFile'),
   installUpdate:    () => call('installUpdate'),
 }
 

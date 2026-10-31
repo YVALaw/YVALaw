@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import MissingRates from '../components/MissingRates'
 import { useNavigate } from 'react-router-dom'
 import type { Client, Employee, Expense, Invoice, Project, Tag, Task, TaskStatus } from '../data/types'
 import { loadSnapshot, saveProjects, loadTasks, saveTasks, loadExpenses, saveExpenses } from '../services/storage'
@@ -253,6 +254,8 @@ export default function ProjectsPage() {
           <button className="btn-primary" onClick={openAdd}>+ Add Project</button>
         </div>
       </div>
+
+      <MissingRates projects={projects} employees={employees} clients={clients} />
 
       {/* CARDS VIEW */}
       {view === 'cards' && (

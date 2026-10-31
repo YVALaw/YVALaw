@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import type { Client, Employee, Project, TimeEntry } from '../data/types'
 import { loadTimeEntries, upsertTimeEntry, deleteTimeEntry, loadEmployees, loadProjects, loadClients } from '../services/storage'
 import { supabase } from '../lib/supabase'
@@ -61,7 +62,13 @@ export default function TimeTrackingPage() {
 
   // YVA Time views
   const { role } = useRole()
-  const [tab, setTab] = useState<'log' | 'live' | 'approve' | 'schedule' | 'screens'>('log')
+  // ?tab=screens&employee=ID&day=YYYY-MM-DD opens a person's screenshots (links from profiles / Live)
+  const [params] = useSearchParams()
+  const TABS = ['log', 'live', 'approve', 'schedule', 'screens'] as const
+  type Tab = typeof TABS[number]
+  const tabFromUrl = (): Tab | null => (TABS as readonly string[]).includes(params.get('tab') ?? '') ? params.get('tab') as Tab : null
+  const [tab, setTab] = useState<Tab>(() => tabFromUrl() ?? 'log')
+  useEffect(() => { const t = tabFromUrl(); if (t) setTab(t) }, [params])   // eslint-disable-line react-hooks/exhaustive-deps
 
   // Approvals add YVA Time entries server-side: reload the log when coming back to it
   useEffect(() => { if (tab === 'log') void loadTimeEntries().then(setEntries) }, [tab])
@@ -210,7 +217,7 @@ export default function TimeTrackingPage() {
           <h1 className="page-title">Time Tracking</h1>
           {tab === 'log' && currentName && <p className="page-sub">Manual entries are logged as <strong>{currentName}</strong></p>}
           {tab === 'live' && <p className="page-sub">Live from the YVA Time desktop app · refreshes every minute</p>}
-          {tab === 'screens' && <p className="page-sub">Client-team screenshots · kept 90 days · never shown to clients</p>}
+          {tab === 'screens' && <p className="page-sub">Client-team screenshots · kept 60 days · never shown to clients</p>}
           {tab === 'approve' && <p className="page-sub">Approve YVA Time hours and manual time requests</p>}
           {tab === 'schedule' && <p className="page-sub">Shift vs. when people actually started and stopped (YVA Time)</p>}
         </div>
@@ -240,7 +247,9 @@ export default function TimeTrackingPage() {
     return (
       <div className="page-wrap">
         {header}
-        {tab === 'live' ? <LiveBoard /> : tab === 'approve' ? <ApproveTime /> : tab === 'schedule' ? <ScheduleReport /> : <ScreenshotDay />}
+        {tab === 'live' ? <LiveBoard /> : tab === 'approve' ? <ApproveTime /> : tab === 'schedule' ? <ScheduleReport />
+          : can.viewScreenshots(role) ? <ScreenshotDay key={params.toString()} initialEmployee={params.get('employee') ?? undefined} initialDay={params.get('day') ?? undefined} />
+          : <div className="data-card" style={{ color: 'var(--muted)' }}>Screenshots are only visible to the CEO and admins.</div>}
       </div>
     )
   }

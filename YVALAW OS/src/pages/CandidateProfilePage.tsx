@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { OpeningPicker } from '../components/OpeningCandidates'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { Attachment, Candidate, CandidateStage } from '../data/types'
 import { loadCandidates, saveCandidates } from '../services/storage'
@@ -352,7 +353,7 @@ export default function CandidateProfilePage() {
                   ].map(({ label, value }) => value ? (
                     <div key={label} className="profile-field">
                       <span className="profile-field-label">{label}</span>
-                      {label === 'Resume URL' || label === 'LinkedIn'
+                      {(label === 'Resume URL' || label === 'LinkedIn') && /^https?:\/\//i.test(String(value))
                         ? <a href={value} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--gold)', fontSize: 13 }}>{value}</a>
                         : <span className="profile-field-value">{value}</span>}
                     </div>
@@ -439,6 +440,7 @@ export default function CandidateProfilePage() {
           </div>
         </div>
       )}
+      <div style={{ marginTop: 20 }}><OpeningPicker candidateId={candidateNN.id} /></div>
     </div>
   )
 }

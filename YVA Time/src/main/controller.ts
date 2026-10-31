@@ -13,6 +13,7 @@ import * as api from './api'
 import { captureScreens } from './screenshots'
 import { reminderDue, type ReminderMemory } from './reminders'
 import { dataPath, readJson, writeJson } from './store'
+import { logFilePath, logInfo } from './logfile'
 import type { UpdateState } from './updater'
 import {
   CONSENT_VERSION, PROFILE_EVERY_MS, SAVE_EVERY_MS, SCREENSHOT_DELETE_MS, SYNC_EVERY_MS,
@@ -34,6 +35,7 @@ type Saved = {
 }
 
 const DAY_MS = 86_400_000
+const LAST_SHOT_DIR = 'last-screenshot'          // full-size copies of the latest screenshot, to open on click
 const DISCONNECTED_MESSAGE = 'YVA disconnected this computer from your account. Sign in again to keep tracking — time not uploaded yet stays on this computer.'
 
 function startOfDay(ms: number): number {
@@ -61,6 +63,7 @@ export class Controller {
   private message: string | null = null
   private syncing = false
   private uploadingShots = false
+  private uploadError: string | null = null        // why screenshots aren't uploading (cleared on success)
   private capturing = false
   private listeners = new Set<(s: Snapshot) => void>()
   private timers: NodeJS.Timeout[] = []
@@ -193,6 +196,8 @@ export class Controller {
     for (const q of this.queue) fs.rmSync(q.file, { force: true })
     this.queue = []
     this.lastShot = null
+    this.clearLastShotFiles()
+    this.uploadError = null
     this.consentAt = null
     this.consentVersion = 0
     this.consentSynced = false
@@ -254,6 +259,27 @@ export class Controller {
     else await shell.openExternal(url)
   }
 
+  /** Open the latest screenshot full size (Windows Photos) — one file per screen */
+  async openLastShot(screen: number) {
+    const g = this.lastShot
+    const file = g ? dataPath(LAST_SHOT_DIR, `screen-${Math.max(0, Math.floor(Number(screen) || 0)) + 1}.jpg`) : null
+    if (!file || !fs.existsSync(file)) return
+    if (TEST_NO_BROWSER) fs.writeFileSync(dataPath('last-opened-file.txt'), file)
+    else await shell.openPath(file)
+  }
+
+  /** Show the log file in File Explorer, so it can be attached to an email to YVA */
+  async openLogFile() {
+    const file = logFilePath()
+    if (!fs.existsSync(file)) logInfo('log file opened')
+    if (TEST_NO_BROWSER) fs.writeFileSync(dataPath('last-opened-file.txt'), file)
+    else shell.showItemInFolder(file)
+  }
+
+  private clearLastShotFiles() {
+    try { fs.rmSync(dataPath(LAST_SHOT_DIR), { recursive: true, force: true }) } catch { /* ignore */ }
+  }
+
   private checkReminders(now: number) {
     if (this.phase !== 'ready' || !this.profile) return
     const due = reminderDue(new Date(now), this.profile.shiftStart, this.profile.shiftEnd, this.tracker.status, this.reminders)
@@ -292,6 +318,9 @@ export class Controller {
         preview: shots[0].preview, paths: [], uploaded: [], deleting: false,
       }
       fs.mkdirSync(dataPath('queue'), { recursive: true })
+      this.clearLastShotFiles()
+      fs.mkdirSync(dataPath(LAST_SHOT_DIR), { recursive: true })
+      for (const s of shots) fs.writeFileSync(dataPath(LAST_SHOT_DIR, `screen-${s.monitor + 1}.jpg`), s.jpeg)
       for (const s of shots) {
         const id = crypto.randomUUID()
         const path = api.screenshotPath(this.profile.employeeId, now, id, s.monitor)
@@ -326,10 +355,15 @@ export class Controller {
         fs.rmSync(q.file, { force: true })
         if (this.lastShot?.groupId === q.groupId) this.lastShot.uploaded.push(q.path)
         this.online = true
+        this.uploadError = null
       }
     } catch (e) {
       if (e instanceof api.OfflineError) this.online = false
-      else console.error('screenshot upload failed (will retry)', e)
+      else {
+        const reason = (e as Error)?.message || String(e)
+        if (reason !== this.uploadError) console.error('screenshot upload failed (will retry)', e)
+        this.uploadError = reason
+      }
     } finally {
       this.uploadingShots = false
       this.save()
@@ -353,6 +387,7 @@ export class Controller {
       this.queue = this.queue.filter(x => x.groupId !== g.groupId)
       this.tracker.removeBlock(g.blockStart, g.uploaded.length > 0)
       this.lastShot = null
+      this.clearLastShotFiles()
       this.message = 'Screenshot deleted. That 10-minute block was removed from your time.'
       void this.sync()
     } catch (e) {
@@ -441,6 +476,7 @@ export class Controller {
       idleReview:     t.idleReview,
       lastShot: g ? { takenAt: g.takenAt, preview: g.preview, screens: g.paths.length, deletableUntil: g.takenAt + SCREENSHOT_DELETE_MS } : null,
       online:         this.online,
+      uploadProblem:  this.queue.length > 0 ? this.uploadError : null,
       lastSavedAt:    this.lastSavedAt,
       pending:        { blocks: t.dirtyRows().length, screenshots: this.queue.length },
       workTypes:      this.profile?.worksFor === 'yva' ? WORK_TYPES : [],
