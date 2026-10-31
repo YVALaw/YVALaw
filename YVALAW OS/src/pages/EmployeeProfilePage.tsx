@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import EmployeePayRates from '../components/EmployeePayRates'
+import EmployeePayoutMethod from '../components/EmployeePayoutMethod'
 import RecordHistory from '../components/RecordHistory'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { Attachment, Employee, Invoice, Project, TimeEntry } from '../data/types'
@@ -1020,6 +1021,7 @@ export default function EmployeeProfilePage() {
         </div>
       )}
       <div style={{ marginTop: 20 }}><EmployeePayRates employee={empNN} /></div>
+      <div style={{ marginTop: 20 }}><EmployeePayoutMethod employeeId={empNN.id} employeeName={empNN.name} /></div>
       <RecordHistory table="employees" recordId={empNN.id} />
     </div>
   )

@@ -90,17 +90,6 @@ export default function MyPay({ lang = 'en', onData }: { lang?: 'en' | 'es'; onD
         </div>
       ))}
 
-      {data.paid.length > 0 && (
-        <div>
-          <div className="mypay-label" style={{ marginBottom: 6 }}>{t.history}</div>
-          {data.paid.map(p => (
-            <div key={`${p.payday}-${p.netUsd}`} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-              <span>{weekday(p.payday, lang)} <span className="badge badge-green" style={{ marginLeft: 6 }}>{t.paidLabel}</span></span>
-              <strong>{p.netDop ? dop(p.netDop) : usd(p.netUsd)}</strong>
-            </div>
-          ))}
-        </div>
-      )}
       <div style={{ fontSize: 12, color: 'var(--muted)' }}>{t.explain} {t.updated} {new Date(data.updatedAt).toLocaleTimeString(lang === 'es' ? 'es-DO' : 'en-US', { hour: 'numeric', minute: '2-digit' })}.</div>
     </div>
   )

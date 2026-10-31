@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase'
 import { IconBarChart, IconBriefcase, IconClock, IconBell, IconDollar, IconEdit, IconImage, IconLogOut, IconPlus, IconUser } from '../../components/Icon'
 import MyHours from './MyHours'
 import MyPay from './MyPay'
+import MyPayslips from './MyPayslips'
 import MyAdjustments from './MyAdjustments'
 import ManualTime from './ManualTime'
 import ScreenshotDay from '../time/ScreenshotDay'
@@ -108,6 +109,7 @@ export default function EmployeeWorkspace() {
 
             <Section icon={<IconDollar size={20} />} title="My pay" sub="Live earnings — updates every minute while you track">
               <MyPay />
+              <div style={{ marginTop: 16 }}><MyPayslips employeeName={employee.name} employeeNumber={employee.employeeNumber} /></div>
             </Section>
 
             <Section icon={<IconBarChart size={20} />} title="My hours" sub="From the YVA Time app — YVA approves them each week">

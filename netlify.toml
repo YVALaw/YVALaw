@@ -18,6 +18,10 @@
 [functions."week-close-scheduled"]
   schedule = "5 4 * * 1"
 
+# YVA OS payroll: Wednesday 9:07 am Dominican time — prepares Friday's payroll + reminder
+[functions."payroll-reminder"]
+  schedule = "7 13 * * 3"
+
 # Marketing-site blog: publishes scheduled posts (see the function for setup)
 [functions."publish-scheduled-posts"]
   schedule = "@hourly"
