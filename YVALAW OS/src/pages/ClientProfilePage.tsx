@@ -5,6 +5,7 @@ import { loadSnapshot, saveClients, loadActivityLog, saveActivityLog, loadSettin
 import { sendEmail } from '../services/gmail'
 import { uploadFile, deleteFile } from '../services/fileStorage'
 import { supabase } from '../lib/supabase'
+import { APP_URL } from '../lib/appUrl'
 import { IconMail, IconLink, IconEye, IconX, IconTrash, IconLock, IconMessage, IconPhone, IconHandshake, IconZap, IconCamera } from '../components/Icon'
 
 function uid() { return crypto.randomUUID() }
@@ -428,7 +429,6 @@ export default function ClientProfilePage() {
     if (!session) { setInviteLoading(null); setInviteMsg({ ok: false, text: 'You must be logged in.' }); return }
 
     try {
-      const base = `${window.location.origin}${import.meta.env.BASE_URL}`.replace(/\/+$/, '/')
       const res = await fetch('/.netlify/functions/invite-client', {
         method: 'POST',
         headers: {
@@ -439,7 +439,7 @@ export default function ClientProfilePage() {
           clientId:   clientNN.id,
           email:      clientNN.email,
           mode,
-          redirectTo: `${base}portal/set-password`,
+          redirectTo: `${APP_URL}portal/set-password`,
         }),
       })
       const data = await res.json()

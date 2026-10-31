@@ -103,6 +103,16 @@ function AuthenticatedRouter() {
 
   if (loading) return <LoadingScreen />
 
+  // ── "Forgot password?" and "Copy new sign-in link" open here, signed in by the link ──
+  if (location.pathname === '/reset-password') {
+    const home = role === 'employee' ? '/me' : role === 'client' ? '/portal/dashboard' : '/'
+    return (
+      <Routes>
+        <Route path="*" element={<PortalSetPassword title="Choose a new password" subtitle="Pick a new password for your YVA account" next={home} />} />
+      </Routes>
+    )
+  }
+
   // ── YVA Time desktop sign-in — employees and staff (the code is only issued
   //    to logins linked to an employee record; desktop-link-create checks) ──────
   if (location.pathname === '/connect-app' && !mustChangePassword && (role === 'employee' || isStaff(role))) {

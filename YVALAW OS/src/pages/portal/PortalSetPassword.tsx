@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { IconCheck } from '../../components/Icon'
 
-/** First-login password screen — used by portal clients and invited employees */
-export default function PortalSetPassword({ title = 'Welcome to YVA Portal', next = '/portal/dashboard' }: { title?: string; next?: string }) {
+/** Password screen — first login (portal clients, invited employees) and "Forgot password" / new sign-in links */
+export default function PortalSetPassword({ title = 'Welcome to YVA Portal', next = '/portal/dashboard', subtitle = 'Set your password to activate your account' }: {
+  title?: string; next?: string; subtitle?: string
+}) {
   const navigate              = useNavigate()
   const [password, setPass]   = useState('')
   const [confirm,  setConf]   = useState('')
@@ -93,7 +95,7 @@ export default function PortalSetPassword({ title = 'Welcome to YVA Portal', nex
             {title}
           </div>
           <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 5 }}>
-            Set your password to activate your account
+            {subtitle}
           </div>
         </div>
 

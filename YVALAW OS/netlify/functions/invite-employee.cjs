@@ -3,10 +3,13 @@
  * Creates a Supabase Auth login for an employee (YVA Time / My workspace) and either:
  *  - mode='email': Supabase sends the invitation email (redirects to redirectTo)
  *  - mode='link': returns a one-time invite link for manual delivery
+ *  - mode='reset': the employee already has a login (invite expired, link used on the wrong
+ *    site, forgot password) — returns a one-time sign-in link that opens "Choose a new
+ *    password" (redirectTo should be <app>/reset-password). Never creates a login.
  *
  * POST /.netlify/functions/invite-employee
  * Headers: Authorization: Bearer <caller_access_token>
- * Body:    { employeeId: string, mode?: 'email' | 'link', redirectTo?: string }
+ * Body:    { employeeId: string, mode?: 'email' | 'link' | 'reset', redirectTo?: string }
  *
  * Required Netlify env vars:
  *   SUPABASE_URL              — your Supabase project URL
@@ -73,7 +76,7 @@ exports.handler = async function handler(event) {
     return json(400, { error: 'Invalid JSON body' })
   }
   if (!employeeId) return json(400, { error: 'employeeId is required' })
-  if (mode !== 'email' && mode !== 'link') return json(400, { error: 'mode must be email or link' })
+  if (mode !== 'email' && mode !== 'link' && mode !== 'reset') return json(400, { error: 'mode must be email, link or reset' })
 
   // ── Verify the caller ─────────────────────────────────────────────────────
   const authHeader = event.headers['authorization'] || event.headers['Authorization'] || ''
@@ -104,6 +107,25 @@ exports.handler = async function handler(event) {
   if (!empRes.ok) return json(500, { error: 'Failed to load employee' })
   const employee = (await empRes.json())?.[0]
   if (!employee) return json(404, { error: 'Employee not found' })
+
+  // ── New sign-in link for an existing login ────────────────────────────────
+  if (mode === 'reset') {
+    if (!employee.user_id) return json(400, { error: 'This employee has no login yet — send an invite instead' })
+    const userRes = await fetch(`${supabaseUrl}/auth/v1/admin/users/${enc(employee.user_id)}`, { headers: serviceHeaders() })
+    const authUser = userRes.ok ? await userRes.json().catch(() => null) : null
+    if (!authUser?.email) return json(404, { error: 'The login for this employee was not found' })
+    const linkRes = await fetch(`${supabaseUrl}/auth/v1/admin/generate_link`, {
+      method: 'POST',
+      headers: serviceHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ type: 'recovery', email: authUser.email, ...(redirectTo ? { redirect_to: redirectTo } : {}) }),
+    })
+    const linkData = await linkRes.json().catch(() => ({}))
+    const resetLink = linkData?.action_link || linkData?.properties?.action_link
+    if (!linkRes.ok || !resetLink) return json(500, { error: linkData?.msg || 'Could not create a sign-in link' })
+    return json(200, { success: true, mode, email: authUser.email, inviteLink: resetLink,
+      message: `New sign-in link created for ${authUser.email}` })
+  }
+
   if (employee.user_id) return json(409, { error: 'This employee already has a login' })
 
   const email = String(employee.email || '').trim()

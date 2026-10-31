@@ -13,6 +13,7 @@ import {
   IconMail, IconPrinter, IconCamera, IconPlay, IconLink, IconLock,
 } from '../components/Icon'
 import { supabase } from '../lib/supabase'
+import { APP_URL } from '../lib/appUrl'
 import { formatMoney, fmtHoursHM } from '../utils/money'
 import { employeePremiumConfig, normalizeClockInput, payrollFromInvoiceItem } from '../utils/payroll'
 
@@ -175,7 +176,7 @@ export default function EmployeeProfilePage() {
     worksFor: 'client' as 'client' | 'yva', manualTimeAllowed: false,
   })
   const [attachments, setAttachments] = useState<Attachment[]>([])
-  const [inviteLoading, setInviteLoading] = useState<'email' | 'link' | null>(null)
+  const [inviteLoading, setInviteLoading] = useState<'email' | 'link' | 'reset' | null>(null)
   const [inviteMsg,     setInviteMsg]     = useState<{ ok: boolean; text: string } | null>(null)
   const [consent,       setConsent]       = useState<{ at: number; version: number } | null>(null)
   useEffect(() => { if (id) void loadLatestConsent(id).then(setConsent) }, [id])
@@ -320,31 +321,32 @@ export default function EmployeeProfilePage() {
     setEditing(false)
   }
 
-  // YVA Time / My workspace login — created server-side by invite-employee
-  async function sendEmployeeInvite(mode: 'email' | 'link') {
-    if (!empNN.email) { setInviteMsg({ ok: false, text: 'Add an email address to this employee before inviting.' }); return }
+  // YVA Time / My workspace login — created server-side by invite-employee.
+  // 'reset' = they already have a login: a one-time link that opens "Choose a new password".
+  async function sendEmployeeInvite(mode: 'email' | 'link' | 'reset') {
+    if (!empNN.email && mode !== 'reset') { setInviteMsg({ ok: false, text: 'Add an email address to this employee before inviting.' }); return }
     setInviteLoading(mode)
     setInviteMsg(null)
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) { setInviteLoading(null); setInviteMsg({ ok: false, text: 'You must be logged in.' }); return }
     try {
-      const base = `${window.location.origin}${import.meta.env.BASE_URL}`.replace(/\/+$/, '/')
       const res = await fetch('/.netlify/functions/invite-employee', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ employeeId: empNN.id, mode, redirectTo: `${base}me/set-password` }),
+        body: JSON.stringify({ employeeId: empNN.id, mode, redirectTo: `${APP_URL}${mode === 'reset' ? 'reset-password' : 'me/set-password'}` }),
       })
       const data = await res.json()
-      if (!res.ok) { setInviteMsg({ ok: false, text: data.error || 'Failed to create the invitation.' }); return }
+      if (!res.ok) { setInviteMsg({ ok: false, text: data.error || 'Failed to create the link.' }); return }
       // The server linked the login; mirror it locally (whole-table saves never write userId)
-      setEmployeesState(prev => prev.map(e => e.id === empNN.id ? { ...e, userId: data.userId } : e))
-      if (mode === 'link') {
+      if (mode !== 'reset') setEmployeesState(prev => prev.map(e => e.id === empNN.id ? { ...e, userId: data.userId } : e))
+      if (mode === 'link' || mode === 'reset') {
+        const what = mode === 'reset' ? 'New sign-in link' : 'Invite link'
         try {
           await navigator.clipboard.writeText(data.inviteLink)
-          setInviteMsg({ ok: true, text: `Invite link copied for ${data.email}. Paste it into your own email or message.` })
+          setInviteMsg({ ok: true, text: `${what} copied for ${data.email}. Paste it into your own email or message — it works once.` })
         } catch {
-          window.prompt('Copy this invite link:', data.inviteLink)
-          setInviteMsg({ ok: true, text: `Invite link created for ${data.email}.` })
+          window.prompt(`Copy this ${what.toLowerCase()}:`, data.inviteLink)
+          setInviteMsg({ ok: true, text: `${what} created for ${data.email}.` })
         }
       } else {
         setInviteMsg({ ok: true, text: `Invitation email sent to ${data.email}` })
@@ -641,6 +643,12 @@ export default function EmployeeProfilePage() {
             {empNN.userId ? (
               <div style={{ color: 'var(--muted)', fontSize: 13, paddingTop: 4 }}>
                 This employee can sign in to My workspace and the YVA Time app.
+                <div style={{ marginTop: 8 }}>
+                  <button className="btn-ghost btn-sm" disabled={inviteLoading !== null} onClick={() => void sendEmployeeInvite('reset')}
+                    title="For an expired invite or a forgotten password: a one-time link that lets them choose a new password">
+                    {inviteLoading === 'reset' ? 'Creating…' : <><IconLink size={12} /> Copy new sign-in link</>}
+                  </button>
+                </div>
                 {empNN.worksFor !== 'yva' && (
                   <div style={{ marginTop: 6 }}>
                     Screenshot &amp; activity notice: {consent

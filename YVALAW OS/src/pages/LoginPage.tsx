@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { APP_URL } from '../lib/appUrl'
 
 type ResetState = 'idle' | 'sending' | 'sent' | 'error'
 
@@ -83,7 +84,7 @@ export default function LoginPage() {
     setResetState('sending')
     setResetMsg(null)
     const { error } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${APP_URL}reset-password`,   // opens "Choose a new password" (App.tsx)
     })
     if (error) {
       setResetState('error')
