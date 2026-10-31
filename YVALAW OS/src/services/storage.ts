@@ -77,7 +77,9 @@ async function syncAll<T extends { id: string }>(
 ): Promise<void> {
   const rows = items.map(i => normalizeRow(i as unknown as Record<string, unknown>))
   const base = baselines.get(table) ?? null
-  const plan = planSync(base, rows, scope, loads.deletable(table, items) ?? undefined)
+  // Compare with the version this page loaded (not a newer copy another screen loaded since)
+  const pageBase = loads.baseline(table, items, base)
+  const plan = planSync(pageBase, rows, scope, loads.deletable(table, items) ?? undefined)
 
   if (plan.deletes.length > 0) {
     const { error } = await supabase.from(table).delete().in('id', plan.deletes)

@@ -170,6 +170,11 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 
 ## Things Completed
 
+### Session 13 (YVA OS automation & growth plan — Steps 0–9, `YVALAW OS/PLAN.md`)
+- Built on branch `claude/charming-turing-ue7mxi`, **not merged**; YVA Time **0.4.0 not published**. Owner checklist: `YVALAW OS/SETUP-AFTER-BUILD.md` (6 SQL scripts, Gmail, phone notifications, one-time data, publish the app).
+- Step 0 screenshots (60-day retention, full size in the app, upload warnings, log file, My screenshots) · 1 foundation (safe saving, permissions, change history, notifications bell/email/phone push, installable "YVA OS" app) · 2 per-person bill/pay rates from a date · 3 live earnings in My workspace · 4 Monday weekly close (one invoice per client, flags, approve, send) · 5 client payments · 6 Friday payroll (DOP rate, payslips, bank/PayPal, bonuses that don't come back) · 7 My workspace redesign in Spanish/English (time off, client instructions, documents, announcements) · 8 phone pass · 9 CRM (website leads → pipeline, follow-ups, won → client + project, client contacts and health, careers → Candidates).
+- Website: `assets/js/lead-send.js` also sends booking-form leads to YVA OS (`lead-intake`, background, existing email routes unchanged); `careers.html` also sends applications to YVA OS (`application-intake`).
+
 ### Session 12 (security audit — YVA LawOS)
 - Audited `YVALAW OS/` with Semgrep (incl. Pro + Supply Chain), vibescan, TruffleHog (full git history: no secrets), Trivy and OSV-Scanner.
 - Invoice and earnings-statement HTML now escapes every value (`YVALAW OS/src/utils/html.ts`); before, a name or note containing HTML could run script in print windows/previews/attachments.

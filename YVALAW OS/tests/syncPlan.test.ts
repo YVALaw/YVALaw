@@ -146,3 +146,24 @@ test('emptied list (deleted the last row) → the last generation', () => {
   t.record('tasks', [{ id: 't1' }])
   assert.deepEqual([...t.deletable('tasks', [])!], ['t1'])
 })
+
+test('a record the page did not touch is never written back, even after another screen loaded a newer copy', () => {
+  const t = new LoadTracker()
+  const pageList = [{ id: '1', status: 'sent', notes: '' }, { id: '2', status: 'draft', notes: '' }]
+  t.record('invoices', pageList)                                                 // Invoices page loads
+  const newer = new Map([['1', normalizeRow({ id: '1', status: 'paid', notes: '' })], ['2', normalizeRow({ id: '2', status: 'draft', notes: '' })]] as [string, Row][])
+  t.record('invoices', [{ id: '1', status: 'paid', notes: '' }, { id: '2', status: 'draft', notes: '' }])   // the dashboard reloads: Stripe marked #1 paid
+  const next = pageList.map(i => (i.id === '2' ? { ...i, notes: 'call client' } : i))                       // the page edits only #2
+  const plan = planSync(t.baseline('invoices', next, newer), next.map(r => normalizeRow(r)), undefined, t.deletable('invoices', next) ?? undefined)
+  assert.deepEqual(plan.updates, [{ patch: { notes: 'call client' }, ids: ['2'] }])   // #1 stays "paid"
+  assert.deepEqual(plan.deletes, [])
+})
+
+test('a field changed in place on the loaded object is still saved (compared with the loaded copy)', () => {
+  const t = new LoadTracker()
+  const list = [{ id: '1', status: 'sent' }]
+  t.record('invoices', list)
+  list[0].status = 'paid'                                                         // mutated in place
+  const plan = planSync(t.baseline('invoices', list, null), list.map(r => normalizeRow(r)), undefined, t.deletable('invoices', list) ?? undefined)
+  assert.deepEqual(plan.updates, [{ patch: { status: 'paid' }, ids: ['1'] }])
+})

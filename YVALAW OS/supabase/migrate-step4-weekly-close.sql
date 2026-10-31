@@ -47,12 +47,13 @@ CREATE POLICY "week_closes_manage" ON public.week_closes
 
 ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS client_id uuid;
 ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS week_close_id uuid;
-ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS auto_generated boolean NOT NULL DEFAULT false;
+-- Nullable on purpose: the previous app version saves all invoices in one batch (NOT NULL would break new invoices)
+ALTER TABLE public.invoices ADD COLUMN IF NOT EXISTS auto_generated boolean DEFAULT false;
 CREATE INDEX IF NOT EXISTS invoices_week_close ON public.invoices (week_close_id);
 CREATE UNIQUE INDEX IF NOT EXISTS invoices_one_per_client_week ON public.invoices (week_close_id, client_id) WHERE week_close_id IS NOT NULL;
 
 ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS invoice_prefix text;
-ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS next_invoice_seq integer NOT NULL DEFAULT 1;
+ALTER TABLE public.clients ADD COLUMN IF NOT EXISTS next_invoice_seq integer DEFAULT 1;
 
 -- Next number for a client's invoice, e.g. HAL-0001. Locks the client row, so two runs can't
 -- hand out the same number. The prefix is the first 3 letters of the client name (made unique).

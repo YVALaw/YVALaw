@@ -54,10 +54,12 @@ CREATE TRIGGER audit_row AFTER INSERT OR UPDATE OR DELETE ON public.placement_ra
 DO $$
 BEGIN
   IF to_regclass('public.projects') IS NOT NULL THEN
-    ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS pay_schedule text NOT NULL DEFAULT 'weekly';
+    -- Nullable on purpose (NULL = weekly): the app version before this one saves projects in one batch
+    -- and would write NULL into a NOT NULL column for a new project.
+    ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS pay_schedule text DEFAULT 'weekly';
     ALTER TABLE public.projects ADD COLUMN IF NOT EXISTS pay_anchor date;
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'projects_pay_schedule') THEN
-      ALTER TABLE public.projects ADD CONSTRAINT projects_pay_schedule CHECK (pay_schedule IN ('weekly', 'biweekly', 'semimonthly', 'monthly'));
+      ALTER TABLE public.projects ADD CONSTRAINT projects_pay_schedule CHECK (pay_schedule IS NULL OR pay_schedule IN ('weekly', 'biweekly', 'semimonthly', 'monthly'));
     END IF;
   END IF;
   IF to_regclass('public.employees') IS NOT NULL THEN

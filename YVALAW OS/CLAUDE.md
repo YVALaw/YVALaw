@@ -223,6 +223,12 @@ Groundwork for the YVA Time Windows desktop tracker (Electron, Phase 1). Plan de
 - **UI:** `pages/LeadsPage.tsx` (`/leads`, CRM menu for CEO/Admin/Lead Gen or lead permissions; kanban with drag and drop, lead modal with activity + follow-ups, Mark won → `convertLead` creates client + project + contact), `components/ClientContacts.tsx` (client profile), `utils/clientHealth.ts` + badge on client cards, `components/OpeningCandidates.tsx` (`OpeningPicker` on the candidate profile, list on Requests). `services/crm.ts`. Notification kind `application_new` added.
 - Tests: 26 SQL, 22 function, 16 browser + 7 website checks.
 
+### Rules learned while building Steps 0–9
+- **Columns added to existing tables must be nullable** (use a DEFAULT, not NOT NULL): the previous app version saves whole lists in one batch and PostgREST writes NULL for keys a new row lacks. `projects.pay_schedule`, `invoices.auto_generated`, `clients.next_invoice_seq` are nullable for this reason; code treats NULL as the default.
+- **Trigger functions written by server functions** (service role) and that call `private.*` must be SECURITY DEFINER (or rely on Step 1's `GRANT USAGE ON SCHEMA private TO service_role`) — PL/pgSQL plans the whole IF expression, so a private call inside a short-circuited condition still needs schema access.
+- Safe saving compares each save with the **version that page loaded** (`LoadTracker.baseline`), so records the page didn't touch are never written back even if another screen loaded a newer copy.
+- Owner setup checklist for this work: `SETUP-AFTER-BUILD.md`.
+
 ## Session Progress — Client Portal
 
 ### Completed This Session

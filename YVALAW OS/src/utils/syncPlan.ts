@@ -109,32 +109,55 @@ export function applyPlan(baseline: Map<string, Row>, plan: SyncPlan, rows: Row[
  * so it is never treated as "removed by this page".
  */
 export class LoadTracker {
-  private gens = new Map<number, { table: string; ids: Set<string> }>()
+  // Each generation keeps the rows exactly as they were loaded/saved (normalized), so a save
+  // compares the page's rows with the version THAT page had — not a newer copy another screen loaded.
+  private gens = new Map<number, { table: string; rows: Map<string, Row> }>()
   private next = 0
   private tags = new WeakMap<object, number>()
 
   /** Record a load or a successful save of `items` (row objects as the page holds them) */
   record(table: string, items: readonly object[]): void {
     const gen = this.next++
-    this.gens.set(gen, { table, ids: new Set(items.map(i => (i as { id?: string }).id).filter((x): x is string => !!x)) })
-    for (const it of items) if (it && typeof it === 'object') this.tags.set(it, gen)
-    if (this.gens.size > 400) this.gens.delete(this.gens.keys().next().value as number)   // keep memory bounded
+    const rows = new Map<string, Row>()
+    for (const it of items) {
+      if (!it || typeof it !== 'object') continue
+      const row = normalizeRow(it as Record<string, unknown>)
+      if (row.id) rows.set(row.id, row)
+      this.tags.set(it, gen)
+    }
+    this.gens.set(gen, { table, rows })
+    if (this.gens.size > 120) this.gens.delete(this.gens.keys().next().value as number)   // keep memory bounded
   }
 
-  /** Ids this save may delete, or null when the table was never loaded here */
-  deletable(table: string, items: readonly object[]): Set<string> | null {
+  /** The generation the page's list came from (see class comment), or null if the table was never loaded */
+  private choose(table: string, items: readonly object[]) {
     let newest = -1
     for (const it of items) {
       const g = it && typeof it === 'object' ? this.tags.get(it) : undefined
       if (g !== undefined && g > newest && this.gens.get(g)?.table === table) newest = g
     }
-    if (newest >= 0) return this.gens.get(newest)!.ids
+    if (newest >= 0) return this.gens.get(newest)!
     const mine = [...this.gens.values()].filter(g => g.table === table)
     if (mine.length === 0) return null
-    const known = items.map(i => (i as { id?: string }).id).filter((id): id is string => !!id && mine.some(g => g.ids.has(id)))
+    const known = items.map(i => (i as { id?: string }).id).filter((id): id is string => !!id && mine.some(g => g.rows.has(id)))
     // An empty (or all-new) list: only the latest load/save of this table tells what the page had
-    if (known.length === 0) return mine[mine.length - 1].ids
+    if (known.length === 0) return mine[mine.length - 1]
     // Every row was rebuilt: the oldest generation holding all of them — the least that could be stale
-    return mine.find(g => known.every(id => g.ids.has(id)))?.ids ?? new Set()
+    return mine.find(g => known.every(id => g.rows.has(id))) ?? { table, rows: new Map<string, Row>() }
+  }
+
+  /** Ids this save may delete, or null when the table was never loaded here */
+  deletable(table: string, items: readonly object[]): Set<string> | null {
+    const g = this.choose(table, items)
+    return g ? new Set(g.rows.keys()) : null
+  }
+
+  /** What the page started from: its generation's rows, falling back to `fallback` for ids it doesn't have */
+  baseline(table: string, items: readonly object[], fallback: Map<string, Row> | null): Map<string, Row> | null {
+    const g = this.choose(table, items)
+    if (!g && !fallback) return null
+    const out = new Map(fallback ?? [])
+    if (g) for (const [id, row] of g.rows) out.set(id, row)
+    return out
   }
 }
