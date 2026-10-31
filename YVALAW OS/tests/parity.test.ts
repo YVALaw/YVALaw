@@ -75,3 +75,29 @@ test('zoned midnight (DR has no DST; New York does)', () => {
   assert.equal(new Date(web.zonedMidnight('2026-11-02', 'America/New_York')).toISOString(), '2026-11-02T05:00:00.000Z')
   assert.equal(web.zonedMidnight('2026-03-09', 'America/New_York'), server.zonedMidnight('2026-03-09', 'America/New_York'))
 })
+
+test('free-text time zones never break the maths (fall back to the business zone)', () => {
+  for (const tz of ['AST / EST', 'America/New_York', '', null]) {
+    assert.equal(web.safeTz(tz), server.safeTz(tz))
+  }
+  assert.equal(web.safeTz('AST / EST'), 'America/Santo_Domingo')
+  const block = { block_start: '2026-10-29T01:30:00Z', seconds: 600, first_offset: 0, last_offset: 599, project_id: 'p1', status: 'approved' }
+  const bad = { ...ana, timezone: 'AST / EST' }
+  assert.equal(web.premiumSeconds(block, bad), server.premiumSeconds(block, bad))
+  assert.equal(web.premiumSeconds(block, bad), 600)                       // 9:30 pm DR
+})
+
+test('removing time comes off regular time first, then premium, never below zero', () => {
+  const day = [
+    { block_start: '2026-10-28T23:00:00Z', seconds: 600, first_offset: 0, last_offset: 599, project_id: 'p1', status: 'approved' },  // 7:00 pm regular
+    { block_start: '2026-10-29T01:30:00Z', seconds: 600, first_offset: 0, last_offset: 599, project_id: 'p1', status: 'approved' },  // 9:30 pm premium
+    { block_start: '2026-10-28T16:00:00Z', seconds: -900, first_offset: null, last_offset: null, project_id: 'p1', status: 'approved' }, // YVA removes 15 min
+  ]
+  const ctx = { blocks: day, employee: ana, projectsById: { p1, p2, p3 }, clientsById: clients, rates, kind: 'pay' as const }
+  const w = web.blocksMoney(ctx), s = server.blocksMoney(ctx)
+  assert.deepEqual(JSON.parse(JSON.stringify(w)), JSON.parse(JSON.stringify(s)))
+  assert.equal(w.seconds, 300); assert.equal(w.premiumSeconds, 300)          // 10 min regular gone, then 5 of premium
+  assert.equal(w.amount, Math.round(((300 / 3600) * 6 * 1.15 + Number.EPSILON) * 100) / 100)   // 0.575 → 0.58
+  const tooMuch = web.blocksMoney({ ...ctx, blocks: [day[0], { ...day[2], seconds: -5000 }] })
+  assert.equal(tooMuch.seconds, 0); assert.equal(tooMuch.amount, 0)
+})

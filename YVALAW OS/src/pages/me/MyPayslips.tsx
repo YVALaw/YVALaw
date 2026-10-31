@@ -19,6 +19,8 @@ export default function MyPayslips({ employeeName, employeeNumber, lang = 'en' }
     void supabase.from('payroll_adjustments').select('run_id,type,amount,reason').eq('status', 'applied').then(({ data }) => setAdjs((data || []) as Adj[]))
   }, [])
   if (lines === null) return null
+  const periodDate = (d: string, l: typeof lang, year = false) =>
+    new Date(`${d}T12:00:00`).toLocaleDateString(l === 'es' ? 'es-DO' : 'en-US', { month: 'short', day: 'numeric', ...(year ? { year: 'numeric' as const } : {}) })
   if (lines.length === 0) return <div style={{ fontSize: 14, color: 'var(--muted)' }}>{t.none}</div>
   return (
     <div>
@@ -26,7 +28,7 @@ export default function MyPayslips({ employeeName, employeeNumber, lang = 'en' }
         <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 600 }}>{new Date(`${l.payday}T12:00:00`).toLocaleDateString(lang === 'es' ? 'es-DO' : 'en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · {l.label}</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>{l.period_start} – {l.period_end}</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)' }}>{periodDate(l.period_start, lang)} – {periodDate(l.period_end, lang, true)}</div>
           </div>
           <strong>{l.net_dop != null ? `RD$${Math.round(Number(l.net_dop)).toLocaleString('en-US')}` : `$${Number(l.net_usd).toFixed(2)}`}</strong>
           <button className="btn-ghost btn-sm" onClick={() => openPayslip({ companyName: 'YVA Staffing', employeeName, employeeNumber, label: l.label, periodStart: l.period_start, periodEnd: l.period_end, payday: l.payday,

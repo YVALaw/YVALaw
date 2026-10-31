@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { loadPlacementRates, rateClient, rateEmployee, rateProject, type PlacementRate } from '../services/rates'
+import { loadRatesForInvoicing, rateClient, rateEmployee, rateProject, type PlacementRate } from '../services/rates'
 import { localParts, resolveRates } from '../utils/moneyRules'
 import type { AppSettings, Client, Employee, Invoice, InvoiceItem, InvoiceTemplate, Project } from '../data/types'
 import {
@@ -112,7 +112,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
     })
     void loadInvoiceTemplates().then(setTemplates)
     void loadSettings().then(setSettings)
-    void loadPlacementRates().then(r => setPlacementRates(r.rows))   // empty without the rates.manage permission
+    void loadRatesForInvoicing().then(setPlacementRates)   // without rates.manage: bill rates + positions only
   }, [])
   const [placementRates, setPlacementRates] = useState<PlacementRate[]>([])
 

@@ -98,25 +98,33 @@ export function applyPlan(baseline: Map<string, Row>, plan: SyncPlan, rows: Row[
   }
 }
 
+/** Load tag carried by row objects. An enumerable Symbol survives `{ ...row, field }` (object
+ *  spread copies symbol keys) but is ignored by Object.entries / JSON, so it never reaches the database. */
+const GEN: unique symbol = Symbol('yvaLoadGen')
+const KEEP_PER_TABLE = 30
+
 /**
- * Which rows may a save delete? Only rows the page actually had.
+ * What a save compares against, per row.
  *
- * Each load (and each save) is a "generation" with the ids it contained. Loaded row objects are
- * tagged with their generation; pages build the list they save with filter/map/spread, which keeps
- * the untouched row objects, so the tags in a saved list tell which load it came from. A row
- * created by someone else after that load (e.g. invoices made by the Sunday job while the Invoices
- * page stayed open, then picked up by another part of the app) is in a newer generation only,
- * so it is never treated as "removed by this page".
+ * Each load (and each save) is a "generation" holding the rows exactly as they were loaded/saved.
+ * Row objects are tagged with their generation, and the tag survives `{ ...row, notes }`, so an
+ * edited row is compared with the copy IT was made from — not a newer copy another screen loaded
+ * (that would write back everyone else's changes, e.g. undo a payment) and not an older one.
+ * Changes this browser itself saved after that copy are layered on top, so changing a field back
+ * to its original value is still saved. Rows rebuilt from scratch (no tag) use the oldest copy
+ * this browser still remembers, plus its own later saves.
+ *
+ * Deleting: a save only deletes rows that were in the load the page's list came from, so rows
+ * created elsewhere later (the Monday job, another person) are never treated as "removed".
  */
 export class LoadTracker {
-  // Each generation keeps the rows exactly as they were loaded/saved (normalized), so a save
-  // compares the page's rows with the version THAT page had — not a newer copy another screen loaded.
   private gens = new Map<number, { table: string; rows: Map<string, Row> }>()
   private next = 0
-  private tags = new WeakMap<object, number>()
+  private tags = new WeakMap<object, number>()          // fallback when an object can't take the symbol (frozen)
+  private writes = new Map<string, { gen: number; id: string; patch: Record<string, unknown> }[]>()
 
-  /** Record a load or a successful save of `items` (row objects as the page holds them) */
-  record(table: string, items: readonly object[]): void {
+  /** Record a load (or the list of a successful save) */
+  record(table: string, items: readonly object[]): number {
     const gen = this.next++
     const rows = new Map<string, Row>()
     for (const it of items) {
@@ -124,40 +132,82 @@ export class LoadTracker {
       const row = normalizeRow(it as Record<string, unknown>)
       if (row.id) rows.set(row.id, row)
       this.tags.set(it, gen)
+      try { (it as Record<symbol, unknown>)[GEN] = gen } catch { /* frozen: WeakMap tag only */ }
     }
     this.gens.set(gen, { table, rows })
-    if (this.gens.size > 120) this.gens.delete(this.gens.keys().next().value as number)   // keep memory bounded
+    const mine = [...this.gens.entries()].filter(([, g]) => g.table === table)
+    if (mine.length > KEEP_PER_TABLE) {
+      for (const [n] of mine.slice(0, mine.length - KEEP_PER_TABLE)) this.gens.delete(n)
+      const oldest = mine[mine.length - KEEP_PER_TABLE][0]
+      this.writes.set(table, (this.writes.get(table) ?? []).filter(w => w.gen >= oldest))
+    }
+    return gen
   }
 
-  /** The generation the page's list came from (see class comment), or null if the table was never loaded */
-  private choose(table: string, items: readonly object[]) {
-    let newest = -1
-    for (const it of items) {
-      const g = it && typeof it === 'object' ? this.tags.get(it) : undefined
-      if (g !== undefined && g > newest && this.gens.get(g)?.table === table) newest = g
-    }
-    if (newest >= 0) return this.gens.get(newest)!
-    const mine = [...this.gens.values()].filter(g => g.table === table)
-    if (mine.length === 0) return null
-    const known = items.map(i => (i as { id?: string }).id).filter((id): id is string => !!id && mine.some(g => g.rows.has(id)))
-    // An empty (or all-new) list: only the latest load/save of this table tells what the page had
-    if (known.length === 0) return mine[mine.length - 1]
-    // Every row was rebuilt: the oldest generation holding all of them — the least that could be stale
-    return mine.find(g => known.every(id => g.rows.has(id))) ?? { table, rows: new Map<string, Row>() }
+  /** Record a successful save: its list (new generation) and exactly what it wrote */
+  recordSave(table: string, items: readonly object[], plan: SyncPlan): void {
+    const gen = this.record(table, items)
+    const log = this.writes.get(table) ?? []
+    for (const group of plan.inserts) for (const r of group) log.push({ gen, id: r.id, patch: r })
+    for (const u of plan.updates) for (const id of u.ids) log.push({ gen, id, patch: u.patch })
+    this.writes.set(table, log)
+  }
+
+  private tagOf(it: unknown): number | undefined {
+    if (!it || typeof it !== 'object') return undefined
+    const s = (it as Record<symbol, unknown>)[GEN]
+    return typeof s === 'number' ? s : this.tags.get(it)
+  }
+
+  private mine(table: string) {
+    return [...this.gens.entries()].filter(([, g]) => g.table === table)
   }
 
   /** Ids this save may delete, or null when the table was never loaded here */
   deletable(table: string, items: readonly object[]): Set<string> | null {
-    const g = this.choose(table, items)
-    return g ? new Set(g.rows.keys()) : null
+    const mine = this.mine(table)
+    if (mine.length === 0) return null
+    let newest = -1
+    for (const it of items) {
+      const g = this.tagOf(it)
+      if (g !== undefined && g > newest && this.gens.get(g)?.table === table) newest = g
+    }
+    if (newest >= 0) return new Set(this.gens.get(newest)!.rows.keys())
+    const known = items.map(i => (i as { id?: string }).id).filter((id): id is string => !!id && mine.some(([, g]) => g.rows.has(id)))
+    if (known.length > 0) {
+      // Every row rebuilt: the oldest generation holding all of them — the least that could be stale
+      const g = mine.find(([, g]) => known.every(id => g.rows.has(id)))
+      return g ? new Set(g[1].rows.keys()) : new Set()
+    }
+    // An empty (or all-new) list: only rows every remembered load/save had (a row another screen
+    // picked up later is not one this page could have removed)
+    const [first, ...rest] = mine
+    return new Set([...first[1].rows.keys()].filter(id => rest.every(([, g]) => g.rows.has(id))))
   }
 
-  /** What the page started from: its generation's rows, falling back to `fallback` for ids it doesn't have */
+  /** Per row: the copy the page's row was made from (+ this browser's later saves); `fallback` for unknown ids */
   baseline(table: string, items: readonly object[], fallback: Map<string, Row> | null): Map<string, Row> | null {
-    const g = this.choose(table, items)
-    if (!g && !fallback) return null
+    const mine = this.mine(table)
+    if (mine.length === 0 && !fallback) return null
     const out = new Map(fallback ?? [])
-    if (g) for (const [id, row] of g.rows) out.set(id, row)
+    const log = this.writes.get(table) ?? []
+    for (const it of items) {
+      const id = (it as { id?: string })?.id
+      if (!id) continue
+      let from = -1
+      let row: Row | undefined
+      const g = this.tagOf(it)
+      const tagged = g !== undefined ? this.gens.get(g) : undefined
+      if (tagged && tagged.table === table && tagged.rows.has(id)) { from = g!; row = tagged.rows.get(id) }
+      else {
+        const oldest = mine.find(([, gg]) => gg.rows.has(id))
+        if (oldest) { from = oldest[0]; row = oldest[1].rows.get(id) }
+      }
+      if (!row) continue
+      let merged: Row = row
+      for (const w of log) if (w.id === id && w.gen > from) merged = { ...merged, ...w.patch } as Row
+      out.set(id, merged)
+    }
     return out
   }
 }

@@ -64,6 +64,15 @@ export const PAY_SOURCE_LABEL: Record<PaySource, string> = {
 
 // ── Dates ────────────────────────────────────────────────────────────────────
 
+/** A usable IANA time zone, or `fallback`. Profiles hold free text ("AST / EST"), which Intl rejects with a RangeError. */
+const tzCache = new Map<string, boolean>()
+export function safeTz(tz: string | null | undefined, fallback = DEFAULT_TZ): string {
+  const t = String(tz || '').trim()
+  if (!t) return fallback
+  if (!tzCache.has(t)) { try { new Intl.DateTimeFormat('en-US', { timeZone: t }); tzCache.set(t, true) } catch { tzCache.set(t, false) } }
+  return tzCache.get(t) ? t : fallback
+}
+
 export function localParts(ms: number, tz = DEFAULT_TZ) {
   const f = new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23', weekday: 'short' })
   const m = Object.fromEntries(f.formatToParts(new Date(ms)).map(p => [p.type, p.value]))
@@ -124,7 +133,7 @@ export function premiumSeconds(block: MoneyBlock, employee?: RateEmployee | null
   const first = Number.isInteger(block.first_offset) ? block.first_offset! : 0
   const last = Number.isInteger(block.last_offset) ? block.last_offset! : 599
   const span = Math.max(1, last - first + 1)
-  const p = localParts(bs, tz || employee.timezone || DEFAULT_TZ)
+  const p = localParts(bs, safeTz(employee.timezone, safeTz(tz)))     // the employee's clock (business zone if theirs isn't valid)
   const localSec = p.hour * 3600 + p.minute * 60 + p.second
   const winStart = startMin * 60, winEnd = 24 * 3600
   const a = localSec + first, b = localSec + last + 1
@@ -134,29 +143,45 @@ export function premiumSeconds(block: MoneyBlock, employee?: RateEmployee | null
 
 export type MoneyGroup = { seconds: number; premiumSeconds: number; amount: number; rate: number; rates: number[]; missingRate: boolean }
 
+/** Days in the business zone `tz`; negative blocks (YVA removing time) come off regular time first, then premium. */
 export function blocksMoney({ blocks, employee, projectsById = {}, clientsById = {}, rates = [], kind = 'pay', tz }: {
   blocks: MoneyBlock[]; employee?: RateEmployee | null; projectsById?: Record<string, RateProject>; clientsById?: Record<string, RateClient>
   rates?: RateRow[]; kind?: 'pay' | 'bill'; tz?: string
 }) {
   const out = { seconds: 0, premiumSeconds: 0, amount: 0, byProject: {} as Record<string, MoneyGroup> }
   const pct = employee?.premium_enabled ? num(employee.premium_percent) : 0
+  const zone = safeTz(tz, safeTz(employee?.timezone))
+  type Cell = { key: string; reg: number; prem: number; rate: number }
+  const cells = new Map<string, Cell>()
   const rateSets: Record<string, Set<number>> = {}
+  const removals: [Cell, number][] = []
   for (const b of blocks) {
     if (b.status === 'removed' || b.status === 'rejected') continue
-    const day = localParts(Date.parse(b.block_start), tz || employee?.timezone || DEFAULT_TZ).date
+    const day = localParts(Date.parse(b.block_start), zone).date
     const project = b.project_id ? projectsById[b.project_id] : null
     if (kind === 'bill' && !project) continue
     const client = project?.client_id ? clientsById[project.client_id] : null
     const r = resolveRates({ employee, project, client, rates, day })
     const rate = kind === 'bill' ? r.bill.rate : r.pay.rate
-    const prem = premiumSeconds(b, employee, tz)
-    const sec = Number(b.seconds) || 0
-    const amount = ((sec - prem) / 3600) * rate + (prem / 3600) * rate * (1 + pct / 100)
     const key = b.project_id || 'yva'
-    const g = (out.byProject[key] ||= { seconds: 0, premiumSeconds: 0, amount: 0, rate, rates: [], missingRate: false })
     ;(rateSets[key] ||= new Set()).add(rate)
-    g.seconds += sec; g.premiumSeconds += prem; g.amount += amount; if (!rate) g.missingRate = true
-    out.seconds += sec; out.premiumSeconds += prem; out.amount += amount
+    const c = cells.get(`${key}|${day}`) || { key, reg: 0, prem: 0, rate }
+    cells.set(`${key}|${day}`, c)
+    const sec = Number(b.seconds) || 0
+    if (sec < 0) { removals.push([c, -sec]); continue }
+    const prem = premiumSeconds(b, employee, zone)
+    c.reg += sec - prem; c.prem += prem
+  }
+  for (const [c, take] of removals) {
+    const fromReg = Math.min(c.reg, take)
+    c.reg -= fromReg
+    c.prem -= Math.min(c.prem, take - fromReg)
+  }
+  for (const c of cells.values()) {
+    const g = (out.byProject[c.key] ||= { seconds: 0, premiumSeconds: 0, amount: 0, rate: c.rate, rates: [], missingRate: false })
+    const amount = (c.reg / 3600) * c.rate + (c.prem / 3600) * c.rate * (1 + pct / 100)
+    g.seconds += c.reg + c.prem; g.premiumSeconds += c.prem; g.amount += amount; if (!c.rate) g.missingRate = true
+    out.seconds += c.reg + c.prem; out.premiumSeconds += c.prem; out.amount += amount
   }
   out.amount = round2(out.amount)
   for (const [k, g] of Object.entries(out.byProject)) { g.amount = round2(g.amount); g.rates = [...rateSets[k]] }

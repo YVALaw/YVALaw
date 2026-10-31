@@ -54,9 +54,14 @@ export async function convertLead(lead: Lead, p: { clientName: string; projectNa
     notes: [lead.service && `Service: ${lead.service}`, lead.source && `Lead source: ${lead.source}`, lead.message].filter(Boolean).join('\n') || null })
   if (c.error) throw new Error(`Client: ${c.error.message}`)
   const pr = await supabase.from('projects').insert({ id: projectId, name: p.projectName.trim(), client_id: clientId, rate: p.rate, status: 'active', employee_ids: [] })
-  if (pr.error) throw new Error(`Project: ${pr.error.message}`)
-  await supabase.from('contacts').insert({ client_id: clientId, name: lead.name, email: lead.email, phone: lead.phone, whatsapp: lead.phone, role: 'Main contact', is_billing: true })
+  if (pr.error) {
+    await supabase.from('clients').delete().eq('id', clientId)          // don't leave a client behind; a retry starts clean
+    throw new Error(`Project: ${pr.error.message}`)
+  }
+  // From here the client + project exist: record them on the lead first, so a retry can't duplicate them
   await updateLead(lead.id, { stage: 'won', client_id: clientId, project_id: projectId })
+  const ct = await supabase.from('contacts').insert({ client_id: clientId, name: lead.name, email: lead.email, phone: lead.phone, whatsapp: lead.phone, role: 'Main contact', is_billing: true })
+  if (ct.error) throw new Error(`Client and project were created, but the contact could not be saved: ${ct.error.message}`)
   await addActivity({ leadId: lead.id, kind: 'system', body: `Won — client "${p.clientName}" and project "${p.projectName}" created` })
   return { clientId, projectId }
 }

@@ -71,6 +71,22 @@ BEGIN
   END IF;
 END $$;
 
+-- Bill rates + positions for invoicing, for every staff member (no pay rates): the invoice builder
+-- needs the client's rate per person, but placement_rates itself is rates.manage only.
+CREATE OR REPLACE FUNCTION public.placement_bill_rates()
+RETURNS TABLE (employee_id uuid, project_id uuid, "position" text, bill_rate numeric, effective_from date)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT r.employee_id, r.project_id, r.position, r.bill_rate, r.effective_from
+  FROM public.placement_rates r
+  WHERE private.is_internal() AND r.project_id IS NOT NULL AND (r.bill_rate IS NOT NULL OR r.position IS NOT NULL)
+$$;
+REVOKE ALL ON FUNCTION public.placement_bill_rates() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.placement_bill_rates() TO authenticated;
+
 NOTIFY pgrst, 'reload schema';
 
 -- Check

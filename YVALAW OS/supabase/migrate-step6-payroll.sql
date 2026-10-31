@@ -203,7 +203,7 @@ BEGIN
       status = 'paid', paid_on = coalesce(p_paid_on, current_date), paid_at = now(), reference = nullif(trim(p_reference), ''),
       exchange_rate = r.exchange_rate, net_dop = round(l.net_usd * r.exchange_rate, 2),
       payout = CASE WHEN pm IS NULL THEN NULL ELSE jsonb_build_object('method', pm.method, 'bank', pm.bank_name, 'accountType', pm.account_type,
-               'account', CASE WHEN pm.account_number IS NULL THEN NULL ELSE '••••' || right(pm.account_number, 4) END, 'paypal', pm.paypal_email, 'currency', pm.currency) END
+               'account', CASE WHEN pm.account_number IS NULL THEN NULL ELSE '••••' || right(pm.account_number, 4) END, 'paypal', CASE WHEN pm.paypal_email IS NULL THEN NULL ELSE left(pm.paypal_email, 1) || '•••@' || split_part(pm.paypal_email, '@', 2) END, 'currency', pm.currency) END
     WHERE id = l.id;
     -- Bonuses / deductions attached to this payroll for this person are now used up
     UPDATE public.payroll_adjustments SET status = 'applied', applied_at = now()
@@ -213,7 +213,7 @@ BEGIN
     PERFORM private.notify_user(uid, 'payslip_ready',
       'Your pay is ready — Tu pago está listo',
       l.label || ' · ' || to_char(l.period_start, 'Mon DD') || ' – ' || to_char(l.period_end, 'Mon DD') ||
-      ' · RD$' || to_char(round(l.net_usd * r.exchange_rate), 'FM999,999,990'), '/me');
+      ' · RD$' || to_char(round(l.net_usd * r.exchange_rate), 'FM999,999,990'), '/me?s=pay');
   END LOOP;
   UPDATE public.payroll_runs pr SET status = 'paid', paid_at = now()
   WHERE pr.id IN (SELECT run_id FROM public.payroll_lines WHERE id = ANY (p_lines))

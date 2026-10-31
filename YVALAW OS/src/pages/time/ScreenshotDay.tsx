@@ -12,7 +12,8 @@ const DAY_MS = 86_400_000
 function todayInput(): string {
   const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
-function clock(ms: number): string { return new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) }
+/** Staff pages stay English (lang defaults to 'en'); My workspace passes the employee's language */
+function clock(ms: number, lang: 'en' | 'es' = 'en'): string { return new Date(ms).toLocaleTimeString(lang === 'es' ? 'es-DO' : 'en-US', { hour: 'numeric', minute: '2-digit' }) }
 function hm(seconds: number): string { return `${Math.floor(seconds / 3600)}h ${String(Math.floor((seconds % 3600) / 60)).padStart(2, '0')}m` }
 
 type Cell = { blockStart: number; seconds: number; active: number; measured: number; removed: boolean; labels: string[]; notes: string[]; shots: TrackerShot[] }
@@ -129,7 +130,7 @@ export default function ScreenshotDay({ initialEmployee, initialDay, self, lang 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {hours.map(h => (
           <div key={h} className="data-card" style={{ padding: 14 }}>
-            <div style={{ fontWeight: 700, marginBottom: 10 }}>{clock(dayStart + h * 3_600_000)}</div>
+            <div style={{ fontWeight: 700, marginBottom: 10 }}>{clock(dayStart + h * 3_600_000, lang)}</div>
             <div className="tracker-hour-grid">
               {Array.from({ length: 6 }, (_, i) => {
                 const bs = dayStart + h * 3_600_000 + i * BLOCK_MS
@@ -137,11 +138,11 @@ export default function ScreenshotDay({ initialEmployee, initialDay, self, lang 
                 const first = c?.shots.find(s => s.monitor === 0) ?? c?.shots[0]
                 return (
                   <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 8, fontSize: 12, background: c ? 'var(--surface)' : 'var(--surf2)', opacity: c ? 1 : 0.6 }}>
-                    <div style={{ color: 'var(--muted)', marginBottom: 6 }}>{clock(bs)}</div>
+                    <div style={{ color: 'var(--muted)', marginBottom: 6 }}>{clock(bs, lang)}</div>
                     {c?.removed ? (
                       <div style={{ height: 84, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', textAlign: 'center' }}>{tx.deleted}<br />{tx.removed}</div>
                     ) : first && urls[first.storagePath] ? (
-                      <img src={urls[first.storagePath]} alt={`Screenshot ${clock(first.takenAt)}`} onClick={() => setOpen(c!)}
+                      <img src={urls[first.storagePath]} alt={`Screenshot ${clock(first.takenAt, lang)}`} onClick={() => setOpen(c!)}
                         style={{ width: '100%', height: 84, objectFit: 'cover', borderRadius: 6, cursor: 'zoom-in', background: '#111' }} />
                     ) : (
                       <div style={{ height: 84, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)' }}>{c ? tx.noShot : '—'}</div>
@@ -172,7 +173,7 @@ export default function ScreenshotDay({ initialEmployee, initialDay, self, lang 
           <div className="modal" style={{ maxWidth: 1100, width: '95vw' }} onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title">
-                {clock(open.blockStart)} – {clock(open.blockStart + BLOCK_MS)} · {Math.round(open.seconds / 60)} min
+                {clock(open.blockStart, lang)} – {clock(open.blockStart + BLOCK_MS, lang)} · {Math.round(open.seconds / 60)} min
                 {activityPct(open.active, open.measured) !== null && ` · ${activityPct(open.active, open.measured)}% ${tx.active}`} · {open.labels.join(', ')}
               </div>
               <button className="modal-close btn-icon" onClick={() => setOpen(null)}>✕</button>
@@ -181,7 +182,7 @@ export default function ScreenshotDay({ initialEmployee, initialDay, self, lang 
               {open.notes.length > 0 && <div style={{ fontSize: 13, color: 'var(--muted)' }}>{open.notes.join(' — ')}</div>}
               {open.shots.map(s => urls[s.storagePath] && (
                 <div key={s.id}>
-                  <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>{tx.screen} {s.monitor + 1} · {tx.taken} {clock(s.takenAt)}</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>{tx.screen} {s.monitor + 1} · {tx.taken} {clock(s.takenAt, lang)}</div>
                   <img src={urls[s.storagePath]} alt={`Screen ${s.monitor + 1}`} style={{ width: '100%', borderRadius: 8, border: '1px solid var(--border)' }} />
                 </div>
               ))}

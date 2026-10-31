@@ -90,7 +90,17 @@ ALTER TABLE public.audit_log ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "audit_log_read" ON public.audit_log;
 CREATE POLICY "audit_log_read" ON public.audit_log
-  FOR SELECT TO authenticated USING (private.has_permission('history.view'));
+  FOR SELECT TO authenticated USING (
+    private.has_permission('history.view')
+    -- history of rates, payroll, bank details and leads also needs the permission that shows them
+    AND CASE table_name
+      WHEN 'placement_rates'         THEN private.has_permission('rates.manage')
+      WHEN 'payroll_runs'            THEN private.has_permission('payroll.view')
+      WHEN 'payroll_lines'           THEN private.has_permission('payroll.view')
+      WHEN 'payroll_adjustments'     THEN private.has_permission('payroll.view')
+      WHEN 'employee_payout_methods' THEN private.has_permission('bank.view')
+      WHEN 'leads'                   THEN private.has_permission('leads.view_all')
+      ELSE true END);
 -- No insert/update/delete policies: rows are written only by the trigger below and never changed.
 REVOKE INSERT, UPDATE, DELETE ON public.audit_log FROM authenticated, anon;
 
@@ -170,7 +180,9 @@ END $$;
 
 DO $$
 BEGIN
-  IF to_regclass('public.client_users') IS NOT NULL AND to_regclass('public.invoices') IS NOT NULL THEN
+  IF to_regclass('public.client_users') IS NOT NULL AND to_regclass('public.invoices') IS NOT NULL
+     -- only replace an existing policy: once migrate-portal-invoices-lockdown.sql removed it, re-running this keeps it removed
+     AND EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'invoices' AND policyname = 'portal_client_invoices') THEN
     DROP POLICY IF EXISTS "portal_client_invoices" ON public.invoices;
     CREATE POLICY "portal_client_invoices" ON public.invoices
       FOR SELECT TO authenticated

@@ -10,7 +10,7 @@
  * Preparing again is safe: drafts of that week are updated in place (same numbers), sent
  * invoices are never changed. Approval is a separate SQL function (week_close_approve).
  */
-const { rest, rpc, enc } = require('./supa.cjs')
+const { rest, restAll, rpc, enc } = require('./supa.cjs')
 const M = require('./money.cjs')
 
 const FLAG_ORDER = ['missing_rate', 'project_no_client', 'client_no_email', 'invoice_locked', 'late', 'manual_pending', 'no_time', 'over_50h', 'low_activity', 'outside_shift', 'missing_screenshots']
@@ -45,9 +45,9 @@ async function loadContext(weekStart) {
     rest('projects?select=id,name,client_id,rate,employee_ids,status'),
     rest('clients?select=id,name,email,address,default_rate,payment_terms'),
     optional('placement_rates?select=employee_id,project_id,position,bill_rate,pay_rate,effective_from'),
-    rest(`tracker_blocks?block_start=gte.${enc(from)}&block_start=lt.${enc(to)}&select=employee_id,block_start,project_id,work_type,seconds,active_seconds,first_offset,last_offset,status,created_at&limit=100000`),
-    optional(`time_adjustments?day=gte.${weekStart}&day=lte.${weekEnd}&status=eq.applied&select=id,employee_id,project_id,work_type,day,seconds_delta,kind,note`),
-    optional(`tracker_screenshots?block_start=gte.${enc(from)}&block_start=lt.${enc(to)}&select=employee_id,block_start&limit=100000`),
+    restAll(`tracker_blocks?block_start=gte.${enc(from)}&block_start=lt.${enc(to)}&select=id,employee_id,block_start,project_id,work_type,seconds,active_seconds,first_offset,last_offset,status,created_at`),
+    optional(`time_adjustments?day=gte.${weekStart}&day=lte.${weekEnd}&status=eq.applied&select=id,employee_id,project_id,work_type,day,seconds_delta,kind,note,created_at`),
+    restAll(`tracker_screenshots?block_start=gte.${enc(from)}&block_start=lt.${enc(to)}&select=id,employee_id,block_start`).catch(e => { if (e.status === 404 || e.status === 400) return []; throw e }),
     optional(`manual_time_requests?status=eq.pending&starts_at=lt.${enc(to)}&ends_at=gt.${enc(from)}&select=id,employee_id,starts_at,ends_at`),
     rest(`week_closes?week_start=eq.${weekStart}&select=*`),
     optional(`time_off_requests?status=eq.approved&start_date=lte.${weekEnd}&end_date=gte.${weekStart}&select=employee_id,start_date,end_date`),
@@ -100,7 +100,12 @@ function buildWeek(ctx) {
     const emp = empById[a.employee_id], project = projById[a.project_id]
     if (!emp || !project || !project.client_id || !clientById[project.client_id]) continue
     const g = lineFor(project.client_id, emp, project, a.day)
-    g.regular[a.day] = (g.regular[a.day] || 0) + Number(a.seconds_delta)
+    const delta = Number(a.seconds_delta) || 0
+    if (delta >= 0) { g.regular[a.day] = (g.regular[a.day] || 0) + delta; continue }
+    // Removing time: off that day's regular time first, then its night-premium time (never below zero)
+    const fromReg = Math.min(g.regular[a.day] || 0, -delta)
+    g.regular[a.day] = (g.regular[a.day] || 0) - fromReg
+    if (g.premium[a.day]) g.premium[a.day] = Math.max(0, g.premium[a.day] - (-delta - fromReg))
   }
   for (const [pid, sec] of noClient) flag({ kind: 'project_no_client', projectId: pid, seconds: sec, message: `${projById[pid].name} has ${hmText(sec)} of time but no client — not invoiced` })
 
@@ -111,22 +116,27 @@ function buildWeek(ctx) {
     invoices.set(g.clientId, inv)
     inv.projects.add(g.project.name)
     const pct = g.emp.premium_enabled ? M.num(g.emp.premium_percent) : 0
+    // Whole minutes per day: the invoice shows h:mm per day and in total, and the amount is
+    // exactly hours shown × rate shown (no hidden seconds or unrounded premium rate)
+    const minutes = o => Object.fromEntries(Object.entries(o).map(([d, v]) => [d, Math.max(0, Math.round(v / 60))]).filter(([, m]) => m > 0))
+    const regM = minutes(g.regular), premM = minutes(g.premium)
     const sum = o => Object.values(o).reduce((s, v) => s + v, 0)
-    const regSec = sum(g.regular), premSec = sum(g.premium)
-    const daily = o => Object.fromEntries(Object.entries(o).filter(([, v]) => v > 0).map(([d, v]) => [d, hoursToHM(v)]))
-    const payFor = (sec, mult) => M.round2((sec / 3600) * g.payRate * mult)
-    if (regSec > 0) inv.items.push({
+    const regMin = sum(regM), premMin = sum(premM)
+    const daily = o => Object.fromEntries(Object.entries(o).map(([d, m]) => [d, `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`]))
+    const premRate = M.round2(g.billRate * (1 + pct / 100))
+    const regAmount = M.round2((regMin / 60) * g.billRate), premAmount = M.round2((premMin / 60) * premRate)
+    if (regMin > 0) inv.items.push({
       employeeId: g.emp.id, employeeName: g.emp.name, position: [g.position, g.project.name].filter(Boolean).join(' · '),
-      hoursTotal: regSec / 3600, rate: g.billRate, regularHours: regSec / 3600, premiumHours: 0,
-      basePayRate: g.payRate, premiumPercent: 0, totalPay: payFor(regSec, 1), daily: daily(g.regular), projectId: g.project.id,
+      hoursTotal: regMin / 60, rate: g.billRate, regularHours: regMin / 60, premiumHours: 0,
+      basePayRate: g.payRate, premiumPercent: 0, totalPay: M.round2((regMin / 60) * g.payRate), daily: daily(regM), projectId: g.project.id,
     })
-    if (premSec > 0) inv.items.push({
+    if (premMin > 0) inv.items.push({
       employeeId: g.emp.id, employeeName: g.emp.name, position: `Night premium +${pct}% · ${g.project.name}`,
-      hoursTotal: premSec / 3600, rate: M.round2(g.billRate * (1 + pct / 100)), regularHours: 0, premiumHours: premSec / 3600,
-      basePayRate: g.payRate, premiumPercent: pct, totalPay: payFor(premSec, 1 + pct / 100), daily: daily(g.premium), projectId: g.project.id,
+      hoursTotal: premMin / 60, rate: premRate, regularHours: 0, premiumHours: premMin / 60,
+      basePayRate: g.payRate, premiumPercent: pct, totalPay: M.round2((premMin / 60) * g.payRate * (1 + pct / 100)), daily: daily(premM), projectId: g.project.id,
     })
-    inv.subtotal += (regSec / 3600) * g.billRate + (premSec / 3600) * g.billRate * (1 + pct / 100)
-    inv.seconds += regSec + premSec
+    inv.subtotal += (regMin > 0 ? regAmount : 0) + (premMin > 0 ? premAmount : 0)
+    inv.seconds += (regMin + premMin) * 60
   }
   for (const inv of invoices.values()) {
     inv.subtotal = M.round2(inv.subtotal)
@@ -172,7 +182,7 @@ function buildWeek(ctx) {
       const s = M.clockMinutes(emp.default_shift_start, null), e = M.clockMinutes(emp.default_shift_end, null)
       if (s !== null && e !== null) {
         const inShift = min => { const lo = s - 30, hi = (e <= s ? e + 1440 : e) + 30; return (min >= lo && min <= hi) || (min + 1440 >= lo && min + 1440 <= hi) }
-        const outside = list.filter(b => { const p = M.localParts(Date.parse(b.block_start), emp.timezone || tz); return !inShift(p.hour * 60 + p.minute) }).reduce((x, b) => x + (Number(b.seconds) || 0), 0)
+        const outside = list.filter(b => { const p = M.localParts(Date.parse(b.block_start), M.safeTz(emp.timezone, tz)); return !inShift(p.hour * 60 + p.minute) }).reduce((x, b) => x + (Number(b.seconds) || 0), 0)
         if (outside >= 1800) flag({ kind: 'outside_shift', employeeId: emp.id, employeeName: emp.name, seconds: outside, message: `${emp.name}: ${hmText(outside)} outside shift hours (${emp.default_shift_start} – ${emp.default_shift_end})` })
       }
     }
@@ -189,7 +199,17 @@ function buildWeek(ctx) {
       l.seconds += Number(b.seconds) || 0; const d = dayOf(b); l.byDay[d] = (l.byDay[d] || 0) + (Number(b.seconds) || 0)
       late.set(k, l)
     }
+    // Time YVA already moved to next week ("Move to next week" = defer_out) is no longer late
+    for (const a of ctx.adjustments) if (a.kind === 'defer_out' && (!a.created_at || Date.parse(a.created_at) > firstPrepared)) {
+      const l = late.get(`${a.employee_id}|${a.project_id || ''}|${a.work_type || ''}`)
+      if (!l) continue
+      const moved = -Number(a.seconds_delta) || 0
+      l.seconds -= moved
+      if (l.byDay[a.day]) l.byDay[a.day] = Math.max(0, l.byDay[a.day] - moved)
+    }
     for (const l of late.values()) {
+      if (l.seconds < 60) continue
+      for (const d of Object.keys(l.byDay)) if (l.byDay[d] <= 0) delete l.byDay[d]
       const emp = empById[l.employeeId]
       flag({ kind: 'late', employeeId: l.employeeId, employeeName: emp?.name, projectId: l.projectId, workType: l.workType, seconds: l.seconds, byDay: l.byDay,
         message: `${emp?.name || 'Someone'}: ${hmText(l.seconds)} uploaded after the week closed${l.projectId ? ` (${projById[l.projectId]?.name})` : ''} — included; move it to next week if it belongs there` })

@@ -79,30 +79,38 @@ function keyToBytes(b64url: string): Uint8Array {
 }
 const toB64url = (buf: ArrayBuffer | null) => (buf ? btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') : '')
 
+/** enablePush failures with a code, so a screen can show its own (e.g. Spanish) wording; `message` stays English */
+export type PushSetupErrorCode = 'ios_install' | 'unsupported' | 'not_allowed' | 'not_configured' | 'signed_out' | 'other_account'
+export class PushSetupError extends Error {
+  constructor(public code: PushSetupErrorCode, message: string) { super(message); this.name = 'PushSetupError' }
+}
+
 /** Ask permission, subscribe this device and save it. Must be called from a tap/click. */
 export async function enablePush(): Promise<void> {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
-    throw new Error(isIos() ? 'On iPhone: tap Share → "Add to Home Screen", open YVA OS from the new icon, then turn this on.' : 'This browser does not support notifications.')
+    throw isIos()
+      ? new PushSetupError('ios_install', 'On iPhone: tap Share → "Add to Home Screen", open YVA OS from the new icon, then turn this on.')
+      : new PushSetupError('unsupported', 'This browser does not support notifications.')
   }
   const permission = await Notification.requestPermission()
-  if (permission !== 'granted') throw new Error('Notifications were not allowed. You can allow them in your browser or phone settings.')
+  if (permission !== 'granted') throw new PushSetupError('not_allowed', 'Notifications were not allowed. You can allow them in your browser or phone settings.')
   const reg = (await navigator.serviceWorker.getRegistration(import.meta.env.BASE_URL))
     ?? await navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, { scope: import.meta.env.BASE_URL })
   await navigator.serviceWorker.ready
   const cfg = await fetch('/.netlify/functions/push-config').then(r => r.json()).catch(() => ({}))
-  if (!cfg.publicKey) throw new Error(cfg.error || 'Phone notifications are not set up on the server yet.')
+  if (!cfg.publicKey) throw new PushSetupError('not_configured', cfg.error || 'Phone notifications are not set up on the server yet.')
   let sub = await reg.pushManager.getSubscription()
   if (sub && toB64url(sub.options.applicationServerKey) !== cfg.publicKey) { await sub.unsubscribe(); sub = null }
   if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyToBytes(cfg.publicKey) as BufferSource })
   const json = sub.toJSON() as { endpoint: string; keys: { p256dh: string; auth: string } }
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Not signed in')
+  if (!user) throw new PushSetupError('signed_out', 'Not signed in')
   // A device used by someone else before keeps its old row (other person's): replace only our own
   await supabase.from('push_subscriptions').delete().eq('endpoint', json.endpoint)
   const { error } = await supabase.from('push_subscriptions').insert({
     user_id: user.id, endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth, user_agent: navigator.userAgent.slice(0, 300),
   })
-  if (error) throw new Error(error.code === '23505' ? 'This device is registered to another YVA account. Sign out there first.' : error.message)
+  if (error) throw error.code === '23505' ? new PushSetupError('other_account', 'This device is registered to another YVA account. Sign out there first.') : new Error(error.message)
 }
 
 export async function disablePush(): Promise<void> {
@@ -111,4 +119,10 @@ export async function disablePush(): Promise<void> {
   if (!sub) return
   await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint)
   await sub.unsubscribe()
+}
+
+/** Sign out, first removing this device's phone/computer notifications (so a shared device stops getting them) */
+export async function signOutAndForgetDevice(): Promise<void> {
+  try { await Promise.race([disablePush(), new Promise(r => setTimeout(r, 2500))]) } catch { /* still sign out */ }
+  await supabase.auth.signOut()
 }

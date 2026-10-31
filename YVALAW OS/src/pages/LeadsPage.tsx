@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePermission, useRole } from '../context/RoleContext'
 import { addActivity, completeActivity, convertLead, deleteLead, loadActivities, loadLeads, loadStaff, saveLead, STAGES, updateLead, type Lead, type LeadActivity, type LeadStage } from '../services/crm'
@@ -27,6 +27,10 @@ export default function LeadsPage() {
   const [act, setAct] = useState<{ kind: LeadActivity['kind']; body: string; dueOn: string }>({ kind: 'note', body: '', dueOn: '' })
   const [convert, setConvert] = useState<{ clientName: string; projectName: string; rate: string; terms: string } | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
+  const [converting, setConverting] = useState(false)
+  const convertingRef = useRef(false)   // state updates are async: a fast double-click would pass a state check twice
+  // Permissions arrive after the first render for non-CEO roles: follow leads.view_all once it is known
+  useEffect(() => { setMine(!canAll) }, [canAll])
 
   async function load() { const r = await loadLeads(); setLeads(r.rows); setError(r.error) }
   useEffect(() => { void load(); void loadStaff().then(setStaff) }, [])
@@ -43,7 +47,11 @@ export default function LeadsPage() {
   async function move(id: string, stage: LeadStage) {
     const l = leads.find(x => x.id === id); if (!l || l.stage === stage) return
     if (stage === 'won') { setOpen(l); setConvert({ clientName: l.company || l.name, projectName: l.service ? `${l.service} team` : 'New team', rate: '', terms: 'Net 7' }); return }
-    if (stage === 'lost') { const reason = window.prompt('Why was it lost? (optional)') ?? ''; await updateLead(id, { stage, lost_reason: reason || null }).catch(e => setError(e.message)) }
+    if (stage === 'lost') {
+      const reason = window.prompt('Why was it lost? (optional)')
+      if (reason === null) return   // Cancel = don't move the lead
+      await updateLead(id, { stage, lost_reason: reason.trim() || null }).catch(e => setError(e.message))
+    }
     else await updateLead(id, { stage }).catch(e => setError(e.message))
     await addActivity({ leadId: id, kind: 'system', body: `Moved to ${STAGES.find(s => s.key === stage)?.label}` }).catch(() => {})
     await load()
@@ -57,12 +65,17 @@ export default function LeadsPage() {
     } catch (e) { setError((e as Error).message) }
   }
   async function doConvert() {
-    if (!open?.id || !convert) return
+    if (!open?.id || !convert || convertingRef.current) return
+    if ((open as Lead).client_id) { setError('This lead was already converted — its client and project exist. Open the client from Clients instead.'); return }
+    const rate = convert.rate.trim() ? Number(convert.rate.trim().replace(',', '.')) : null
+    if (rate !== null && !(rate >= 0)) { setError('Enter the bill rate as a number, e.g. 10.50.'); return }
+    convertingRef.current = true; setConverting(true); setError(null)
     try {
-      const r = await convertLead(open as Lead, { clientName: convert.clientName, projectName: convert.projectName, rate: convert.rate ? Number(convert.rate) : null, paymentTerms: convert.terms })
+      const r = await convertLead(open as Lead, { clientName: convert.clientName, projectName: convert.projectName, rate, paymentTerms: convert.terms })
       setConvert(null); setOpen(null); await load()
       if (window.confirm('Client and project created. Open the client now?')) navigate(`/clients/${r.clientId}`)
     } catch (e) { setError((e as Error).message) }
+    finally { convertingRef.current = false; setConverting(false) }
   }
 
   const totals = (stage: LeadStage) => shown.filter(l => l.stage === stage)
@@ -130,7 +143,7 @@ export default function LeadsPage() {
                     <label>Bill rate ($/hr)<input aria-label="Bill rate" className="form-input" inputMode="decimal" value={convert.rate} onChange={e => setConvert({ ...convert, rate: e.target.value })} /></label>
                     <label>Payment terms<input aria-label="Payment terms" className="form-input" value={convert.terms} onChange={e => setConvert({ ...convert, terms: e.target.value })} /></label>
                   </div>
-                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}><button className="btn-primary btn-sm" disabled={!convert.clientName.trim() || !convert.projectName.trim()} onClick={() => void doConvert()}>Create client + project</button><button className="btn-ghost btn-sm" onClick={() => setConvert(null)}>Cancel</button></div>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 10 }}><button className="btn-primary btn-sm" disabled={converting || !convert.clientName.trim() || !convert.projectName.trim()} onClick={() => void doConvert()}>{converting ? 'Creating…' : 'Create client + project'}</button><button className="btn-ghost btn-sm" onClick={() => setConvert(null)}>Cancel</button></div>
                 </div>
               )}
               {open.id && (

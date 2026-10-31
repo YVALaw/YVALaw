@@ -1,6 +1,7 @@
 // YVA Time data for the admin views (Time Tracking → Live / Approve / Schedule / Screenshots).
 // RLS: staff read tracker_blocks; only CEO/Admin read screenshots (rows + private bucket).
 import { supabase } from '../lib/supabase'
+import { fetchAllPages } from '../lib/pages'
 
 export type TrackerBlock = {
   employeeId: string
@@ -48,13 +49,15 @@ export type TrackerShot = {
 }
 
 export async function loadTrackerBlocks(fromMs: number, toMs: number, employeeId?: string): Promise<TrackerBlock[]> {
-  let q = supabase.from('tracker_blocks')
-    .select('employee_id,block_start,target_key,project_id,work_type,seconds,active_seconds,first_offset,last_offset,source,note,status,updated_at')
-    .gte('block_start', new Date(fromMs).toISOString())
-    .lt('block_start', new Date(toMs).toISOString())
-    .order('block_start')
-  if (employeeId) q = q.eq('employee_id', employeeId)
-  const { data, error } = await q
+  const { data, error } = await fetchAllPages<Record<string, any>>((from, to) => {   // eslint-disable-line @typescript-eslint/no-explicit-any
+    let q = supabase.from('tracker_blocks')
+      .select('employee_id,block_start,target_key,project_id,work_type,seconds,active_seconds,first_offset,last_offset,source,note,status,updated_at')
+      .gte('block_start', new Date(fromMs).toISOString())
+      .lt('block_start', new Date(toMs).toISOString())
+      .order('block_start').order('id')
+    if (employeeId) q = q.eq('employee_id', employeeId)
+    return q.range(from, to)
+  })
   if (error) { console.error('loadTrackerBlocks', error); return [] }
   return (data || []).map(r => ({
     employeeId: r.employee_id,
@@ -74,12 +77,12 @@ export async function loadTrackerBlocks(fromMs: number, toMs: number, employeeId
 }
 
 export async function loadTrackerShots(employeeId: string, fromMs: number, toMs: number): Promise<TrackerShot[]> {
-  const { data, error } = await supabase.from('tracker_screenshots')
+  const { data, error } = await fetchAllPages<Record<string, any>>((from, to) => supabase.from('tracker_screenshots')   // eslint-disable-line @typescript-eslint/no-explicit-any
     .select('id,employee_id,block_start,taken_at,monitor,storage_path')
     .eq('employee_id', employeeId)
     .gte('block_start', new Date(fromMs).toISOString())
     .lt('block_start', new Date(toMs).toISOString())
-    .order('taken_at')
+    .order('taken_at').order('id').range(from, to))
   if (error) { console.error('loadTrackerShots', error); return [] }
   return (data || []).map(r => ({
     id:          r.id,

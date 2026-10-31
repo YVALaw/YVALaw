@@ -28,7 +28,7 @@ export default function ClientContacts({ clientId }: { clientId: string }) {
           {c.email && <a className="btn-ghost btn-sm" href={`mailto:${c.email}`}>Email</a>}
           {(c.whatsapp || c.phone) && <a className="btn-ghost btn-sm" href={`https://wa.me/${(c.whatsapp || c.phone || '').replace(/\D/g, '')}`} target="_blank" rel="noreferrer">WhatsApp</a>}
           <button className="btn-ghost btn-sm" onClick={() => setForm({ ...c })}>Edit</button>
-          <button className="btn-ghost btn-sm" onClick={() => { if (window.confirm(`Remove ${c.name}?`)) void deleteContact(c.id).then(load) }}>Remove</button>
+          <button className="btn-ghost btn-sm" onClick={() => { if (window.confirm(`Remove ${c.name}?`)) void deleteContact(c.id).then(load).catch(e => setError(`Could not remove ${c.name}: ${(e as Error).message}`)) }}>Remove</button>
         </div>
       ))}
       {rows.length === 0 && !form && <div className="td-muted" style={{ fontSize: 13 }}>No contacts yet.</div>}

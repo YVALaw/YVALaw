@@ -1,5 +1,6 @@
 // My workspace sections (Step 7): Home, Requests, My client, Documents, Company, Profile.
 import { useEffect, useState } from 'react'
+import { signOutAndForgetDevice } from '../../services/notifications'
 import { supabase } from '../../lib/supabase'
 import { DICT, locale, type Lang } from './i18n'
 import { fetchEarnings, hm, usd, type Earnings } from './MyPay'
@@ -112,17 +113,33 @@ export function MeHome({ e, lang, go }: { e: MyEmployee; lang: Lang; go: (s: str
 }
 
 // ── Requests ─────────────────────────────────────────────────────────────────
-export function MeRequests({ e, projects, lang }: { e: MyEmployee; projects: MyProject[]; lang: Lang }) {
+/** Whole days from date a to date b (YYYY-MM-DD) */
+const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000)
+const shiftDate = (d: string, days: number) => new Date(Date.parse(`${d}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10)
+
+export function MeRequests({ e, projects, lang, scrollToManual, onScrolled }: { e: MyEmployee; projects: MyProject[]; lang: Lang; scrollToManual?: boolean; onScrolled?: () => void }) {
   const t = DICT[lang].requests
   const today = localParts(Date.now()).date
+  // Same rules as the database (migrate-step7-workspace.sql): end − start ≤ 60 days, start ≥ current_date − 30
+  // (the database's date is UTC, which is ahead of the DR in the evening — use it so the check is never looser)
+  const oldestStart = shiftDate(new Date().toISOString().slice(0, 10), -30)
   const [list, setList] = useState<TimeOffRequest[]>([])
+  const [listLoaded, setListLoaded] = useState(false)
   const [form, setForm] = useState({ kind: 'vacation', start: today, end: today, halfDay: false, note: '' })
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [busy, setBusy] = useState(false)
-  const load = () => void loadTimeOff().then(r => { setList(r.rows); if (r.error) setMsg({ ok: false, text: r.error }) })
+  const load = () => void loadTimeOff().then(r => { setList(r.rows); setListLoaded(true); if (r.error) setMsg({ ok: false, text: r.error }) })
   useEffect(load, [])
+  // /me#manual (desktop app's "Add missing time"): scroll once the list above has its final height
+  useEffect(() => {
+    if (!scrollToManual || !listLoaded) return
+    requestAnimationFrame(() => document.getElementById('manual')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+    onScrolled?.()
+  }, [scrollToManual, listLoaded])   // eslint-disable-line react-hooks/exhaustive-deps
   async function send() {
     if (form.end < form.start) { setMsg({ ok: false, text: t.badDates }); return }
+    if (daysBetween(form.start, form.end) > 60) { setMsg({ ok: false, text: t.tooLong }); return }
+    if (form.start < oldestStart) { setMsg({ ok: false, text: t.tooOld }); return }
     setBusy(true); setMsg(null)
     try { await requestTimeOff(form); setMsg({ ok: true, text: t.sent }); setForm(f => ({ ...f, note: '' })); load() } catch (err) { setMsg({ ok: false, text: (err as Error).message }) }
     setBusy(false)
@@ -134,8 +151,8 @@ export function MeRequests({ e, projects, lang }: { e: MyEmployee; projects: MyP
         <div className="me-form">
           <label>{t.kind}<select className="form-select" value={form.kind} onChange={ev => setForm(f => ({ ...f, kind: ev.target.value }))}>
             {(['vacation', 'sick', 'personal', 'other'] as const).map(k => <option key={k} value={k}>{t.kinds[k]}</option>)}</select></label>
-          <label>{t.from}<input className="form-input" type="date" value={form.start} onChange={ev => setForm(f => ({ ...f, start: ev.target.value, end: f.end < ev.target.value ? ev.target.value : f.end }))} /></label>
-          <label>{t.to}<input className="form-input" type="date" value={form.end} min={form.start} onChange={ev => setForm(f => ({ ...f, end: ev.target.value }))} /></label>
+          <label>{t.from}<input className="form-input" type="date" value={form.start} min={oldestStart} onChange={ev => setForm(f => ({ ...f, start: ev.target.value, end: f.end < ev.target.value ? ev.target.value : f.end }))} /></label>
+          <label>{t.to}<input className="form-input" type="date" value={form.end} min={form.start} max={shiftDate(form.start, 60)} onChange={ev => setForm(f => ({ ...f, end: ev.target.value }))} /></label>
           <label className="me-check"><input type="checkbox" checked={form.halfDay} onChange={ev => setForm(f => ({ ...f, halfDay: ev.target.checked }))} /> {t.halfDay}</label>
           <label className="me-wide">{t.note}<input className="form-input" value={form.note} maxLength={500} onChange={ev => setForm(f => ({ ...f, note: ev.target.value }))} /></label>
           <div className="me-wide"><button className="btn-primary" disabled={busy} onClick={() => void send()}>{busy ? t.sending : t.send}</button></div>
@@ -151,7 +168,7 @@ export function MeRequests({ e, projects, lang }: { e: MyEmployee; projects: MyP
                 {(r.note || r.decision_note) && <span className="me-muted">{r.note}{r.decision_note ? ` · YVA: ${r.decision_note}` : ''}</span>}
               </div>
               <span className={`badge ${badge(r.status)}`}>{t.status[r.status]}</span>
-              {r.status === 'pending' && <button className="btn-ghost btn-sm" onClick={() => void cancelTimeOff(r.id).then(load)}>{t.cancel}</button>}
+              {r.status === 'pending' && <button className="btn-ghost btn-sm" onClick={() => void cancelTimeOff(r.id).then(load).catch(err => setMsg({ ok: false, text: (err as Error).message }))}>{t.cancel}</button>}
             </div>
           ))}
         </div>
@@ -252,7 +269,7 @@ export function MeProfile({ e, lang, setLang }: { e: MyEmployee; lang: Lang; set
         <div className="me-details">{rows.map(([k, v]) => <div key={k}><span>{k}</span><strong>{v}</strong></div>)}</div>
       </Card>
       <Card title={t.notifications} sub={t.notificationsSub}><NotificationSettings kinds={EMPLOYEE_KINDS} lang={lang} /></Card>
-      <button className="btn-ghost" onClick={() => void supabase.auth.signOut()}>{DICT[lang].signOut}</button>
+      <button className="btn-ghost" onClick={() => void signOutAndForgetDevice()}>{DICT[lang].signOut}</button>
     </div>
   )
 }

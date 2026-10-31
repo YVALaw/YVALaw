@@ -102,7 +102,9 @@ GRANT EXECUTE ON FUNCTION public.next_client_invoice_number(uuid) TO authenticat
 -- Portal: a client sees its invoices by client_id (new) or by name (older invoices); never drafts
 DO $$
 BEGIN
-  IF to_regclass('public.client_users') IS NOT NULL THEN
+  IF to_regclass('public.client_users') IS NOT NULL
+     -- only replace an existing policy: once migrate-portal-invoices-lockdown.sql removed it, re-running this keeps it removed
+     AND EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = 'public' AND tablename = 'invoices' AND policyname = 'portal_client_invoices') THEN
     DROP POLICY IF EXISTS "portal_client_invoices" ON public.invoices;
     CREATE POLICY "portal_client_invoices" ON public.invoices
       FOR SELECT TO authenticated
@@ -114,6 +116,37 @@ BEGIN
       );
   END IF;
 END $$;
+
+-- Portal invoices without staff pay: invoice items carry each person's pay rate / pay total for
+-- payroll, and a row policy can't hide parts of a JSON column. The portal reads invoices through
+-- this function (pay fields removed); migrate-portal-invoices-lockdown.sql then drops the direct
+-- portal policy above once this app version is live. Staff (portal preview) pass the client name.
+CREATE OR REPLACE FUNCTION public.portal_invoices(p_client_name text DEFAULT NULL)
+RETURNS SETOF jsonb
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT (to_jsonb(i) - 'employee_payments')
+         || jsonb_build_object('items', CASE WHEN jsonb_typeof(to_jsonb(i) -> 'items') = 'array' THEN
+              coalesce((SELECT jsonb_agg(CASE WHEN jsonb_typeof(it) = 'object'
+                                              THEN it - 'basePayRate' - 'totalPay' - 'payRate' - 'payAmount'
+                                              ELSE it END ORDER BY n)
+                        FROM jsonb_array_elements(to_jsonb(i) -> 'items') WITH ORDINALITY AS x(it, n)), '[]'::jsonb)
+              ELSE '[]'::jsonb END)
+  FROM public.invoices i
+  WHERE coalesce(i.status, 'draft') <> 'draft'
+    AND (
+      (private.is_portal_client()
+       AND (i.client_id = private.portal_client_id()
+            OR i.client_name = (SELECT c.name FROM public.clients c WHERE c.id = private.portal_client_id() LIMIT 1)))
+      OR (private.is_internal() AND p_client_name IS NOT NULL AND i.client_name = p_client_name)
+    )
+  ORDER BY i.date DESC NULLS LAST
+$$;
+REVOKE ALL ON FUNCTION public.portal_invoices(text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.portal_invoices(text) TO authenticated;
 
 -- ── 3. Time adjustments ─────────────────────────────────────────────────────
 
@@ -167,7 +200,7 @@ BEGIN
       ELSE 'YVA adjusted your time on ' || to_char(NEW.day, 'Mon DD') || ': ' || CASE WHEN NEW.seconds_delta > 0 THEN '+' ELSE '−' END
            || (mins / 60) || 'h ' || lpad((mins % 60)::text, 2, '0') || 'm'
     END,
-    NEW.note, '/me');
+    NEW.note, '/me?s=time');
   RETURN NULL;
 END
 $$;
@@ -238,6 +271,65 @@ $$;
 REVOKE ALL ON FUNCTION public.week_close_approve(date, text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.week_close_approve(date, text) TO authenticated, service_role;
 
+-- The per-person Approve / manual-time decisions (YVA Time phase 2) rebuild a person's day totals from
+-- blocks. Redefined here so they also count YVA's adjustments — before, approving someone after the
+-- weekly close silently dropped those adjustments from time_entries (portal hours, time log).
+-- SECURITY DEFINER so an approver who can't read time_adjustments directly still counts them.
+CREATE OR REPLACE FUNCTION public.yva_time_rollup(p_employee uuid, p_from date, p_to date, p_tz text DEFAULT 'America/Santo_Domingo')
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  written integer;
+BEGIN
+  IF auth.uid() IS NOT NULL AND COALESCE(private.current_user_role(), '') NOT IN ('ceo', 'admin', 'accounting')
+     AND NOT private.has_permission('weekly_close.manage') THEN
+    RAISE EXCEPTION 'Only CEO, Admin or Accounting can approve time' USING ERRCODE = '42501';
+  END IF;
+
+  WITH src AS (
+    SELECT (b.block_start AT TIME ZONE p_tz)::date AS day, b.target_key, b.project_id, b.work_type, b.seconds AS secs, b.note
+    FROM   public.tracker_blocks b
+    WHERE  b.employee_id = p_employee AND b.status = 'approved'
+      AND  (b.block_start AT TIME ZONE p_tz)::date BETWEEN p_from AND p_to
+    UNION ALL
+    SELECT a.day,
+           CASE WHEN a.project_id IS NOT NULL THEN 'project:' || a.project_id ELSE 'work:' || coalesce(a.work_type, 'Other') END,
+           a.project_id, CASE WHEN a.project_id IS NULL THEN coalesce(a.work_type, 'Other') END, a.seconds_delta, 'Adjusted by YVA: ' || a.note
+    FROM   public.time_adjustments a
+    WHERE  a.employee_id = p_employee AND a.status = 'applied' AND a.day BETWEEN p_from AND p_to
+      -- only days that have approved time (an adjustment alone is rolled up when its week is approved)
+      AND  EXISTS (SELECT 1 FROM public.tracker_blocks b2 WHERE b2.employee_id = p_employee AND b2.status = 'approved'
+                   AND (b2.block_start AT TIME ZONE p_tz)::date = a.day)
+  ), agg AS (
+    SELECT day, target_key, project_id, work_type, SUM(secs) AS secs, string_agg(DISTINCT note, '; ') AS notes
+    FROM src GROUP BY 1, 2, 3, 4
+  ), up AS (
+    INSERT INTO public.time_entries
+      (employee_id, employee_name, project_id, project_name, client_name, date, hours, description,
+       billable, invoiced, source, tracker_key, approved_by, approved_at)
+    SELECT p_employee, e.name, a.project_id, p.name, c.name, a.day, ROUND(greatest(a.secs, 0) / 3600.0, 2),
+           LEFT(concat_ws(' — ', a.work_type, a.notes), 500),
+           a.project_id IS NOT NULL, false, 'tracker',
+           concat(p_employee, '|', a.day, '|', a.target_key), auth.uid(), now()
+    FROM   agg a
+    JOIN   public.employees e ON e.id::text = p_employee::text
+    LEFT JOIN public.projects p ON p.id::text = a.project_id::text
+    LEFT JOIN public.clients  c ON c.id::text = p.client_id::text
+    ON CONFLICT (tracker_key) DO UPDATE
+      SET hours = EXCLUDED.hours, description = EXCLUDED.description,
+          approved_by = EXCLUDED.approved_by, approved_at = EXCLUDED.approved_at
+    RETURNING 1
+  )
+  SELECT count(*) INTO written FROM up;
+  RETURN written;
+END
+$$;
+REVOKE ALL ON FUNCTION public.yva_time_rollup(uuid, date, date, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.yva_time_rollup(uuid, date, date, text) TO authenticated;
+
 -- ── 5. Client payments ──────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS public.client_payments (
@@ -271,21 +363,20 @@ CREATE POLICY "client_payments_write" ON public.client_payments
   WITH CHECK (private.has_permission('payments.record'));
 
 -- Keep the invoice's amount paid and status in step with its payments
-CREATE OR REPLACE FUNCTION private.client_payment_apply()
-RETURNS trigger
+CREATE OR REPLACE FUNCTION private.client_payment_adjust(inv_id uuid, delta numeric)
+RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  inv_id uuid := coalesce(NEW.invoice_id, OLD.invoice_id);
-  delta  numeric := coalesce(CASE WHEN TG_OP <> 'DELETE' THEN NEW.amount END, 0) - coalesce(CASE WHEN TG_OP <> 'INSERT' THEN OLD.amount END, 0);
   inv    record;
   paid   numeric;
   new_status text;
 BEGIN
+  IF inv_id IS NULL OR delta = 0 THEN RETURN; END IF;
   SELECT id, status, subtotal, amount_paid, status_history INTO inv FROM public.invoices WHERE id = inv_id FOR UPDATE;
-  IF NOT FOUND THEN RETURN NULL; END IF;
+  IF NOT FOUND THEN RETURN; END IF;
   paid := greatest(0, round(coalesce(inv.amount_paid, 0) + delta, 2));
   new_status := CASE
     WHEN paid >= coalesce(inv.subtotal, 0) - 0.005 AND paid > 0 THEN 'paid'
@@ -299,6 +390,28 @@ BEGIN
         THEN coalesce(inv.status_history, '[]'::jsonb) || jsonb_build_array(jsonb_build_object('status', new_status, 'changedAt', (extract(epoch FROM now()) * 1000)::bigint))
         ELSE inv.status_history END
   WHERE id = inv_id;
+END
+$$;
+REVOKE ALL ON FUNCTION private.client_payment_adjust(uuid, numeric) FROM PUBLIC;
+
+CREATE OR REPLACE FUNCTION private.client_payment_apply()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    PERFORM private.client_payment_adjust(NEW.invoice_id, NEW.amount);
+  ELSIF TG_OP = 'DELETE' THEN
+    PERFORM private.client_payment_adjust(OLD.invoice_id, -OLD.amount);
+  ELSIF NEW.invoice_id IS DISTINCT FROM OLD.invoice_id THEN
+    -- moved to another invoice: take the whole old amount off the old one, put the new amount on the new one
+    PERFORM private.client_payment_adjust(OLD.invoice_id, -OLD.amount);
+    PERFORM private.client_payment_adjust(NEW.invoice_id, NEW.amount);
+  ELSE
+    PERFORM private.client_payment_adjust(NEW.invoice_id, NEW.amount - OLD.amount);
+  END IF;
   IF TG_OP = 'INSERT' AND NEW.source = 'stripe' THEN
     PERFORM private.notify_permission('payments.record', 'payment_received',
       'Payment received: $' || to_char(NEW.amount, 'FM999,999,990.00'), 'Paid by card in the client portal.', '/invoice');

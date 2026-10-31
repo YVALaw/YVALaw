@@ -52,7 +52,7 @@ export default function PayrollPage() {
   useEffect(() => {
     void loadEmployees().then(setEmployees)
     void loadSettings().then(s => setCompany(s.companyName || 'YVA Staffing'))
-    if (canBank) void loadPayoutMethods().then(setPayouts)
+    if (canBank) void loadPayoutMethods().then(setPayouts).catch(e => setError(`Could not load payout details: ${(e as Error).message}`))
   }, [canBank])
   useEffect(() => { void load() }, [payday])   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -87,7 +87,8 @@ export default function PayrollPage() {
     openPayslip({ companyName: company, employeeName: e?.name ?? '', employeeNumber: e?.employeeNumber, label: l.label, periodStart: l.period_start, periodEnd: l.period_end,
       payday: l.payday, paidOn: l.paid_on, reference: l.reference, regularSeconds: l.regular_seconds, premiumSeconds: l.premium_seconds, payRate: l.pay_rate,
       rates: l.rates || [], premiumPercent: Number(l.premium_percent) || 0, grossUsd: l.gross_usd, netUsd: l.net_usd,
-      adjustments: l.adjustments_usd ? adjs.filter(a => a.employee_id === l.employee_id).map(a => ({ type: a.type, amount: a.amount, reason: a.reason })) : [],
+      // Paid line → the adjustments that were applied with it (as MyPayslips shows); unpaid preview → the ones still attached. Never cancelled ones.
+      adjustments: l.adjustments_usd ? adjs.filter(a => a.employee_id === l.employee_id && a.status === (l.status === 'paid' ? 'applied' : 'pending')).map(a => ({ type: a.type, amount: a.amount, reason: a.reason })) : [],
       exchangeRate: l.exchange_rate ?? (rate || null), netDop: l.net_dop ?? (rate ? Math.round(l.net_usd * rate * 100) / 100 : null), payout: l.payout })
   }
   function paymentList(format: 'csv' | 'print') {
@@ -259,7 +260,7 @@ export default function PayrollPage() {
             </div>
             <div className="modal-footer">
               <button className="btn-ghost btn-sm" onClick={() => setAdjForm(null)}>Cancel</button>
-              <button className="btn-primary btn-sm" disabled={!adjForm.employeeId || !(Number(adjForm.amount) > 0) || adjForm.reason.trim().length < 2}
+              <button className="btn-primary btn-sm" disabled={!adjForm.employeeId || !(Number(adjForm.amount.replace(',', '.')) > 0) || adjForm.reason.trim().length < 2}
                 onClick={() => { const f = adjForm; setAdjForm(null); void act('adj', () => addAdjustment({ employeeId: f.employeeId, type: f.type, amount: Number(f.amount.replace(',', '.')), reason: f.reason, repeat: Number(f.repeat) }), 'Saved — it goes on the next payroll (press "Prepare again" if this one is open).') }}>Save</button>
             </div>
           </div>

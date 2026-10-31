@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { fetchAllPages } from '../lib/pages'
 import type {
   ActivityLogEntry, AppSettings, Candidate, CommEntryType, DataSnapshot,
   Employee, Client, Expense, Invoice, InvoiceTemplate, Project, Task,
@@ -57,7 +58,7 @@ function remember(table: string, items: object[], scope?: (row: Row) => boolean)
 }
 
 async function fetchAll<T>(table: string): Promise<T[]> {
-  const { data, error } = await supabase.from(table).select('*').order('created_at')
+  const { data, error } = await fetchAllPages<Record<string, unknown>>((from, to) => supabase.from(table).select('*').order('created_at').order('id').range(from, to))
   if (error) { console.error('fetchAll(%s)', table, error); return [] }
   const items = (data || []).map(row => toCamel<T>(row as Record<string, unknown>))
   remember(table, items as object[])
@@ -75,9 +76,19 @@ async function syncAll<T extends { id: string }>(
   items: T[],
   scope?: (row: Row) => boolean,
 ): Promise<void> {
+  // One save per table at a time: a second quick save is planned after the first one is written,
+  // so it compares with what the first one saved (two fast toggles both stick)
+  const prev = saving.get(table) ?? Promise.resolve()
+  const run = prev.catch(() => undefined).then(() => syncNow(table, items, scope))
+  saving.set(table, run)
+  try { await run } finally { if (saving.get(table) === run) saving.delete(table) }
+}
+const saving = new Map<string, Promise<void>>()
+
+async function syncNow<T extends { id: string }>(table: string, items: T[], scope?: (row: Row) => boolean): Promise<void> {
   const rows = items.map(i => normalizeRow(i as unknown as Record<string, unknown>))
   const base = baselines.get(table) ?? null
-  // Compare with the version this page loaded (not a newer copy another screen loaded since)
+  // Each row is compared with the copy it was made from (not a newer copy another screen loaded)
   const pageBase = loads.baseline(table, items, base)
   const plan = planSync(pageBase, rows, scope, loads.deletable(table, items) ?? undefined)
 
@@ -95,7 +106,7 @@ async function syncAll<T extends { id: string }>(
   }
   if (base) applyPlan(base, plan, rows)
   else baselines.set(table, new Map(rows.map(r => [r.id, r])))
-  loads.record(table, items)
+  loads.recordSave(table, items, plan)
 }
 
 // ─── Employees ────────────────────────────────────────────────────────────────
@@ -138,10 +149,10 @@ export async function saveProjects(projects: Project[]): Promise<void> {
 // ─── Invoices ─────────────────────────────────────────────────────────────────
 
 export async function loadInvoices(): Promise<Invoice[]> {
-  const { data, error } = await supabase
+  const { data, error } = await fetchAllPages<Record<string, unknown>>((from, to) => supabase
     .from('invoices')
     .select('*')
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: false }).order('id').range(from, to))
   if (error) { console.error('loadInvoices', error); return [] }
   const items = (data || []).map(row => toCamel<Invoice>(row as Record<string, unknown>))
   remember('invoices', items)

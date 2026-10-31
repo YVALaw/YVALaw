@@ -66,7 +66,9 @@ export async function cancelAdjustment(adj: PayrollAdjustment, wholeGroup = fals
   if (error) throw new Error(error.message)
 }
 export async function loadPayoutMethods(): Promise<PayoutMethod[]> {
-  const { data } = await supabase.from('employee_payout_methods').select('*')
+  const { data, error } = await supabase.from('employee_payout_methods').select('*')
+  // Thrown, not swallowed: an empty list on error would look like "no details yet" and invite overwriting the real account
+  if (error) throw new Error(error.message)
   return (data || []) as PayoutMethod[]
 }
 export async function savePayoutMethod(p: PayoutMethod): Promise<void> {

@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { signOutAndForgetDevice } from './services/notifications'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
@@ -72,7 +73,7 @@ function PendingAccess() {
     <div className="loading-screen">
       <div className="loading-text">Your account is waiting for approval.</div>
       <div className="loading-text">A YVA admin needs to give you access before you can use YVA OS.</div>
-      <button className="btn-ghost" onClick={() => void supabase.auth.signOut()}>Sign out</button>
+      <button className="btn-ghost" onClick={() => void signOutAndForgetDevice()}>Sign out</button>
     </div>
   )
 }

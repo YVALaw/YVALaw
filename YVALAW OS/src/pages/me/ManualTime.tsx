@@ -37,10 +37,7 @@ export default function ManualTime({ employeeId, isYva, projects, lang = 'en' }:
   const [msg,  setMsg]      = useState<{ ok: boolean; text: string } | null>(null)
 
   const reload = () => void loadManualRequests().then(setRequests)
-  useEffect(reload, [])
-  useEffect(() => {
-    if (window.location.hash === '#manual') document.getElementById('manual')?.scrollIntoView({ behavior: 'smooth' })
-  }, [])
+  useEffect(reload, [])   // /me#manual scrolling is handled by MeRequests (the hash is gone by the time this mounts)
 
   async function submit() {
     const t = targets.find(x => x.key === target)
@@ -66,10 +63,10 @@ export default function ManualTime({ employeeId, isYva, projects, lang = 'en' }:
     try { await cancelManualRequest(id); reload() } catch (e) { setMsg({ ok: false, text: (e as Error).message }) }
   }
 
-  const targetLabel = (r: ManualRequest) => r.projectId ? targets.find(t => t.projectId === r.projectId)?.label ?? 'Project' : r.workType
+  const targetLabel = (r: ManualRequest) => r.projectId ? targets.find(t => t.projectId === r.projectId)?.label ?? tr.project : r.workType
 
   return (
-    <div id="manual" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {targets.length === 0 ? (
         <div style={{ fontSize: 14, color: 'var(--muted)' }}>{tr.noTarget}</div>
       ) : (

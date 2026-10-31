@@ -1,6 +1,7 @@
 // Weekly close (PLAN.md Step 4): the week-close function prepares/approves; the page reads rows
 // directly (RLS: weekly_close.manage) and records time adjustments.
 import { supabase } from '../lib/supabase'
+import { fetchAllPages } from '../lib/pages'
 import type { Invoice } from '../data/types'
 import { addDays, DEFAULT_TZ, localParts, mondayOf, zonedMidnight } from '../utils/moneyRules'
 
@@ -45,8 +46,8 @@ export async function markInvoiceSent(inv: Invoice): Promise<void> {
 
 export async function loadWeekBlocks(weekStart: string, tz = DEFAULT_TZ): Promise<WeekBlock[]> {
   const from = new Date(zonedMidnight(weekStart, tz)).toISOString(), to = new Date(zonedMidnight(addDays(weekStart, 7), tz)).toISOString()
-  const { data } = await supabase.from('tracker_blocks').select('employee_id,block_start,project_id,work_type,seconds,status,created_at')
-    .gte('block_start', from).lt('block_start', to).in('status', ['tracked', 'approved']).limit(100000)
+  const { data } = await fetchAllPages<WeekBlock>((a, b) => supabase.from('tracker_blocks').select('employee_id,block_start,project_id,work_type,seconds,status,created_at')
+    .gte('block_start', from).lt('block_start', to).in('status', ['tracked', 'approved']).order('id').range(a, b))
   return (data || []) as WeekBlock[]
 }
 export async function loadAdjustments(weekStart: string): Promise<Adjustment[]> {

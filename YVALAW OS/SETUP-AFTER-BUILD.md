@@ -24,6 +24,11 @@ Open each file, paste it all, press **Run**. Each one ends with a small table �
 Ask me to open the pull request. Netlify builds a **preview** of it (real data) so you can click around
 first. When you're happy, merge it.
 
+**Right after it's live**, run one more script: `supabase/migrate-portal-invoices-lockdown.sql`.
+It stops clients from reading staff pay details through the portal. (Running it *before* the new
+version is live would make the old portal show no invoices — so wait until the merge has deployed.)
+If you ever re-run the YVA Time phase 2 script, run `migrate-step4-weekly-close.sql` again after it.
+
 ## 3. Connect Gmail (for invoices, payslips and automatic emails)
 
 1. Google Cloud Console → your OAuth client (Web application) → **Authorized redirect URIs** → add
@@ -82,4 +87,8 @@ compare the numbers before retiring Hubstaff / Excel.
   (this also fixed **Business Expenses**, which deleted every project expense when you saved).
 - The invoice builder no longer bills a client at the employee's pay rate when a project has no rate.
 - Every change is in Settings → **History** (and "Show change history" on client / employee / project pages).
+  History of pay rates, payroll, bank details and leads is only shown to people who may see those.
+- Time approved **after** a payday is paid on the next payday as a "late time" line (it used to be missed).
+- Employee time zones should be real zone names (e.g. *America/Santo_Domingo*). Anything else is ignored
+  and the Dominican time zone is used.
 - Full details for developers: `PLAN.md` (Build progress) and `CLAUDE.md`.

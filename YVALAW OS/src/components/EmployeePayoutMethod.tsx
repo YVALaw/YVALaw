@@ -11,8 +11,20 @@ export default function EmployeePayoutMethod({ employeeId, employeeName }: { emp
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState<PayoutMethod>(empty(employeeId))
   const [msg, setMsg] = useState<string | null>(null)
-  useEffect(() => { if (allowed('bank.view')) void loadPayoutMethods().then(all => setP(all.find(x => x.employee_id === employeeId) ?? null)) }, [employeeId])   // eslint-disable-line react-hooks/exhaustive-deps
-  if (!allowed('bank.view') && !allowed('bank.manage')) return null
+  const [loaded, setLoaded] = useState(false)
+  // bank.manage can read too (DB policy). Permissions arrive after the first render for non-CEO roles, so re-run then.
+  // Change/Add stay hidden until the current details are loaded, so a blank form can't overwrite a real account.
+  const canSee = allowed('bank.view') || allowed('bank.manage')
+  useEffect(() => {
+    if (!canSee) return
+    let alive = true
+    setLoaded(false)
+    void loadPayoutMethods()
+      .then(all => { if (alive) { setP(all.find(x => x.employee_id === employeeId) ?? null); setLoaded(true) } })
+      .catch(e => { if (alive) setMsg(`Could not load payout details: ${(e as Error).message}`) })
+    return () => { alive = false }
+  }, [employeeId, canSee])
+  if (!canSee) return null
 
   async function save() {
     try {
@@ -32,7 +44,7 @@ export default function EmployeePayoutMethod({ employeeId, employeeName }: { emp
             ? <span>PayPal · <strong>{p.paypal_email}</strong> · paid in {p.currency}</span>
             : <span>{p.bank_name} · {p.account_type === 'checking' ? 'Checking' : 'Savings'} <strong>{p.account_number}</strong>{p.holder_id ? ` · ID ${p.holder_id}` : ''} · {p.currency}</span>)
             : <span style={{ color: 'var(--muted)' }}>No bank or PayPal details yet.</span>}
-          {allowed('bank.manage') && <button className="btn-ghost btn-sm" onClick={() => { setForm(p ?? empty(employeeId)); setEditing(true) }}>{p ? 'Change' : 'Add'}</button>}
+          {allowed('bank.manage') && loaded && <button className="btn-ghost btn-sm" onClick={() => { setForm(p ?? empty(employeeId)); setEditing(true) }}>{p ? 'Change' : 'Add'}</button>}
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }}>

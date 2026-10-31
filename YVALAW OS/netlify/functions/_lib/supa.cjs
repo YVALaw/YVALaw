@@ -41,6 +41,26 @@ async function rest(path, { method = 'GET', body, prefer, headers = {} } = {}) {
   return text ? JSON.parse(text) : null
 }
 
+/**
+ * GET every row, page by page. Supabase caps each request at its "Max rows" setting (1,000 by
+ * default) whatever `limit=` says, so big reads (a week of 10-minute blocks for the whole team)
+ * must page. `order` must be unique-ish so pages don't overlap — we always add `id` last.
+ */
+async function restAll(path, { pageSize = 1000, max = 500000 } = {}) {
+  const [base, query = ''] = path.split('?')
+  const params = new URLSearchParams(query)
+  params.delete('limit'); params.delete('offset')
+  const order = params.get('order')
+  params.set('order', order ? (order.split(',').some(o => o.split('.')[0] === 'id') ? order : `${order},id`) : 'id')
+  const out = []
+  for (let offset = 0; offset < max; offset += pageSize) {
+    const rows = await rest(`${base}?${params.toString()}&limit=${pageSize}&offset=${offset}`)
+    out.push(...rows)
+    if (rows.length < pageSize) break
+  }
+  return out
+}
+
 /** Call a public SQL function (RPC) as the service role */
 function rpc(name, args = {}) {
   return rest(`rpc/${name}`, { method: 'POST', body: args })
@@ -110,4 +130,4 @@ function json(statusCode, body, extraHeaders = {}) {
 
 const APP_URL = (process.env.PUBLIC_APP_URL || 'https://yvastaffing.agency/os/').replace(/\/*$/, '/')
 
-module.exports = { STAFF_ROLES, APP_URL, enc, rest, rpc, authAdmin, callerFromEvent, roleOf, hasPermission, usersWithPermission, json }
+module.exports = { STAFF_ROLES, APP_URL, enc, rest, restAll, rpc, authAdmin, callerFromEvent, roleOf, hasPermission, usersWithPermission, json }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { signOutAndForgetDevice } from '../services/notifications'
 import type { AppSettings, DataSnapshot } from '../data/types'
 import {
   loadCandidates, loadSettings, saveSettings,
@@ -401,7 +402,7 @@ export default function SettingsPage() {
           <button
             className="btn-ghost btn-sm"
             style={{ color: '#dc2626' }}
-            onClick={() => void supabase.auth.signOut()}
+            onClick={() => void signOutAndForgetDevice()}
           >
             Sign Out
           </button>

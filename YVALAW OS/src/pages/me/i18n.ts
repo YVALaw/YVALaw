@@ -15,6 +15,7 @@ export function useMeLang(): [Lang, (l: Lang) => void] {
 
 const en = {
   workspace: 'My workspace', hi: 'Hi', signOut: 'Sign out', loading: 'Loading your workspace…', more: 'More',
+  loadError: 'Could not load your profile.', networkError: 'Network error — could not load your profile. Check your connection and reload.',
   nav: { home: 'Home', time: 'My time', pay: 'My pay', screenshots: 'My screenshots', requests: 'Requests', client: 'My client', documents: 'Documents', company: 'Company', profile: 'Profile' },
   home: {
     trackingNow: 'Tracking now', notTracking: 'Not tracking', lastActive: 'Last active', today: 'Today', week: 'This week', target: 'of', targetSuffix: 'target',
@@ -33,12 +34,13 @@ const en = {
     mine: 'My requests', cancel: 'Cancel', status: { pending: 'Waiting', approved: 'Approved', declined: 'Declined', cancelled: 'Cancelled' }, none: 'No requests yet.',
     badDates: 'The end date must be on or after the start date.', missing: 'Add missing time', missingSub: 'Forgot to start the timer, or worked offline? Ask YVA to add it',
     missingOff: 'Adding time by hand is not enabled for your account. Ask YVA if you need it.',
+    tooLong: 'One request can cover at most 61 days. Send longer leave as two requests.', tooOld: 'The start date can be at most 30 days ago. Contact YVA for older dates.',
   },
   manual: { day: 'Day', from: 'From', to: 'To', workedOn: 'Worked on', why: 'Why is this time missing?', whyPh: 'e.g. Power cut — worked on paper and called clients from my phone',
     send: 'Send to YVA for approval', sending: 'Sending…', sent: 'Sent. YVA will approve or reject it — you will see the answer here.', mine: 'My requests', cancel: 'Cancel',
     noTarget: "You're not assigned to a project yet, so there's nothing to add time to.", pick: 'Pick what you worked on.', endAfter: 'The end time must be after the start time.',
     max12: 'One request can cover at most 12 hours.', future: "You can't request time in the future.", old: 'Requests can only go back 14 days. Contact YVA for older time.',
-    reason: 'Tell YVA briefly why the time is missing.', added: 'min added', yva: 'YVA', status: { pending: 'Waiting', approved: 'Approved', rejected: 'Rejected', cancelled: 'Cancelled' } },
+    reason: 'Tell YVA briefly why the time is missing.', added: 'min added', yva: 'YVA', project: 'Project', status: { pending: 'Waiting', approved: 'Approved', rejected: 'Rejected', cancelled: 'Cancelled' } },
   client: { title: 'My client', sub: 'Who you work for, your supervisor and instructions', none: "You're not assigned to a client project yet.", yvaTeam: 'You work for YVA directly.',
     supervisor: 'Supervisor', instructions: 'Instructions', noInstructions: 'No instructions yet.' },
   docs: { title: 'Documents', sub: 'Your contract and other files from YVA', none: 'No documents yet.', open: 'Open', categories: { contract: 'Contract', policy: 'Policy', tax: 'Tax', id: 'ID', other: 'Other' } },
@@ -49,6 +51,7 @@ const en = {
 export type Dict = typeof en
 const es: Dict = {
   workspace: 'Mi espacio', hi: 'Hola', signOut: 'Cerrar sesión', loading: 'Cargando tu espacio…', more: 'Más',
+  loadError: 'No se pudo cargar tu perfil.', networkError: 'Error de red — no se pudo cargar tu perfil. Revisa tu conexión y recarga la página.',
   nav: { home: 'Inicio', time: 'Mi tiempo', pay: 'Mi pago', screenshots: 'Mis capturas', requests: 'Solicitudes', client: 'Mi cliente', documents: 'Documentos', company: 'Empresa', profile: 'Perfil' },
   home: {
     trackingNow: 'Registrando ahora', notTracking: 'Sin registrar', lastActive: 'Última actividad', today: 'Hoy', week: 'Esta semana', target: 'de', targetSuffix: 'meta',
@@ -67,12 +70,13 @@ const es: Dict = {
     mine: 'Mis solicitudes', cancel: 'Cancelar', status: { pending: 'En espera', approved: 'Aprobada', declined: 'Rechazada', cancelled: 'Cancelada' }, none: 'Aún no hay solicitudes.',
     badDates: 'La fecha final debe ser igual o posterior a la inicial.', missing: 'Agregar tiempo faltante', missingSub: '¿Olvidaste iniciar el temporizador o trabajaste sin conexión? Pide a YVA que lo agregue',
     missingOff: 'Agregar tiempo a mano no está activado para tu cuenta. Pregunta a YVA si lo necesitas.',
+    tooLong: 'Una solicitud puede cubrir como máximo 61 días. Envía una ausencia más larga en dos solicitudes.', tooOld: 'La fecha de inicio puede ser como máximo de hace 30 días. Contacta a YVA para fechas anteriores.',
   },
   manual: { day: 'Día', from: 'Desde', to: 'Hasta', workedOn: 'Trabajé en', why: '¿Por qué falta este tiempo?', whyPh: 'p. ej. Se fue la luz — trabajé en papel y llamé a clientes desde mi teléfono',
     send: 'Enviar a YVA para aprobación', sending: 'Enviando…', sent: 'Enviada. YVA la aprobará o rechazará — verás la respuesta aquí.', mine: 'Mis solicitudes', cancel: 'Cancelar',
     noTarget: 'Aún no estás asignado a un proyecto, así que no hay dónde agregar tiempo.', pick: 'Elige en qué trabajaste.', endAfter: 'La hora final debe ser después de la inicial.',
     max12: 'Una solicitud puede cubrir como máximo 12 horas.', future: 'No puedes solicitar tiempo en el futuro.', old: 'Solo puedes solicitar hasta 14 días atrás. Contacta a YVA para tiempo más antiguo.',
-    reason: 'Explica brevemente a YVA por qué falta el tiempo.', added: 'min agregados', yva: 'YVA', status: { pending: 'En espera', approved: 'Aprobada', rejected: 'Rechazada', cancelled: 'Cancelada' } },
+    reason: 'Explica brevemente a YVA por qué falta el tiempo.', added: 'min agregados', yva: 'YVA', project: 'Proyecto', status: { pending: 'En espera', approved: 'Aprobada', rejected: 'Rechazada', cancelled: 'Cancelada' } },
   client: { title: 'Mi cliente', sub: 'Para quién trabajas, tu supervisor e instrucciones', none: 'Aún no estás asignado a un proyecto de cliente.', yvaTeam: 'Trabajas directamente para YVA.',
     supervisor: 'Supervisor', instructions: 'Instrucciones', noInstructions: 'Aún no hay instrucciones.' },
   docs: { title: 'Documentos', sub: 'Tu contrato y otros archivos de YVA', none: 'Aún no hay documentos.', open: 'Abrir', categories: { contract: 'Contrato', policy: 'Política', tax: 'Impuestos', id: 'Identificación', other: 'Otro' } },

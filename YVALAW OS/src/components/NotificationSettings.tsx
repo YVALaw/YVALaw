@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
-  disablePush, enablePush, loadNotificationPrefs, pushState, saveNotificationPref, sendNotificationsNow,
-  type NotificationPref, type PushState,
+  disablePush, enablePush, loadNotificationPrefs, pushState, PushSetupError, saveNotificationPref, sendNotificationsNow,
+  type NotificationPref, type PushSetupErrorCode, type PushState,
 } from '../services/notifications'
 
 type Kind = { kind: string; label: string; labelEs?: string }
@@ -14,6 +14,9 @@ const T = {
     what: 'What to tell me about', email: 'Email', push: 'Phone', sendTo: 'Send my notification emails to', sendToSub: 'Leave empty to use your login email.',
     save: 'Save', saved: 'Saved', test: 'Send me a test', testing: 'Sending…', testOk: (e: number, p: number) => `Test sent${e ? ' · email ✓' : ''}${p ? ' · phone ✓' : ''}.`,
     emailProblem: 'Email not sent: ', bell: 'Everything always shows in the bell.',
+    pushErr: { ios_install: 'On iPhone: tap Share → "Add to Home Screen", open YVA OS from the new icon, then turn this on.', unsupported: 'This browser does not support notifications.',
+      not_allowed: 'Notifications were not allowed. You can allow them in your browser or phone settings.', not_configured: 'Phone notifications are not set up on the server yet.',
+      signed_out: 'You are not signed in. Sign in again and try once more.', other_account: 'This device is registered to another YVA account. Sign out there first.' } as Record<PushSetupErrorCode, string>,
   },
   es: {
     device: 'Notificaciones en el teléfono y la computadora', deviceSub: 'Recibe un aviso en este dispositivo, aunque YVA OS esté cerrado.',
@@ -22,6 +25,9 @@ const T = {
     what: 'Avisarme sobre', email: 'Correo', push: 'Teléfono', sendTo: 'Enviar mis correos de aviso a', sendToSub: 'Déjalo vacío para usar tu correo de inicio de sesión.',
     save: 'Guardar', saved: 'Guardado', test: 'Enviarme una prueba', testing: 'Enviando…', testOk: (e: number, p: number) => `Prueba enviada${e ? ' · correo ✓' : ''}${p ? ' · teléfono ✓' : ''}.`,
     emailProblem: 'Correo no enviado: ', bell: 'Todo aparece siempre en la campana.',
+    pushErr: { ios_install: 'En iPhone: toca Compartir → "Agregar a pantalla de inicio", abre YVA OS desde el nuevo ícono y actívalas aquí.', unsupported: 'Este navegador no admite notificaciones.',
+      not_allowed: 'No se permitieron las notificaciones. Puedes permitirlas en la configuración del navegador o del teléfono.', not_configured: 'Las notificaciones al teléfono aún no están configuradas en el servidor.',
+      signed_out: 'No has iniciado sesión. Vuelve a iniciar sesión e inténtalo otra vez.', other_account: 'Este dispositivo está registrado con otra cuenta de YVA. Cierra sesión allí primero.' } as Record<PushSetupErrorCode, string>,
   },
 }
 
@@ -52,7 +58,7 @@ export default function NotificationSettings({ kinds, lang = 'en' }: { kinds: Ki
   }
   async function device(on: boolean) {
     setBusy(true); setMsg(null)
-    try { if (on) await enablePush(); else await disablePush() } catch (e) { setMsg({ ok: false, text: (e as Error).message }) }
+    try { if (on) await enablePush(); else await disablePush() } catch (e) { setMsg({ ok: false, text: e instanceof PushSetupError ? t.pushErr[e.code] : (e as Error).message }) }
     setState(await pushState()); setBusy(false)
   }
   async function test() {

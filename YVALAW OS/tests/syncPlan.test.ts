@@ -141,10 +141,12 @@ test('tables are tracked separately; never-loaded table → null', () => {
   assert.equal(t.deletable('clients', exp), null)
 })
 
-test('emptied list (deleted the last row) → the last generation', () => {
+test('emptied list (deleted the last row) → only rows every remembered load had', () => {
   const t = new LoadTracker()
   t.record('tasks', [{ id: 't1' }])
   assert.deepEqual([...t.deletable('tasks', [])!], ['t1'])
+  t.record('tasks', [{ id: 't1' }, { id: 't2' }])          // another screen later sees a colleague's new task
+  assert.deepEqual([...t.deletable('tasks', [])!], ['t1'])  // t2 is never deleted by the stale page
 })
 
 test('a record the page did not touch is never written back, even after another screen loaded a newer copy', () => {
@@ -166,4 +168,49 @@ test('a field changed in place on the loaded object is still saved (compared wit
   list[0].status = 'paid'                                                         // mutated in place
   const plan = planSync(t.baseline('invoices', list, null), list.map(r => normalizeRow(r)), undefined, t.deletable('invoices', list) ?? undefined)
   assert.deepEqual(plan.updates, [{ patch: { status: 'paid' }, ids: ['1'] }])
+})
+
+// Helper: plan a save the way storage.ts does, then record it
+function save(t: LoadTracker, table: string, items: object[], fallback: Map<string, Row> | null = null) {
+  const rows = items.map(r => normalizeRow(r as Record<string, unknown>))
+  const plan = planSync(t.baseline(table, items, fallback), rows, undefined, t.deletable(table, items) ?? undefined)
+  t.recordSave(table, items, plan)
+  return plan
+}
+
+test('a stale copy edited inside a fresh list only writes its own change (no undoing a payment)', () => {
+  const t = new LoadTracker()
+  const pageList = [{ id: 'I1', status: 'sent', amountPaid: 0, notes: '' }]
+  t.record('invoices', pageList)                                   // Invoices page loads
+  const editing = pageList[0]
+  const fresh = [{ id: 'I1', status: 'paid', amountPaid: 500, notes: '' }]
+  t.record('invoices', fresh)                                      // builder reloads just before saving: paid meanwhile
+  const inv = { ...editing, notes: 'typo fixed' }                  // built from the stale copy
+  const plan = save(t, 'invoices', fresh.map(i => (i.id === inv.id ? inv : i)))
+  assert.deepEqual(plan.updates, [{ patch: { notes: 'typo fixed' }, ids: ['I1'] }])
+})
+
+test('changing a field back to its original value is saved (copied rows, two saves)', () => {
+  const t = new LoadTracker()
+  const loaded = [{ id: 'e1', active: true }]
+  t.record('employees', loaded)
+  const off = loaded.map(e => ({ ...e, active: false }))
+  assert.deepEqual(save(t, 'employees', off.map(e => ({ ...e }))).updates, [{ patch: { active: false }, ids: ['e1'] }])
+  const on = off.map(e => ({ ...e, active: true }))                 // page still holds the pre-save copy
+  assert.deepEqual(save(t, 'employees', on.map(e => ({ ...e }))).updates, [{ patch: { active: true }, ids: ['e1'] }])
+})
+
+test('rows rebuilt from scratch (no tag) still save a change back', () => {
+  const t = new LoadTracker()
+  t.record('invoice_templates', [{ id: 'x', name: 'A' }])
+  assert.deepEqual(save(t, 'invoice_templates', [{ id: 'x', name: 'B' }]).updates, [{ patch: { name: 'B' }, ids: ['x'] }])
+  assert.deepEqual(save(t, 'invoice_templates', [{ id: 'x', name: 'A' }]).updates, [{ patch: { name: 'A' }, ids: ['x'] }])
+})
+
+test('the load tag never reaches the database row', () => {
+  const t = new LoadTracker()
+  const list = [{ id: '1', a: 1 }]
+  t.record('x', list)
+  assert.deepEqual(Object.keys(normalizeRow({ ...list[0] })), ['id', 'a'])
+  assert.equal(JSON.stringify({ ...list[0] }), '{"id":"1","a":1}')
 })

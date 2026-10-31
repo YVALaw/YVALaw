@@ -18,7 +18,7 @@ exports.handler = async function handler(event) {
   const origin = h.origin || h.Origin || ''
   if (event.httpMethod === 'OPTIONS') return reply(200, { ok: true }, origin)
   if (event.httpMethod !== 'POST') return reply(405, { error: 'Method not allowed' }, origin)
-  if (origin && !ALLOWED.some(r => r.test(origin))) return reply(403, { error: 'Not allowed' }, origin)
+  if (!ALLOWED.some(r => r.test(origin))) return reply(403, { error: 'Not allowed' }, origin)
   if ((event.body || '').length > 20000) return reply(413, { error: 'Too large' }, origin)
   let b
   try { b = JSON.parse(event.body || '{}') } catch { return reply(400, { error: 'Invalid' }, origin) }
@@ -28,8 +28,13 @@ exports.handler = async function handler(event) {
   if (ip && recent.length >= 5) return reply(429, { error: 'Too many requests' }, origin)
   hits.set(ip, [...recent, now])
   const name = clip(b.name, 200), email = clip(b.email, 254)?.toLowerCase(), role = clip(b.role, 120)
+  // Only real web links (a javascript: link would run code when a recruiter clicks it)
+  const linkedin = /^https?:\/\/[^\s]+$/i.test(String(b.linkedin || '').trim()) ? clip(b.linkedin, 300) : null
   if (!name || !email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return reply(400, { error: 'Name and a valid email are required' }, origin)
   try {
+    const hour = new Date(now - 3600_000).toISOString()
+    const lastHour = await rest(`candidates?source=eq.Careers%20page&created_at=gt.${enc(hour)}&select=id&limit=41`).catch(() => [])
+    if (lastHour.length > 40) return reply(429, { error: 'Too many requests' }, origin)
     const since = new Date(now - 86_400_000).toISOString().slice(0, 10)
     const dup = await rest(`candidates?email=eq.${enc(email)}&applied_at=gte.${since}&select=id,role&limit=5`).catch(() => [])
     if (dup.some(d => (d.role || '') === (role || ''))) return reply(200, { ok: true, duplicate: true }, origin)
@@ -39,11 +44,11 @@ exports.handler = async function handler(event) {
     ].filter(Boolean).join('\n')
     const base = { id: crypto.randomUUID(), name, email, phone: clip(b.phone, 50), role, source: 'Careers page', stage: 'applied', notes: notes || null }
     try {
-      await rest('candidates', { method: 'POST', body: { ...base, linkedin_url: clip(b.linkedin, 300), applied_at: new Date(now).toISOString().slice(0, 10), updated_at: now } })
+      await rest('candidates', { method: 'POST', body: { ...base, linkedin_url: linkedin, applied_at: new Date(now).toISOString().slice(0, 10), updated_at: now } })
     } catch (e) {
       if (e.status !== 400) throw e
       // an older candidates table without some optional columns: keep the essentials (LinkedIn into the notes)
-      await rest('candidates', { method: 'POST', body: { ...base, notes: [base.notes, b.linkedin && `LinkedIn: ${clip(b.linkedin, 300)}`].filter(Boolean).join('\n') || null } })
+      await rest('candidates', { method: 'POST', body: { ...base, notes: [base.notes, linkedin && `LinkedIn: ${linkedin}`].filter(Boolean).join('\n') || null } })
     }
     const team = await rest('user_roles?role=in.(ceo,admin,recruiter)&select=user_id')
     await notify(team.map(t => t.user_id), { kind: 'application_new', title: `New application: ${name}${role ? ` — ${role}` : ''}`, body: [clip(b.country, 80), clip(b.languages, 200)].filter(Boolean).join(' · ') || null, link: '/candidates' })

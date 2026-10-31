@@ -22,8 +22,9 @@ export default function PlacementRates({ project, members, client }: { project: 
     setRows(r.rows.filter(x => x.project_id === project.id || (!x.project_id && members.some(m => m.id === x.employee_id))))
     setError(r.error)
   }
-  useEffect(() => { if (allowed('rates.manage')) void load() }, [project.id, members.length])   // eslint-disable-line react-hooks/exhaustive-deps
-  if (!allowed('rates.manage')) return null
+  const canRates = allowed('rates.manage')   // arrives after the first render for non-CEO roles
+  useEffect(() => { if (canRates) void load() }, [project.id, members.length, canRates])   // eslint-disable-line react-hooks/exhaustive-deps
+  if (!canRates) return null
 
   const resolved = (e: Employee) => resolveRates({ employee: rateEmployee(e), project: rateProject(project), client: client ? rateClient(client) : null, rates: rows, day: today() })
 

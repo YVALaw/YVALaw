@@ -57,7 +57,7 @@ export default function AnnouncementsPage() {
               <div className="td-muted" style={{ fontSize: 13 }}>{AUD[a.audience]}{a.published_at ? ` · ${new Date(a.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''} · {a.body.slice(0, 120)}</div>
             </div>
             <button className="btn-ghost btn-sm" onClick={() => setForm({ id: a.id, title: a.title, body: a.body, audience: a.audience, pinned: a.pinned })}>Edit</button>
-            <button className="btn-ghost btn-sm" onClick={() => { if (window.confirm('Delete this announcement?')) void deleteAnnouncement(a.id).then(load) }}>Delete</button>
+            <button className="btn-ghost btn-sm" onClick={() => { if (window.confirm('Delete this announcement?')) void deleteAnnouncement(a.id).then(load).catch(e => setError(`Could not delete: ${(e as Error).message}`)) }}>Delete</button>
           </div>
         ))}
       </div>
@@ -73,7 +73,7 @@ export default function AnnouncementsPage() {
           <div key={h.id} className="approval-row" style={{ fontSize: 14 }}>
             <strong style={{ minWidth: 120 }}>{new Date(`${h.day}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</strong>
             <span style={{ flex: 1 }}>{h.name}</span>{h.paid && <span className="badge badge-green">Paid</span>}
-            <button className="btn-ghost btn-sm" onClick={() => void deleteHoliday(h.id).then(load)}>Delete</button>
+            <button className="btn-ghost btn-sm" onClick={() => void deleteHoliday(h.id).then(load).catch(e => setError(`Could not delete: ${(e as Error).message}`))}>Delete</button>
           </div>
         ))}
       </div>

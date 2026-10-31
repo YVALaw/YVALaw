@@ -15,6 +15,15 @@ export async function loadPlacementRates(filter?: { projectId?: string; employee
   return { rows: (data || []) as PlacementRate[], error: null }
 }
 
+/** Rates the invoice builder can use: everything with rates.manage, otherwise bill rates + positions only (no pay rates) */
+export async function loadRatesForInvoicing(): Promise<PlacementRate[]> {
+  const full = await loadPlacementRates()
+  if (full.rows.length) return full.rows
+  const { data, error } = await supabase.rpc('placement_bill_rates')
+  if (error) return []
+  return ((data || []) as RateRow[]).map((r, i) => ({ ...r, pay_rate: null, id: `bill-${i}` }))
+}
+
 export async function addPlacementRate(r: Omit<PlacementRate, 'id' | 'created_at'>): Promise<void> {
   const { error } = await supabase.from('placement_rates').upsert({
     employee_id: r.employee_id, project_id: r.project_id, position: r.position || null,

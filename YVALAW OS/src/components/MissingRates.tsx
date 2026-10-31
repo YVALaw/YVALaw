@@ -29,8 +29,10 @@ export default function MissingRates({ projects, employees, clients }: { project
   const navigate = useNavigate()
   const [rates, setRates] = useState<PlacementRate[] | null>(null)
   const [open, setOpen] = useState(false)
-  useEffect(() => { if (allowed('rates.manage')) void loadPlacementRates().then(r => setRates(r.rows)) }, [])   // eslint-disable-line react-hooks/exhaustive-deps
-  if (!allowed('rates.manage') || rates === null) return null
+  // Permissions load after the first render for non-CEO roles: re-run when the permission arrives
+  const canRates = allowed('rates.manage')
+  useEffect(() => { if (canRates) void loadPlacementRates().then(r => setRates(r.rows)) }, [canRates])
+  if (!canRates || rates === null) return null
   const missing = findMissingRates(projects, employees, clients, rates)
   if (missing.length === 0) return null
   return (

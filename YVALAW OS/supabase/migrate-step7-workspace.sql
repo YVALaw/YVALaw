@@ -76,7 +76,7 @@ BEGIN
   ELSIF NEW.status IS DISTINCT FROM OLD.status AND NEW.status IN ('approved', 'declined') THEN
     PERFORM private.notify_user(e.user_id, 'timeoff_decision',
       CASE WHEN NEW.status = 'approved' THEN 'Time off approved — Días libres aprobados: ' ELSE 'Time off declined — Días libres rechazados: ' END || span,
-      NEW.decision_note, '/me');
+      NEW.decision_note, '/me?s=requests');
   END IF;
   RETURN NULL;
 END
@@ -95,6 +95,9 @@ BEGIN
   IF NEW.status IS DISTINCT FROM OLD.status AND NEW.status IN ('approved', 'declined') THEN
     NEW.decided_at := now();
     NEW.decided_by := auth.uid();
+  ELSIF NOT private.has_permission('timeoff.approve') THEN
+    -- the employee cancelling their own request can't write a decision
+    NEW.decided_at := OLD.decided_at; NEW.decided_by := OLD.decided_by; NEW.decision_note := OLD.decision_note;
   END IF;
   -- nothing but the status (and a decision note) changes after the request is made
   NEW.employee_id := OLD.employee_id; NEW.kind := OLD.kind; NEW.start_date := OLD.start_date; NEW.end_date := OLD.end_date;
@@ -163,7 +166,7 @@ AS $$
 BEGIN
   IF NEW.published_at IS NOT NULL AND (TG_OP = 'INSERT' OR OLD.published_at IS NULL) THEN
     INSERT INTO public.notifications (user_id, kind, title, body, link)
-    SELECT e.user_id, 'announcement', left(NEW.title, 200), left(NEW.body, 300), '/me'
+    SELECT e.user_id, 'announcement', left(NEW.title, 200), left(NEW.body, 300), '/me?s=company'
     FROM public.employees e
     WHERE e.user_id IS NOT NULL AND coalesce(lower(e.status), '') NOT IN ('inactive', 'terminated')
       AND (NEW.audience = 'all' OR coalesce(e.works_for, 'client') = NEW.audience);

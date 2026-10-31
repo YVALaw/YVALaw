@@ -14,8 +14,9 @@ export default function EmployeeDocuments({ employeeId }: { employeeId: string }
   const [busy, setBusy] = useState(false)
   const file = useRef<HTMLInputElement>(null)
   const load = async () => { const r = await loadEmployeeDocuments(employeeId); setDocs(r.rows); setError(r.error) }
-  useEffect(() => { if (allowed('documents.manage')) void load() }, [employeeId])   // eslint-disable-line react-hooks/exhaustive-deps
-  if (!allowed('documents.manage')) return null
+  const canDocs = allowed('documents.manage')   // arrives after the first render for non-CEO roles
+  useEffect(() => { if (canDocs) void load() }, [employeeId, canDocs])   // eslint-disable-line react-hooks/exhaustive-deps
+  if (!canDocs) return null
   async function upload() {
     const f = file.current?.files?.[0]; if (!f) return
     setBusy(true); setError(null)

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { deletePayment, loadInvoicePaidState, loadPayments, PAYMENT_METHODS, recordPayment, type ClientPayment } from '../services/payments'
 import { usePermission } from '../context/RoleContext'
 import { localParts } from '../utils/moneyRules'
@@ -14,17 +14,30 @@ export default function RecordPaymentModal({ invoice, onClose, onChanged }: { in
   const [saving, setSaving] = useState(false)
   const total = Number(invoice.subtotal) || 0
   const paid = list.reduce((s, p) => s + p.amount, 0)
-  const balance = Math.max(0, Math.round((total - Math.max(paid, Number(invoice.amountPaid) || 0)) * 100) / 100)
+  // invoices.amount_paid read fresh from the database (its trigger moves it with every payment row, and it also holds
+  // legacy partial amounts recorded before payment rows existed). The prop is only a snapshot from when the modal opened.
+  const [dbPaid, setDbPaid] = useState<number | null>(null)
+  const received = dbPaid ?? Math.max(paid, Number(invoice.amountPaid) || 0)
+  const balance = Math.max(0, Math.round((total - received) * 100) / 100)
   const [form, setForm] = useState({ paidOn: localParts(Date.now()).date, amount: '', method: 'wire', reference: '', note: '' })
 
   async function load() {
     const r = await loadPayments({ invoiceId: invoice.id })
     setList(r.rows); setError(r.error)
   }
-  useEffect(() => { void load() }, [invoice.id])   // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { setForm(f => ({ ...f, amount: f.amount || (balance ? balance.toFixed(2) : '') })) }, [balance])
+  useEffect(() => {
+    void load()
+    void loadInvoicePaidState(invoice.id).then(s => { if (s) setDbPaid(s.amountPaid) })
+  }, [invoice.id])   // eslint-disable-line react-hooks/exhaustive-deps
+  // Pre-fill the balance; follow it when it changes (fresh amount_paid arrived, payment recorded) unless the user typed an amount
+  const autoAmount = useRef('')
+  useEffect(() => {
+    const next = balance ? balance.toFixed(2) : ''
+    setForm(f => ({ ...f, amount: !f.amount || f.amount === autoAmount.current ? next : f.amount }))
+    autoAmount.current = next
+  }, [balance])
 
-  async function refreshInvoice() { const s = await loadInvoicePaidState(invoice.id); if (s) onChanged(s) }
+  async function refreshInvoice() { const s = await loadInvoicePaidState(invoice.id); if (s) { setDbPaid(s.amountPaid); onChanged(s) } }
   async function save() {
     const amount = Number(form.amount.replace(',', '.'))
     if (!(amount > 0)) { setError('Enter the amount received.'); return }
@@ -51,7 +64,7 @@ export default function RecordPaymentModal({ invoice, onClose, onChanged }: { in
         <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div style={{ display: 'flex', gap: 18, fontSize: 13, flexWrap: 'wrap' }}>
             <span>Invoice <strong>{usd(total)}</strong></span>
-            <span>Received <strong>{usd(Math.max(paid, Number(invoice.amountPaid) || 0))}</strong></span>
+            <span>Received <strong>{usd(received)}</strong></span>
             <span>Balance <strong style={{ color: balance ? '#b45309' : '#15803d' }}>{usd(balance)}</strong></span>
           </div>
           {error && <div className="portal-message portal-message-error">{error}</div>}

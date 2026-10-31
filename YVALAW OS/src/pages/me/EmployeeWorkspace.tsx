@@ -24,8 +24,12 @@ export default function EmployeeWorkspace() {
   const [params, setParams] = useSearchParams()
   const [employee, setEmployee] = useState<MyEmployee | null>(null)
   const [projects, setProjects] = useState<MyProject[]>([])
-  const [error, setError] = useState<string | null>(null)
+  // Stored as a kind (not text) so it follows the language switch; detail = the server's own message
+  const [error, setError] = useState<{ kind: 'load' | 'network'; detail?: string } | null>(null)
   const [moreOpen, setMoreOpen] = useState(false)
+  // The desktop app's "Add missing time" opens /me#manual. Switching to ?s=requests drops the hash and the section
+  // mounts only after the profile loads, so remember the request here and let MeRequests scroll when it's rendered.
+  const [scrollToManual, setScrollToManual] = useState(() => window.location.hash === '#manual')
 
   useEffect(() => {
     void (async () => {
@@ -34,13 +38,12 @@ export default function EmployeeWorkspace() {
       try {
         const res = await fetch('/.netlify/functions/employee-me', { headers: { Authorization: `Bearer ${session.access_token}` } })
         const data = await res.json()
-        if (!res.ok) { setError(data.error || 'Could not load your profile.'); return }
+        if (!res.ok) { setError({ kind: 'load', detail: data.error }); return }
         setEmployee(data.employee); setProjects(data.projects || [])
-      } catch { setError('Network error — could not load your profile.') }
+      } catch { setError({ kind: 'network' }) }
     })()
   }, [])
-  // The desktop app's "Add missing time" opens /me#manual
-  useEffect(() => { if (window.location.hash === '#manual') setParams({ s: 'requests' }, { replace: true }) }, [])   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (scrollToManual) setParams({ s: 'requests' }, { replace: true }) }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const isYva = employee?.worksFor === 'yva'
   const sections: Section[] = ['home', 'time', 'pay', ...(isYva ? [] : ['screenshots' as Section]), 'requests', 'client', 'documents', 'company', 'profile']
@@ -65,7 +68,7 @@ export default function EmployeeWorkspace() {
           <NotificationBell lang={lang} />
         </header>
         <main className="me-content">
-          {error && <div className="portal-message portal-message-error">{error}</div>}
+          {error && <div className="portal-message portal-message-error">{error.kind === 'network' ? t.networkError : `${t.loadError}${error.detail ? ` (${error.detail})` : ''}`}</div>}
           {!employee && !error && <div className="loading-text">{t.loading}</div>}
           {employee && (
             <>
@@ -83,7 +86,7 @@ export default function EmployeeWorkspace() {
                 </div>
               )}
               {section === 'screenshots' && !isYva && <Card title={t.shots.title} sub={t.shots.sub}><ScreenshotDay self={{ employeeId: employee.id, projectNames }} lang={lang} /></Card>}
-              {section === 'requests' && <MeRequests e={employee} projects={projects} lang={lang} />}
+              {section === 'requests' && <MeRequests e={employee} projects={projects} lang={lang} scrollToManual={scrollToManual} onScrolled={() => setScrollToManual(false)} />}
               {section === 'client' && <MeClient e={employee} projects={projects} lang={lang} />}
               {section === 'documents' && <MeDocuments lang={lang} />}
               {section === 'company' && <MeCompany lang={lang} />}

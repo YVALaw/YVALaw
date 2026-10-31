@@ -3,6 +3,7 @@ import type { AppSettings, Employee, Invoice, Project } from '../data/types'
 import { loadEmployees, loadProjects, loadSettings } from '../services/storage'
 import { usePermission } from '../context/RoleContext'
 import { invoiceHtmlFor, sendInvoiceEmail } from '../services/invoiceEmail'
+import { isGmailConnected } from '../services/gmail'
 import RecordPaymentModal from '../components/RecordPaymentModal'
 import {
   addAdjustment, callWeekClose, cancelAdjustment, lastFinishedWeek, loadAdjustments, loadWeekBlocks, loadWeekCloses, loadWeekInvoices,
@@ -50,10 +51,6 @@ export default function WeeklyClosePage() {
   useEffect(() => { void loadEmployees().then(setEmployees); void loadProjects().then(setProjects); void loadSettings().then(setSettings) }, [])
   useEffect(() => { void loadAll() }, [weekStart])   // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (!allowed('weekly_close.manage')) {
-    return <div className="page-wrap"><div className="data-card" style={{ color: 'var(--muted)' }}>The weekly close needs the "Run the weekly close" permission (Settings → Team Access → Permissions).</div></div>
-  }
-
   async function run(action: 'prepare' | 'approve') {
     setBusy(action); setMsg(null); setError(null)
     try {
@@ -63,26 +60,50 @@ export default function WeeklyClosePage() {
     } catch (e) { setError((e as Error).message) }
     setBusy(null)
   }
-  async function send(inv: Invoice) {
-    if (!settings) return false
-    if (!inv.clientEmail) { setError(`${inv.number}: ${inv.clientName} has no email address. Add it on the client's profile and prepare again.`); return false }
+  /** 'sent' only when Gmail delivered it; 'mailto' = handed to the mail app, which we can't confirm */
+  async function send(inv: Invoice): Promise<'sent' | 'mailto' | 'failed'> {
+    if (!settings) return 'failed'
+    if (!inv.clientEmail) { setError(`${inv.number}: ${inv.clientName} has no email address. Add it on the client's profile and prepare again.`); return 'failed' }
     const r = await sendInvoiceEmail(inv, settings)
-    if (r.mode === 'failed') { setError(`${inv.number} was not sent: ${r.fallbackReason}`); return false }
+    if (r.mode === 'failed') { setError(`${inv.number} was not sent: ${r.fallbackReason}`); return 'failed' }
+    if (r.mode !== 'gmail') return 'mailto'
     await markInvoiceSent(inv)
-    return true
+    return 'sent'
   }
   async function sendOne(inv: Invoice) {
     setBusy(`send-${inv.id}`); setError(null)
-    try { if (await send(inv)) setMsg(`${inv.number} sent to ${inv.clientEmail}.`) } catch (e) { setError((e as Error).message) }
+    try {
+      const r = await send(inv)
+      if (r === 'sent') setMsg(`${inv.number} sent to ${inv.clientEmail}.`)
+      else if (r === 'mailto' && window.confirm(`${inv.number} was opened in your email app. Mark it as sent? Only say OK once you have actually sent the email.`)) {
+        await markInvoiceSent(inv)
+        setMsg(`${inv.number} marked as sent.`)
+      }
+    } catch (e) { setError((e as Error).message) }
     await loadAll(); setBusy(null)
   }
   async function sendAll() {
     const drafts = invoices.filter(i => (i.status || 'draft') === 'draft')
+    const gmailReady = await isGmailConnected().catch(() => false)
+    if (!gmailReady) {
+      setError('"Send all" needs Gmail connected (Settings → Integrations). Without it, send the invoices one at a time with each row\'s Send button.')
+      return
+    }
     if (!window.confirm(`Email ${drafts.length} invoice${drafts.length === 1 ? '' : 's'} to the clients now?`)) return
     setBusy('send-all'); setError(null)
     let ok = 0
-    for (const inv of drafts) { try { if (await send(inv)) ok++ } catch (e) { setError((e as Error).message) } }
-    setMsg(`${ok} of ${drafts.length} invoices sent.`)
+    let stopped = false
+    for (const inv of drafts) {
+      try {
+        const r = await send(inv)
+        if (r === 'sent') ok++
+        // Gmail dropped mid-run and the user chose the mail app: stop instead of opening one mail window per invoice
+        if (r === 'mailto') { stopped = true; break }
+      } catch (e) { setError((e as Error).message) }
+    }
+    setMsg(stopped
+      ? `${ok} of ${drafts.length} invoices sent through Gmail. Stopped: Gmail isn't sending, so the rest were not sent — reconnect Gmail (Settings → Integrations) or send them one at a time. The invoice opened in your email app is still a draft; use its Send button to mark it sent.`
+      : `${ok} of ${drafts.length} invoices sent.`)
     await loadAll(); setBusy(null)
   }
   function preview(inv: Invoice) {
@@ -113,7 +134,8 @@ export default function WeeklyClosePage() {
 
   async function saveAdjustment() {
     if (!editing) return
-    const mins = Number(adjForm.minutes.replace(',', '.'))
+    // Accept "-15", "−15" (the hint's minus sign), "+30" and a comma decimal
+    const mins = Number(adjForm.minutes.trim().replace(/[\u2212\u2013]/g, '-').replace(',', '.'))
     if (!mins || adjForm.note.trim().length < 2) { setError('Enter minutes (use − to remove time) and a short note — the employee will see it.'); return }
     const target = grid.get(editing.employeeId)?.get(editing.target)
     try {
@@ -132,6 +154,11 @@ export default function WeeklyClosePage() {
       for (const [day, sec] of Object.entries(f.byDay)) await moveToNextWeek({ employeeId: f.employeeId, projectId: f.projectId ?? null, workType: f.workType ?? null, day, seconds: sec, note: 'Uploaded after the week closed — moved to next week', weekStart })
       setMsg('Moved. Press "Prepare again" to update the invoices.'); setAdjustments(await loadAdjustments(weekStart))
     } catch (e) { setError((e as Error).message) }
+  }
+
+  // After every hook: permissions arrive asynchronously for non-CEO roles, so an earlier return changes the hook count
+  if (!allowed('weekly_close.manage')) {
+    return <div className="page-wrap"><div className="data-card" style={{ color: 'var(--muted)' }}>The weekly close needs the "Run the weekly close" permission (Settings → Team Access → Permissions).</div></div>
   }
 
   const s = close?.summary ?? {}
@@ -250,7 +277,7 @@ export default function WeeklyClosePage() {
                         <option value="edit">Add / remove minutes</option>
                         <option value="move">Move to next week</option>
                       </select>
-                      <input aria-label="Minutes" className="form-input" style={{ width: 110 }} inputMode="decimal" placeholder={editing.mode === 'move' ? 'minutes' : '+30 or −15'} value={adjForm.minutes} onChange={e => setAdjForm(f => ({ ...f, minutes: e.target.value }))} />
+                      <input aria-label="Minutes" className="form-input" style={{ width: 110 }} inputMode="text" placeholder={editing.mode === 'move' ? 'minutes' : '+30 or −15'} value={adjForm.minutes} onChange={e => setAdjForm(f => ({ ...f, minutes: e.target.value }))} />
                       <input aria-label="Note for the employee" className="form-input" style={{ flex: 1, minWidth: 180 }} placeholder="Note the employee will see" value={adjForm.note} onChange={e => setAdjForm(f => ({ ...f, note: e.target.value }))} />
                       <button className="btn-primary btn-sm" onClick={() => void saveAdjustment()}>Save</button>
                       <button className="btn-ghost btn-sm" onClick={() => setEditing(null)}>Cancel</button>
@@ -259,7 +286,7 @@ export default function WeeklyClosePage() {
                   {adjustments.filter(a => a.employee_id === emp && a.status === 'applied' && a.kind !== 'defer_in').map(a => (
                     <div key={a.id} style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                       <span>{dayLabel(a.day)}: {a.kind === 'defer_out' ? `moved ${hm(-a.seconds_delta)} to next week` : `${a.seconds_delta > 0 ? '+' : ''}${hm(a.seconds_delta)}`} — {a.note}</span>
-                      <button className="notif-link" onClick={() => void cancelAdjustment(a).then(async () => setAdjustments(await loadAdjustments(weekStart)))}>Undo</button>
+                      <button className="notif-link" onClick={() => void cancelAdjustment(a).then(async () => setAdjustments(await loadAdjustments(weekStart))).catch(e => setError(`Could not undo: ${(e as Error).message}`))}>Undo</button>
                     </div>
                   ))}
                 </div>

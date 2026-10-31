@@ -16,8 +16,9 @@ export default function EmployeePayRates({ employee }: { employee: Employee }) {
   const [saved, setSaved] = useState<string | null>(null)
 
   async function load() { const r = await loadPlacementRates({ employeeId: employee.id }); setRows(r.rows); setError(r.error) }
-  useEffect(() => { if (allowed('rates.manage')) void load() }, [employee.id])   // eslint-disable-line react-hooks/exhaustive-deps
-  if (!allowed('rates.manage')) return null
+  const canRates = allowed('rates.manage')   // arrives after the first render for non-CEO roles
+  useEffect(() => { if (canRates) void load() }, [employee.id, canRates])   // eslint-disable-line react-hooks/exhaustive-deps
+  if (!canRates) return null
   const own = rows.filter(r => !r.project_id)
 
   async function add() {

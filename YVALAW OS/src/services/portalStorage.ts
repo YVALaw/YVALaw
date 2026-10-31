@@ -97,6 +97,10 @@ export async function loadPortalProjects(clientId: string): Promise<Project[]> {
  * Scoped to sent/viewed/paid/overdue/partial status only — drafts are internal.
  */
 export async function loadPortalInvoices(clientName: string): Promise<Invoice[]> {
+  // portal_invoices() leaves out the staff pay fields stored on invoice items
+  const rpc = await supabase.rpc('portal_invoices', { p_client_name: clientName })
+  if (!rpc.error) return rowsToInvoices((rpc.data || []) as Record<string, unknown>[])
+  // Database not updated yet (function missing): the older direct read
   const { data, error } = await supabase
     .from('invoices')
     .select('*')

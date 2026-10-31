@@ -26,7 +26,8 @@ exports.handler = async function handler(event) {
   const origin = h.origin || h.Origin || ''
   if (event.httpMethod === 'OPTIONS') return reply(200, { ok: true }, origin)
   if (event.httpMethod !== 'POST') return reply(405, { error: 'Method not allowed' }, origin)
-  if (origin && !ALLOWED.some(r => r.test(origin))) return reply(403, { error: 'Not allowed' }, origin)
+  // Browsers always send Origin on a POST; scripts without one (or from other sites) are refused
+  if (!ALLOWED.some(r => r.test(origin))) return reply(403, { error: 'Not allowed' }, origin)
   if ((event.body || '').length > 20000) return reply(413, { error: 'Too large' }, origin)
   let b
   try { b = JSON.parse(event.body || '{}') } catch { return reply(400, { error: 'Invalid' }, origin) }
@@ -34,7 +35,11 @@ exports.handler = async function handler(event) {
   try {
     if (b.kind === 'calendly') {
       if (!/^[0-9a-f-]{36}$/.test(String(b.id || '')) || b.token !== tokenFor(b.id)) return reply(403, { error: 'Not allowed' }, origin)
-      await rest(`leads?id=eq.${b.id}`, { method: 'PATCH', body: { calendly_booked: true, stage: 'meeting' } })
+      // Only moves an early lead to Meeting (never a lead staff already advanced, won or lost); the token is only accepted for 14 days
+      const since = new Date(Date.now() - 14 * 86_400_000).toISOString()
+      const hit = await rest(`leads?id=eq.${b.id}&created_at=gt.${enc(since)}&select=id,stage`)
+      if (!hit.length) return reply(200, { ok: true }, origin)
+      await rest(`leads?id=eq.${b.id}`, { method: 'PATCH', body: { calendly_booked: true, ...(['new', 'contacted'].includes(hit[0].stage) ? { stage: 'meeting' } : {}) } })
       await rest('lead_activities', { method: 'POST', body: { lead_id: b.id, kind: 'system', body: 'Booked a call on Calendly', created_by: null } }).catch(() => {})
       return reply(200, { ok: true }, origin)
     }
@@ -43,6 +48,11 @@ exports.handler = async function handler(event) {
     const now = Date.now(), recent = (hits.get(ip) || []).filter(t => now - t < 10 * 60_000)
     if (ip && recent.length >= 6) return reply(429, { error: 'Too many requests' }, origin)
     hits.set(ip, [...recent, now])
+    // Site-wide cap (the per-visitor one resets when Netlify starts a new instance): protects staff
+    // phones/inboxes and the Gmail sending quota from a flood of fake leads
+    const hour = new Date(now - 3600_000).toISOString()
+    const lastHour = await rest(`leads?created_at=gt.${enc(hour)}&select=id&limit=61`)
+    if (lastHour.length > 60) return reply(429, { error: 'Too many requests' }, origin)
 
     const name = clip(b.name, 200) || clip([b.first_name, b.last_name].filter(Boolean).join(' '), 200)
     const email = clip(b.email, 254)?.toLowerCase() || null
@@ -58,9 +68,15 @@ exports.handler = async function handler(event) {
     // Same person within 30 minutes (e.g. EmailJS + backup form): update instead of a duplicate
     if (email) {
       const since = new Date(now - 30 * 60_000).toISOString()
-      const [dup] = await rest(`leads?email=eq.${enc(email)}&created_at=gt.${enc(since)}&select=id&order=created_at.desc&limit=1`)
+      const [dup] = await rest(`leads?email=eq.${enc(email)}&created_at=gt.${enc(since)}&select=*&order=created_at.desc&limit=1`)
       if (dup) {
-        await rest(`leads?id=eq.${dup.id}`, { method: 'PATCH', body: Object.fromEntries(Object.entries(row).filter(([, v]) => v !== null && v !== '' && !(typeof v === 'object' && !Object.keys(v).length))) })
+        // Never overwrite what's there (anyone could post someone else's email): only fill empty fields,
+        // and keep a different message as a note on the lead
+        const fill = Object.fromEntries(Object.entries(row).filter(([k, v]) => v !== null && v !== '' && typeof v !== 'object' && typeof v !== 'boolean' && (dup[k] === null || dup[k] === '')))
+        if (Object.keys(fill).length) await rest(`leads?id=eq.${dup.id}`, { method: 'PATCH', body: fill })
+        if (row.message && dup.message && row.message !== dup.message) {
+          await rest('lead_activities', { method: 'POST', body: { lead_id: dup.id, kind: 'system', body: `Sent the form again: ${row.message}`.slice(0, 4000), created_by: null } }).catch(() => {})
+        }
         return reply(200, { id: dup.id, token: tokenFor(dup.id) }, origin)
       }
     }
