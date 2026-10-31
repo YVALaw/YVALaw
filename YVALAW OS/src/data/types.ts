@@ -24,6 +24,8 @@ export type Employee = {
   premiumEnabled?: boolean
   premiumStartTime?: string
   premiumPercent?: string | number
+  paySchedule?: 'weekly' | 'biweekly' | 'semimonthly' | 'monthly' | null   // YVA team: overrides the project's
+  payAnchor?: string | null
   role?: string
   employmentType?: string
   location?: string
@@ -62,6 +64,8 @@ export type Project = {
   clientId?: string | null
   employeeIds?: string[]
   nextInvoiceSeq?: number
+  paySchedule?: 'weekly' | 'biweekly' | 'semimonthly' | 'monthly'   // PLAN Step 6 (default weekly)
+  payAnchor?: string | null                                       // biweekly: a Monday that starts a period
   status?: string
   billingModel?: string
   startDate?: string

@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../../lib/supabase'
-import { IconBarChart, IconBriefcase, IconClock, IconBell, IconImage, IconLogOut, IconPlus, IconUser } from '../../components/Icon'
+import { IconBarChart, IconBriefcase, IconClock, IconBell, IconDollar, IconImage, IconLogOut, IconPlus, IconUser } from '../../components/Icon'
 import MyHours from './MyHours'
+import MyPay from './MyPay'
 import ManualTime from './ManualTime'
 import ScreenshotDay from '../time/ScreenshotDay'
 import NotificationBell from '../../components/NotificationBell'
@@ -102,6 +103,10 @@ export default function EmployeeWorkspace() {
                   {employee.manualTimeAllowed ? 'allowed — use “Add missing time” below; YVA approves each request' : 'not enabled for your account'}
                 </strong>
               </div>
+            </Section>
+
+            <Section icon={<IconDollar size={20} />} title="My pay" sub="Live earnings — updates every minute while you track">
+              <MyPay />
             </Section>
 
             <Section icon={<IconBarChart size={20} />} title="My hours" sub="From the YVA Time app — YVA approves them each week">

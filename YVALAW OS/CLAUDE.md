@@ -187,6 +187,14 @@ Groundwork for the YVA Time Windows desktop tracker (Electron, Phase 1). Plan de
 - **Installable app "YVA OS":** `public/manifest.webmanifest` (scope `/os/`, standalone), icons in `public/icons/` (180/192/512, maskable, badge), `public/sw.js` (push + notification click only — **no page caching**), registered in `main.tsx` (production only). `index.html`: manifest, theme-color, apple-mobile-web-app tags, `viewport-fit=cover`; portal bottom bar pads for the iPhone home bar. iPhone push needs iOS 16.4+ and the app opened from the home-screen icon. Sidebar/brand text renamed "YVA OS".
 - Tests: 47 SQL checks (local Postgres), 30 server checks (fake Supabase/Google/push), 28 unit tests, 24 browser checks.
 
+### Steps 2 + 3 — Rates per placement, live earnings ✅ built, not merged — run `supabase/migrate-step2-rates.sql`
+- **`placement_rates`** (employee_id, project_id NULL = the person's own pay rate, position, bill_rate, pay_rate, effective_from, note): one change per person/project/day (`UNIQUE NULLS NOT DISTINCT`, PG15+), bill rate only with a project, RLS `has_permission('rates.manage')`, audit trigger. `projects.pay_schedule` (weekly default) / `pay_anchor`, `employees.pay_schedule` (NULL = follow project) / `pay_anchor`.
+- **Rules live twice** — `netlify/functions/_lib/money.cjs` (server) and `src/utils/moneyRules.ts` (browser) — and `tests/parity.test.ts` runs both on the same cases. Change both together. Bill = placement → project → client default → none; pay = placement → dated own pay → employee pay → none (they never cross). `payPeriod(date, schedule, anchor)` → start/end/payday (Friday after the end). Night premium per 10-minute block from first/last offsets, premium start → midnight in the employee's TZ (default `America/Santo_Domingo`). `blocksMoney` sums pay or bill for blocks (YVA work types are never billed; removed/rejected skipped).
+- **UI:** `components/PlacementRates.tsx` (project page, rates.manage), `components/EmployeePayRates.tsx` (employee page), `components/MissingRates.tsx` (Projects page), project edit → Pay schedule. `services/rates.ts` (load/add-upsert/delete + camel→snake adapters).
+- **Invoice builder:** default row rate = resolved **bill** rate (it used to fall back to the employee's pay rate — invoicing at cost); position from the placement; payroll uses the resolved pay rate.
+- **`employee-earnings`** (GET, employee): today + per-project pay period (project schedule; YVA bucket uses the employee's schedule), amounts from tracker blocks × the pay rate on each day + premium + `time_adjustments` (Step 4), approved vs estimated, paid history from `payroll_lines` (Step 6; missing tables are ignored). Never returns bill rates. UI: `pages/me/MyPay.tsx` (EN/ES strings, refresh every minute).
+- Tests: 23 SQL, 18 function, 32 unit (incl. parity), 16 browser checks.
+
 ## Session Progress — Client Portal
 
 ### Completed This Session
