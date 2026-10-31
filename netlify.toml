@@ -14,6 +14,10 @@
 [functions."notifications-dispatch"]
   schedule = "*/5 * * * *"
 
+# YVA OS weekly close: Monday 12:05 am Dominican time (04:05 UTC) — prepares last week's invoices
+[functions."week-close-scheduled"]
+  schedule = "5 4 * * 1"
+
 # Marketing-site blog: publishes scheduled posts (see the function for setup)
 [functions."publish-scheduled-posts"]
   schedule = "@hourly"

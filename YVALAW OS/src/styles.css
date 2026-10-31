@@ -2089,3 +2089,9 @@ input, select, textarea { font-family: inherit; }
 .mypay-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
 .mypay-period { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
 @media (max-width: 380px) { .mypay-big { font-size: 22px; } }
+
+/* ── Weekly close (Step 4) ── */
+.week-grid th, .week-grid td { padding: 6px 6px; font-size: 12.5px; }
+.week-cell { border: 1px dashed transparent; background: none; padding: 4px 6px; border-radius: 6px; cursor: pointer; color: var(--text); font: inherit; display: inline-flex; flex-direction: column; align-items: center; min-width: 52px; }
+.week-cell:hover { border-color: var(--gold); background: var(--surface); }
+.week-adj { font-size: 10.5px; color: #b45309; font-weight: 700; }

@@ -22,6 +22,7 @@ import CandidatesPage from './pages/CandidatesPage'
 import CandidateProfilePage from './pages/CandidateProfilePage'
 import GeneralExpensesPage from './pages/GeneralExpensesPage'
 import EstimatesPage from './pages/EstimatesPage'
+import WeeklyClosePage from './pages/WeeklyClosePage'
 import TimeTrackingPage from './pages/TimeTrackingPage'
 import CalendarPage from './pages/CalendarPage'
 import PortalDashboard from './pages/portal/PortalDashboard'
@@ -206,6 +207,7 @@ function AuthenticatedRouter() {
         <Route path="/settings"      element={<SettingsPage />} />
         <Route path="/estimates"     element={<EstimatesPage />} />
         <Route path="/time"          element={<TimeTrackingPage />} />
+        <Route path="/weekly-close"  element={<WeeklyClosePage />} />
         <Route path="/calendar"      element={<CalendarPage />} />
         <Route path="/requests"      element={<RequestsPage />} />
         <Route path="*"              element={<Navigate to="/" replace />} />

@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../../lib/supabase'
-import { IconBarChart, IconBriefcase, IconClock, IconBell, IconDollar, IconImage, IconLogOut, IconPlus, IconUser } from '../../components/Icon'
+import { IconBarChart, IconBriefcase, IconClock, IconBell, IconDollar, IconEdit, IconImage, IconLogOut, IconPlus, IconUser } from '../../components/Icon'
 import MyHours from './MyHours'
 import MyPay from './MyPay'
+import MyAdjustments from './MyAdjustments'
 import ManualTime from './ManualTime'
 import ScreenshotDay from '../time/ScreenshotDay'
 import NotificationBell from '../../components/NotificationBell'
@@ -118,6 +119,10 @@ export default function EmployeeWorkspace() {
                 <ScreenshotDay self={{ employeeId: employee.id, projectNames: Object.fromEntries(projects.map(p => [p.id, p.name])) }} />
               </Section>
             )}
+
+            <Section icon={<IconEdit size={20} />} title="Changes made by YVA" sub="When YVA adjusts your time, you see it here with the reason">
+              <MyAdjustments projectNames={Object.fromEntries(projects.map(p => [p.id, p.name]))} />
+            </Section>
 
             {employee.manualTimeAllowed && (
               <Section icon={<IconPlus size={20} />} title="Add missing time" sub="Forgot to start the timer, or worked offline? Ask YVA to add it">

@@ -36,6 +36,13 @@ function dopLabel(usd: number, rate: number): string {
   return `RD$${(usd * rate).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
 }
 
+/** Hours on invoices: "7h 20m" (exact minutes), never a long decimal */
+function fmtHours(h: unknown): string {
+  const n = Number(h) || 0
+  const m = Math.round(n * 60)
+  return m % 60 === 0 ? `${m / 60}h` : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`
+}
+
 export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): string {
   const rate           = opts.rate           ?? 0
   const companyName    = opts.companyName    || DEFAULTS.companyName
@@ -82,7 +89,7 @@ export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): s
       return '<tr><td style="white-space:nowrap"><strong>' + esc(it.employeeName) + '</strong>' +
         (it.position ? '<br><span style="font-size:10px;color:#888">' + esc(it.position) + '</span>' : '') +
         '</td>' + dayCells +
-        '<td style="text-align:right;font-weight:700;white-space:nowrap">' + esc(it.hoursTotal) + 'h</td>' +
+        '<td style="text-align:right;font-weight:700;white-space:nowrap">' + fmtHours(it.hoursTotal) + '</td>' +
         '<td style="text-align:right;white-space:nowrap">$' + esc(it.rate) + '/hr</td>' +
         '<td style="text-align:right;font-weight:700;white-space:nowrap">$' + (it.hoursTotal * it.rate).toFixed(2) + '</td></tr>'
     }).join('')
@@ -101,7 +108,7 @@ export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): s
     const bodyRows = (inv.items || []).map(it =>
       '<tr><td><strong>' + esc(it.employeeName) + '</strong>' +
       (it.position ? '<br><span style="font-size:11px;color:#888">' + esc(it.position) + '</span>' : '') +
-      '</td><td style="text-align:right">' + esc(it.hoursTotal) + 'h</td>' +
+      '</td><td style="text-align:right">' + fmtHours(it.hoursTotal) + '</td>' +
       '<td style="text-align:right">$' + esc(it.rate) + '/hr</td>' +
       '<td style="text-align:right"><strong>$' + (it.hoursTotal * it.rate).toFixed(2) + '</strong></td></tr>'
     ).join('')
