@@ -6,9 +6,13 @@
 [functions."run-autopay"]
   schedule = "0 13 * * *"
 
-# YVA Time: screenshots are kept 90 days
+# YVA Time: screenshots are kept 60 days
 [functions."purge-old-screenshots"]
   schedule = "@daily"
+
+# YVA OS: email + phone push for new notifications (bell)
+[functions."notifications-dispatch"]
+  schedule = "*/5 * * * *"
 
 # Marketing-site blog: publishes scheduled posts (see the function for setup)
 [functions."publish-scheduled-posts"]

@@ -10,7 +10,12 @@ import {
 import { supabase } from '../lib/supabase'
 import { IconCheck } from '../components/Icon'
 import { initiateGmailAuth, disconnectGmail, isGmailConnected, sendEmail } from '../services/gmail'
-import { useRole } from '../context/RoleContext'
+import { usePermission, useRole } from '../context/RoleContext'
+import NotificationSettings from '../components/NotificationSettings'
+import AutoEmailSender from '../components/AutoEmailSender'
+import PermissionsMatrix from '../components/PermissionsMatrix'
+import HistoryList from '../components/HistoryList'
+import { STAFF_KINDS } from '../lib/notifications'
 import { can, ROLE_LABELS, ROLE_OPTIONS } from '../lib/roles'
 
 type InfoDolarBhdResponse = {
@@ -154,7 +159,7 @@ function normalizeImportedCandidates(items: unknown[], idMap: Map<string, string
   })
 }
 
-type SettingsTab = 'company' | 'email' | 'integrations' | 'currency' | 'notifications' | 'data' | 'access'
+type SettingsTab = 'company' | 'email' | 'integrations' | 'currency' | 'notifications' | 'data' | 'access' | 'history'
 
 const ALL_TABS: { id: SettingsTab; label: string; adminOnly?: boolean }[] = [
   { id: 'company',       label: 'Company' },
@@ -164,11 +169,14 @@ const ALL_TABS: { id: SettingsTab; label: string; adminOnly?: boolean }[] = [
   { id: 'notifications', label: 'Notifications' },
   { id: 'data',          label: 'Data' },
   { id: 'access',        label: 'Team Access', adminOnly: true },
+  { id: 'history',       label: 'History' },
 ]
 
 export default function SettingsPage() {
   const { role: currentRole, loading: roleLoading } = useRole()
-  const TABS = roleLoading ? ALL_TABS.filter(t => !t.adminOnly) : ALL_TABS.filter(t => !t.adminOnly || can.manageRoles(currentRole))
+  const allowed = usePermission()
+  const TABS = (roleLoading ? ALL_TABS.filter(t => !t.adminOnly) : ALL_TABS.filter(t => !t.adminOnly || can.manageRoles(currentRole)))
+    .filter(t => t.id !== 'history' || allowed('history.view'))
   const fileRef = useRef<HTMLInputElement>(null)
   const [settings, setSettingsState] = useState<AppSettings>({
     usdToDop: 0, companyName: 'YVA Staffing', companyEmail: '', emailSignature: '',
@@ -240,8 +248,8 @@ export default function SettingsPage() {
     setInviteSending(true)
     setInviteMsg(null)
     const signupUrl = `${window.location.origin}/os/xDdasQwd24zaQ`
-    const subject = `You've been invited to YVA LawOS`
-    const body = `Hi,\n\nYou've been invited to join YVA LawOS — the internal operations platform.\n\nClick the link below to create your account:\n${signupUrl}\n\nOnce you sign up, your account will be active and an admin can assign your role.\n\nWelcome to the team!\n\n— YVA Staffing`
+    const subject = `You've been invited to YVA OS`
+    const body = `Hi,\n\nYou've been invited to join YVA OS — the internal operations platform.\n\nClick the link below to create your account:\n${signupUrl}\n\nOnce you sign up, your account will be active and an admin can assign your role.\n\nWelcome to the team!\n\n— YVA Staffing`
     try {
       await sendEmail(inviteEmail.trim(), subject, body)
       setInviteMsg({ type: 'ok', text: `Invite sent to ${inviteEmail.trim()}` })
@@ -730,6 +738,28 @@ export default function SettingsPage() {
         </div>
       )}
 
+      {activeTab === 'notifications' && (
+        <div className="settings-section">
+          <div className="settings-section-title">My notifications</div>
+          <NotificationSettings kinds={STAFF_KINDS} />
+        </div>
+      )}
+
+      {activeTab === 'notifications' && can.manageRoles(currentRole) && (
+        <div className="settings-section">
+          <div className="settings-section-title">Automatic emails</div>
+          <AutoEmailSender />
+        </div>
+      )}
+
+      {activeTab === 'history' && allowed('history.view') && (
+        <div className="settings-section">
+          <div className="settings-section-title">Change history</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>Every change to invoices, clients, projects, employees, rates, payroll and access — who made it and when.</div>
+          <HistoryList />
+        </div>
+      )}
+
       {/* ── Data ── */}
       {activeTab === 'data' && (
         <>
@@ -865,6 +895,16 @@ export default function SettingsPage() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {activeTab === 'access' && can.manageRoles(currentRole) && (
+        <div className="settings-section">
+          <div className="settings-section-title">Permissions</div>
+          <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>
+            What each role may do besides what it already sees. You (CEO) always have everything; tick a box to give a role that permission.
+          </div>
+          <PermissionsMatrix />
         </div>
       )}
 

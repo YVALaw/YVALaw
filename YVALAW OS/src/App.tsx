@@ -47,7 +47,7 @@ function LoadingScreen() {
   return (
     <div className="loading-screen">
       <div className="loading-spinner" />
-      <div className="loading-text">Loading YVA LawOS…</div>
+      <div className="loading-text">Loading YVA OS…</div>
     </div>
   )
 }
@@ -66,7 +66,7 @@ function PendingAccess() {
   return (
     <div className="loading-screen">
       <div className="loading-text">Your account is waiting for approval.</div>
-      <div className="loading-text">A YVA admin needs to give you access before you can use YVA LawOS.</div>
+      <div className="loading-text">A YVA admin needs to give you access before you can use YVA OS.</div>
       <button className="btn-ghost" onClick={() => void supabase.auth.signOut()}>Sign out</button>
     </div>
   )
@@ -249,7 +249,7 @@ async function maybeFireReminder() {
     return s === 'sent' || s === 'viewed' || s === 'overdue' || s === 'partial'
   })
   if (unpaid.length > 0) {
-    new Notification('YVA LawOS — Invoice Reminder', {
+    new Notification('YVA OS — Invoice Reminder', {
       body: `${unpaid.length} unpaid invoice${unpaid.length > 1 ? 's' : ''} waiting. Check the Invoices pipeline.`,
       icon: `${window.location.origin}${import.meta.env.BASE_URL}yva-logo.png`,
     })

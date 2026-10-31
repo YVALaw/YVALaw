@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import RecordHistory from '../components/RecordHistory'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { Client, Contract, ContractStatus, Employee, Expense, Invoice, Project, Task, TaskStatus } from '../data/types'
 import { loadSnapshot, saveProjects, loadTasks, saveTasks, loadExpenses, saveExpenses } from '../services/storage'
@@ -874,6 +875,7 @@ export default function ProjectProfilePage() {
           </div>
         </div>
       )}
+      <RecordHistory table="projects" recordId={projectNN.id} />
     </div>
   )
 }

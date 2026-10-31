@@ -1,9 +1,12 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../../lib/supabase'
-import { IconBarChart, IconBriefcase, IconClock, IconImage, IconLogOut, IconPlus, IconUser } from '../../components/Icon'
+import { IconBarChart, IconBriefcase, IconClock, IconBell, IconImage, IconLogOut, IconPlus, IconUser } from '../../components/Icon'
 import MyHours from './MyHours'
 import ManualTime from './ManualTime'
 import ScreenshotDay from '../time/ScreenshotDay'
+import NotificationBell from '../../components/NotificationBell'
+import NotificationSettings from '../../components/NotificationSettings'
+import { EMPLOYEE_KINDS } from '../../lib/notifications'
 
 // Shape returned by /.netlify/functions/employee-me (safe fields only)
 type MyEmployee = {
@@ -68,6 +71,7 @@ export default function EmployeeWorkspace() {
             </div>
             <div style={{ fontSize: 13, color: 'var(--muted)' }}>YVA Staffing · My workspace</div>
           </div>
+          <NotificationBell />
           <button className="btn-ghost btn-sm" onClick={() => void supabase.auth.signOut()}>
             <IconLogOut size={14} /> Sign out
           </button>
@@ -135,6 +139,10 @@ export default function EmployeeWorkspace() {
                   ))}
                 </div>
               )}
+            </Section>
+
+            <Section icon={<IconBell size={20} />} title="Notifications" sub="Phone notifications and emails from YVA">
+              <NotificationSettings kinds={EMPLOYEE_KINDS} />
             </Section>
 
             <Section icon={<IconUser size={20} />} title="My details" sub="Ask YVA to update anything that's wrong">

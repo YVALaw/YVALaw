@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { loadSnapshot, loadCandidates, countPendingStaffRequests } from '../services/storage'
 import { useRole } from '../context/RoleContext'
 import { can, ROLE_LABELS } from '../lib/roles'
+import NotificationBell from './NotificationBell'
 
 type Props = { children: ReactNode }
 
@@ -200,7 +201,7 @@ function PageTitle({ pathname }: { pathname: string }) {
       if (match || (item.to === '/' && pathname === '/')) return <span>{item.label}</span>
     }
   }
-  return <span>YVA LawOS</span>
+  return <span>YVA OS</span>
 }
 
 export default function Shell({ children }: Props) {
@@ -242,8 +243,8 @@ export default function Shell({ children }: Props) {
         <div className="sidebar-brand">
           <img src={`${import.meta.env.BASE_URL}yva-logo.png`} alt="YVA" className="sidebar-brand-logo" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
           <div>
-            <div className="sidebar-brand-name">YVA LawOS</div>
-            <div className="sidebar-brand-sub">Law Operations</div>
+            <div className="sidebar-brand-name">YVA OS</div>
+            <div className="sidebar-brand-sub">YVA Staffing</div>
           </div>
         </div>
 
@@ -320,7 +321,7 @@ export default function Shell({ children }: Props) {
         </div>
         <div className="topbar-actions">
           <GlobalSearch />
-          <div className="topbar-badge">Live</div>
+          <NotificationBell />
         </div>
       </header>
 

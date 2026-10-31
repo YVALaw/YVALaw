@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import RecordHistory from '../components/RecordHistory'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { Attachment, Employee, Invoice, Project, TimeEntry } from '../data/types'
 import { loadSnapshot, saveEmployees, saveInvoices, loadSettings, loadTimeEntries } from '../services/storage'
@@ -1017,6 +1018,7 @@ export default function EmployeeProfilePage() {
           </div>
         </div>
       )}
+      <RecordHistory table="employees" recordId={empNN.id} />
     </div>
   )
 }

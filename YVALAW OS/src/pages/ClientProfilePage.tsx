@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import RecordHistory from '../components/RecordHistory'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { ActivityLogEntry, Client, ClientDocument, CommEntryType, Contract, ContractStatus, Invoice, Project, PaymentAttempt } from '../data/types'
 import { loadSnapshot, saveClients, loadActivityLog, saveActivityLog, loadSettings, loadClientDocuments, addClientDocument, removeClientDocument, loadClientBillingSummary, type ClientBillingSummary } from '../services/storage'
@@ -1219,6 +1220,7 @@ export default function ClientProfilePage() {
           </div>
         </div>
       )}
+      <RecordHistory table="clients" recordId={clientNN.id} />
     </div>
   )
 }
