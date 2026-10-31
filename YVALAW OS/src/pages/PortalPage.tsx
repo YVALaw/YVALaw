@@ -29,7 +29,7 @@ export default function PortalPage() {
     return (
       <div style={{ minHeight: '100vh', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Arial, sans-serif' }}>
         <div style={{ textAlign: 'center', color: '#888' }}>
-          <div style={{ fontSize: 48, marginBottom: 16, color: '#f5b533' }}><IconAlert size={48} /></div>
+          <div style={{ fontSize: 48, marginBottom: 16, color: '#a16207' }}><IconAlert size={48} /></div>
           <div style={{ fontSize: 20, fontWeight: 700, color: '#333' }}>Invalid invoice link</div>
           <div style={{ fontSize: 14, marginTop: 8 }}>This link may be expired or malformed.</div>
         </div>
@@ -54,7 +54,7 @@ export default function PortalPage() {
             onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
           />
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 30, fontWeight: 900, color: '#f5b533', letterSpacing: '-0.02em' }}>INVOICE</div>
+            <div style={{ fontSize: 30, fontWeight: 900, color: '#a16207', letterSpacing: '-0.02em' }}>INVOICE</div>
             <div style={{ fontSize: 14, color: '#888', marginTop: 4 }}>{inv.number}</div>
             {inv.status && (
               <div style={{ marginTop: 6, display: 'inline-block', padding: '3px 12px', borderRadius: 999, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em',
@@ -113,7 +113,7 @@ export default function PortalPage() {
             <tfoot>
               <tr style={{ borderTop: '2px solid #111' }}>
                 <td colSpan={3} style={{ padding: '14px 10px', fontWeight: 800, fontSize: 15 }}>Total Due</td>
-                <td style={{ padding: '14px 10px', textAlign: 'right', fontWeight: 900, fontSize: 20, color: '#f5b533' }}>{fmtMoney(total)}</td>
+                <td style={{ padding: '14px 10px', textAlign: 'right', fontWeight: 900, fontSize: 20, color: '#a16207' }}>{fmtMoney(total)}</td>
               </tr>
               {dop && (
                 <tr>
@@ -125,7 +125,7 @@ export default function PortalPage() {
         ) : (
           <div style={{ textAlign: 'center', padding: '32px 0', borderTop: '2px solid #111', borderBottom: '1px solid #e5e7eb', marginBottom: 24 }}>
             <div style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>Amount Due</div>
-            <div style={{ fontSize: 40, fontWeight: 900, color: '#f5b533' }}>{fmtMoney(total)}</div>
+            <div style={{ fontSize: 40, fontWeight: 900, color: '#a16207' }}>{fmtMoney(total)}</div>
             {dop && <div style={{ fontSize: 13, color: '#aaa', marginTop: 4 }}>RD${dop}</div>}
           </div>
         )}
@@ -135,7 +135,7 @@ export default function PortalPage() {
           <div style={{ fontSize: 12, color: '#aaa' }}>YVA Staffing · Bilingual Virtual Professionals · yvastaffing.net</div>
           <button
             onClick={() => window.print()}
-            style={{ padding: '8px 20px', background: '#f5b533', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer', color: '#111' }}
+            style={{ padding: '8px 20px', background: '#a16207', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer', color: '#111' }}
           >
             Print / Save PDF
           </button>

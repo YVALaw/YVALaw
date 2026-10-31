@@ -112,6 +112,8 @@ Groundwork for the YVA Time Windows desktop tracker (Electron, Phase 1). Plan de
 - Employees have **no direct table access** (RLS stays staff-only). Their data comes from `netlify/functions/employee-me.cjs` (GET, finds the employee by `employees.user_id` server-side, returns safe fields + assigned projects with client names — no pay rate, premium, notes or attachments). The desktop app will reuse it.
 - `employees.user_id` is written only by `linkEmployeeLogin()` (staff auto-link, only if unlinked) and `invite-employee` — `saveEmployees()` strips `userId` so a stale whole-table save can't unlink a login.
 - Web timer removed: `useActiveTimer`, top-bar timer pill and Start/Stop on Time Tracking are gone; "+ Log Manual" stays for admins.
+- **Links people open from an email/message always point at the real site:** `APP_URL` (`src/lib/appUrl.ts`, `https://yvastaffing.agency/os/`, override with `VITE_PUBLIC_APP_URL`) — employee and client invites, "Forgot password?" and new sign-in links. Before, they used the admin's current address, so an invite made on a Netlify preview pointed at the preview, Supabase refused it and fell back to its Site URL. **Supabase → Authentication → URL Configuration** must have Site URL `https://yvastaffing.agency/os/` (with `https://`) and Redirect URL `https://yvastaffing.agency/os/**`.
+- **Copy new sign-in link** (employee profile, when they already have a login — expired invite, link used wrongly, forgotten password): `invite-employee` `mode: 'reset'` returns a one-time Supabase recovery link (never creates a login) → **`/reset-password`** ("Choose a new password", any role, then home). "Forgot password?" on the login page uses the same page (it used to point at a non-existent `/reset-password` on the marketing site).
 
 ## YVA Time — Phase 1 (desktop app) ✅ built, needs SQL + deploy + first installer
 
@@ -498,10 +500,12 @@ All data is scoped to the authenticated user via Supabase RLS.
 - `GlobalSearch` in Shell topbar searches all entities and navigates to profile routes
 
 ## Design System
-- Dark theme: `--bg: #020617`, `--surface: #0b1428`, `--surf2: #0e1a35`
-- Gold accent: `--gold: #f5b533`, `--goldl: #ffd57e`
-- Font: Inter (system fallback)
-- Card-heavy layout: `.entity-card`, `.card-grid`, `.avatar`
+- **Navy & gold (v9, matches yvastaffing.agency):** navy `--primary` / `--sidebar-bg` `#1b1e2b`, background `--bg #f6f7f9`, white cards with 1px borders (shadows only on hover), radii 8–12px, Inter.
+- **Two yellows:** `--brand #facc15` (website yellow) for **fills** — active menu item, current-month chart bar, avatars/badges with navy text, settings tab. `--gold #a16207` (and `--goldl` / `--goldd`) for **text, borders and focus rings** — bright yellow text on white is unreadable.
+- Dashboard numbers (`.kpi-value`) are navy; red only for a real problem (overdue/unpaid > 0, negative earnings). KPI icons are neutral (`.kpi-icon-wrap`, top-right) — don't colour them inline. Cards without a `.kpi-body` stack vertically.
+- Titles: `.page-title` 26px/700, card titles sentence case 15px/600 (no uppercase). Tabs (`.filter-tab`, `.view-toggle`) are quiet; the active one is white with a border.
+- Phones: top bar hides the page name (≤640px), dashboard cards two per row without icons (≤480px). Client portal phone bottom bar: `.portal-bottom-nav-item`.
+- Colours from the old dark theme (`#f87171`, `#4ade80`, `#f5b533`…) were replaced with readable ones; on white use `#dc2626` / `#059669` / `var(--gold)`.
 - All kanban boards use `.kanban-board` + `.kanban-col-{stage}` color classes
 
 ## Invoice System

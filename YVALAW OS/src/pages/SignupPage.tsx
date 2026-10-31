@@ -10,9 +10,9 @@ function passwordStrength(pw: string): { score: number; label: string; color: st
   if (/[A-Z]/.test(pw)) score++
   if (/[0-9]/.test(pw)) score++
   if (/[^A-Za-z0-9]/.test(pw)) score++
-  if (score <= 1) return { score, label: 'Weak',   color: '#f87171' }
+  if (score <= 1) return { score, label: 'Weak',   color: '#dc2626' }
   if (score <= 3) return { score, label: 'Fair',   color: '#facc15' }
-  return               { score, label: 'Strong', color: '#4ade80' }
+  return               { score, label: 'Strong', color: '#059669' }
 }
 
 export default function SignupPage() {
@@ -143,7 +143,7 @@ export default function SignupPage() {
             </div>
 
             {error && (
-              <div style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 12, padding: '10px 14px', fontSize: 13, color: '#f87171' }}>
+              <div style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 12, padding: '10px 14px', fontSize: 13, color: '#dc2626' }}>
                 {error}
               </div>
             )}

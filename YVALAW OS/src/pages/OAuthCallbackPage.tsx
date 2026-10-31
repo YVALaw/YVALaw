@@ -61,7 +61,7 @@ export default function OAuthCallbackPage() {
       )}
       {ok === true  && <div style={{ fontSize: 36, color: '#22c55e' }}><IconCheck size={36} /></div>}
       {ok === false && <div style={{ fontSize: 36, color: '#ef4444' }}><IconX size={36} /></div>}
-      <div style={{ fontSize: 16, color: ok === false ? '#f87171' : ok === true ? '#22c55e' : '#fff' }}>{msg}</div>
+      <div style={{ fontSize: 16, color: ok === false ? '#dc2626' : ok === true ? '#22c55e' : '#fff' }}>{msg}</div>
       <div style={{ fontSize: 12, color: '#475569' }}>Redirecting to Settings…</div>
       <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
     </div>

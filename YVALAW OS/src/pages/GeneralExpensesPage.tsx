@@ -76,19 +76,19 @@ export default function GeneralExpensesPage() {
       <div className="kpi-grid" style={{ marginBottom: 20 }}>
         <div className="kpi-card">
           <div className="kpi-label">All-Time Total</div>
-          <div className="kpi-value" style={{ color: '#f87171' }}>{formatMoney(allTotal)}</div>
+          <div className="kpi-value">{formatMoney(allTotal)}</div>
           <div className="kpi-sub">{expenses.length} entries</div>
         </div>
         {monthlyArr.slice(0, 1).map(([m, amt]) => (
           <div key={m} className="kpi-card">
             <div className="kpi-label">This Month ({m})</div>
-            <div className="kpi-value" style={{ color: '#f87171' }}>{formatMoney(amt)}</div>
+            <div className="kpi-value">{formatMoney(amt)}</div>
           </div>
         ))}
         {catArr.slice(0, 1).map(([c, amt]) => (
           <div key={c} className="kpi-card">
             <div className="kpi-label">Top Category</div>
-            <div className="kpi-value" style={{ color: 'var(--gold)', fontSize: 18 }}>{c}</div>
+            <div className="kpi-value" style={{ fontSize: 18 }}>{c}</div>
             <div className="kpi-sub">{formatMoney(amt)}</div>
           </div>
         ))}
@@ -170,8 +170,8 @@ export default function GeneralExpensesPage() {
                     <td className="td-name">{ex.description}</td>
                     <td className="td-muted">{ex.category || '—'}</td>
                     <td className="td-muted">{ex.date}</td>
-                    <td className="td-muted">{ex.recurring ? <span style={{ color: '#4ade80', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconCheck size={10} /> Yes</span> : '—'}</td>
-                    <td style={{ textAlign: 'right', color: '#f87171', fontWeight: 700 }}>{formatMoney(ex.amount)}</td>
+                    <td className="td-muted">{ex.recurring ? <span style={{ color: '#059669', fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconCheck size={10} /> Yes</span> : '—'}</td>
+                    <td style={{ textAlign: 'right', color: '#dc2626', fontWeight: 700 }}>{formatMoney(ex.amount)}</td>
                     <td>
                       <button className="btn-icon btn-danger" style={{ fontSize: 11, padding: '2px 6px' }}
                         onClick={() => setConfirmDelete(ex.id)}><IconTrash size={12} /></button>
@@ -182,7 +182,7 @@ export default function GeneralExpensesPage() {
                   <td colSpan={4} style={{ textAlign: 'right', fontWeight: 700, paddingRight: 8, fontSize: 12, color: 'var(--muted)' }}>
                     {filterMonth || filterCat ? 'Filtered Total' : 'Total'}
                   </td>
-                  <td style={{ textAlign: 'right', color: '#f87171', fontWeight: 800 }}>{formatMoney(filteredTotal)}</td>
+                  <td style={{ textAlign: 'right', color: '#dc2626', fontWeight: 800 }}>{formatMoney(filteredTotal)}</td>
                   <td></td>
                 </tr>
               </tbody>
@@ -203,7 +203,7 @@ export default function GeneralExpensesPage() {
                   {monthlyArr.map(([m, amt]) => (
                     <tr key={m}>
                       <td className="td-name">{m}</td>
-                      <td style={{ textAlign: 'right', color: '#f87171', fontWeight: 700 }}>{formatMoney(amt)}</td>
+                      <td style={{ textAlign: 'right', color: '#dc2626', fontWeight: 700 }}>{formatMoney(amt)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -219,7 +219,7 @@ export default function GeneralExpensesPage() {
                   {catArr.map(([c, amt]) => (
                     <tr key={c}>
                       <td className="td-name">{c}</td>
-                      <td style={{ textAlign: 'right', color: '#f87171', fontWeight: 700 }}>{formatMoney(amt)}</td>
+                      <td style={{ textAlign: 'right', color: '#dc2626', fontWeight: 700 }}>{formatMoney(amt)}</td>
                     </tr>
                   ))}
                 </tbody>

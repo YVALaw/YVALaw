@@ -114,6 +114,8 @@ function sBadge(s?: string) {
 }
 
 /* ── Reusable KpiCard with icon ── */
+// Numbers are navy; red only when the colour passed in means a problem (overdue, negative)
+const DANGER = new Set(['#dc2626', '#ef4444', 'var(--danger)'])
 function KpiCard({ icon, value, label, color = 'var(--muted)', onClick }: {
   icon: React.ReactNode
   value: string | number
@@ -123,12 +125,12 @@ function KpiCard({ icon, value, label, color = 'var(--muted)', onClick }: {
 }) {
   return (
     <div className={`kpi-card${onClick ? ' clickable-card' : ''}`} onClick={onClick}>
-      <div className="kpi-icon-wrap" style={{ color, borderColor: color + '25' }}>
+      <div className="kpi-icon-wrap">
         {icon}
       </div>
       <div className="kpi-body">
         <div className="kpi-label">{label}</div>
-        <div className="kpi-value" style={{ color }}>{value}</div>
+        <div className="kpi-value" style={DANGER.has(color) ? { color: 'var(--danger)' } : undefined}>{value}</div>
       </div>
     </div>
   )
@@ -389,7 +391,7 @@ export default function ReportsPage() {
                       <tr key={emp.id}>
                         <td className="td-name">{emp.name}</td>
                         <td className="td-muted">{emp.role || '—'}</td>
-                        <td><span style={{ fontSize: 11, textTransform: 'capitalize', color: (emp.status||'active') === 'active' ? '#4ade80' : 'var(--muted)' }}>{emp.status || 'active'}</span></td>
+                        <td><span style={{ fontSize: 11, textTransform: 'capitalize', color: (emp.status||'active') === 'active' ? '#059669' : 'var(--muted)' }}>{emp.status || 'active'}</span></td>
                         <td className="td-muted">{assigned.map(p => p.name).join(', ') || '—'}</td>
                         <td className="td-muted">{hoursThisMonth > 0 ? fmtHoursHM(hoursThisMonth) : '—'}</td>
                       </tr>
@@ -502,8 +504,8 @@ export default function ReportsPage() {
                             <td className="td-muted">{hours > 0 ? fmtHoursHM(hours) : '—'}</td>
                             <td className="td-muted">{empInvs.length}</td>
                             <td>
-                              {paidCount > 0 && <span style={{ color: '#4ade80', fontWeight: 600, fontSize: 12, marginRight: 8 }}>{paidCount} paid</span>}
-                              {pendingCount > 0 && <span style={{ color: '#f5b533', fontWeight: 600, fontSize: 12 }}>{pendingCount} pending</span>}
+                              {paidCount > 0 && <span style={{ color: '#059669', fontWeight: 600, fontSize: 12, marginRight: 8 }}>{paidCount} paid</span>}
+                              {pendingCount > 0 && <span style={{ color: '#a16207', fontWeight: 600, fontSize: 12 }}>{pendingCount} pending</span>}
                             </td>
                           </tr>
                         )
@@ -661,7 +663,7 @@ export default function ReportsPage() {
               return (
                 <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
                   <span style={{ fontSize: 13, fontWeight: 600 }}>{c.name}</span>
-                  <span style={{ fontSize: 12, color: days <= 14 ? '#f87171' : '#f5b533' }}>{days}d left</span>
+                  <span style={{ fontSize: 12, color: days <= 14 ? '#dc2626' : '#a16207' }}>{days}d left</span>
                 </div>
               )
             })}
@@ -718,13 +720,13 @@ export default function ReportsPage() {
             <div style={{
               height: '100%',
               width: `${Math.min((computed.totalBilled / settings.monthlyGoal) * 100, 100)}%`,
-              background: computed.totalBilled >= settings.monthlyGoal ? '#4ade80' : 'var(--gold)',
+              background: computed.totalBilled >= settings.monthlyGoal ? '#059669' : 'var(--gold)',
               borderRadius: 6,
               transition: 'width .4s ease',
             }} />
           </div>
           {computed.totalBilled >= settings.monthlyGoal && (
-            <div style={{ fontSize: 12, color: '#4ade80', marginTop: 6 }}>Goal reached!</div>
+            <div style={{ fontSize: 12, color: '#059669', marginTop: 6 }}>Goal reached!</div>
           )}
         </div>
       )}
@@ -746,14 +748,14 @@ export default function ReportsPage() {
             )}
             <KpiCard icon={<IconClock size={20} />} value={fmtHoursHM(computed.totalHours)} label="Total Hours" color="#2563eb" onClick={() => setKpiDrill('hours')} />
             {can.viewOwnerStats(role) && (
-              <KpiCard icon={<IconUsers size={20} />} value={formatMoney(computed.totalPayroll)} label="Est. Payroll" color="#dc2626" onClick={() => setKpiDrill('payroll')} />
+              <KpiCard icon={<IconUsers size={20} />} value={formatMoney(computed.totalPayroll)} label="Est. Payroll" color="var(--text)" onClick={() => setKpiDrill('payroll')} />
             )}
             <KpiCard icon={<IconPieChart size={20} />} value={formatMoney(totalExpenses)} label="Business Expenses" color="#d97706" onClick={() => setKpiDrill('expenses')} />
             {can.viewOwnerStats(role) && (
               <KpiCard icon={<IconTrendUp size={20} />} value={formatMoney(netAfterExpenses)} label="Net Earnings" color={netAfterExpenses >= 0 ? '#059669' : '#dc2626'} onClick={() => setKpiDrill('net')} />
             )}
             <KpiCard icon={<IconCheck size={20} />} value={computed.paidCount} label="Paid" color="#059669" onClick={() => setKpiDrill('paid')} />
-            <KpiCard icon={<IconAlert size={20} />} value={computed.unpaidCount} label="Unpaid" color="#dc2626" onClick={() => setKpiDrill('unpaid')} />
+            <KpiCard icon={<IconAlert size={20} />} value={computed.unpaidCount} label="Unpaid" color={computed.unpaidCount > 0 ? '#dc2626' : 'var(--text)'} onClick={() => setKpiDrill('unpaid')} />
             <KpiCard icon={<IconAward size={20} />} value={topClient?.name || '—'} label="Top Client" color="var(--text)" onClick={() => setKpiDrill('topClient')} />
             <KpiCard icon={<IconBuilding size={20} />} value={store.clients.length} label="Clients" color="#2563eb" onClick={() => setKpiDrill('clients')} />
             <KpiCard icon={<IconUsers size={20} />} value={store.employees.length} label="Team" color="#7c3aed" onClick={() => setKpiDrill('team')} />
@@ -898,9 +900,9 @@ export default function ReportsPage() {
                     <td className="td-name">{e.name}</td>
                     <td className="td-muted">{fmtHoursHM(e.hours)}</td>
                     <td style={{ color: 'var(--gold)', fontWeight: 700 }}>{formatMoney(e.billed)}</td>
-                    {can.viewOwnerStats(role) && <td style={{ color: '#f87171' }}>{e.payroll > 0 ? formatMoney(e.payroll) : <span className="td-muted">—</span>}</td>}
+                    {can.viewOwnerStats(role) && <td style={{ color: '#dc2626' }}>{e.payroll > 0 ? formatMoney(e.payroll) : <span className="td-muted">—</span>}</td>}
                     {can.viewOwnerStats(role) && (
-                      <td style={{ color: e.margin >= 0 ? '#4ade80' : '#f87171', fontWeight: 600 }}>
+                      <td style={{ color: e.margin >= 0 ? '#059669' : '#dc2626', fontWeight: 600 }}>
                         {e.payroll > 0 ? formatMoney(e.margin) : <span className="td-muted">—</span>}
                       </td>
                     )}
@@ -982,7 +984,7 @@ export default function ReportsPage() {
           return s !== 'paid' && s !== 'draft'
         })
         const buckets = [
-          { label: '0–30 days',  min: 0,  max: 30,  color: '#f5b533', invoices: [] as typeof unpaid },
+          { label: '0–30 days',  min: 0,  max: 30,  color: '#a16207', invoices: [] as typeof unpaid },
           { label: '31–60 days', min: 31, max: 60,  color: '#f97316', invoices: [] as typeof unpaid },
           { label: '61–90 days', min: 61, max: 90,  color: '#ef4444', invoices: [] as typeof unpaid },
           { label: '90+ days',   min: 91, max: 9999, color: '#7f1d1d', invoices: [] as typeof unpaid },
@@ -1017,7 +1019,7 @@ export default function ReportsPage() {
                     const ref = inv.dueDate || inv.date || ''; const d = new Date(ref); d.setHours(0,0,0,0)
                     const age = ref ? Math.floor((today.getTime()-d.getTime())/86400000) : 0
                     const balance = (Number(inv.subtotal)||0) - (Number(inv.amountPaid)||0)
-                    const ageColor = age > 90 ? '#7f1d1d' : age > 60 ? '#ef4444' : age > 30 ? '#f97316' : '#f5b533'
+                    const ageColor = age > 90 ? '#7f1d1d' : age > 60 ? '#ef4444' : age > 30 ? '#f97316' : '#a16207'
                     return (
                       <tr key={inv.id}>
                         <td className="td-name">{inv.number}</td>
@@ -1089,7 +1091,7 @@ export default function ReportsPage() {
                 })}
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '8px 0' }}>
                   <span style={{ color: 'var(--muted)' }}>Active projects</span>
-                  <span style={{ fontWeight: 700, color: '#60a5fa' }}>{activeProjects}</span>
+                  <span style={{ fontWeight: 700, color: '#2563eb' }}>{activeProjects}</span>
                 </div>
               </div>
             </div>

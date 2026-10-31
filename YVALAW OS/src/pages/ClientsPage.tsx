@@ -20,7 +20,7 @@ const STAGES: { key: ClientStage; label: string }[] = [
   { key: 'churned',  label: 'Churned' },
 ]
 
-const AVATAR_COLORS = ['#f5b533','#3b82f6','#22c55e','#a855f7','#14b8a6','#f97316','#ec4899']
+const AVATAR_COLORS = ['#a16207','#3b82f6','#22c55e','#a855f7','#14b8a6','#f97316','#ec4899']
 function avatarColor(name: string) {
   let h = 0
   for (const c of name) h = (h * 31 + c.charCodeAt(0)) % AVATAR_COLORS.length
@@ -33,7 +33,7 @@ function initials(name: string) {
 function stageColor(s?: string): string {
   switch ((s || 'lead').toLowerCase()) {
     case 'active':   return '#22c55e'
-    case 'prospect': return '#f5b533'
+    case 'prospect': return '#a16207'
     case 'paused':   return '#475569'
     case 'churned':  return '#ef4444'
     default:         return '#3b82f6'
@@ -279,7 +279,7 @@ export default function ClientsPage() {
                   {outstanding > 0 && (
                     <div className="stat-item">
                       <div className="stat-label">Outstanding</div>
-                      <div className="stat-value" style={{ color: '#f87171', fontSize: 13 }}>${outstanding.toFixed(2)}</div>
+                      <div className="stat-value" style={{ color: '#dc2626', fontSize: 13 }}>${outstanding.toFixed(2)}</div>
                     </div>
                   )}
                   {c.paymentTerms && (
@@ -299,7 +299,7 @@ export default function ClientsPage() {
                   const daysLeft = Math.ceil((new Date(c.contractEnd).getTime() - Date.now()) / 86400000)
                   if (daysLeft > 60) return null
                   return (
-                    <div style={{ fontSize: 11, color: daysLeft <= 0 ? '#ef4444' : daysLeft <= 30 ? '#f97316' : '#f5b533', marginTop: 4, fontWeight: 600 }}>
+                    <div style={{ fontSize: 11, color: daysLeft <= 0 ? '#ef4444' : daysLeft <= 30 ? '#f97316' : '#a16207', marginTop: 4, fontWeight: 600 }}>
                       {daysLeft <= 0 ? `Contract expired ${Math.abs(daysLeft)}d ago` : `Contract ends in ${daysLeft}d (${c.contractEnd})`}
                     </div>
                   )
@@ -322,7 +322,7 @@ export default function ClientsPage() {
                 <div className="card-footer">
                   <button className="btn-xs btn-ghost" onClick={ev => { ev.stopPropagation(); navigate('/clients/' + c.id) }}>View Profile</button>
                   {outstanding > 0 && c.email && (
-                    <button className="btn-xs btn-ghost" style={{ color: '#fb923c' }} onClick={ev => { ev.stopPropagation(); sendClientReminder(c) }}><IconMail size={12} /> Remind</button>
+                    <button className="btn-xs btn-ghost" style={{ color: '#ea580c' }} onClick={ev => { ev.stopPropagation(); sendClientReminder(c) }}><IconMail size={12} /> Remind</button>
                   )}
                   <button className="btn-xs btn-ghost" onClick={ev => { ev.stopPropagation(); openEdit(c) }}>Edit</button>
                   <button className="btn-xs btn-danger" onClick={ev => { ev.stopPropagation(); setConfirmDelete(c.id) }}>Remove</button>

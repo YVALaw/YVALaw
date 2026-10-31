@@ -391,16 +391,16 @@ export default function ProjectProfilePage() {
           {[
             { label: 'Total Billed', value: formatMoney(totalBilled), icon: <IconDollar size={18} />, color: 'var(--gold)' },
             { label: 'Budget', value: projectNN.budget ? formatMoney(projectNN.budget) : '—', icon: <IconWallet size={18} />, color: 'var(--text)' },
-            { label: 'Expenses', value: totalExpenses > 0 ? formatMoney(totalExpenses) : '$0', icon: <IconReceipt size={18} />, color: '#f87171' },
-            { label: 'Team Size', value: String(assignedEmps.length), icon: <IconUsers size={18} />, color: '#c084fc' },
+            { label: 'Expenses', value: totalExpenses > 0 ? formatMoney(totalExpenses) : '$0', icon: <IconReceipt size={18} />, color: '#dc2626' },
+            { label: 'Team Size', value: String(assignedEmps.length), icon: <IconUsers size={18} />, color: '#9333ea' },
           ].map(({ label, value, icon, color }) => (
             <div key={label} className="kpi-card-sm">
-              <div className="kpi-icon-wrap" style={{ color, borderColor: color + '25' }}>
+              <div className="kpi-icon-wrap">
                 {icon}
               </div>
               <div className="kpi-body">
                 <div className="kpi-label">{label}</div>
-                <div className="kpi-value" style={{ color }}>{value}</div>
+                <div className="kpi-value" style={['#dc2626', '#ef4444', 'var(--danger)'].includes(color) ? { color: 'var(--danger)' } : undefined}>{value}</div>
               </div>
             </div>
           ))}
@@ -606,7 +606,7 @@ export default function ProjectProfilePage() {
                           </div>
                         )}
                         {t.assigneeName && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{t.assigneeName}</div>}
-                        {t.dueDate && <div style={{ fontSize: 11, color: '#f5b533', marginTop: 2 }}>Due: {t.dueDate}</div>}
+                        {t.dueDate && <div style={{ fontSize: 11, color: '#a16207', marginTop: 2 }}>Due: {t.dueDate}</div>}
                         <button className="btn-icon btn-danger" style={{ fontSize: 10, padding: '1px 5px', marginTop: 4, opacity: .6 }} onClick={() => deleteTask(t.id)}><IconTrash size={10} /></button>
                       </div>
                     ))}
@@ -669,7 +669,7 @@ export default function ProjectProfilePage() {
                         <td className="td-name">{exp.description}</td>
                         <td className="td-muted">{exp.category || '—'}</td>
                         <td className="td-muted">{exp.date}</td>
-                        <td style={{ color: '#f87171', fontWeight: 700 }}>{formatMoney(exp.amount)}</td>
+                        <td style={{ color: '#dc2626', fontWeight: 700 }}>{formatMoney(exp.amount)}</td>
                         <td><button className="btn-icon btn-danger" style={{ fontSize: 11, padding: '2px 5px' }} onClick={() => deleteExpense(exp.id)}><IconTrash size={12} /></button></td>
                       </tr>
                     ))}

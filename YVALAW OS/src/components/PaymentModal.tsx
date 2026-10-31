@@ -312,7 +312,7 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
               Amount Due
             </div>
-            <div style={{ fontSize: 28, fontWeight: 900, color: '#f5b533', marginTop: 2 }}>
+            <div style={{ fontSize: 28, fontWeight: 900, color: '#a16207', marginTop: 2 }}>
               {fmtUSD(amountToPay)}
             </div>
           </div>
@@ -342,7 +342,7 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
           {/* Error (init failed) */}
           {step === 'error' && (
             <div style={{ textAlign: 'center', padding: '20px 0' }}>
-              <div style={{ fontSize: 32, marginBottom: 12, color: '#f5b533' }}><IconAlert size={32} /></div>
+              <div style={{ fontSize: 32, marginBottom: 12, color: '#a16207' }}><IconAlert size={32} /></div>
               <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', marginBottom: 8 }}>
                 Could not load payment form
               </div>
@@ -414,7 +414,7 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
                         display: 'flex', alignItems: 'center', gap: 12,
                         padding: '12px 14px', borderRadius: 10, cursor: 'pointer',
                         border: `1px solid ${selectedMethod === card.id ? 'var(--gold)' : 'var(--border)'}`,
-                        background: selectedMethod === card.id ? 'rgba(245,181,51,.06)' : 'var(--surf2)',
+                        background: selectedMethod === card.id ? 'rgba(161,98,7,.06)' : 'var(--surf2)',
                         transition: 'all 0.15s',
                       }}>
                         <input
@@ -441,7 +441,7 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
                       display: 'flex', alignItems: 'center', gap: 12,
                       padding: '12px 14px', borderRadius: 10, cursor: 'pointer',
                       border: `1px solid ${selectedMethod === 'new' ? 'var(--gold)' : 'var(--border)'}`,
-                      background: selectedMethod === 'new' ? 'rgba(245,181,51,.06)' : 'var(--surf2)',
+                      background: selectedMethod === 'new' ? 'rgba(161,98,7,.06)' : 'var(--surf2)',
                       transition: 'all 0.15s',
                     }}>
                       <input
@@ -526,8 +526,8 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
                 alignItems: 'flex-start',
                 padding: '12px 14px',
                 borderRadius: 10,
-                background: 'rgba(245,181,51,.06)',
-                border: '1px solid rgba(245,181,51,.24)',
+                background: 'rgba(161,98,7,.06)',
+                border: '1px solid rgba(161,98,7,.24)',
                 marginBottom: 16,
                 cursor: 'pointer',
               }}>

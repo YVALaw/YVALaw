@@ -11,7 +11,7 @@ const CATEGORY_META: Record<ClientDocument['category'], { label: string; color: 
   contract: { label: 'Contract',  color: '#3b82f6', bg: 'rgba(59,130,246,.1)',  icon: <IconClipboard size={16} /> },
   nda:      { label: 'NDA',       color: '#a855f7', bg: 'rgba(168,85,247,.1)',  icon: <IconLock size={16} /> },
   report:   { label: 'Report',    color: '#22c55e', bg: 'rgba(34,197,94,.1)',   icon: <IconBarChart size={16} /> },
-  invoice:  { label: 'Invoice',   color: '#f5b533', bg: 'rgba(245,181,51,.1)',  icon: <IconReceipt size={16} /> },
+  invoice:  { label: 'Invoice',   color: '#a16207', bg: 'rgba(161,98,7,.1)',  icon: <IconReceipt size={16} /> },
   other:    { label: 'Other',     color: '#94a3b8', bg: 'rgba(148,163,184,.1)', icon: <IconFile size={16} /> },
 }
 

@@ -39,7 +39,7 @@ function VideoPlayer({ url }: { url: string }) {
   )
 }
 
-const AVATAR_COLORS = ['#f5b533','#3b82f6','#22c55e','#a855f7','#14b8a6','#f97316','#ec4899']
+const AVATAR_COLORS = ['#a16207','#3b82f6','#22c55e','#a855f7','#14b8a6','#f97316','#ec4899']
 function avatarColor(name: string) {
   let h = 0
   for (const c of name) h = (h * 31 + c.charCodeAt(0)) % AVATAR_COLORS.length
@@ -419,7 +419,7 @@ export default function CandidateProfilePage() {
               ))}
             </div>
             {checkedTasks.size === ONBOARDING_TASKS.length && (
-              <div style={{ marginTop: 16, background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.2)', borderRadius: 8, padding: 12, textAlign: 'center', color: '#4ade80', fontWeight: 600 }}>
+              <div style={{ marginTop: 16, background: 'rgba(34,197,94,.1)', border: '1px solid rgba(34,197,94,.2)', borderRadius: 8, padding: 12, textAlign: 'center', color: '#059669', fontWeight: 600 }}>
                 All onboarding tasks complete!
               </div>
             )}

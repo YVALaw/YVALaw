@@ -33,7 +33,7 @@ function stageColor(s?: string): string {
     case 'hiring':    return '#f97316'
     case 'review':    return '#a855f7'
     case 'completed': return '#14b8a6'
-    case 'on-hold':   return '#f5b533'
+    case 'on-hold':   return '#a16207'
     default:          return '#3b82f6'
   }
 }
@@ -296,7 +296,7 @@ export default function ProjectsPage() {
                   {expTotal > 0 && (
                     <div className="stat-item">
                       <div className="stat-label">Expenses</div>
-                      <div className="stat-value" style={{ color: '#f87171' }}>{formatMoney(expTotal)}</div>
+                      <div className="stat-value" style={{ color: '#dc2626' }}>{formatMoney(expTotal)}</div>
                     </div>
                   )}
                   <div className="stat-item">
@@ -480,7 +480,7 @@ export default function ProjectsPage() {
                           return emp ? (
                             <span key={eid} style={{
                               display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12,
-                              background: 'rgba(245,181,51,.15)', border: '1px solid var(--gold)',
+                              background: 'rgba(161,98,7,.15)', border: '1px solid var(--gold)',
                               borderRadius: 6, padding: '3px 8px', color: 'var(--soft)',
                             }}>
                               {emp.name}
@@ -636,14 +636,14 @@ export default function ProjectsPage() {
                           <td>{ex.description}</td>
                           <td className="td-muted">{ex.category || '—'}</td>
                           <td className="td-muted">{ex.date}</td>
-                          <td className="td-muted">{ex.recurring ? <span style={{color:'#4ade80',fontSize:11,display:'inline-flex',alignItems:'center',gap:4}}><IconCheck size={10} /> Yes</span> : '—'}</td>
-                          <td style={{textAlign:'right',color:'#f87171',fontWeight:700}}>{formatMoney(ex.amount)}</td>
+                          <td className="td-muted">{ex.recurring ? <span style={{color:'#059669',fontSize:11,display:'inline-flex',alignItems:'center',gap:4}}><IconCheck size={10} /> Yes</span> : '—'}</td>
+                          <td style={{textAlign:'right',color:'#dc2626',fontWeight:700}}>{formatMoney(ex.amount)}</td>
                           <td><button className="btn-icon btn-danger" style={{fontSize:11,padding:'2px 6px'}} onClick={()=>deleteExpense(ex.id)}><IconTrash size={12} /></button></td>
                         </tr>
                       ))}
                       <tr>
                         <td colSpan={4} style={{fontWeight:700,textAlign:'right',paddingRight:8}}>Total</td>
-                        <td style={{textAlign:'right',color:'#f87171',fontWeight:800}}>{formatMoney(expenses.reduce((s,e)=>s+e.amount,0))}</td>
+                        <td style={{textAlign:'right',color:'#dc2626',fontWeight:800}}>{formatMoney(expenses.reduce((s,e)=>s+e.amount,0))}</td>
                         <td></td>
                       </tr>
                     </tbody>

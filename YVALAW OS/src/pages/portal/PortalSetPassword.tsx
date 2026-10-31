@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { IconCheck } from '../../components/Icon'
 
-/** First-login password screen — used by portal clients and invited employees */
-export default function PortalSetPassword({ title = 'Welcome to YVA Portal', next = '/portal/dashboard' }: { title?: string; next?: string }) {
+/** Password screen — first login (portal clients, invited employees) and "Forgot password" / new sign-in links */
+export default function PortalSetPassword({ title = 'Welcome to YVA Portal', next = '/portal/dashboard', subtitle = 'Set your password to activate your account' }: {
+  title?: string; next?: string; subtitle?: string
+}) {
   const navigate              = useNavigate()
   const [password, setPass]   = useState('')
   const [confirm,  setConf]   = useState('')
@@ -82,7 +84,7 @@ export default function PortalSetPassword({ title = 'Welcome to YVA Portal', nex
         <div style={{ textAlign: 'center', marginBottom: 36 }}>
           <div style={{
             width: 56, height: 56, borderRadius: 16,
-            background: 'var(--gold)',
+            background: 'var(--brand)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             margin: '0 auto 16px',
             boxShadow: '0 8px 32px rgba(250,204,21,0.3)',
@@ -93,7 +95,7 @@ export default function PortalSetPassword({ title = 'Welcome to YVA Portal', nex
             {title}
           </div>
           <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 5 }}>
-            Set your password to activate your account
+            {subtitle}
           </div>
         </div>
 
