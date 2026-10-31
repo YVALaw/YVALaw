@@ -857,6 +857,11 @@
                     time: new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })
                 });
                 await emailjs.send('service_e0rf9ot', 'template_2mbtvvn', { name, email, role });
+                // Also into YVA OS → Candidates (background; the email above is the main route)
+                try {
+                    fetch('/.netlify/functions/application-intake', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name, email, phone, country, role, languages, experience, linkedin, message }) }).catch(() => {});
+                } catch (e) { /* never break the form */ }
                 document.getElementById('apply-form-step').classList.add('hidden');
                 document.getElementById('apply-success-step').classList.remove('hidden');
                 gtag('event', 'application_submitted', { event_category: 'careers', event_label: role });

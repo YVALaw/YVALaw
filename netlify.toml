@@ -22,6 +22,10 @@
 [functions."payroll-reminder"]
   schedule = "7 13 * * 3"
 
+# YVA OS CRM: lead follow-ups due today, 8:17 am Dominican time
+[functions."crm-followups"]
+  schedule = "17 12 * * *"
+
 # Marketing-site blog: publishes scheduled posts (see the function for setup)
 [functions."publish-scheduled-posts"]
   schedule = "@hourly"

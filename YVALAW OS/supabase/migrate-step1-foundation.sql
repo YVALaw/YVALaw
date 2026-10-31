@@ -17,6 +17,8 @@
 
 CREATE SCHEMA IF NOT EXISTS private;
 GRANT USAGE ON SCHEMA private TO authenticated;
+-- server functions (service role) write tables whose triggers live in this schema
+GRANT USAGE ON SCHEMA private TO service_role;
 
 -- ── 1. Permissions ──────────────────────────────────────────────────────────
 

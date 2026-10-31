@@ -25,6 +25,7 @@ import EstimatesPage from './pages/EstimatesPage'
 import WeeklyClosePage from './pages/WeeklyClosePage'
 import PayrollPage from './pages/PayrollPage'
 import ApprovalsPage from './pages/ApprovalsPage'
+import LeadsPage from './pages/LeadsPage'
 import AnnouncementsPage from './pages/AnnouncementsPage'
 import TimeTrackingPage from './pages/TimeTrackingPage'
 import CalendarPage from './pages/CalendarPage'
@@ -213,6 +214,7 @@ function AuthenticatedRouter() {
         <Route path="/weekly-close"  element={<WeeklyClosePage />} />
         <Route path="/payroll"       element={<PayrollPage />} />
         <Route path="/approvals"     element={<ApprovalsPage />} />
+        <Route path="/leads"         element={<LeadsPage />} />
         <Route path="/announcements" element={<AnnouncementsPage />} />
         <Route path="/calendar"      element={<CalendarPage />} />
         <Route path="/requests"      element={<RequestsPage />} />

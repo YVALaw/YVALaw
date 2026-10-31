@@ -216,6 +216,13 @@ Groundwork for the YVA Time Windows desktop tracker (Electron, Phase 1). Plan de
 - **Phones (Step 8):** `.staff-tabs` bottom bar in `Shell` (≤768 px), safe-area padding, wrapping headers, invoice group headers; `InvoicePage` blocks the builder on phones with an explanation.
 - Tests: 35 SQL, 24 + 8 browser checks (16 staff pages at 390 px).
 
+### Step 9 — CRM ✅ built, not merged — run `supabase/migrate-step9-crm.sql`
+- **SQL:** `leads` (stage new/contacted/meeting/proposal/won/lost, owner_id, value_monthly, next_follow_up, utm, calendly_booked, client_id/project_id once won; RLS: staff with `leads.view_all` see all, others only their own; insert/update for `leads.manage` or the owner; only `leads.manage` deletes/reassigns — enforced by a SECURITY DEFINER BEFORE trigger; AFTER trigger notifies `leads.manage` of new leads and the owner when assigned), `lead_activities` (note/call/email/meeting/whatsapp/follow_up/system; visible with the lead), `contacts` (staff), `candidates.staff_request_id` (openings). Step 1 now also grants `USAGE ON SCHEMA private TO service_role` (server functions write tables with private triggers).
+- **Functions:** **`lead-intake`** (public POST from `assets/js/lead-send.js`: origin allow-list incl. deploy previews, honeypot `hp`, 6/10 min per IP, clipped fields, utm allow-list, same email within 30 min updates instead of duplicating; returns `{id, token}` — HMAC token lets the page report the Calendly booking `{kind:'calendly', id, token}`), **`application-intake`** (public POST from careers.html → `candidates` stage applied / source "Careers page", dedupe per day, falls back if optional columns are missing, notifies CEO/Admin/Recruiter `application_new`), **`crm-followups`** (cron `17 12 * * *` = 8:17 am DR: owners — or `leads.manage` for unowned leads — get "N follow-ups due today").
+- **Website:** `lead-send.js` calls lead-intake in the background (keepalive, never blocks; EmailJS/Netlify Forms routes unchanged) and listens for Calendly's `calendly.event_scheduled` message (origin-checked). `careers.html` posts to application-intake after the EmailJS sends.
+- **UI:** `pages/LeadsPage.tsx` (`/leads`, CRM menu for CEO/Admin/Lead Gen or lead permissions; kanban with drag and drop, lead modal with activity + follow-ups, Mark won → `convertLead` creates client + project + contact), `components/ClientContacts.tsx` (client profile), `utils/clientHealth.ts` + badge on client cards, `components/OpeningCandidates.tsx` (`OpeningPicker` on the candidate profile, list on Requests). `services/crm.ts`. Notification kind `application_new` added.
+- Tests: 26 SQL, 22 function, 16 browser + 7 website checks.
+
 ## Session Progress — Client Portal
 
 ### Completed This Session

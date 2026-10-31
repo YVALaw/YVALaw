@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { OpeningPicker } from '../components/OpeningCandidates'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { Attachment, Candidate, CandidateStage } from '../data/types'
 import { loadCandidates, saveCandidates } from '../services/storage'
@@ -439,6 +440,7 @@ export default function CandidateProfilePage() {
           </div>
         </div>
       )}
+      <div style={{ marginTop: 20 }}><OpeningPicker candidateId={candidateNN.id} /></div>
     </div>
   )
 }

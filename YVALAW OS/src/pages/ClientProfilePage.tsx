@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import ClientContacts from '../components/ClientContacts'
 import RecordHistory from '../components/RecordHistory'
 import { useNavigate, useParams } from 'react-router-dom'
 import type { ActivityLogEntry, Client, ClientDocument, CommEntryType, Contract, ContractStatus, Invoice, Project, PaymentAttempt } from '../data/types'
@@ -1220,6 +1221,7 @@ export default function ClientProfilePage() {
           </div>
         </div>
       )}
+      <div style={{ marginTop: 20 }}><ClientContacts clientId={clientNN.id} /></div>
       <RecordHistory table="clients" recordId={clientNN.id} />
     </div>
   )

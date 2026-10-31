@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
+import { clientHealth, HEALTH_BADGE } from '../utils/clientHealth'
+import { loadStaffRequests } from '../services/storage'
 import { useNavigate } from 'react-router-dom'
-import type { ActivityLogEntry, Client, Invoice, Project, Tag } from '../data/types'
+import type { ActivityLogEntry, Client, Invoice, Project, StaffRequest, Tag } from '../data/types'
 import { loadSnapshot, saveClients, loadActivityLog, saveActivityLog, loadSettings } from '../services/storage'
 import { sendEmail } from '../services/gmail'
 import { loadTags, saveTags } from '../services/tagStorage'
@@ -87,7 +89,12 @@ export default function ClientsPage() {
       setProjects(snap.projects)
     })
     loadTags().then(setAllTags)
+    // Client health badge inputs (Step 9)
+    void loadActivityLog().then(setHealthActivity)
+    void loadStaffRequests().then(setHealthRequests).catch(() => {})
   }, [])
+  const [healthActivity, setHealthActivity] = useState<ActivityLogEntry[]>([])
+  const [healthRequests, setHealthRequests] = useState<StaffRequest[]>([])
   const [view, setView]   = useState<ViewMode>('kanban')
   const [modal, setModal] = useState<null | 'add' | 'edit'>(null)
   const [form,  setForm]  = useState<FormData>(EMPTY)
@@ -265,7 +272,10 @@ export default function ClientsPage() {
                       <div className="card-sub">{c.email || 'No email'}</div>
                     </div>
                   </div>
-                  <span className={`badge ${stageBadge(c.status)}`}>{c.status || 'Lead'}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                    <span className={`badge ${stageBadge(c.status)}`}>{c.status || 'Lead'}</span>
+                    {String(c.status || '').toLowerCase() !== 'lead' && (() => { const h = clientHealth(c, invoices, healthActivity, healthRequests); return <span className={`badge ${HEALTH_BADGE[h.level]}`} title={h.reasons.join(' · ') || 'All good'}>{h.label}</span> })()}
+                  </div>
                 </div>
                 <div className="card-stats">
                   <div className="stat-item">

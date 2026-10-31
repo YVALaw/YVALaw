@@ -2187,3 +2187,18 @@ input, select, textarea { font-family: inherit; }
   .invoice-group-name { flex: 1 1 calc(100% - 30px); overflow-wrap: normal; word-break: normal; }
   .invoice-group-meta { flex: 1 1 100%; padding-left: 22px; }
 }
+
+/* ── Leads (Step 9) ── */
+.lead-board { display: grid; grid-template-columns: repeat(6, minmax(220px, 1fr)); gap: 12px; overflow-x: auto; padding-bottom: 8px; }
+.lead-col { background: var(--surf2); border: 1px solid var(--border); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px; min-height: 120px; }
+.lead-col-head { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; padding: 2px 4px 4px; }
+.lead-col-head span { color: var(--muted); font-size: 12px; }
+.lead-card { text-align: left; display: flex; flex-direction: column; gap: 3px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px; cursor: pointer; font: inherit; color: var(--text); }
+.lead-card:hover { border-color: var(--gold); }
+.lead-card strong { font-size: 14px; }
+.lead-card span { font-size: 12.5px; color: var(--text2); overflow-wrap: anywhere; }
+.lead-card .lead-meta { color: var(--muted); font-size: 11.5px; }
+.lead-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.lead-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.lead-form .lead-wide { grid-column: 1 / -1; }
+@media (max-width: 768px) { .lead-board { grid-template-columns: repeat(6, minmax(78vw, 1fr)); scroll-snap-type: x mandatory; } .lead-col { scroll-snap-align: start; } }
