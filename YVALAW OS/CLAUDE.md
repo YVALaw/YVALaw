@@ -3,6 +3,9 @@
 ## Project Location
 `C:\Users\cronu\Desktop\LegalWebs\YVALAW OS\`
 
+## Roadmap
+**`PLAN.md`** (agreed 2026-10-31, not built yet): automatic weekly close (tracked hours → one combined draft invoice per client), live employee earnings, Friday payroll in DOP, per-person bill/pay rates (from the old CRM YVALaw/YVA-OS), permissions + change history, Gmail sending, notifications (bell + email + phone), installable "YVA OS" phone app, My workspace redesign, CRM. Read it before starting any of that work — it lists every decision Hans made.
+
 ## Tech Stack
 - React 18 + TypeScript + Vite
 - React Router v6
