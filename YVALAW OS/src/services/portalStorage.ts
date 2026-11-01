@@ -423,25 +423,48 @@ export async function removePortalSavedCard(clientId: string): Promise<void> {
   if (!res.ok) throw new Error(data.error || 'Could not remove saved card.')
 }
 
-/** Submit a staff request from the client portal */
+/** Submit a staff request from the client portal.
+ *  `headcount` / `project_id` / `project_name` need supabase/migrate-redesign-portal.sql; until it has run,
+ *  the request is saved without them and they are written into the notes instead (nothing is lost). */
 export async function submitStaffRequest(params: {
   clientId: string
   clientName: string
   role: string
+  headcount?: number
   hoursPerWeek?: number
   startDate?: string
+  projectId?: string
+  projectName?: string
   notes?: string
 }): Promise<void> {
-  const { error } = await supabase.from('staff_requests').insert({
-    id:            crypto.randomUUID(),
-    client_id:     params.clientId,
-    client_name:   params.clientName,
-    type:          'additional',
-    role:          params.role || null,
+  const base = {
+    id:             crypto.randomUUID(),
+    client_id:      params.clientId,
+    client_name:    params.clientName,
+    type:           'additional',
+    role:           params.role || null,
     hours_per_week: params.hoursPerWeek || null,
-    start_date:    params.startDate || null,
-    notes:         params.notes || null,
-    status:        'pending',
+    start_date:     params.startDate || null,
+    notes:          params.notes || null,
+    status:         'pending',
+  }
+  const { error } = await supabase.from('staff_requests').insert({
+    ...base,
+    headcount:    params.headcount ?? 1,
+    project_id:   params.projectId || null,
+    project_name: params.projectName || null,
   })
-  if (error) throw new Error(error.message)
+  if (!error) return
+  // Database not updated yet (new columns missing): save without them, keep the details in the notes
+  const missingColumn = error.code === 'PGRST204' || error.code === '42703' || /column/i.test(error.message || '')
+  if (!missingColumn) throw new Error(error.message)
+  const extra = [
+    (params.headcount ?? 1) > 1 ? `People needed: ${params.headcount}` : '',
+    params.projectName ? `Project: ${params.projectName}` : '',
+  ].filter(Boolean).join(' · ')
+  const { error: retryErr } = await supabase.from('staff_requests').insert({
+    ...base,
+    notes: [extra, params.notes].filter(Boolean).join('\n') || null,
+  })
+  if (retryErr) throw new Error(retryErr.message)
 }

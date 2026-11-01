@@ -11,13 +11,13 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { IconRefresh } from '../components/Icon'
+import { createPortal } from 'react-dom'
 import { loadStripe } from '@stripe/stripe-js'
 import type { Stripe, StripeCardElement, StripeElements } from '@stripe/stripe-js'
 import { supabase } from '../lib/supabase'
 import type { Invoice } from '../data/types'
 import { savePortalAutoPaySettings } from '../services/portalStorage'
-import { IconX, IconAlert, IconCheck } from './Icon'
+import { Ic, P } from './Icon'
 
 // Initialise Stripe once at module level — not inside component
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string)
@@ -37,6 +37,8 @@ type Step = 'loading' | 'form' | 'success' | 'error'
 interface Props {
   invoice: Invoice
   clientId: string
+  /** Shown under the title ("$3,120.00 · Harbor Dental Group") */
+  clientName?: string
   onClose: () => void
   onSuccess: (paidAmount: number, options?: {
     autoPayEnabled?: boolean
@@ -65,22 +67,22 @@ function brandIcon(brand: string) {
 
 const CARD_STYLE = {
   base: {
-    color: '#0f172a',
-    fontFamily: 'Inter, system-ui, -apple-system, sans-serif',
-    fontSize: '14px',
+    color: '#111827',
+    fontFamily: 'Geist, system-ui, -apple-system, sans-serif',
+    fontSize: '15px',
     fontWeight: '500',
-    '::placeholder': { color: '#64748b' },
-    iconColor: '#64748b',
+    '::placeholder': { color: '#9ca3af' },
+    iconColor: '#6b7280',
   },
   invalid: {
-    color: '#ef4444',
-    iconColor: '#ef4444',
+    color: '#b91c1c',
+    iconColor: '#b91c1c',
   },
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: Props) {
+export default function PaymentModal({ invoice, clientId, clientName, onClose, onSuccess }: Props) {
   const amountToPay = (Number(invoice.subtotal) || 0) - (Number(invoice.amountPaid) || 0)
   const amountCents = Math.round(amountToPay * 100)
 
@@ -269,321 +271,127 @@ export default function PaymentModal({ invoice, clientId, onClose, onSuccess }: 
     }
   }
 
+  // Esc closes (not while a payment is being processed); the page behind doesn't scroll
+  const processingRef = useRef(isProcessing)
+  processingRef.current = isProcessing
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !processingRef.current) onClose() }
+    window.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
+  }, [onClose])
+
   // ── Render ───────────────────────────────────────────────────────────────────
 
-  return (
-    <div
-      className="modal-overlay"
-      onClick={isProcessing ? undefined : onClose}
-      style={{ zIndex: 300 }}
-    >
-      <div
-        className="modal"
-        onClick={e => e.stopPropagation()}
-        style={{ maxWidth: 460, width: '100%', padding: 0, overflow: 'hidden' }}
-      >
+  const sub = [fmtUSD(amountToPay), clientName || invoice.clientName].filter(Boolean).join(' · ')
 
-        {/* ── Header ────────────────────────────────────────────────────── */}
-        <div style={{
-          padding: '20px 24px', borderBottom: '1px solid var(--border)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          background: 'var(--surf2)',
-        }}>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--text)' }}>Pay Invoice</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{invoice.number}</div>
+  return createPortal(
+    <>
+      <div className="scrim por-scrim" onClick={isProcessing ? undefined : onClose} />
+      <div className="modal-x por-pay" role="dialog" aria-modal="true" aria-label={`Pay ${invoice.number}`}>
+        <div className="modal-x__head">
+          <div className="por-pay__titles">
+            <h2 className="modal-x__title por-pay__title">Pay <span className="mono">{invoice.number}</span></h2>
+            <div className="modal-x__sub por-pay__sub">{sub}</div>
           </div>
           {!isProcessing && (
-            <button
-              onClick={onClose}
-              className="modal-close btn-icon"
-              style={{ flexShrink: 0 }}
-            ><IconX size={14} /></button>
+            <button type="button" className="x-close" onClick={onClose} aria-label="Close"><Ic d={P.x} /></button>
           )}
         </div>
 
-        {/* ── Amount banner ─────────────────────────────────────────────── */}
-        <div style={{
-          padding: '16px 24px',
-          background: 'linear-gradient(135deg, #0f172a, #1e293b)',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        }}>
-          <div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Amount Due
-            </div>
-            <div style={{ fontSize: 28, fontWeight: 900, color: '#a16207', marginTop: 2 }}>
-              {fmtUSD(amountToPay)}
-            </div>
+        {/* Loading */}
+        {step === 'loading' && (
+          <div className="por-pay__state">
+            <span className="por-pay__spin"><Ic d={P.refresh} size={20} /></span>
+            <span className="muted">Preparing secure checkout…</span>
           </div>
-          <div style={{ textAlign: 'right' }}>
-            {invoice.projectName && (
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>{invoice.projectName}</div>
-            )}
-            {invoice.dueDate && (
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 3 }}>
-                Due {new Date(invoice.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-              </div>
-            )}
+        )}
+
+        {/* Error (init failed) */}
+        {step === 'error' && (
+          <div className="por-pay__state">
+            <span className="por-pay__icon por-pay__icon--err"><Ic d={P.alert} size={24} /></span>
+            <span className="por-pay__state-title">Could not load payment form</span>
+            <span className="t-danger">{errorMsg}</span>
+            <button type="button" className="btn btn--block por-btn-lg" onClick={onClose}>Close</button>
           </div>
-        </div>
+        )}
 
-        {/* ── Body ──────────────────────────────────────────────────────── */}
-        <div style={{ padding: '20px 24px' }}>
+        {/* Success */}
+        {step === 'success' && (
+          <div className="por-pay__state">
+            <span className="por-pay__icon por-pay__icon--ok"><Ic d={P.check} size={24} stroke={2.4} /></span>
+            <span className="por-pay__state-title">Payment received</span>
+            <span className="muted">{fmtUSD(paidAmount)} received. Invoice #{invoice.number} has been marked paid.</span>
+            {successNote && (
+              <div className={`banner ${successNote.startsWith('AutoPay') ? 'banner--success' : 'banner--warning'} por-pay__note`}>{successNote}</div>
+            )}
+            <button type="button" className="btn btn--primary btn--block por-btn-lg" onClick={onClose}>Done</button>
+          </div>
+        )}
 
-          {/* Loading */}
-          {step === 'loading' && (
-            <div style={{ textAlign: 'center', padding: '28px 0', color: 'var(--muted)', fontSize: 14 }}>
-              <div style={{ marginBottom: 10, opacity: 0.5 }}><IconRefresh size={20} /></div>
-              Preparing secure checkout…
-            </div>
-          )}
+        {/* Payment form — stays mounted while processing so the Card Element keeps its data */}
+        {step === 'form' && (
+          <>
+            <div className={`modal-x__body por-pay__body${isProcessing ? ' por-pay__body--busy' : ''}`}>
 
-          {/* Error (init failed) */}
-          {step === 'error' && (
-            <div style={{ textAlign: 'center', padding: '20px 0' }}>
-              <div style={{ fontSize: 32, marginBottom: 12, color: '#a16207' }}><IconAlert size={32} /></div>
-              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', marginBottom: 8 }}>
-                Could not load payment form
-              </div>
-              <div style={{ fontSize: 13, color: '#ef4444', marginBottom: 20 }}>{errorMsg}</div>
-              <button
-                className="btn-ghost btn-sm"
-                onClick={onClose}
-              >
-                Close
-              </button>
-            </div>
-          )}
-
-          {/* Success */}
-          {step === 'success' && (
-            <div style={{ textAlign: 'center', padding: '24px 0' }}>
-              <div style={{
-                width: 60, height: 60, borderRadius: '50%',
-                background: 'rgba(34,197,94,.15)', border: '2px solid rgba(34,197,94,.3)',
-                display: 'grid', placeItems: 'center', margin: '0 auto 16px',
-                fontSize: 28,
-              }}>
-                <IconCheck size={14} />
-              </div>
-              <div style={{ fontWeight: 800, fontSize: 18, color: 'var(--text)', marginBottom: 6 }}>
-                Payment Successful
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20 }}>
-                {fmtUSD(paidAmount)} received. Invoice #{invoice.number} has been marked paid.
-              </div>
-              {successNote && (
-                <div style={{
-                  fontSize: 12,
-                  color: successNote.startsWith('AutoPay') ? '#15803d' : '#f97316',
-                  background: successNote.startsWith('AutoPay') ? 'rgba(34,197,94,.08)' : 'rgba(249,115,22,.08)',
-                  border: `1px solid ${successNote.startsWith('AutoPay') ? 'rgba(34,197,94,.22)' : 'rgba(249,115,22,.22)'}`,
-                  borderRadius: 10,
-                  padding: '10px 12px',
-                  marginBottom: 18,
-                  lineHeight: 1.45,
-                }}>
-                  {successNote}
-                </div>
-              )}
-              <button
-                className="btn-primary"
-                onClick={onClose}
-                style={{ fontSize: 13 }}
-              >
-                Done
-              </button>
-            </div>
-          )}
-
-          {/* Payment form */}
-          {step === 'form' && (
-            <div style={{ opacity: isProcessing ? 0.6 : 1, pointerEvents: isProcessing ? 'none' : 'auto' }}>
-
-              {/* Saved cards */}
               {savedMethods.length > 0 && (
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 10 }}>
-                    PAYMENT METHOD
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {savedMethods.map(card => (
-                      <label key={card.id} style={{
-                        display: 'flex', alignItems: 'center', gap: 12,
-                        padding: '12px 14px', borderRadius: 10, cursor: 'pointer',
-                        border: `1px solid ${selectedMethod === card.id ? 'var(--gold)' : 'var(--border)'}`,
-                        background: selectedMethod === card.id ? 'rgba(161,98,7,.06)' : 'var(--surf2)',
-                        transition: 'all 0.15s',
-                      }}>
-                        <input
-                          type="radio"
-                          name="payment-method"
-                          value={card.id}
-                          checked={selectedMethod === card.id}
-                          onChange={() => setSelectedMethod(card.id)}
-                          style={{ accentColor: 'var(--gold)' }}
-                        />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>
-                            {brandIcon(card.brand)} •••• {card.last4}
-                          </div>
-                          <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-                            Expires {String(card.expMonth).padStart(2, '0')}/{String(card.expYear).slice(-2)}
-                          </div>
-                        </div>
-                      </label>
-                    ))}
-
-                    {/* New card option */}
-                    <label style={{
-                      display: 'flex', alignItems: 'center', gap: 12,
-                      padding: '12px 14px', borderRadius: 10, cursor: 'pointer',
-                      border: `1px solid ${selectedMethod === 'new' ? 'var(--gold)' : 'var(--border)'}`,
-                      background: selectedMethod === 'new' ? 'rgba(161,98,7,.06)' : 'var(--surf2)',
-                      transition: 'all 0.15s',
-                    }}>
-                      <input
-                        type="radio"
-                        name="payment-method"
-                        value="new"
-                        checked={selectedMethod === 'new'}
-                        onChange={() => setSelectedMethod('new')}
-                        style={{ accentColor: 'var(--gold)' }}
-                      />
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
-                        + Use a different card
-                      </div>
+                <div className="por-pay__methods" role="radiogroup" aria-label="Payment method">
+                  <span className="field__label">Payment method</span>
+                  {savedMethods.map(card => (
+                    <label key={card.id} className={`por-pay__method${selectedMethod === card.id ? ' por-pay__method--on' : ''}`}>
+                      <input type="radio" name="payment-method" value={card.id} checked={selectedMethod === card.id} onChange={() => setSelectedMethod(card.id)} />
+                      <span className="por-pay__method-text">
+                        <span className="por-pay__method-name">{brandIcon(card.brand)} •• {card.last4}</span>
+                        <span className="por-pay__method-exp">Expires {String(card.expMonth).padStart(2, '0')}/{String(card.expYear).slice(-2)}</span>
+                      </span>
                     </label>
-                  </div>
+                  ))}
+                  <label className={`por-pay__method${selectedMethod === 'new' ? ' por-pay__method--on' : ''}`}>
+                    <input type="radio" name="payment-method" value="new" checked={selectedMethod === 'new'} onChange={() => setSelectedMethod('new')} />
+                    <span className="por-pay__method-name">+ Use a different card</span>
+                  </label>
                 </div>
               )}
 
-              {/* Card Element (shown when "new card" selected) */}
               {selectedMethod === 'new' && (
-                <div style={{ marginBottom: 20 }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 10 }}>
-                    BILLING DETAILS
+                <>
+                  <label className="field">
+                    <span className="field__label">Name on card</span>
+                    <input className="input por-pay__input" value={billingName} onChange={e => setBillingName(e.target.value)} autoComplete="cc-name" />
+                  </label>
+                  <label className="field">
+                    <span className="field__label">ZIP / postal code</span>
+                    <input className="input por-pay__input" value={billingPostal} onChange={e => setBillingPostal(e.target.value)} autoComplete="postal-code" inputMode="text" />
+                  </label>
+                  <div className="field">
+                    <span className="field__label">Card</span>
+                    <div ref={cardMountRef} className="por-pay__card" data-testid="stripe-card" />
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 10, marginBottom: 16 }}>
-                    <input
-                      value={billingName}
-                      onChange={e => setBillingName(e.target.value)}
-                      placeholder="Cardholder name"
-                      style={billingInputStyle}
-                    />
-                    <input
-                      value={billingPostal}
-                      onChange={e => setBillingPostal(e.target.value)}
-                      placeholder="ZIP / postal code"
-                      style={billingInputStyle}
-                    />
-                  </div>
-                  {savedMethods.length === 0 && (
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)', marginBottom: 10 }}>
-                      CARD DETAILS
-                    </div>
-                  )}
-                  <div
-                    ref={cardMountRef}
-                    style={{
-                      padding: '13px 14px', borderRadius: 10,
-                      border: '1px solid #cbd5e1',
-                      background: '#ffffff',
-                      color: '#0f172a',
-                    }}
-                  />
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect width="11" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                    Card saved for future invoices · Secured by Stripe
-                  </div>
-                </div>
+                </>
               )}
 
-              {/* Payment error */}
-              {errorMsg && (
-                <div style={{
-                  marginBottom: 16, padding: '10px 14px',
-                  background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)',
-                  borderRadius: 8, fontSize: 13, color: '#ef4444',
-                }}>
-                  {errorMsg}
-                </div>
-              )}
-
-              {/* Processing spinner */}
-              {isProcessing && (
-                <div style={{ textAlign: 'center', marginBottom: 16, fontSize: 13, color: 'var(--muted)' }}>
-                  Processing payment…
-                </div>
-              )}
-
-              {/* AutoPay consent */}
-              <label style={{
-                display: 'flex',
-                gap: 10,
-                alignItems: 'flex-start',
-                padding: '12px 14px',
-                borderRadius: 10,
-                background: 'rgba(161,98,7,.06)',
-                border: '1px solid rgba(161,98,7,.24)',
-                marginBottom: 16,
-                cursor: 'pointer',
-              }}>
-                <input
-                  type="checkbox"
-                  checked={autoPayConsent}
-                  onChange={e => setAutoPayConsent(e.target.checked)}
-                  style={{ marginTop: 2, accentColor: 'var(--gold)' }}
-                />
-                <span>
-                  <span style={{ display: 'block', fontSize: 13, fontWeight: 800, color: 'var(--text)' }}>
-                    Authorize AutoPay for future invoices
-                  </span>
-                  <span style={{ display: 'block', marginTop: 3, fontSize: 11, lineHeight: 1.45, color: 'var(--muted)' }}>
-                    YVA may charge this saved card for future due invoices. You can turn AutoPay off from Billing.
-                  </span>
-                </span>
+              <label className="por-pay__consent">
+                <input type="checkbox" checked={autoPayConsent} onChange={e => setAutoPayConsent(e.target.checked)} />
+                <span className="check__box por-pay__box" aria-hidden>{autoPayConsent && <Ic d={P.check} size={12} stroke={3} />}</span>
+                <span>Save this card and turn on AutoPay. I authorize YVA Staffing to charge future invoices on their due date. You can turn AutoPay off from Billing.</span>
               </label>
 
-              {/* Pay button */}
-              <button
-                className="btn-primary"
-                onClick={() => void handlePay()}
-                disabled={isProcessing || !cardReady}
-                style={{ width: '100%', fontSize: 15, fontWeight: 800, padding: '13px', justifyContent: 'center' }}
-              >
-                {isProcessing
-                  ? 'Processing…'
-                  : !cardReady
-                    ? 'Loading card form…'
-                  : `Pay ${fmtUSD(amountToPay)}`
-                }
-              </button>
+              {errorMsg && <div className="banner banner--danger" role="alert">{errorMsg}</div>}
 
-              {/* Stripe branding */}
-              <div style={{ textAlign: 'center', marginTop: 14, fontSize: 11, color: 'rgba(148,163,184,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect width="11" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                Payments processed securely by Stripe
-              </div>
+              <span className="por-pay__secure"><Ic d={P.lock} size={12} />Payments processed securely by Stripe</span>
             </div>
-          )}
-
-        </div>
+            <div className="por-pay__foot">
+              <button type="button" className="btn por-btn-lg" onClick={onClose} disabled={isProcessing}>Cancel</button>
+              <button type="button" className="btn btn--primary por-btn-lg por-pay__go" onClick={() => void handlePay()} disabled={isProcessing || !cardReady}>
+                {isProcessing ? 'Processing…' : !cardReady ? 'Loading card form…' : `Pay ${fmtUSD(amountToPay)}`}
+              </button>
+            </div>
+          </>
+        )}
       </div>
-    </div>
+    </>,
+    document.body,
   )
-}
-
-const billingInputStyle: React.CSSProperties = {
-  width: '100%',
-  boxSizing: 'border-box',
-  padding: '10px 12px',
-  borderRadius: 8,
-  border: '1px solid #cbd5e1',
-  background: '#ffffff',
-  color: '#0f172a',
-  fontSize: 13,
-  outline: 'none',
 }

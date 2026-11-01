@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { IconCheck } from '../../components/Icon'
+import { Ic, P } from '../../components/Icon'
 
 /** Password screen — first login (portal clients, invited employees) and "Forgot password" / new sign-in links */
 export default function PortalSetPassword({ title = 'Welcome to YVA Portal', next = '/portal/dashboard', subtitle = 'Set your password to activate your account' }: {
@@ -19,6 +19,7 @@ export default function PortalSetPassword({ title = 'Welcome to YVA Portal', nex
   const hasNumber  = /[0-9]/.test(password)
   const strong     = hasLength && hasUpper && hasNumber
   const matches    = password === confirm && confirm.length > 0
+  const score      = [hasLength, hasUpper, hasNumber].filter(Boolean).length
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -43,153 +44,53 @@ export default function PortalSetPassword({ title = 'Welcome to YVA Portal', nex
     navigate(next, { replace: true })
   }
 
-  function strengthBar() {
-    const score = [hasLength, hasUpper, hasNumber].filter(Boolean).length
-    const colors = ['#ef4444', '#f97316', '#22c55e']
-    return (
-      <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-        {[0, 1, 2].map(i => (
-          <div key={i} style={{
-            flex: 1, height: 3, borderRadius: 999,
-            background: i < score ? colors[score - 1] : 'var(--border)',
-            transition: 'background .3s',
-          }} />
-        ))}
-      </div>
-    )
-  }
-
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'var(--bg)',
-      padding: '20px',
-      fontFamily: "'Inter', system-ui, sans-serif",
-    }}>
-      {/* Subtle gold glow */}
-      <div style={{ position: 'fixed', inset: 0, overflow: 'hidden', zIndex: 0, pointerEvents: 'none' }}>
-        <div style={{
-          position: 'absolute', top: '-20%', left: '50%', transform: 'translateX(-50%)',
-          width: 600, height: 600,
-          background: 'radial-gradient(ellipse, rgba(250,204,21,0.08) 0%, transparent 70%)',
-          borderRadius: '50%',
-        }} />
-      </div>
-
-      <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420 }}>
-        {/* Logo */}
-        <div style={{ textAlign: 'center', marginBottom: 36 }}>
-          <div style={{
-            width: 56, height: 56, borderRadius: 16,
-            background: 'var(--brand)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 16px',
-            boxShadow: '0 8px 32px rgba(250,204,21,0.3)',
-          }}>
-            <span style={{ fontSize: 22, fontWeight: 900, color: '#1b1e2b' }}>Y</span>
-          </div>
-          <div style={{ fontSize: 26, fontWeight: 900, color: 'var(--text)', letterSpacing: '-.02em' }}>
-            {title}
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 5 }}>
-            {subtitle}
-          </div>
+    <div className="por-auth">
+      <div className="por-auth__box">
+        <div className="por-auth__brand">
+          <img className="por-auth__logo" src={`${import.meta.env.BASE_URL}yva-logo.png`} alt="YVA" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+          <h1 className="por-auth__title">{title}</h1>
+          <p className="por-auth__sub">{subtitle}</p>
         </div>
 
-        {/* Card */}
-        <div style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 24,
-          padding: '36px 32px',
-          boxShadow: '0 24px 64px rgba(0,0,0,0.12)',
-        }}>
-          <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--text)', marginBottom: 6 }}>
-            Create your password
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 24 }}>
-            Choose a strong password you'll remember.
+        <form className="card por-auth__card" onSubmit={handleSubmit}>
+          <div className="por-auth__head">
+            <h2 className="por-card__title">Create your password</h2>
+            <p className="por-card__sub">Choose a strong password you&apos;ll remember.</p>
           </div>
 
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-            <div className="form-group">
-              <label className="form-label">New password</label>
-              <input
-                className="form-input"
-                type="password"
-                value={password}
-                onChange={e => setPass(e.target.value)}
-                placeholder="••••••••"
-                required
-                autoFocus
-              />
-              {password.length > 0 && (
-                <>
-                  {strengthBar()}
-                  <div style={{ display: 'flex', gap: 12, marginTop: 8, flexWrap: 'wrap' }}>
-                    {[
-                      { ok: hasLength, label: '8+ chars'      },
-                      { ok: hasUpper,  label: 'Uppercase'      },
-                      { ok: hasNumber, label: 'Number'         },
-                    ].map(({ ok, label }) => (
-                      <span key={label} style={{
-                        fontSize: 11, fontWeight: 600,
-                        color: ok ? '#15803d' : 'var(--muted)',
-                        display: 'flex', alignItems: 'center', gap: 4,
-                      }}>
-                        {ok ? <IconCheck size={12} /> : <span style={{ width: 12, height: 12, borderRadius: '50%', border: '1.5px solid currentColor', display: 'inline-block', verticalAlign: 'middle', opacity: .4 }} />} {label}
-                      </span>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Confirm password</label>
-              <input
-                className="form-input"
-                type="password"
-                value={confirm}
-                onChange={e => setConf(e.target.value)}
-                placeholder="••••••••"
-                required
-                style={{ borderColor: confirm.length > 0 ? (matches ? 'var(--success)' : '#ef4444') : undefined }}
-              />
-              {confirm.length > 0 && !matches && (
-                <div style={{ fontSize: 11, color: '#ef4444', marginTop: 4 }}>Passwords do not match</div>
-              )}
-              {matches && (
-                <div style={{ fontSize: 11, color: 'var(--success)', marginTop: 4, display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconCheck size={10} /> Passwords match</div>
-              )}
-            </div>
-
-            {error && (
-              <div style={{
-                background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)',
-                borderRadius: 12, padding: '10px 14px', fontSize: 13, color: '#ef4444',
-              }}>
-                {error}
-              </div>
+          <label className="field">
+            <span className="field__label">New password</span>
+            <input className="input por-input-lg" type="password" value={password} onChange={e => setPass(e.target.value)} placeholder="••••••••" autoComplete="new-password" required autoFocus />
+            {password.length > 0 && (
+              <>
+                <span className={`por-strength por-strength--${score}`} aria-hidden><i /><i /><i /></span>
+                <span className="por-rules">
+                  {[{ ok: hasLength, label: '8+ chars' }, { ok: hasUpper, label: 'Uppercase' }, { ok: hasNumber, label: 'Number' }].map(({ ok, label }) => (
+                    <span key={label} className={`por-rule${ok ? ' por-rule--ok' : ''}`}>
+                      {ok ? <Ic d={P.check} size={12} stroke={2.6} /> : <span className="por-rule__dot" />} {label}
+                    </span>
+                  ))}
+                </span>
+              </>
             )}
+          </label>
 
-            <button
-              className="btn-primary"
-              type="submit"
-              disabled={loading || !strong || !matches}
-              style={{ marginTop: 4, width: '100%', justifyContent: 'center', padding: '12px 20px', fontSize: 14, fontWeight: 800 }}
-            >
-              {loading ? 'Saving…' : 'Set password & continue'}
-            </button>
-          </form>
-        </div>
+          <label className="field">
+            <span className="field__label">Confirm password</span>
+            <input className={`input por-input-lg${confirm.length > 0 && !matches ? ' input--invalid' : ''}`} type="password" value={confirm} onChange={e => setConf(e.target.value)} placeholder="••••••••" autoComplete="new-password" required />
+            {confirm.length > 0 && !matches && <span className="field__error">Passwords do not match</span>}
+            {matches && <span className="field__hint t-success por-rule--ok"><Ic d={P.check} size={11} stroke={2.6} /> Passwords match</span>}
+          </label>
 
-        <div style={{ textAlign: 'center', marginTop: 20, fontSize: 12, color: 'var(--muted)' }}>
-          Questions? Contact your YVA account manager.
-        </div>
+          {error && <div className="banner banner--danger" role="alert">{error}</div>}
+
+          <button className="btn btn--primary btn--block por-btn-lg" type="submit" disabled={loading || !strong || !matches}>
+            {loading ? 'Saving…' : 'Set password & continue'}
+          </button>
+        </form>
+
+        <p className="por-auth__foot">Questions? Contact your YVA account manager.</p>
       </div>
     </div>
   )
