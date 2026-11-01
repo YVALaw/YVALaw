@@ -7,7 +7,8 @@ Everything in PLAN.md is built and tested on the branch `claude/charming-turing-
 
 ## 1. Run the database scripts (Supabase → SQL Editor)
 
-Open each file, paste it all, press **Run**. Each one ends with a small table — every row should say
+Open each file, paste it all, press **Run**. (If one stops with an error, send it to me; after a fix, run
+**all six again from the top** — they're safe to repeat.) Each one ends with a small table — every row should say
 `RLS on` / `yes`. They're safe to run again, and safe for the site that's live today.
 
 1. `supabase/migrate-step1-foundation.sql`
@@ -28,6 +29,9 @@ first. When you're happy, merge it.
 It stops clients from reading staff pay details through the portal. (Running it *before* the new
 version is live would make the old portal show no invoices — so wait until the merge has deployed.)
 If you ever re-run the YVA Time phase 2 script, run `migrate-step4-weekly-close.sql` again after it.
+
+**Netlify → Forms:** if you have an email notification on the `lead-backup` form, add one for the new
+`application-backup` form too (careers applications when EmailJS is blocked). They also land in YVA OS → Candidates.
 
 ## 3. Connect Gmail (for invoices, payslips and automatic emails)
 

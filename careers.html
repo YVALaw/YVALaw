@@ -94,8 +94,16 @@
         }
         .animate-float { animation: float 5s ease-in-out infinite; }
     </style>
+  <!-- CMS:email contact@yvastaffing.agency · the contact address on this page, set in /admin (Contact & Hours) -->
 </head>
 <body class="bg-white text-slate-900 overflow-x-hidden">
+    <!-- Netlify Forms: declares the "application-backup" form so Netlify accepts it. Never shown;
+         the application form posts here when EmailJS is blocked in the applicant's browser. -->
+    <form name="application-backup" data-netlify="true" hidden>
+        <input name="name"><input name="email"><input name="phone"><input name="country"><input name="role">
+        <input name="languages"><input name="experience"><input name="linkedin"><textarea name="message"></textarea>
+        <input name="sms_consent"><input name="error">
+    </form>
 
     <!-- Top Utility Bar -->
     <div class="bg-[#1b1e2b] text-white py-2 px-6 hidden lg:block border-b border-white/10">
@@ -109,7 +117,7 @@
                 </span>
             </div>
             <div class="flex gap-6">
-                <a href="mailto:careers@yvastaffing.agency" class="hover:text-yellow-400 transition-colors">careers@yvastaffing.agency</a>
+                <a href="mailto:contact@yvastaffing.agency" class="hover:text-yellow-400 transition-colors">contact@yvastaffing.agency</a>
                 <span class="text-yellow-400 font-black">Now Hiring</span>
             </div>
         </div>
@@ -176,8 +184,8 @@
             </button>
         </nav>
         <div class="px-6 py-6 border-t border-white/10">
-            <a href="mailto:careers@yvastaffing.agency" class="flex items-center gap-2 text-slate-400 text-xs font-bold hover:text-yellow-400 transition-colors mb-2">
-                <i data-lucide="mail" class="w-4 h-4"></i> careers@yvastaffing.agency
+            <a href="mailto:contact@yvastaffing.agency" class="flex items-center gap-2 text-slate-400 text-xs font-bold hover:text-yellow-400 transition-colors mb-2">
+                <i data-lucide="mail" class="w-4 h-4"></i> contact@yvastaffing.agency
             </a>
             <p class="text-slate-500 text-[11px] font-bold uppercase tracking-widest"><!-- CMS:hours -->Mon – Fri · 9am – 6pm EST<!-- /CMS:hours --></p>
         </div>
@@ -398,7 +406,7 @@
                         <a href="#" target="_blank" aria-label="X / Twitter" class="w-9 h-9 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-yellow-400 hover:text-[#1b1e2b] hover:border-yellow-400 transition-all">
                             <i data-lucide="twitter" class="w-4 h-4"></i>
                         </a>
-                        <a href="mailto:careers@yvastaffing.agency" aria-label="Email" class="w-9 h-9 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-yellow-400 hover:text-[#1b1e2b] hover:border-yellow-400 transition-all">
+                        <a href="mailto:contact@yvastaffing.agency" aria-label="Email" class="w-9 h-9 bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-yellow-400 hover:text-[#1b1e2b] hover:border-yellow-400 transition-all">
                             <i data-lucide="mail" class="w-4 h-4"></i>
                         </a>
                     </div>
@@ -430,9 +438,9 @@
                     <p class="text-white font-black text-xs uppercase tracking-widest mb-6">Get In Touch</p>
                     <ul class="space-y-4 mb-8">
                         <li>
-                            <a href="mailto:careers@yvastaffing.agency" class="flex items-start gap-3 text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors">
+                            <a href="mailto:contact@yvastaffing.agency" class="flex items-start gap-3 text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors">
                                 <i data-lucide="mail" class="w-4 h-4 mt-0.5 flex-shrink-0"></i>
-                                careers@yvastaffing.agency
+                                contact@yvastaffing.agency
                             </a>
                         </li>
                         <li>
@@ -846,27 +854,44 @@
             submitBtn.textContent = 'Sending...';
             submitBtn.disabled = true;
 
+            const fields = { name, email, phone, country, role, languages, experience, linkedin, message };
+            const time = new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' });
+            // 1. Save it in YVA OS → Candidates (works even when an ad blocker stops EmailJS)
+            let savedToOs = false;
+            try {
+                const ctrl = new AbortController();
+                const timer = setTimeout(() => ctrl.abort(), 10000);
+                const res = await fetch('/.netlify/functions/application-intake', { method: 'POST', signal: ctrl.signal,
+                    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields) });
+                clearTimeout(timer);
+                savedToOs = res.ok;
+            } catch (e) { /* try the email routes */ }
+            // 2. Email to YVA (EmailJS); if that fails, the Netlify Forms backup
+            let emailed = false;
             try {
                 await emailjs.send('service_e0rf9ot', 'template_5q01i8v', {
-                    name, email,
-                    phone: phone || 'Not provided',
-                    country, role, languages, experience,
-                    linkedin: linkedin || 'Not provided',
-                    message,
-                    sms_consent: smsConsent ? 'Yes' : 'No',
-                    time: new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })
+                    ...fields, phone: phone || 'Not provided', linkedin: linkedin || 'Not provided',
+                    sms_consent: smsConsent ? 'Yes' : 'No', time
                 });
-                await emailjs.send('service_e0rf9ot', 'template_2mbtvvn', { name, email, role });
-                // Also into YVA OS → Candidates (background; the email above is the main route)
+                emailed = true;
+            } catch (e) {
                 try {
-                    fetch('/.netlify/functions/application-intake', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name, email, phone, country, role, languages, experience, linkedin, message }) }).catch(() => {});
-                } catch (e) { /* never break the form */ }
+                    const res = await fetch('/', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: new URLSearchParams({ 'form-name': 'application-backup', ...fields, sms_consent: smsConsent ? 'Yes' : 'No', error: String((e && (e.text || e.message)) || e).slice(0, 300) }).toString() });
+                    emailed = res.ok;
+                    if (res.ok) gtag('event', 'application_backup_used', { event_category: 'careers', event_label: role });
+                } catch (e2) { /* nothing more to try */ }
+            }
+            try {
+                if (!savedToOs && !emailed) throw new Error('not delivered');
+                // 3. Confirmation email to the applicant — nice to have; its failure doesn't fail the application
+                try { await emailjs.send('service_e0rf9ot', 'template_2mbtvvn', { name, email, role }); } catch (e) { /* ignore */ }
                 document.getElementById('apply-form-step').classList.add('hidden');
                 document.getElementById('apply-success-step').classList.remove('hidden');
                 gtag('event', 'application_submitted', { event_category: 'careers', event_label: role });
             } catch (err) {
-                errorText.textContent = 'Something went wrong. Please email us directly at careers@yvastaffing.agency';
+                gtag('event', 'application_lost', { event_category: 'careers', event_label: role });
+                errorText.textContent = 'Something went wrong. Please email us directly at contact@yvastaffing.agency';
                 errorEl.classList.remove('hidden');
             } finally {
                 submitBtn.textContent = 'Submit Application';

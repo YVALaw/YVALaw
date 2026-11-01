@@ -261,6 +261,7 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 - Created `careers.html` — standalone careers page, globally open (not DR-only)
 - 7 open roles: Legal Intake Specialist, Legal Assistant, Demand Writer, Case Manager, Social Media Manager, Web Designer, Marketing Specialist
 - Application modal: pre-fills role from card clicked, collects name/email/phone/country/languages/experience/LinkedIn/message
+- Submit (2026-11-01): 1) saves to YVA OS → Candidates (`application-intake`), 2) EmailJS to YVA, or the **Netlify Forms `application-backup`** form (hidden form at the top of `careers.html` — keep its fields in sync) when EmailJS fails, 3) applicant confirmation (its failure is ignored). Success if any of 1/2 worked; GA `application_backup_used` / `application_lost`. The page shows **contact@yvastaffing.agency** (careers@ never existed) and follows /admin Contact & Hours via its `CMS:email` marker
 - EmailJS: separate account — service `service_e0rf9ot`, public key `3eYVQFnWUlAnJ1Ah0`
   - `template_5q01i8v` — application notification to YVA
   - `template_2mbtvvn` — auto-reply confirmation to applicant

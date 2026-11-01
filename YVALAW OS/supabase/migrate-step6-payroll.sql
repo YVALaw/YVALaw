@@ -209,7 +209,7 @@ BEGIN
     UPDATE public.payroll_adjustments SET status = 'applied', applied_at = now()
     WHERE run_id = l.run_id AND employee_id = l.employee_id AND status = 'pending';
     paid := paid + 1;
-    SELECT user_id INTO uid FROM public.employees WHERE id = l.employee_id;
+    SELECT CASE WHEN user_id::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN user_id::text::uuid END INTO uid FROM public.employees WHERE id::text = l.employee_id::text;
     PERFORM private.notify_user(uid, 'payslip_ready',
       'Your pay is ready — Tu pago está listo',
       l.label || ' · ' || to_char(l.period_start, 'Mon DD') || ' – ' || to_char(l.period_end, 'Mon DD') ||

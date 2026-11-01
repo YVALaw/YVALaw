@@ -74,7 +74,7 @@ BEGIN
   IF auth.uid() IS NOT NULL AND NOT private.has_permission('weekly_close.manage') THEN
     RAISE EXCEPTION 'Not allowed' USING ERRCODE = '42501';
   END IF;
-  SELECT * INTO c FROM public.clients WHERE id = p_client FOR UPDATE;
+  SELECT * INTO c FROM public.clients WHERE id::text = p_client::text FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'Client not found'; END IF;
 
   prefix := upper(nullif(trim(c.invoice_prefix), ''));
@@ -82,17 +82,17 @@ BEGIN
     base := upper(left(regexp_replace(coalesce(c.name, 'INV'), '[^A-Za-z0-9]', '', 'g'), 3));
     IF base = '' THEN base := 'INV'; END IF;
     prefix := base;
-    WHILE EXISTS (SELECT 1 FROM public.clients WHERE upper(invoice_prefix) = prefix AND id <> p_client) LOOP
+    WHILE EXISTS (SELECT 1 FROM public.clients WHERE upper(invoice_prefix) = prefix AND id::text <> p_client::text) LOOP
       n := n + 1; prefix := base || n;
     END LOOP;
-    UPDATE public.clients SET invoice_prefix = prefix WHERE id = p_client;
+    UPDATE public.clients SET invoice_prefix = prefix WHERE id::text = p_client::text;
   END IF;
 
   -- Never reuse a number already on an invoice (counters can drift)
   SELECT coalesce(max((regexp_match(number, '^' || prefix || '-(\d+)$'))[1]::integer), 0) INTO existing
   FROM public.invoices WHERE number ~ ('^' || prefix || '-\d+$');
   seq := greatest(coalesce(c.next_invoice_seq, 1), existing + 1);
-  UPDATE public.clients SET next_invoice_seq = seq + 1 WHERE id = p_client;
+  UPDATE public.clients SET next_invoice_seq = seq + 1 WHERE id::text = p_client::text;
   RETURN prefix || '-' || lpad(seq::text, 4, '0');
 END
 $$;
@@ -110,8 +110,8 @@ BEGIN
       FOR SELECT TO authenticated
       USING (
         private.is_portal_client()
-        AND (client_id = private.portal_client_id()
-             OR client_name = (SELECT name FROM public.clients WHERE id = private.portal_client_id() LIMIT 1))
+        AND (client_id::text = private.portal_client_id()::text
+             OR client_name = (SELECT name FROM public.clients WHERE id::text = private.portal_client_id()::text LIMIT 1))
         AND coalesce(status, 'draft') <> 'draft'
       );
   END IF;
@@ -139,8 +139,8 @@ AS $$
   WHERE coalesce(i.status, 'draft') <> 'draft'
     AND (
       (private.is_portal_client()
-       AND (i.client_id = private.portal_client_id()
-            OR i.client_name = (SELECT c.name FROM public.clients c WHERE c.id = private.portal_client_id() LIMIT 1)))
+       AND (i.client_id::text = private.portal_client_id()::text
+            OR i.client_name = (SELECT c.name FROM public.clients c WHERE c.id::text = private.portal_client_id()::text LIMIT 1)))
       OR (private.is_internal() AND p_client_name IS NOT NULL AND i.client_name = p_client_name)
     )
   ORDER BY i.date DESC NULLS LAST
@@ -192,7 +192,7 @@ DECLARE
   mins integer := round(abs(NEW.seconds_delta) / 60.0);
 BEGIN
   IF NEW.kind = 'defer_in' THEN RETURN NULL; END IF;     -- one notification per move
-  SELECT user_id INTO uid FROM public.employees WHERE id = NEW.employee_id;
+  SELECT CASE WHEN user_id::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN user_id::text::uuid END INTO uid FROM public.employees WHERE id::text = NEW.employee_id::text;
   PERFORM private.notify_user(uid, 'time_adjusted',
     CASE NEW.kind
       WHEN 'defer_out' THEN 'YVA moved ' || (mins / 60) || 'h ' || lpad((mins % 60)::text, 2, '0') || 'm to next week'
@@ -375,7 +375,7 @@ DECLARE
   new_status text;
 BEGIN
   IF inv_id IS NULL OR delta = 0 THEN RETURN; END IF;
-  SELECT id, status, subtotal, amount_paid, status_history INTO inv FROM public.invoices WHERE id = inv_id FOR UPDATE;
+  SELECT id, status, subtotal, amount_paid, status_history INTO inv FROM public.invoices WHERE id::text = inv_id::text FOR UPDATE;
   IF NOT FOUND THEN RETURN; END IF;
   paid := greatest(0, round(coalesce(inv.amount_paid, 0) + delta, 2));
   new_status := CASE
@@ -389,7 +389,7 @@ BEGIN
       status_history = CASE WHEN new_status IS DISTINCT FROM inv.status
         THEN coalesce(inv.status_history, '[]'::jsonb) || jsonb_build_array(jsonb_build_object('status', new_status, 'changedAt', (extract(epoch FROM now()) * 1000)::bigint))
         ELSE inv.status_history END
-  WHERE id = inv_id;
+  WHERE id::text = inv_id::text;
 END
 $$;
 REVOKE ALL ON FUNCTION private.client_payment_adjust(uuid, numeric) FROM PUBLIC;

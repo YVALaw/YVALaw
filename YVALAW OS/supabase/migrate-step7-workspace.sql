@@ -69,7 +69,7 @@ DECLARE
   e record;
   span text := to_char(NEW.start_date, 'Mon DD') || CASE WHEN NEW.end_date <> NEW.start_date THEN ' – ' || to_char(NEW.end_date, 'Mon DD') ELSE '' END;
 BEGIN
-  SELECT name, user_id INTO e FROM public.employees WHERE id = NEW.employee_id;
+  SELECT name, CASE WHEN user_id::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN user_id::text::uuid END AS user_id INTO e FROM public.employees WHERE id::text = NEW.employee_id::text;
   IF TG_OP = 'INSERT' THEN
     PERFORM private.notify_permission('timeoff.approve', 'timeoff_request', coalesce(e.name, 'Someone') || ' asked for time off: ' || span,
       initcap(NEW.kind) || coalesce(' — ' || NEW.note, ''), '/approvals');
@@ -137,7 +137,7 @@ CREATE OR REPLACE FUNCTION private.current_employee_works_for()
 RETURNS text
 LANGUAGE sql SECURITY DEFINER STABLE
 SET search_path = public
-AS $$ SELECT coalesce(works_for, 'client') FROM public.employees WHERE user_id = auth.uid() LIMIT 1 $$;
+AS $$ SELECT coalesce(works_for, 'client') FROM public.employees WHERE user_id::text = auth.uid()::text LIMIT 1 $$;
 GRANT EXECUTE ON FUNCTION private.current_employee_works_for() TO authenticated;
 
 DROP POLICY IF EXISTS "announcements_read"   ON public.announcements;
@@ -166,9 +166,9 @@ AS $$
 BEGIN
   IF NEW.published_at IS NOT NULL AND (TG_OP = 'INSERT' OR OLD.published_at IS NULL) THEN
     INSERT INTO public.notifications (user_id, kind, title, body, link)
-    SELECT e.user_id, 'announcement', left(NEW.title, 200), left(NEW.body, 300), '/me?s=company'
+    SELECT e.user_id::uuid, 'announcement', left(NEW.title, 200), left(NEW.body, 300), '/me?s=company'
     FROM public.employees e
-    WHERE e.user_id IS NOT NULL AND coalesce(lower(e.status), '') NOT IN ('inactive', 'terminated')
+    WHERE e.user_id::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' AND coalesce(lower(e.status), '') NOT IN ('inactive', 'terminated')
       AND (NEW.audience = 'all' OR coalesce(e.works_for, 'client') = NEW.audience);
   END IF;
   RETURN NULL;

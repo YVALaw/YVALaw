@@ -188,7 +188,7 @@ BEGIN
       FOR SELECT TO authenticated
       USING (
         private.is_portal_client()
-        AND client_name = (SELECT name FROM public.clients WHERE id = private.portal_client_id() LIMIT 1)
+        AND client_name = (SELECT name FROM public.clients WHERE id::text = private.portal_client_id()::text LIMIT 1)
         AND coalesce(status, 'draft') <> 'draft'
       );
   END IF;
