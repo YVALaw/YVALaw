@@ -226,10 +226,10 @@ export default function IntegrationsTab({ clientId, onClientId, saveClientId, gm
       </section>
 
       {/* ── Crisp ── */}
-      <section className={`set-int${crispOn ? '' : ' set-int--soon'}`} aria-label="Crisp chat">
+      <section className="set-int" aria-label="Crisp chat">
         <div className="set-int__head">
           <span className="set-int__name"><Ic d={P.message} /> Crisp chat</span>
-          {crisp.loading ? <Status tone="off">Checking…</Status> : crispOn ? <Status tone="ok">Connected</Status> : <Status tone="soon">Not set up</Status>}
+          {crisp.loading ? <Status tone="off">Checking…</Status> : crispOn ? <Status tone="ok">Connected</Status> : <Status tone="off">Not set up</Status>}
         </div>
         <span className="set-int__desc">Live chat on the Messages tab of the client portal. Replies come from your Crisp inbox.</span>
         {crispOn && (
