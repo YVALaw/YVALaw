@@ -18,7 +18,8 @@ const ICON: Record<Section, (p: { size?: number }) => JSX.Element> = {
 const PHONE_TABS: Section[] = ['home', 'time', 'pay', 'requests']
 
 /** My workspace — the only area an invited employee can open (PLAN.md Step 7: Spanish / English, phone-first) */
-export default function EmployeeWorkspace() {
+/** staffView: a staff member opened their own workspace from the OS account menu (gold banner + back link) */
+export default function EmployeeWorkspace({ staffView = false }: { staffView?: boolean } = {}) {
   const [lang, setLang] = useMeLang()
   const t = DICT[lang]
   const [params, setParams] = useSearchParams()
@@ -54,6 +55,7 @@ export default function EmployeeWorkspace() {
 
   return (
     <div className="me-shell">
+      {staffView && employee && <div className="banner banner--gold" style={{ borderRadius: 0, justifyContent: 'center' }}>Viewing {employee.name}'s workspace as staff · <a href={`${import.meta.env.BASE_URL}`} style={{ color: 'inherit', textDecoration: 'underline', marginLeft: 6 }}>Back to YVA OS</a></div>}
       <aside className="me-side">
         <div className="me-brand"><img src={`${import.meta.env.BASE_URL}icons/icon-192.png`} alt="" /><div><strong>YVA OS</strong><span>{t.workspace}</span></div></div>
         <nav>{sections.map(s => { const I = ICON[s]; return <button key={s} className={section === s ? 'active' : ''} onClick={() => go(s)}><I size={17} />{t.nav[s]}</button> })}</nav>

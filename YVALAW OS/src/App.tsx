@@ -194,11 +194,15 @@ function AuthenticatedRouter() {
     )
   }
 
+  // ── Staff viewing their own employee workspace (account menu → Open employee workspace) ──
+  if (location.pathname === '/me' && sessionStorage.getItem('linkedEmployeeId')) return <EmployeeWorkspace staffView />
+
   // ── Internal OS ────────────────────────────────────────────────────────────
   return (
     <Shell>
       <Routes>
         <Route path="/" element={<ReportsPage />} />
+        <Route path="/reports"       element={<RoleGuard allow={can.viewReports}><ReportsPage /></RoleGuard>} />
         <Route path="/invoice"       element={<RoleGuard allow={can.viewInvoices}><InvoicePage /></RoleGuard>} />
         <Route path="/employees"     element={<RoleGuard allow={can.viewEmployees}><EmployeesPage /></RoleGuard>} />
         <Route path="/employees/:id" element={<RoleGuard allow={can.viewEmployees}><EmployeeProfilePage /></RoleGuard>} />
