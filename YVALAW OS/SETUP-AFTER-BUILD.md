@@ -46,6 +46,15 @@ Same way as step 1, in this order (each is safe to run again):
 copy the **Website ID** → YVA OS → Settings → **Integrations** → Crisp → paste → Save. Clients then chat with
 you from the portal; you answer in the Crisp app or website.
 
+## 2c. Move the old CRM's data in (one time, November 2026)
+
+1. YVA OS → Settings → Data → **Export JSON** (a copy of the test data, just in case).
+2. Supabase → SQL Editor → paste and run `supabase/start-fresh-DELETES-ALL-DATA.sql`. It empties everything except
+   your CEO login, settings and permissions. Sign out of YVA OS and back in afterwards.
+3. YVA OS → Settings → Data → **Import from old CRM** → choose the old CRM's backup file → read the preview → **Import**
+   (leave "Copy résumé/video files" ticked). Wait for "Everything is in YVA OS" → **Done — reload YVA OS**.
+4. Optional: Supabase → Storage → empty the `screenshots` bucket (old test screenshots).
+
 ## 3. Connect Gmail (for invoices, payslips and automatic emails)
 
 1. Google Cloud Console → your OAuth client (Web application) → **Authorized redirect URIs** → add

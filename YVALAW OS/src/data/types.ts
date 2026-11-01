@@ -112,6 +112,9 @@ export type InvoiceItem = {
   basePayRate?: number
   premiumPercent?: number
   totalPay?: number
+  /** What the line bills, night premium included (hours lines). When present, it is the line's amount — hours × rate
+   *  alone would leave the premium out. Set by the invoice builder and the old-CRM import. */
+  billAmount?: number
   daily?: Record<string, string>
 }
 

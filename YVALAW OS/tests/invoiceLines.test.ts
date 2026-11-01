@@ -51,3 +51,9 @@ test('hours and payroll sums skip item lines', () => {
   const pay = mixed.reduce((s, it) => s + payrollFromInvoiceItem(it, ana).totalPay, 0)
   assert.equal(Math.round(pay * 100) / 100, 36.67 + 50)
 })
+
+test('hours lines with a stored bill amount (night premium) use it as the line amount', () => {
+  const it = { employeeName: 'Frankely', hoursTotal: 39.85, rate: 4.5, regularHours: 28.464, premiumHours: 11.386, premiumPercent: 15, billAmount: 187.01 }
+  assert.equal(lineAmount(it), 187.01)
+  assert.equal(lineAmount({ employeeName: 'A', hoursTotal: 10, rate: 5 }), 50)
+})

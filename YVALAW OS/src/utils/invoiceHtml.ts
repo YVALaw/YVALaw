@@ -122,7 +122,7 @@ export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): s
         '</td>' + dayCells +
         '<td style="text-align:right;font-weight:700;white-space:nowrap">' + fmtHours(it.hoursTotal) + '</td>' +
         '<td style="text-align:right;white-space:nowrap">$' + esc(it.rate) + '/hr</td>' +
-        '<td style="text-align:right;font-weight:700;white-space:nowrap">$' + (it.hoursTotal * it.rate).toFixed(2) + '</td></tr>'
+        '<td style="text-align:right;font-weight:700;white-space:nowrap">$' + lineAmount(it).toFixed(2) + '</td></tr>'
     }).join('')
     const colSpan = allDates.length + 3
     itemsSection = `
@@ -141,7 +141,7 @@ export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): s
       (it.position ? '<br><span style="font-size:11px;color:#888">' + esc(it.position) + '</span>' : '') +
       '</td><td style="text-align:right">' + fmtHours(it.hoursTotal) + '</td>' +
       '<td style="text-align:right">$' + esc(it.rate) + '/hr</td>' +
-      '<td style="text-align:right"><strong>$' + (it.hoursTotal * it.rate).toFixed(2) + '</strong></td></tr>'
+      '<td style="text-align:right"><strong>$' + lineAmount(it).toFixed(2) + '</strong></td></tr>'
     ).join('')
     itemsSection = `
     <table>

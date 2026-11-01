@@ -17,9 +17,12 @@ export function hourLines<T extends Pick<InvoiceItem, 'kind'>>(items: T[] | null
   return Array.isArray(items) ? items.filter(it => !isItemLine(it)) : []
 }
 
-/** What one line bills: qty × price for item lines, hours × rate for hours lines */
+/** What one line bills: qty × price for item lines; for hours lines the stored bill amount (night premium included)
+ *  when there is one, else hours × rate */
 export function lineAmount(it: InvoiceItem): number {
-  return isItemLine(it) ? num(it.qty) * num(it.rate) : num(it.hoursTotal) * num(it.rate)
+  if (isItemLine(it)) return num(it.qty) * num(it.rate)
+  if (it.billAmount != null && Number.isFinite(Number(it.billAmount))) return Number(it.billAmount)
+  return num(it.hoursTotal) * num(it.rate)
 }
 
 /** Σ of item lines only (qty × price), to the cent */
