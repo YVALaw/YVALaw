@@ -104,6 +104,9 @@ button.kpi-cell:hover { background: var(--surface-2); }
 .kpi-cell__value { font-size: 26px; font-weight: 600; letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--text); line-height: 1.15; }
 .kpi-cell__note { font-size: 12.5px; color: var(--muted); }
 .kpi-strip--compact .kpi-cell__value { font-size: 22px; }
+.kpi-cell__note.t-danger { color: var(--danger-text); }
+.kpi-cell__note.t-warning { color: var(--warning-text); }
+.kpi-cell__note.t-success { color: var(--success-text); }
 @media (max-width: 899px) {
   .kpi-strip { display: flex; gap: 10px; overflow-x: auto; margin: 0 -16px; padding: 0 16px 4px; background: transparent; border: 0; border-radius: 0; scroll-snap-type: x mandatory; }
   .kpi-cell { flex: 0 0 152px; scroll-snap-align: start; border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; gap: 4px; box-shadow: none; }
