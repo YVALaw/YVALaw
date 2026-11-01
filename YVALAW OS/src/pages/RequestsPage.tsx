@@ -7,6 +7,8 @@ import { Banner, PageHeader, Pill, Skel, Tabs, type Tone } from '../components/u
 import { dateMed, dateShort } from '../utils/format'
 
 type Filter = 'all' | StaffRequest['status']
+/** Portal redesign columns (migrate-redesign-portal.sql) — null/missing on older rows or before the migration */
+type Req = StaffRequest & { headcount?: number | null; projectId?: string | null; projectName?: string | null }
 
 const STATUS_META: Record<StaffRequest['status'], { label: string; tone: Tone }> = {
   pending:   { label: 'Pending',   tone: 'warning' },
@@ -30,7 +32,7 @@ const when = (ts?: number | string) => {
 /** CRM → Staff requests: sent by clients from their portal; status workflow + linked candidates (redesign 2026-11) */
 export default function RequestsPage() {
   const navigate = useNavigate()
-  const [requests, setRequests] = useState<StaffRequest[]>([])
+  const [requests, setRequests] = useState<Req[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<Filter>('all')
   const [updating, setUpdating] = useState<string | null>(null)
@@ -40,7 +42,7 @@ export default function RequestsPage() {
   useEffect(() => { void load() }, [])
   async function load() { setLoading(true); setRequests(await loadStaffRequests()); setLoading(false) }
 
-  async function changeStatus(req: StaffRequest, status: StaffRequest['status']) {
+  async function changeStatus(req: Req, status: StaffRequest['status']) {
     setUpdating(req.id); setError(null)
     try {
       await updateStaffRequestStatus(req.id, status)
@@ -88,8 +90,9 @@ export default function RequestsPage() {
                 </div>
                 <div className="crm-req__facts">
                   <div className="info"><span className="info__label">Role</span><span className="info__value crm-td-strong">{req.role || '—'}</span></div>
-                  <div className="info"><span className="info__label">Hours / week</span><span className="info__value crm-td-strong">{req.hoursPerWeek ? `${req.hoursPerWeek} h/wk` : '—'}</span></div>
+                  <div className="info"><span className="info__label">People · hours</span><span className="info__value crm-td-strong">{req.headcount ?? '—'} · {req.hoursPerWeek ? `${req.hoursPerWeek} h/wk` : '— h/wk'}</span></div>
                   <div className="info"><span className="info__label">Start</span><span className="info__value crm-td-strong">{req.startDate ? dateShort(req.startDate) : '—'}</span></div>
+                  {req.projectName && <div className="info"><span className="info__label">Project</span><span className="info__value crm-td-strong">{req.projectId ? <button type="button" className="link" onClick={() => navigate(`/projects/${req.projectId}`)}>{req.projectName}</button> : req.projectName}</span></div>}
                 </div>
                 {req.notes && <p className="crm-req__notes">{req.notes}</p>}
                 <div className="crm-req-cands"><OpeningCandidates requestId={req.id} /></div>

@@ -2,6 +2,8 @@
    Leads, Clients, Client profile, Estimates, Staff requests (+ components/crm/*, ClientContacts). */
 
 .crm-page { min-width: 0; }
+/* .sr-only headers are absolute: keep them inside the scrolling table, not the page */
+.crm-page .table-card, .crm-page .crm-scroll { position: relative; }
 .crm-td-strong { font-weight: 600; }
 .crm-td-2 { color: var(--text-2); }
 .crm-td-mono { font-size: 12.5px; white-space: nowrap; }
@@ -30,7 +32,7 @@
 .crm-skel__row:last-child { border-bottom: 0; }
 
 /* ── Kanban (leads + clients pipeline) ───────────────────────────── */
-.crm-board { grid-auto-columns: minmax(250px, 1fr); gap: 12px; overflow-y: hidden; align-items: stretch; }
+.crm-board { grid-auto-columns: minmax(210px, 1fr); gap: 12px; overflow-y: hidden; align-items: stretch; }
 .crm-board--clients { grid-auto-columns: minmax(230px, 1fr); }
 .crm-col { min-height: 420px; }
 .crm-board--clients .crm-col { min-height: 360px; }
@@ -200,7 +202,7 @@
 .crm-req__who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .crm-req__client { font-size: 16px; font-weight: 600; overflow-wrap: anywhere; }
 .crm-req__sub { font-size: 13px; color: var(--muted); }
-.crm-req__facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; background: var(--surface-2); border-radius: 10px; padding: 12px; }
+.crm-req__facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; background: var(--surface-2); border-radius: 10px; padding: 12px; }
 .crm-req__facts .info__label { font-size: 11.5px; }
 .crm-req__notes { margin: 0; font-size: 13.5px; color: var(--text-2); line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
 .crm-req__actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; border-top: 1px solid var(--row-line); padding-top: 12px; }
@@ -213,6 +215,5 @@
 .crm-req-cands .td-muted { color: var(--soft); }
 @media (max-width: 759px) {
   .crm-req { padding: 16px; }
-  .crm-req__facts { grid-template-columns: 1fr 1fr; }
   .crm-req__link { margin-left: 0; }
 }
