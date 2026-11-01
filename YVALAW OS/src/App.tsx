@@ -5,7 +5,7 @@ import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import { IconZap } from './components/Icon'
 import Shell from './components/Shell'
-import { lazyPage, preloadPages } from './lib/lazyPage'
+import { lazyPage, preloadPages, rarePage } from './lib/lazyPage'
 import ClientShell from './components/ClientShell'
 import LoginPage from './pages/LoginPage'
 import { afterLoginPath, rememberConnectReturn } from './lib/connectApp'
@@ -17,9 +17,9 @@ import { can, isStaff } from './lib/roles'
 
 // Each screen is its own download (smaller first load); all of them are fetched in the background
 // once the app is idle, so moving between pages stays instant. lib/lazyPage.ts
-const SignupPage = lazyPage(() => import('./pages/SignupPage'))
-const PortalPage = lazyPage(() => import('./pages/PortalPage'))
-const OAuthCallbackPage = lazyPage(() => import('./pages/OAuthCallbackPage'))
+const SignupPage = rarePage(() => import('./pages/SignupPage'))
+const PortalPage = rarePage(() => import('./pages/PortalPage'))
+const OAuthCallbackPage = rarePage(() => import('./pages/OAuthCallbackPage'))
 const ReportsPage = lazyPage(() => import('./pages/ReportsPage'))
 const HomePage = lazyPage(() => import('./pages/HomePage'))
 const InvoicePage = lazyPage(() => import('./pages/InvoicePage'))
@@ -49,9 +49,9 @@ const PortalDocuments = lazyPage(() => import('./pages/portal/PortalDocuments'))
 const PortalSettings = lazyPage(() => import('./pages/portal/PortalSettings'))
 const PortalMessages = lazyPage(() => import('./pages/portal/PortalMessages'))
 const RequestsPage = lazyPage(() => import('./pages/RequestsPage'))
-const PortalSetPassword = lazyPage(() => import('./pages/portal/PortalSetPassword'))
+const PortalSetPassword = rarePage(() => import('./pages/portal/PortalSetPassword'))
 const EmployeeWorkspace = lazyPage(() => import('./pages/me/EmployeeWorkspace'))
-const ConnectAppPage = lazyPage(() => import('./pages/ConnectAppPage'))
+const ConnectAppPage = rarePage(() => import('./pages/ConnectAppPage'))
 
 
 // ── Shared loading screen ────────────────────────────────────────────────────

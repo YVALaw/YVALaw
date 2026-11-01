@@ -256,7 +256,7 @@ export async function loadInvoiceCounter(): Promise<number> {
   return cachedRead('counter:invoice', async () => {
     const { data } = await supabase.from('counters').select('value').eq('key', 'invoice').single()
     return (data as { value: number } | null)?.value ?? 1
-  })
+  }, LIST_MS)
 }
 export async function saveInvoiceCounter(n: number): Promise<void> {
   const { error } = await supabase.from('counters').update({ value: n }).eq('key', 'invoice')
@@ -371,7 +371,7 @@ export function invalidateSnapshotCache() { clearReadCache() }
 /** After sign-in (once the first page has loaded): fetch the main lists in the background so the next pages open
  *  instantly. They're kept a minute (lib/readCache.ts); a failure here is ignored — the page loads it again. */
 export async function warmUpLists(): Promise<void> {
-  await Promise.allSettled([loadSnapshot(), loadSettings(), loadCandidates(), loadEstimates()])
+  await Promise.allSettled([loadSnapshot(), loadSettings(), loadCandidates(), loadEstimates(), loadActivityLog(), loadStaffRequests(), import('./tagStorage').then(m => m.loadTags())])
 }
 
 // ─── Snapshot (loads all core data in parallel) ───────────────────────────────
@@ -486,6 +486,9 @@ export async function removeClientDocument(id: string): Promise<void> {
 // ─── Staff Requests ───────────────────────────────────────────────────────────
 
 export async function loadStaffRequests(): Promise<StaffRequest[]> {
+  return cachedRead('staff_requests', loadStaffRequestsNow, LIST_MS)
+}
+async function loadStaffRequestsNow(): Promise<StaffRequest[]> {
   const { data, error } = await supabase
     .from('staff_requests')
     .select('*')

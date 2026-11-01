@@ -61,3 +61,17 @@ test('a failed read is not kept', async () => {
   await assert.rejects(cachedRead('t6', async () => { n++; throw new Error('offline') }))
   assert.deepEqual(await cachedRead('t6', async () => { n++; return [n] }), [2])
 })
+
+test('read-only database functions keep the shared copy; other function calls clear it', async () => {
+  clearReadCache()
+  const c = counter()
+  await cachedRead('t7', c.load)
+  const orig = globalThis.fetch
+  globalThis.fetch = (async () => new Response('[]')) as typeof fetch
+  try {
+    await writeAwareFetch('https://x.supabase.co/rest/v1/rpc/placement_bill_rates', { method: 'POST', body: '{}' })
+    assert.deepEqual(await cachedRead('t7', c.load), [1])
+    await writeAwareFetch('https://x.supabase.co/rest/v1/rpc/payroll_mark_paid', { method: 'POST', body: '{}' })
+    assert.deepEqual(await cachedRead('t7', c.load), [2])
+  } finally { globalThis.fetch = orig }
+})
