@@ -2,8 +2,11 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { GRANTABLE_ROLES, PERMISSIONS } from '../lib/permissions'
 import { ROLE_LABELS } from '../lib/roles'
+import { Banner, Skel } from './ui'
+import BoxToggle from './settings/BoxToggle'
 
-/** Settings → Team Access → Permissions (CEO only; the database enforces it too) */
+/** Settings → Team access → Permissions (CEO only; the database enforces it too).
+ *  Roles are columns; click a box to grant or remove. The CEO always has everything. */
 export default function PermissionsMatrix() {
   const [granted, setGranted] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
@@ -20,6 +23,7 @@ export default function PermissionsMatrix() {
   async function toggle(role: string, permission: string) {
     const key = `${role}|${permission}`
     const on = !granted.has(key)
+    setError(null)
     setGranted(s => { const n = new Set(s); if (on) n.add(key); else n.delete(key); return n })
     const { error: e } = on
       ? await supabase.from('role_permissions').insert({ role, permission })
@@ -31,37 +35,42 @@ export default function PermissionsMatrix() {
   }
 
   const groups = [...new Set(PERMISSIONS.map(p => p.group))]
+  const locked = !ready || (!!error && !granted.size)
   return (
-    <div>
-      {error && <div className="portal-message portal-message-error" style={{ marginBottom: 12 }}>{error}</div>}
-      <div className="table-wrap">
-        <table className="perm-table">
-          <thead>
-            <tr>
-              <th>Permission</th>
-              <th>{ROLE_LABELS.ceo}</th>
-              {GRANTABLE_ROLES.map(r => <th key={r}>{ROLE_LABELS[r]}</th>)}
-            </tr>
-          </thead>
-          <tbody>
-            {groups.map(g => [
-              <tr key={g} className="perm-group"><td colSpan={2 + GRANTABLE_ROLES.length}>{g}</td></tr>,
-              ...PERMISSIONS.filter(p => p.group === g).map(p => (
-                <tr key={p.key}>
-                  <td>{p.label}<small>{p.help}</small></td>
-                  <td><input type="checkbox" checked disabled aria-label={`CEO: ${p.label} (always)`} /></td>
-                  {GRANTABLE_ROLES.map(r => (
-                    <td key={r}>
-                      <input type="checkbox" disabled={!ready || !!error && !granted.size} checked={granted.has(`${r}|${p.key}`)}
-                        aria-label={`${ROLE_LABELS[r]}: ${p.label}`} onChange={() => void toggle(r, p.key)} />
-                    </td>
-                  ))}
-                </tr>
-              )),
-            ])}
-          </tbody>
-        </table>
+    <section className="set-card set-card--scroll" aria-label="Permissions">
+      <div className="set-card__head">
+        <div className="set-card__titles">
+          <h2 className="set-card__title">Permissions</h2>
+          <span className="set-card__sub">{ROLE_LABELS.ceo} always has everything. Click to grant or remove.</span>
+        </div>
       </div>
-    </div>
+      {error && <div className="set-perm__error"><Banner tone="danger">{error}</Banner></div>}
+      <div className="set-perm" role="table" aria-label="Permissions by role">
+        <div className="set-perm__row set-perm__row--head" role="row">
+          <span role="columnheader">Permission</span>
+          {GRANTABLE_ROLES.map(r => <span key={r} role="columnheader">{ROLE_LABELS[r]}</span>)}
+        </div>
+        {!ready ? [0, 1, 2, 3, 4].map(i => (
+          <div key={i} className="set-perm__row" role="row"><Skel w="60%" />{GRANTABLE_ROLES.map(r => <Skel key={r} w={22} h={22} r={6} />)}</div>
+        )) : groups.map(g => [
+          <div key={g} className="set-perm__row set-perm__row--group" role="row"><span role="cell">{g}</span></div>,
+          ...PERMISSIONS.filter(p => p.group === g).map(p => (
+            <div key={p.key} className="set-perm__row" role="row">
+              <span className="set-perm__label" role="cell" title={p.help}>
+                <span>{p.label}</span>
+                <span className="set-perm__key">{p.key}</span>
+              </span>
+              {GRANTABLE_ROLES.map(r => (
+                <span key={r} className="set-perm__cell" role="cell">
+                  <BoxToggle label={`${ROLE_LABELS[r]}: ${p.label}`} disabled={locked}
+                    checked={granted.has(`${r}|${p.key}`)} onChange={() => void toggle(r, p.key)} />
+                  <span className="set-perm__role" aria-hidden>{ROLE_LABELS[r]}</span>
+                </span>
+              ))}
+            </div>
+          )),
+        ])}
+      </div>
+    </section>
   )
 }

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { IconCheck, IconClock, IconCopy } from '../components/Icon'
+import { Ic, P } from '../components/Icon'
+import AuthLayout from '../components/settings/AuthLayout'
+import { Banner, Field } from '../components/ui'
 import { useRole } from '../context/RoleContext'
 import { CONNECT_RETURN_KEY } from '../lib/connectApp'
 
@@ -49,51 +51,47 @@ export default function ConnectAppPage() {
     try { await navigator.clipboard.writeText(code); setCopied(true) } catch { window.prompt('Copy this code:', code) }
   }
 
-  return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', padding: 16 }}>
-      <div className="portal-section" style={{ width: '100%', maxWidth: 440 }}>
-        <div className="portal-section-header" style={{ justifyContent: 'flex-start', gap: 12 }}>
-          <IconClock size={20} />
-          <div>
-            <div className="portal-section-title">Connect YVA Time</div>
-            <div className="portal-section-sub">Sign in to the desktop app on this computer</div>
+  const timeIcon = (tone: string, d: string) => <span className={`set-auth__icon set-auth__icon--${tone}`}><Ic d={d} size={24} stroke={2.2} /></span>
+
+  if (!validLink) {
+    return (
+      <AuthLayout title="Connect YVA Time" sub="Sign in to the desktop app on this computer" icon={timeIcon('bad', P.alert)}>
+        <Banner tone="danger">
+          This link is incomplete. Open YVA Time on your computer and click <strong>Sign in with YVA OS</strong> again.
+        </Banner>
+      </AuthLayout>
+    )
+  }
+
+  if (code) {
+    return (
+      <AuthLayout title="Connected" sub="YVA Time should open now." icon={timeIcon('ok', P.check)} foot="You can close this tab.">
+        <Banner tone="success">Connected. YVA Time should open now.</Banner>
+        <Field label="If the app didn't open, copy this code and paste it into YVA Time (it works for 5 minutes):">
+          <div className="set-code-box">
+            <input className="input" readOnly value={code} onFocus={e => e.target.select()} aria-label="Sign-in code" />
+            <button type="button" className="btn" onClick={() => void copyCode()}>
+              <Ic d={copied ? P.check : P.copy} size={15} /> {copied ? 'Copied' : 'Copy'}
+            </button>
           </div>
-        </div>
-        <div className="portal-section-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {!validLink ? (
-            <div className="portal-message portal-message-error">
-              This link is incomplete. Open YVA Time on your computer and click <strong>Sign in with YVA OS</strong> again.
-            </div>
-          ) : code ? (
-            <>
-              <div className="portal-message portal-message-success"><IconCheck size={14} /> Connected. YVA Time should open now.</div>
-              <div style={{ fontSize: 13, color: 'var(--muted)' }}>
-                If the app didn't open, copy this code and paste it into YVA Time (it works for 5 minutes):
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input className="form-input" readOnly value={code} onFocus={e => e.target.select()} style={{ fontFamily: 'monospace', fontSize: 13 }} />
-                <button className="btn-ghost btn-sm" onClick={() => void copyCode()}>
-                  {copied ? <IconCheck size={14} /> : <IconCopy size={14} />} {copied ? 'Copied' : 'Copy'}
-                </button>
-              </div>
-              <div style={{ fontSize: 13, color: 'var(--muted)' }}>You can close this tab.</div>
-            </>
-          ) : (
-            <>
-              <div style={{ fontSize: 14, color: 'var(--text2)', lineHeight: 1.6 }}>
-                YVA Time will track your hours as <strong>{email || 'you'}</strong>. Only connect it on a computer you use for work.
-              </div>
-              {error && <div className="portal-message portal-message-error">{error}</div>}
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button className="btn-primary" disabled={busy} onClick={() => void connect()}>
-                  {busy ? 'Connecting…' : 'Connect this computer'}
-                </button>
-                <button className="btn-ghost" disabled={busy} onClick={() => window.close()}>Cancel</button>
-              </div>
-            </>
-          )}
-        </div>
+        </Field>
+        <a className="btn btn--block" href={`yvatime://auth?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state)}`}>Open YVA Time again</a>
+      </AuthLayout>
+    )
+  }
+
+  return (
+    <AuthLayout title="Connect YVA Time" sub="Sign in to the desktop app on this computer" icon={timeIcon('gold', P.time)}>
+      <p className="set-auth__sub">
+        YVA Time will track your hours as <strong>{email || 'you'}</strong>. Only connect it on a computer you use for work.
+      </p>
+      {error && <Banner tone="danger">{error}</Banner>}
+      <div className="stack">
+        <button className="btn btn--primary btn--lg btn--block" disabled={busy} onClick={() => void connect()}>
+          {busy ? 'Connecting…' : 'Connect this computer'}
+        </button>
+        <button className="btn btn--ghost btn--block" disabled={busy} onClick={() => window.close()}>Cancel</button>
       </div>
-    </div>
+    </AuthLayout>
   )
 }

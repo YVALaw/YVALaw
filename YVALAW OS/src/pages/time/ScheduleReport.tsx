@@ -4,6 +4,7 @@ import { loadEmployees } from '../../services/storage'
 import { loadHolidays, loadTimeOff } from '../../services/workspace'
 import { LOCAL_TZ, loadTrackerBlocks, type TrackerBlock } from '../../services/trackerStorage'
 import { scheduleWeek, type ScheduleDay } from '../../utils/schedule'
+import { Chips, EmptyState, Pill, Segmented, Skel, Stepper, useIsMobile, type Tone } from '../../components/ui'
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 const DAY_MS = 86_400_000
@@ -14,37 +15,40 @@ function mondayOf(ms: number): number {
 function addDays(ms: number, n: number): number {
   const d = new Date(ms); d.setDate(d.getDate() + n); return d.getTime()     // DST-safe
 }
-function clock(ms: number): string { return new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) }
 function mins(m: number): string { return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` }
 function hm(seconds: number): string { return `${Math.floor(seconds / 3600)}h ${String(Math.floor((seconds % 3600) / 60)).padStart(2, '0')}m` }
 
-const RED = '#b91c1c', AMBER = '#b45309', GREEN = '#047857', BLUE = '#1d4ed8'
+type DayOff = ScheduleDay & { offLabel?: string }
 
-function chip(d: ScheduleDay): { text: string; color: string } | null {
+/** Status pill per day (same statuses as before the redesign; time off / holidays added in Step 7) */
+function chip(d: DayOff): { text: string; tone: Tone } | null {
   switch (d.status) {
-    case 'on-time':         return { text: 'On time', color: GREEN }
-    case 'late':            return { text: `Late ${mins(d.lateMin)}`, color: AMBER }
-    case 'left-early':      return { text: `Left ${mins(d.earlyMin)} early`, color: AMBER }
-    case 'late-left-early': return { text: `Late ${mins(d.lateMin)} · left ${mins(d.earlyMin)} early`, color: RED }
-    case 'absent':          return { text: 'No time', color: RED }
-    case 'not-started':     return { text: 'Not started', color: RED }
-    case 'in-progress':     return { text: 'On shift', color: BLUE }
-    case 'outside-shift':   return { text: 'Only outside shift hours', color: AMBER }
-    case 'extra-day':       return { text: 'Extra day', color: BLUE }
+    case 'on-time':         return { text: 'On time', tone: 'success' }
+    case 'late':            return { text: `Late ${mins(d.lateMin)}`, tone: 'warning' }
+    case 'left-early':      return { text: `Left ${mins(d.earlyMin)} early`, tone: 'partial' }
+    case 'late-left-early': return { text: `Late ${mins(d.lateMin)} · left ${mins(d.earlyMin)} early`, tone: 'danger' }
+    case 'absent':          return { text: 'No time', tone: 'danger' }
+    case 'not-started':     return { text: 'Not started', tone: 'danger' }
+    case 'in-progress':     return { text: 'On shift', tone: 'info' }
+    case 'outside-shift':   return { text: 'Only outside shift hours', tone: 'warning' }
+    case 'extra-day':       return { text: 'Extra day', tone: 'info' }
+    case 'day-off':         return { text: d.offLabel ?? 'Time off', tone: 'sent' }
     default:                return null
   }
 }
+const shortClock = (ms: number) => new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(' AM', 'a').replace(' PM', 'p')
 
 type Row = { employee: Employee; days: ScheduleDay[] }
 
 /** Time Tracking → Schedule: shift vs. first/last tracked moment each day (late, left early, no time) */
 export default function ScheduleReport() {
+  const mobile = useIsMobile()
   const [week, setWeek] = useState(() => mondayOf(Date.now()))
   const [employees, setEmployees] = useState<Employee[]>([])
   const [blocks, setBlocks] = useState<TrackerBlock[]>([])
   const [grace, setGrace] = useState(5)
   const [filter, setFilter] = useState<'all' | 'client' | 'yva'>('all')
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   // Approved time off + company holidays (Step 7): those days are "Time off", never "No time"
   const [offDays, setOffDays] = useState<Map<string, string>>(new Map())
 
@@ -86,94 +90,89 @@ export default function ScheduleReport() {
   const count = (r: Row, ...statuses: ScheduleDay['status'][]) => r.days.filter(d => statuses.includes(d.status)).length
   const lateTotal = (r: Row) => r.days.reduce((s, d) => s + (d.status === 'late' || d.status === 'late-left-early' ? d.lateMin : 0), 0)
 
+  const md = (ms: number, year = false) => new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric', ...(year ? { year: 'numeric' } : {}) })
+  const shiftOf = (e: Employee) => (e.defaultShiftStart && e.defaultShiftEnd ? `${e.defaultShiftStart} – ${e.defaultShiftEnd}` : null)
+  const dayCell = (d: DayOff) => {
+    const c = chip(d)
+    return (
+      <div className={`ops-sday${d.status === 'day-off' ? ' ops-sday--off' : ''}`}>
+        <span className="mono ops-sday__range">{d.firstAt !== null && d.lastAt !== null ? `${shortClock(d.firstAt)}–${shortClock(d.lastAt)}` : '—'}</span>
+        {d.seconds > 0 && <span className="ops-sday__hours">{hm(d.seconds)}</span>}
+        {c && <Pill tone={c.tone} className="ops-sday__pill">{c.text}</Pill>}
+      </div>
+    )
+  }
+  const summary = (r: Row) => {
+    const late = count(r, 'late', 'late-left-early'), early = count(r, 'left-early', 'late-left-early'), absent = count(r, 'absent')
+    const total = r.days.reduce((s, d) => s + d.seconds, 0)
+    return (
+      <div className="ops-ssum">
+        <span className="ops-ssum__total">{hm(total)}</span>
+        {late > 0 && <span className="t-warning">Late {late}× ({mins(lateTotal(r))})</span>}
+        {early > 0 && <span className="t-warning">Left early {early}×</span>}
+        {absent > 0 && <span className="t-danger">No time {absent} day{absent === 1 ? '' : 's'}</span>}
+        {shiftOf(r.employee) && late + early + absent === 0 && total > 0 && <span className="t-success">All on time</span>}
+      </div>
+    )
+  }
+
   return (
     <>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-        <button className="btn-ghost btn-sm" onClick={() => setWeek(w => addDays(w, -7))}>← Previous week</button>
-        <strong style={{ padding: '0 6px' }}>
-          {new Date(week).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {new Date(addDays(week, 6)).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-        </strong>
-        <button className="btn-ghost btn-sm" disabled={addDays(week, 7) > now} onClick={() => setWeek(w => addDays(w, 7))}>Next week →</button>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, marginLeft: 8 }}>
-          Allow
-          <select className="form-select" style={{ width: 'auto', padding: '4px 8px' }} value={grace} onChange={e => setGrace(Number(e.target.value))}>
-            {[0, 5, 10, 15].map(m => <option key={m} value={m}>{m} min</option>)}
-          </select>
-          before counting late / early
-        </label>
-        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--muted)' }}>
-          Shifts from each employee profile, Mon–Fri · times in your time zone ({LOCAL_TZ})
-        </span>
+      <div className="ops-toolbar">
+        <Stepper label={`${md(week)} – ${md(addDays(week, 6), true)}`} onPrev={() => setWeek(w => addDays(w, -7))} onNext={() => setWeek(w => addDays(w, 7))} nextDisabled={addDays(week, 7) > now} prevLabel="Previous week" nextLabel="Next week" />
+        <div className="ops-grace">
+          <span id="ops-grace-label">Grace period</span>
+          <Segmented label="Grace period before counting late or early" value={String(grace)} onChange={v => setGrace(Number(v))} options={[0, 5, 10, 15].map(m => ({ value: String(m), label: `${m} min` }))} />
+        </div>
+        <span className="spacer" />
+        <Chips small value={filter} onChange={setFilter} options={[{ value: 'all', label: 'Everyone' }, { value: 'client', label: 'Client team' }, { value: 'yva', label: 'YVA team' }]} />
       </div>
-
-      <div className="filter-tabs">
-        {(['all', 'client', 'yva'] as const).map(f => (
-          <button key={f} className={`filter-tab${filter === f ? ' active' : ''}`} onClick={() => setFilter(f)}>
-            {f === 'all' ? 'Everyone' : f === 'client' ? 'Client team' : 'YVA team'}
-          </button>
-        ))}
-      </div>
+      <p className="ops-help">Shifts from each employee profile, Mon–Fri · times in your time zone ({LOCAL_TZ}).</p>
 
       {loading ? (
-        <div className="data-card" style={{ color: 'var(--muted)', fontSize: 14 }}>Loading…</div>
+        <div className="card card--pad stack">{[0, 1, 2].map(i => <Skel key={i} h={44} />)}</div>
       ) : rows.length === 0 ? (
-        <div className="data-card" style={{ color: 'var(--muted)', fontSize: 14 }}>
-          No one to show. Employees appear here once they have a YVA Time login (Employee profile → YVA Time Login).
+        <EmptyState>No one to show. Employees appear here once they have a YVA Time login (Employee profile → YVA Time Login).</EmptyState>
+      ) : mobile ? (
+        <div className="mcards">
+          {rows.map(r => (
+            <div key={r.employee.id} className="mcard">
+              <div className="mcard__top">
+                <div><div className="mcard__title">{r.employee.name}</div><div className={`mcard__meta${shiftOf(r.employee) ? '' : ' t-warning'}`}>{shiftOf(r.employee) ?? 'No shift on profile'}</div></div>
+              </div>
+              <div className="ops-sdays-m">
+                {shownDays.map(i => (
+                  <div key={i} className="ops-sdays-m__row"><span className="ops-sdays-m__d">{DAY_NAMES[i]} {new Date(addDays(week, i)).getDate()}</span>{dayCell(r.days[i] as DayOff)}</div>
+                ))}
+              </div>
+              {summary(r)}
+            </div>
+          ))}
         </div>
       ) : (
-        <div className="table-wrap">
-          <table className="data-table">
+        <div className="table-card">
+          <table className="table ops-sched-table">
             <thead>
               <tr>
-                <th>Employee</th>
+                <th>Person</th><th>Shift</th>
                 {shownDays.map(i => <th key={i}>{DAY_NAMES[i]} {new Date(addDays(week, i)).getDate()}</th>)}
-                <th style={{ textAlign: 'right' }}>Week</th>
+                <th className="t-right">Week</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map(r => {
-                const shift = r.employee.defaultShiftStart && r.employee.defaultShiftEnd
-                  ? `${r.employee.defaultShiftStart} – ${r.employee.defaultShiftEnd}` : null
-                const late = count(r, 'late', 'late-left-early'), early = count(r, 'left-early', 'late-left-early'), absent = count(r, 'absent')
-                const total = r.days.reduce((s, d) => s + d.seconds, 0)
-                return (
-                  <tr key={r.employee.id}>
-                    <td className="td-name" style={{ minWidth: 150 }}>
-                      {r.employee.name}
-                      <div style={{ fontSize: 11, fontWeight: 400, color: shift ? 'var(--muted)' : AMBER }}>
-                        {shift ?? 'No shift on profile'}
-                      </div>
-                    </td>
-                    {shownDays.map(i => {
-                      const d = r.days[i], c = chip(d)
-                      return (
-                        <td key={d.day} style={{ fontSize: 12, verticalAlign: 'top', whiteSpace: 'nowrap', padding: '10px 8px',
-                          background: d.status === 'day-off' ? 'var(--surf2)' : undefined }}>
-                          {d.firstAt !== null && d.lastAt !== null ? (
-                            <div>{clock(d.firstAt)} – {clock(d.lastAt)}</div>
-                          ) : (
-                            <div className="td-muted">{d.status === 'day-off' ? ((d as ScheduleDay & { offLabel?: string }).offLabel ?? 'Off') : '—'}</div>
-                          )}
-                          {d.seconds > 0 && <div className="td-muted">{hm(d.seconds)}</div>}
-                          {c && <div style={{ color: c.color, fontWeight: 600, marginTop: 2 }}>{c.text}</div>}
-                        </td>
-                      )
-                    })}
-                    <td style={{ textAlign: 'right', fontSize: 12, whiteSpace: 'nowrap', verticalAlign: 'top' }}>
-                      <div style={{ fontWeight: 700, fontSize: 13 }}>{hm(total)}</div>
-                      {late > 0 && <div style={{ color: AMBER }}>Late {late}× ({mins(lateTotal(r))})</div>}
-                      {early > 0 && <div style={{ color: AMBER }}>Left early {early}×</div>}
-                      {absent > 0 && <div style={{ color: RED }}>No time {absent} day{absent === 1 ? '' : 's'}</div>}
-                      {shift && late + early + absent === 0 && total > 0 && <div style={{ color: GREEN }}>All on time</div>}
-                    </td>
-                  </tr>
-                )
-              })}
+              {rows.map(r => (
+                <tr key={r.employee.id}>
+                  <td className="t-strong">{r.employee.name}</td>
+                  <td className={shiftOf(r.employee) ? 'muted ops-nowrap' : 't-warning'}>{shiftOf(r.employee) ?? 'No shift on profile'}</td>
+                  {shownDays.map(i => <td key={r.days[i].day} className="ops-top">{dayCell(r.days[i] as DayOff)}</td>)}
+                  <td className="t-right ops-top">{summary(r)}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
-          <div style={{ fontSize: 12, color: 'var(--muted)', padding: '8px 4px' }}>
+          <div className="ops-table-foot">
             First and last tracked moment each day from YVA Time (approved manual time included). Saturday and Sunday show when someone
-            worked them. Approved time off and company holidays show as days off, not "No time".
+            worked them. Approved time off and company holidays show as days off, not “No time”.
           </div>
         </div>
       )}

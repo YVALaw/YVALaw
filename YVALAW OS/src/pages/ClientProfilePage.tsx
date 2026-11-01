@@ -1,1228 +1,267 @@
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import ClientContacts from '../components/ClientContacts'
-import RecordHistory from '../components/RecordHistory'
-import { useNavigate, useParams } from 'react-router-dom'
-import type { ActivityLogEntry, Client, ClientDocument, CommEntryType, Contract, ContractStatus, Invoice, Project, PaymentAttempt } from '../data/types'
-import { loadSnapshot, saveClients, loadActivityLog, saveActivityLog, loadSettings, loadClientDocuments, addClientDocument, removeClientDocument, loadClientBillingSummary, type ClientBillingSummary } from '../services/storage'
-import { sendEmail } from '../services/gmail'
-import { uploadFile, deleteFile } from '../services/fileStorage'
+import HistoryList from '../components/HistoryList'
+import type { ActivityLogEntry, Client, ClientDocument, Invoice, Project, StaffRequest, Tag } from '../data/types'
+import { loadSnapshot, saveClients, loadActivityLog, loadClientDocuments, loadClientBillingSummary, loadStaffRequests, type ClientBillingSummary } from '../services/storage'
+import { invoicesOf, isUnpaid, balanceOf, sendClientReminder, loadPortalStatuses } from '../services/crm'
+import { loadTags, saveTags } from '../services/tagStorage'
 import { supabase } from '../lib/supabase'
 import { APP_URL } from '../lib/appUrl'
-import { IconMail, IconLink, IconEye, IconX, IconTrash, IconLock, IconMessage, IconPhone, IconHandshake, IconZap, IconCamera } from '../components/Icon'
+import { can } from '../lib/roles'
+import { usePermission, useRole } from '../context/RoleContext'
+import { clientHealth, HEALTH_TONE } from '../utils/clientHealth'
+import { TagBadge } from '../components/TagBadge'
+import { Banner, KpiStrip, Menu, Modal, PageHeader, Pill, Skel, Tabs, type Tone } from '../components/ui'
+import { Ic, P } from '../components/Icon'
+import ClientFormDrawer, { CLIENT_STAGES, avatarTone, normTags } from '../components/crm/ClientFormDrawer'
+import { BillingTab, CommsTab, ContractsTab, DocumentsTab } from '../components/crm/ClientProfileTabs'
+import { dateMed, dateShort, initials, usd } from '../utils/format'
 
-function uid() { return crypto.randomUUID() }
-
-const AVATAR_COLORS = ['#a16207','#3b82f6','#22c55e','#a855f7','#14b8a6','#f97316','#ec4899']
-function avatarColor(name: string) {
-  let h = 0
-  for (const c of name) h = (h * 31 + c.charCodeAt(0)) % AVATAR_COLORS.length
-  return AVATAR_COLORS[Math.abs(h)]
-}
-function initials(name: string) {
-  return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
-}
-function stageBadge(s?: string): string {
-  switch ((s || 'lead').toLowerCase()) {
-    case 'active':   return 'badge-green'
-    case 'prospect': return 'badge-yellow'
-    case 'paused':   return 'badge-gray'
-    case 'churned':  return 'badge-red'
-    default:         return 'badge-blue'
-  }
-}
-function statusBadge(s: string): string { return stageBadge(s) }
-function fmtTimestamp(ts: number): string {
-  return new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
-}
-function fmtDateTime(iso?: string): string | undefined {
-  if (!iso) return undefined
-  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-function fmtAttemptDate(iso?: string): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
-}
-function fmtUSD(n?: number): string {
-  return `$${(Number(n) || 0).toFixed(2)}`
-}
-function paymentAttemptBadge(attempt: PaymentAttempt): string {
-  switch (attempt.status) {
-    case 'succeeded': return 'badge-green'
-    case 'failed': return 'badge-red'
-    case 'processing': return 'badge-yellow'
-    case 'requires_action':
-    case 'requires_payment_method':
-      return 'badge-orange'
-    case 'canceled': return 'badge-gray'
-    default: return 'badge-blue'
-  }
-}
-function isSetupOnlyPaymentAttempt(attempt: PaymentAttempt): boolean {
-  return attempt.status === 'created' || attempt.status === 'requires_payment_method'
-}
-function portalCardLabel(billing: ClientBillingSummary): string | undefined {
-  if (!billing.defaultCardLast4) return undefined
-  const brand = billing.defaultCardBrand
-    ? billing.defaultCardBrand.charAt(0).toUpperCase() + billing.defaultCardBrand.slice(1)
-    : 'Card'
-  const exp = billing.defaultCardExpMonth && billing.defaultCardExpYear
-    ? ` · expires ${String(billing.defaultCardExpMonth).padStart(2, '0')}/${String(billing.defaultCardExpYear).slice(-2)}`
-    : ''
-  return `${brand} ending ${billing.defaultCardLast4}${exp}`
-}
-
-const STAGES = [
-  { key: 'lead', label: 'Lead' }, { key: 'prospect', label: 'Prospect' },
-  { key: 'active', label: 'Active' }, { key: 'paused', label: 'Paused' }, { key: 'churned', label: 'Churned' },
-]
-
-type LinkEntry = { label: string; url: string }
+type TabKey = 'overview' | 'billing' | 'comms' | 'contracts' | 'docs' | 'history'
+const TAB_KEYS: TabKey[] = ['overview', 'billing', 'comms', 'contracts', 'docs', 'history']
+const INACTIVE_PROJECT = new Set(['completed', 'cancelled', 'canceled', 'closed', 'archived', 'paused', 'on hold', 'inactive'])
+const PAY_LABEL: Record<string, string> = { weekly: 'weekly pay', biweekly: 'bi-weekly', semimonthly: 'twice a month', monthly: 'monthly' }
 
 export default function ClientProfilePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const allowed = usePermission()
+  const { role } = useRole()
+  const [params, setParams] = useSearchParams()
+  const [clients, setClients] = useState<Client[]>([])
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loaded, setLoaded] = useState(false)
+  const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([])
+  const [allActivity, setAllActivity] = useState<ActivityLogEntry[]>([])
+  const [requests, setRequests] = useState<StaffRequest[]>([])
+  const [clientDocs, setClientDocs] = useState<ClientDocument[]>([])
+  const [allTags, setAllTags] = useState<Tag[]>([])
+  const [lastLogin, setLastLogin] = useState<string | null>(null)
+  const [portalBilling, setPortalBilling] = useState<ClientBillingSummary>({ hasPortalAccount: false, autoPayEnabled: false, hasSavedPaymentMethod: false, recentAttempts: [] })
+  const tabParam = params.get('tab') as TabKey | null
+  const [tab, setTab] = useState<TabKey>(tabParam && TAB_KEYS.includes(tabParam) ? tabParam : 'overview')
+  const [editing, setEditing] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [inviteLoading, setInviteLoading] = useState<'email' | 'link' | null>(null)
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const photoInputRef = useRef<HTMLInputElement>(null)
 
-  const [clients,  setClientsState] = useState<Client[]>([])
-  const [invoices, setInvoices]     = useState<Invoice[]>([])
-  const [projects, setProjects]     = useState<Project[]>([])
   useEffect(() => {
-    loadSnapshot().then(snap => {
-      setClientsState(snap.clients)
-      setInvoices(snap.invoices)
-      setProjects(snap.projects)
-    })
-    loadActivityLog().then(all => {
-      setActivityLog(all.filter(e => e.clientId === id).sort((a, b) => b.createdAt - a.createdAt))
-    })
+    void loadSnapshot().then(snap => { setClients(snap.clients); setInvoices(snap.invoices); setProjects(snap.projects); setLoaded(true) })
+    void loadActivityLog().then(all => { setAllActivity(all); setActivityLog(all.filter(e => e.clientId === id).sort((a, b) => b.createdAt - a.createdAt)) })
+    void loadStaffRequests().then(setRequests).catch(() => {})
+    void loadTags().then(setAllTags)
     if (id) {
-      loadClientDocuments(id).then(setClientDocs)
-      loadClientBillingSummary(id).then(setPortalBilling)
+      void loadClientDocuments(id).then(setClientDocs)
+      void loadClientBillingSummary(id).then(setPortalBilling)
+      void loadPortalStatuses().then(m => setLastLogin(m?.get(id)?.lastLoginAt ?? null))
     }
   }, [id])
-
   const client = clients.find(c => c.id === id)
 
-  const [editing, setEditing]     = useState(false)
-  const [form, setForm]           = useState({
-    name: '', company: '', email: '', phone: '', address: '',
-    timezone: '', defaultRate: '', paymentTerms: '', tags: '',
-    notes: '', status: 'active', contractEnd: '', links: [] as LinkEntry[],
-  })
-  const [newLinkLabel, setNewLinkLabel] = useState('')
-  const [newLinkUrl,   setNewLinkUrl]   = useState('')
-  const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined)
-  const photoInputRef = useRef<HTMLInputElement>(null)
-  const [confirmDelete, setConfirmDelete] = useState(false)
-
-  // Activity log
-  const [activityLog, setActivityLog] = useState<ActivityLogEntry[]>([])
-  const [activityNote, setActivityNote] = useState('')
-  const [activityType, setActivityType] = useState<CommEntryType>('note')
-
-  // Portal invite
-  const [inviteLoading, setInviteLoading] = useState<'email' | 'link' | null>(null)
-  const [inviteMsg,     setInviteMsg]     = useState<{ ok: boolean; text: string } | null>(null)
-  const [portalBilling, setPortalBilling] = useState<ClientBillingSummary>({
-    hasPortalAccount: false,
-    autoPayEnabled: false,
-    hasSavedPaymentMethod: false,
-    recentAttempts: [],
-  })
-
-  // Contracts
-  const [contractPanelOpen, setContractPanelOpen] = useState(false)
-  const [contractEditId, setContractEditId] = useState<string | null>(null)
-  const [contractForm, setContractForm] = useState({
-    title: '', status: 'draft' as ContractStatus,
-    startDate: '', endDate: '', value: '', notes: '',
-  })
-  const [contractFile, setContractFile] = useState<File | null>(null)
-  const [contractUploading, setContractUploading] = useState(false)
-  const contractFileRef = useRef<HTMLInputElement>(null)
-
-  // Shared documents (portal-visible)
-  const [clientDocs,      setClientDocs]      = useState<ClientDocument[]>([])
-  const [docCategory,     setDocCategory]     = useState<ClientDocument['category']>('other')
-  const [docFile,         setDocFile]         = useState<File | null>(null)
-  const [docUploading,    setDocUploading]    = useState(false)
-  const [docError,        setDocError]        = useState<string | null>(null)
-  const docFileRef = useRef<HTMLInputElement>(null)
-
-  // Sync form/photo from client once data loads
-  useEffect(() => {
-    if (client && !editing) {
-      setForm({
-        name:         client.name ?? '',
-        company:      client.company ?? '',
-        email:        client.email ?? '',
-        phone:        client.phone ?? '',
-        address:      client.address ?? '',
-        timezone:     client.timezone ?? '',
-        defaultRate:  client.defaultRate != null ? String(client.defaultRate) : '',
-        paymentTerms: client.paymentTerms ?? '',
-        tags:         Array.isArray(client.tags) ? client.tags.join(', ') : (client.tags ?? ''),
-        notes:        client.notes ?? '',
-        status:       client.status ?? 'active',
-        contractEnd:  client.contractEnd ?? '',
-        links:        (client.links ?? []) as LinkEntry[],
-      })
-      setPhotoUrl(client.photoUrl)
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client?.id])
+  // Computed (hooks above the early return)
+  const clientInvoices = useMemo(() => (client ? invoicesOf(client, invoices) : []), [client, invoices])
+  const health = useMemo(() => (client && (client.status || 'lead').toLowerCase() !== 'lead' ? clientHealth(client, invoices, allActivity, requests) : null), [client, invoices, allActivity, requests])
 
   if (!client) {
     return (
-      <div className="page-wrap">
-        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--muted)' }}>
-          Client not found.
-          <br /><button className="btn-ghost btn-sm" style={{ marginTop: 12 }} onClick={() => navigate('/clients')}>← Back to Clients</button>
-        </div>
+      <div className="page crm-page">
+        <button type="button" className="back-link" onClick={() => navigate('/clients')}><Ic d={P.chevL} size={15} />Clients</button>
+        {loaded ? <div className="card card-empty">Client not found.</div> : <div className="card card--pad stack"><Skel h={28} w="40%" /><Skel h={14} w="60%" /><Skel h={80} /></div>}
       </div>
     )
   }
+  const clientNN = client
 
-  // client is guaranteed non-null here (early return above handles null case)
-  const clientNN = client!
-
-  // Computed
-  const clientInvoices = invoices.filter(inv => inv.clientName === clientNN.name)
-  const totalRevenue   = clientInvoices.reduce((s, i) => s + (Number(i.subtotal) || 0), 0)
-  const outstanding    = clientInvoices
-    .filter(inv => new Set(['sent','viewed','overdue','partial']).has((inv.status||'').toLowerCase()))
-    .reduce((s, inv) => s + ((Number(inv.subtotal)||0) - (Number(inv.amountPaid)||0)), 0)
+  const totalRevenue = clientInvoices.reduce((s, i) => s + (Number(i.subtotal) || 0), 0)
+  const outstanding = clientInvoices.filter(isUnpaid).reduce((s, i) => s + balanceOf(i), 0)
   const clientProjects = projects.filter(p => p.clientId === clientNN.id)
-  const visiblePaymentAttempts = portalBilling.recentAttempts.filter(attempt => !isSetupOnlyPaymentAttempt(attempt))
-  const hiddenSetupAttemptCount = portalBilling.recentAttempts.length - visiblePaymentAttempts.length
-  const billingActivityAttempts = visiblePaymentAttempts.length > 0 ? visiblePaymentAttempts : portalBilling.recentAttempts
+  const activeProjects = clientProjects.filter(p => !INACTIVE_PROJECT.has(String(p.status || '').toLowerCase()))
+  const people = new Set(activeProjects.flatMap(p => p.employeeIds ?? [])).size
+  const payDays = clientInvoices.flatMap(inv => {
+    const paid = inv.statusHistory?.filter(h => h.status === 'paid').pop()
+    if (!paid || !inv.date) return []
+    const [y, m, d] = inv.date.slice(0, 10).split('-').map(Number)
+    const days = Math.round((paid.changedAt - new Date(y, (m || 1) - 1, d || 1).getTime()) / 86400000)
+    return days >= 0 ? [days] : []
+  })
+  const avgDays = payDays.length ? Math.round(payDays.reduce((a, b) => a + b, 0) / payDays.length) : null
+  const stage = (clientNN.status || 'lead').toLowerCase()
+  const extra = clientNN as Client & { invoicePrefix?: string | null; nextInvoiceSeq?: number | null }
+  const canPreview = can.viewInvoices(role)   // portal preview is CEO/Admin/Accounting only (enforced by the portal too)
 
-  function persistUpdate(updated: Client) {
-    const next = clients.map(c => c.id === updated.id ? updated : c)
-    setClientsState(next)
-    void saveClients(next)
+  /** Optimistic update → await → roll back with a message if it fails */
+  async function persistUpdate(updated: Client) {
+    const prev = clients
+    const next = clients.map(c => (c.id === updated.id ? updated : c))
+    setClients(next)
+    try { await saveClients(next) } catch (e) { setClients(prev); setMsg({ ok: false, text: `Could not save: ${(e as Error).message}` }); throw e }
   }
-
-  function handleSave() {
-    if (!form.name.trim()) return
-    const updated: Client = {
-      ...clientNN,
-      name: form.name,
-      company: form.company || undefined,
-      email: form.email || undefined,
-      phone: form.phone || undefined,
-      address: form.address || undefined,
-      timezone: form.timezone || undefined,
-      defaultRate: form.defaultRate ? Number(form.defaultRate) : undefined,
-      paymentTerms: form.paymentTerms || undefined,
-      tags: form.tags ? form.tags.split(',').map((t: string) => t.trim()).filter(Boolean) : undefined,
-      notes: form.notes || undefined,
-      status: form.status,
-      contractEnd: form.contractEnd || undefined,
-      links: form.links.length > 0 ? form.links : undefined,
-      photoUrl,
-    }
-    persistUpdate(updated)
-    setEditing(false)
-  }
-
   function handlePhotoUpload(file: File) {
-    if (!file.type.startsWith('image/')) { alert('Please select an image file.'); return }
-    if (file.size > 5 * 1024 * 1024) { alert('Image too large (max 5 MB).'); return }
+    if (!file.type.startsWith('image/')) { setMsg({ ok: false, text: 'Please select an image file.' }); return }
+    if (file.size > 5 * 1024 * 1024) { setMsg({ ok: false, text: 'Image too large (max 5 MB).' }); return }
     const reader = new FileReader()
-    reader.onload = ev => {
-      const url = ev.target?.result as string
-      setPhotoUrl(url)
-      persistUpdate({ ...clientNN, photoUrl: url })
-    }
+    reader.onload = ev => { void persistUpdate({ ...clientNN, photoUrl: ev.target?.result as string }).then(() => setMsg({ ok: true, text: 'Photo updated.' })).catch(() => {}) }
     reader.readAsDataURL(file)
   }
-
-  function handleCancel() {
-    setForm({
-      name: clientNN.name,
-      company: clientNN.company ?? '',
-      email: clientNN.email ?? '',
-      phone: clientNN.phone ?? '',
-      address: clientNN.address ?? '',
-      timezone: clientNN.timezone ?? '',
-      defaultRate: clientNN.defaultRate != null ? String(clientNN.defaultRate) : '',
-      paymentTerms: clientNN.paymentTerms ?? '',
-      tags: Array.isArray(clientNN.tags) ? clientNN.tags.join(', ') : (clientNN.tags ?? ''),
-      notes: clientNN.notes ?? '',
-      status: clientNN.status ?? 'active',
-      contractEnd: clientNN.contractEnd ?? '',
-      links: clientNN.links ?? [],
-    })
-    setEditing(false)
-  }
-
-  function handleDelete() {
+  async function handleDelete() {
+    const prev = clients
     const next = clients.filter(c => c.id !== clientNN.id)
-    setClientsState(next)
-    void saveClients(next)
-    navigate('/clients')
+    setClients(next)
+    try { await saveClients(next); navigate('/clients') } catch (e) { setClients(prev); setConfirmDelete(false); setMsg({ ok: false, text: `Could not delete: ${(e as Error).message}` }) }
   }
-
-  function addLink() {
-    if (!newLinkLabel.trim() || !newLinkUrl.trim()) return
-    setForm(f => ({ ...f, links: [...f.links, { label: newLinkLabel.trim(), url: newLinkUrl.trim() }] }))
-    setNewLinkLabel(''); setNewLinkUrl('')
-  }
-  function removeLink(i: number) {
-    setForm(f => ({ ...f, links: f.links.filter((_, idx) => idx !== i) }))
-  }
-
-  function addActivity() {
-    if (!activityNote.trim()) return
-    const entry: ActivityLogEntry = {
-      id: uid(), clientId: clientNN.id, note: activityNote.trim(),
-      createdAt: Date.now(), type: activityType, auto: false,
-    }
-    loadActivityLog().then(all => {
-      void saveActivityLog([entry, ...all])
-      setActivityLog([entry, ...activityLog])
-      setActivityNote('')
-    })
-  }
-  function deleteActivity(entryId: string) {
-    loadActivityLog().then(all => {
-      void saveActivityLog(all.filter(e => e.id !== entryId))
-      setActivityLog(activityLog.filter(e => e.id !== entryId))
-    })
-  }
-
-  function contractStatusBadge(s: ContractStatus): string {
-    switch (s) {
-      case 'active':     return 'badge-green'
-      case 'expired':    return 'badge-orange'
-      case 'terminated': return 'badge-red'
-      default:           return 'badge-gray'
-    }
-  }
-
-  function openAddContractPanel() {
-    setContractEditId(null)
-    setContractForm({ title: '', status: 'draft', startDate: '', endDate: '', value: '', notes: '' })
-    setContractFile(null)
-    setContractPanelOpen(true)
-  }
-
-  function openEditContractPanel(contract: Contract) {
-    setContractEditId(contract.id)
-    setContractForm({
-      title:     contract.title,
-      status:    contract.status,
-      startDate: contract.startDate ?? '',
-      endDate:   contract.endDate ?? '',
-      value:     contract.value != null ? String(contract.value) : '',
-      notes:     contract.notes ?? '',
-    })
-    setContractFile(null)
-    setContractPanelOpen(true)
-  }
-
-  async function saveContract() {
-    if (!contractForm.title.trim()) return
-    setContractUploading(true)
-    try {
-      let fileUrl: string | undefined
-      let filePath: string | undefined
-      let fileName: string | undefined
-
-      if (contractFile) {
-        const result = await uploadFile(contractFile, `contracts/clients/${clientNN.id}`)
-        fileUrl  = result.storageUrl
-        filePath = result.storagePath
-        fileName = contractFile.name
-      }
-
-      const existingContracts: Contract[] = clientNN.contracts ?? []
-
-      let updatedContracts: Contract[]
-      if (contractEditId) {
-        updatedContracts = existingContracts.map(c => {
-          if (c.id !== contractEditId) return c
-          return {
-            ...c,
-            title:     contractForm.title.trim(),
-            status:    contractForm.status,
-            startDate: contractForm.startDate || undefined,
-            endDate:   contractForm.endDate || undefined,
-            value:     contractForm.value ? Number(contractForm.value) : undefined,
-            notes:     contractForm.notes || undefined,
-            ...(fileUrl ? { fileUrl, filePath, fileName } : {}),
-          }
-        })
-      } else {
-        const newContract: Contract = {
-          id:        crypto.randomUUID(),
-          title:     contractForm.title.trim(),
-          status:    contractForm.status,
-          startDate: contractForm.startDate || undefined,
-          endDate:   contractForm.endDate || undefined,
-          value:     contractForm.value ? Number(contractForm.value) : undefined,
-          notes:     contractForm.notes || undefined,
-          fileUrl,
-          filePath,
-          fileName,
-          createdAt: Date.now(),
-        }
-        updatedContracts = [newContract, ...existingContracts]
-      }
-
-      persistUpdate({ ...clientNN, contracts: updatedContracts })
-      setContractPanelOpen(false)
-    } finally {
-      setContractUploading(false)
-    }
-  }
-
-  async function deleteContract(contract: Contract) {
-    if (contract.filePath) {
-      await deleteFile(contract.filePath).catch(() => {/* ignore */})
-    }
-    const updatedContracts = (clientNN.contracts ?? []).filter(c => c.id !== contract.id)
-    persistUpdate({ ...clientNN, contracts: updatedContracts })
-  }
-
-  async function uploadClientDoc() {
-    if (!docFile || !clientNN) return
-    setDocUploading(true)
-    setDocError(null)
-    try {
-      const { storageUrl, storagePath } = await uploadFile(docFile, `client-docs/${clientNN.id}`)
-      const { data: { user } } = await supabase.auth.getUser()
-      const doc: ClientDocument = {
-        id:         uid(),
-        clientId:   clientNN.id,
-        name:       docFile.name,
-        category:   docCategory,
-        fileUrl:    storageUrl,
-        filePath:   storagePath,
-        fileSize:   docFile.size,
-        uploadedAt: Date.now(),
-        uploadedBy: user?.email ?? 'YVA Team',
-      }
-      await addClientDocument(doc)
-      setClientDocs(prev => [doc, ...prev])
-      setDocFile(null)
-      setDocCategory('other')
-      if (docFileRef.current) docFileRef.current.value = ''
-    } catch (err) {
-      console.error('Doc upload failed:', err)
-      setDocError(err instanceof Error ? err.message : 'Upload failed. Make sure the client_documents table exists in Supabase.')
-    } finally {
-      setDocUploading(false)
-    }
-  }
-
-  async function deleteClientDoc(doc: ClientDocument) {
-    await removeClientDocument(doc.id)
-    await deleteFile(doc.filePath).catch(() => {/* ignore */})
-    setClientDocs(prev => prev.filter(d => d.id !== doc.id))
-  }
-
   async function sendPortalInvite(mode: 'email' | 'link') {
-    if (!clientNN.email) { setInviteMsg({ ok: false, text: 'Add an email address to this client before inviting.' }); return }
-    setInviteLoading(mode)
-    setInviteMsg(null)
-
+    if (!clientNN.email) { setMsg({ ok: false, text: 'Add an email address to this client before inviting.' }); return }
+    setInviteLoading(mode); setMsg(null)
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { setInviteLoading(null); setInviteMsg({ ok: false, text: 'You must be logged in.' }); return }
-
+    if (!session) { setInviteLoading(null); setMsg({ ok: false, text: 'You must be logged in.' }); return }
     try {
       const res = await fetch('/.netlify/functions/invite-client', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          clientId:   clientNN.id,
-          email:      clientNN.email,
-          mode,
-          redirectTo: `${APP_URL}portal/set-password`,
-        }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ clientId: clientNN.id, email: clientNN.email, mode, redirectTo: `${APP_URL}portal/set-password` }),
       })
       const data = await res.json()
-      if (!res.ok) {
-        setInviteMsg({ ok: false, text: data.error || 'Failed to send invitation.' })
-        return
-      }
-
+      if (!res.ok) { setMsg({ ok: false, text: data.error || 'Failed to send invitation.' }); return }
       if (mode === 'link') {
         const inviteLink = data.inviteLink as string | undefined
-        if (!inviteLink) {
-          setInviteMsg({ ok: false, text: 'Invite was created but no link was returned.' })
-          return
-        }
-        try {
-          await navigator.clipboard.writeText(inviteLink)
-          setInviteMsg({ ok: true, text: `Invite link copied for ${clientNN.email}. You can paste it into your own email or message.` })
-        } catch {
-          window.prompt('Copy this portal invite link:', inviteLink)
-          setInviteMsg({ ok: true, text: `Invite link created for ${clientNN.email}.` })
-        }
+        if (!inviteLink) { setMsg({ ok: false, text: 'Invite was created but no link was returned.' }); return }
+        try { await navigator.clipboard.writeText(inviteLink); setMsg({ ok: true, text: `Invite link copied for ${clientNN.email}. You can paste it into your own email or message.` }) }
+        catch { window.prompt('Copy this portal invite link:', inviteLink); setMsg({ ok: true, text: `Invite link created for ${clientNN.email}.` }) }
       } else {
         // Email mode: Supabase sends the invite email automatically with the correct redirect.
-        setInviteMsg({ ok: true, text: `Invitation email sent to ${clientNN.email}` })
+        setMsg({ ok: true, text: `Invitation email sent to ${clientNN.email}` })
       }
     } catch {
-      setInviteMsg({ ok: false, text: 'Network error — could not create invitation.' })
-    } finally {
-      setInviteLoading(null)
-    }
+      setMsg({ ok: false, text: 'Network error — could not create invitation.' })
+    } finally { setInviteLoading(null) }
   }
-
   async function sendReminder() {
-    const settings = await loadSettings()
-    const unpaidInvs = clientInvoices.filter(inv =>
-      new Set(['sent','viewed','overdue','partial']).has((inv.status||'').toLowerCase()))
-    if (unpaidInvs.length === 0) return
-    const totalOwed = unpaidInvs.reduce((s, inv) => s + ((Number(inv.subtotal)||0) - (Number(inv.amountPaid)||0)), 0)
-    const companyName = settings.companyName || 'YVA Staffing'
-    const invoiceList = unpaidInvs.map(inv => `  • ${inv.number} — $${(Number(inv.subtotal)||0).toFixed(2)}`).join('\n')
-    let bodyText: string
-    if (settings.reminderEmailTemplate) {
-      bodyText = settings.reminderEmailTemplate
-        .replace(/\{clientName\}/g, clientNN.name)
-        .replace(/\{invoiceNumber\}/g, unpaidInvs.length === 1 ? unpaidInvs[0].number : `${unpaidInvs.length} invoices`)
-        .replace(/\{amount\}/g, `$${totalOwed.toFixed(2)}`)
-        .replace(/\{dueDate\}/g, unpaidInvs[0]?.dueDate || '')
-        .replace(/\{companyName\}/g, companyName)
-    } else {
-      bodyText = `Hi ${clientNN.name},\n\nThis is a friendly reminder that you have ${unpaidInvs.length === 1 ? 'an outstanding invoice' : `${unpaidInvs.length} outstanding invoices`} totaling $${totalOwed.toFixed(2)}:\n\n${invoiceList}\n\nPlease let us know when we can expect payment.\n\n${settings.emailSignature || companyName}`
-    }
-    const subject = `Outstanding Balance Reminder — ${companyName}`
-    sendEmail(clientNN.email || '', subject, bodyText)
+    try {
+      const r = await sendClientReminder(clientNN, invoices)
+      if (!r) return
+      if (r.result.mode === 'gmail') setMsg({ ok: true, text: `Reminder sent via Gmail to ${clientNN.email} for ${usd(r.total)} (${r.count} invoice${r.count === 1 ? '' : 's'}).` })
+      else if (r.result.mode === 'mailto') setMsg({ ok: true, text: `Reminder for ${usd(r.total)} opened in your email app.` })
+      else setMsg({ ok: false, text: `Reminder not sent: ${r.result.fallbackReason ?? 'Gmail could not send it.'}` })
+    } catch (e) { setMsg({ ok: false, text: `Reminder not sent: ${(e as Error).message}` }) }
   }
+  function handleTagCreated(tag: Tag) { const next = [...allTags, tag]; setAllTags(next); void saveTags(next).catch(() => {}) }
+  const tagColor = (label: string) => allTags.find(t => t.label === label)?.color ?? '#3b82f6'
+  function pickTab(t: TabKey) { setTab(t); setParams(t === 'overview' ? {} : { tab: t }, { replace: true }) }
 
-  const color = avatarColor(clientNN.name)
+  const portalPill: { text: string; tone: Tone; title: string } = portalBilling.autoPayEnabled
+    ? { text: 'AutoPay on', tone: 'success', title: `AutoPay authorized${portalBilling.autoPayAuthorizedAt ? ` on ${dateMed(portalBilling.autoPayAuthorizedAt)}` : ''}` }
+    : portalBilling.hasSavedPaymentMethod ? { text: 'Card saved', tone: 'gold', title: 'Client has a saved card but AutoPay is off' }
+    : portalBilling.hasPortalAccount ? { text: 'AutoPay off', tone: 'neutral', title: 'Client portal account exists, but no AutoPay authorization yet' }
+    : { text: 'No portal', tone: 'neutral', title: 'No client portal account yet' }
+  const info = [
+    { k: 'Email', v: clientNN.email },
+    { k: 'Phone', v: clientNN.phone },
+    { k: 'Company', v: clientNN.company },
+    { k: 'Default rate', v: clientNN.defaultRate ? `$${Number(clientNN.defaultRate).toFixed(2)}/hr` : undefined },
+    { k: 'Payment terms', v: clientNN.paymentTerms },
+    { k: 'Invoice prefix', v: extra.invoicePrefix ? `${extra.invoicePrefix}${extra.nextInvoiceSeq ? ` · next ${String(extra.nextInvoiceSeq).padStart(4, '0')}` : ''}` : undefined },
+    { k: 'Contract ends', v: clientNN.contractEnd ? dateMed(clientNN.contractEnd) : undefined },
+    { k: 'Timezone', v: clientNN.timezone },
+    { k: 'Billing address', v: clientNN.address },
+    { k: 'Portal', v: portalBilling.hasPortalAccount ? (lastLogin ? `Last login ${dateShort(lastLogin)}` : 'Invited, not signed in yet') : 'No portal account' },
+  ].filter(i => i.v)
+  const tags = normTags(clientNN.tags)
 
   return (
-    <div className="page-wrap client-profile-page">
-      <input ref={photoInputRef} type="file" accept="image/*" style={{ display: 'none' }}
-        onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f); e.target.value = '' }} />
+    <div className="page crm-page">
+      <input ref={photoInputRef} type="file" accept="image/*" hidden onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f); e.target.value = '' }} />
+      <button type="button" className="back-link" onClick={() => navigate('/clients')}><Ic d={P.chevL} size={15} />Clients</button>
 
-      <button className="btn-ghost btn-sm" style={{ marginBottom: 16 }} onClick={() => navigate('/clients')}>
-        ← Back to Clients
-      </button>
-
-      {/* Header */}
-      <div className="profile-header">
-        <div className="profile-header-left">
-          <div className="avatar-wrap" title="Click to change photo" onClick={() => photoInputRef.current?.click()}>
-            {photoUrl
-              ? <img className="avatar-photo" src={photoUrl} alt={clientNN.name} />
-              : <div className="avatar profile-avatar" style={{ background: color }}>{initials(clientNN.name)}</div>
-            }
-            <span className="avatar-cam"><IconCamera size={14} /></span>
-          </div>
-          <div>
-            {editing
-              ? <input className="form-input profile-name-input" value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))} />
-              : <h1 className="profile-name">{clientNN.name}</h1>
-            }
-            <div className="profile-sub">
-              {clientNN.company && <span style={{ color: 'var(--muted)' }}>{clientNN.company}</span>}
-              {clientNN.company && clientNN.email && <span style={{ color: 'var(--muted)' }}> · </span>}
-              {clientNN.email && <span style={{ color: 'var(--muted)' }}>{clientNN.email}</span>}
-            </div>
-          </div>
-        </div>
-        <div className="profile-header-actions">
-          {editing ? (
-            <>
-              <button className="btn-primary btn-sm" onClick={handleSave} disabled={!form.name.trim()}>Save Changes</button>
-              <button className="btn-ghost btn-sm" onClick={handleCancel}>Cancel</button>
-            </>
-          ) : (
-            <>
-              <span className={`badge ${statusBadge(clientNN.status || 'lead')}`} style={{ fontSize: 13 }}>{clientNN.status || 'Lead'}</span>
-              <span
-                className={`portal-status-badge ${portalBilling.autoPayEnabled ? 'portal-status-green' : portalBilling.hasSavedPaymentMethod ? 'portal-status-yellow' : 'portal-status-gray'}`}
-                title={
-                  portalBilling.autoPayEnabled
-                    ? `AutoPay authorized${fmtDateTime(portalBilling.autoPayAuthorizedAt) ? ` on ${fmtDateTime(portalBilling.autoPayAuthorizedAt)}` : ''}`
-                    : portalBilling.hasSavedPaymentMethod
-                      ? 'Client has a saved card but AutoPay is off'
-                      : portalBilling.hasPortalAccount
-                        ? 'Client portal account exists, but no AutoPay authorization yet'
-                        : 'No client portal account yet'
-                }
-              >
-                {portalBilling.autoPayEnabled ? 'AutoPay On' : portalBilling.hasSavedPaymentMethod ? 'Card Saved' : portalBilling.hasPortalAccount ? 'AutoPay Off' : 'No Portal'}
+      <div className="crm-prof-head">
+        <div className="crm-prof-id">
+          <button type="button" className={`crm-av crm-av--xl ${avatarTone(clientNN.name)}`} title="Change photo" aria-label="Change photo" onClick={() => photoInputRef.current?.click()}>
+            {clientNN.photoUrl ? <img src={clientNN.photoUrl} alt="" /> : initials(clientNN.name)}
+          </button>
+          <PageHeader keepTitleOnPhone className="crm-prof-title" title={clientNN.name}
+            sub={<>
+              <span>{[clientNN.company, clientNN.email, clientNN.timezone].filter(Boolean).join(' · ') || 'No contact details yet'}</span>
+              <span className="crm-pills">
+                <Pill status={stage}>{CLIENT_STAGES.find(s => s.key === stage)?.label ?? stage}</Pill>
+                {health && <span title={health.reasons.join(' · ') || 'All good'}><Pill tone={HEALTH_TONE[health.level]}>{health.label}{health.reasons[0] ? ` · ${health.reasons[0]}` : ''}</Pill></span>}
+                <span title={portalPill.title}><Pill tone={portalPill.tone}>{portalPill.text}</Pill></span>
+                {portalBilling.lastAttempt?.status === 'failed' && <span title={portalBilling.lastAttempt.failureReason || 'Latest payment attempt failed'}><Pill tone="danger">Payment failed</Pill></span>}
               </span>
-              {portalBilling.lastAttempt?.status === 'failed' && (
-                <span
-                  className="portal-status-badge portal-status-red"
-                  title={portalBilling.lastAttempt.failureReason || 'Latest payment attempt failed'}
-                >
-                  Payment Failed
-                </span>
-              )}
-              {outstanding > 0 && clientNN.email && (
-                <button className="btn-ghost btn-sm" style={{ color: '#ea580c' }} onClick={sendReminder}><IconMail size={12} /> Remind</button>
-              )}
-              <button
-                className="btn-ghost btn-sm"
-                onClick={() => void sendPortalInvite('email')}
-                disabled={inviteLoading !== null}
-                title="Send client portal invitation email"
-                style={{ color: 'var(--gold)', borderColor: 'rgba(250,204,21,0.3)' }}
-              >
-                {inviteLoading === 'email' ? 'Sending…' : <><IconLock size={12} /> Email Invite</>}
-              </button>
-              <button
-                className="btn-ghost btn-sm"
-                onClick={() => void sendPortalInvite('link')}
-                disabled={inviteLoading !== null}
-                title="Create and copy a portal invite link to send manually"
-                style={{ color: '#16a34a', borderColor: 'rgba(22,163,74,0.25)' }}
-              >
-                {inviteLoading === 'link' ? 'Creating…' : <><IconLink size={12} /> Copy Invite Link</>}
-              </button>
-              <button
-                className="btn-ghost btn-sm"
-                onClick={() => window.open(`${import.meta.env.BASE_URL}portal/dashboard?preview=${clientNN.id}`, '_blank')}
-                title="Preview this client's portal view"
-                style={{ color: '#2563eb', borderColor: 'rgba(96,165,250,0.3)' }}
-              >
-                <><IconEye size={12} /> Preview Portal</>
-              </button>
-              <button className="btn-ghost btn-sm" onClick={() => setEditing(true)}>Edit Profile</button>
-              <button className="btn-danger btn-sm" onClick={() => setConfirmDelete(true)}>Delete</button>
-            </>
-          )}
-          {inviteMsg && (
-            <div className="profile-actions-message" style={{
-              background: inviteMsg.ok ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)',
-              color: inviteMsg.ok ? '#15803d' : '#ef4444',
-              border: `1px solid ${inviteMsg.ok ? 'rgba(34,197,94,.2)' : 'rgba(239,68,68,.2)'}`,
-            }}>
-              {inviteMsg.text}
-            </div>
-          )}
+            </>} />
+        </div>
+        <div className="page-actions crm-prof-actions">
+          {outstanding > 0 && clientNN.email && <button type="button" className="btn btn--primary" onClick={() => void sendReminder()}><Ic d={P.mail} size={15} />Send reminder</button>}
+          <Menu label="Portal access" buttonClass="btn" trigger={<>{inviteLoading === 'email' ? 'Sending…' : inviteLoading === 'link' ? 'Creating…' : 'Portal access'}<Ic d={P.chevD} size={14} /></>}
+            items={[
+              { label: <span className="crm-menu2"><span>Email invite</span><span className="crm-menu2__sub">Supabase sends the invite to {clientNN.email || 'the client email'}</span></span>, onClick: () => void sendPortalInvite('email'), disabled: inviteLoading !== null },
+              { label: <span className="crm-menu2"><span>Copy invite link</span><span className="crm-menu2__sub">One-time link to send yourself</span></span>, onClick: () => void sendPortalInvite('link'), disabled: inviteLoading !== null },
+              { label: <span className="crm-menu2"><span>Preview portal</span><span className="crm-menu2__sub">Opens their portal in a new tab</span></span>, hidden: !canPreview, onClick: () => window.open(`${import.meta.env.BASE_URL}portal/dashboard?preview=${clientNN.id}`, '_blank') },
+            ]} />
+          <button type="button" className="btn" onClick={() => setEditing(true)}>Edit</button>
+          <Menu label="More actions" items={[
+            { label: 'Change photo', icon: P.image, onClick: () => photoInputRef.current?.click() },
+            'sep',
+            { label: 'Delete client', icon: P.trash, danger: true, onClick: () => setConfirmDelete(true) },
+          ]} />
         </div>
       </div>
+      {msg && <Banner tone={msg.ok ? 'success' : 'danger'} onClose={() => setMsg(null)}>{msg.text}</Banner>}
 
-      {/* KPI row */}
-      {!editing && (
-        <div className="profile-kpi-grid">
-          {[
-            { label: 'Total Revenue', value: `$${(totalRevenue/1000).toFixed(1)}k`, color: 'var(--gold)' },
-            { label: 'Invoices', value: String(clientInvoices.length), color: 'var(--text)' },
-            { label: 'Outstanding', value: outstanding > 0 ? `$${outstanding.toFixed(2)}` : '$0', color: outstanding > 0 ? '#dc2626' : 'var(--success)' },
-            { label: 'Projects', value: String(clientProjects.length), color: '#2563eb' },
-          ].map(({ label, value, color: c }) => (
-            <div key={label} className="settings-stat-card">
-              <div className="settings-stat-count" style={{ color: c, fontSize: 18 }}>{value}</div>
-              <div className="settings-stat-label">{label}</div>
-            </div>
-          ))}
-        </div>
-      )}
+      <KpiStrip compact items={[
+        { label: 'Revenue, all time', value: usd(totalRevenue, { cents: false }) },
+        { label: 'Outstanding', value: <span className={outstanding > 0 ? 't-danger' : undefined}>{usd(outstanding, { cents: false })}</span>, note: `${clientInvoices.length} invoice${clientInvoices.length === 1 ? '' : 's'}` },
+        { label: 'Active projects', value: activeProjects.length, note: clientProjects.length !== activeProjects.length ? `${clientProjects.length} in total` : undefined },
+        { label: 'People placed', value: people },
+        { label: 'Avg. days to pay', value: avgDays ?? '—' },
+      ]} />
 
-      <div className="profile-grid">
-        {/* Left */}
-        <div className="profile-main-stack">
+      <Tabs label="Client sections" value={tab} onChange={pickTab} tabs={[
+        { value: 'overview', label: 'Overview' },
+        { value: 'billing', label: 'Billing', count: clientInvoices.length || null },
+        { value: 'comms', label: 'Communications' },
+        { value: 'contracts', label: 'Contracts', count: (clientNN.contracts ?? []).length || null },
+        { value: 'docs', label: 'Documents', count: clientDocs.length || null },
+        { value: 'history', label: 'History', hidden: !allowed('history.view') },
+      ]} />
 
-          {/* Info */}
-          <div className="data-card">
-            <div className="data-card-title">Client Information</div>
-            <div className="profile-fields">
-              {editing ? (
-                <>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Company</span>
-                    <input className="form-input form-input-sm" value={form.company} onChange={e => setForm(f => ({...f, company: e.target.value}))} placeholder="Legal entity name" />
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Stage</span>
-                    <select className="form-select form-input-sm" value={form.status} onChange={e => setForm(f => ({...f, status: e.target.value}))}>
-                      {STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-                    </select>
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Email</span>
-                    <input className="form-input form-input-sm" type="email" value={form.email} onChange={e => setForm(f => ({...f, email: e.target.value}))} />
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Phone</span>
-                    <input className="form-input form-input-sm" value={form.phone} onChange={e => setForm(f => ({...f, phone: e.target.value}))} />
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Billing Address</span>
-                    <input className="form-input form-input-sm" value={form.address} onChange={e => setForm(f => ({...f, address: e.target.value}))} />
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Timezone</span>
-                    <input className="form-input form-input-sm" value={form.timezone} onChange={e => setForm(f => ({...f, timezone: e.target.value}))} placeholder="EST / PST" />
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Default Rate ($/hr)</span>
-                    <input className="form-input form-input-sm" type="number" value={form.defaultRate} onChange={e => setForm(f => ({...f, defaultRate: e.target.value}))} />
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Payment Terms</span>
-                    <select className="form-select form-input-sm" value={form.paymentTerms} onChange={e => setForm(f => ({...f, paymentTerms: e.target.value}))}>
-                      <option value="">— Not set —</option>
-                      <option>On receipt</option><option>Net 7</option><option>Net 15</option><option>Net 30</option>
-                    </select>
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Contract End</span>
-                    <input className="form-input form-input-sm" type="date" value={form.contractEnd} onChange={e => setForm(f => ({...f, contractEnd: e.target.value}))} />
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Tags</span>
-                    <input className="form-input form-input-sm" value={form.tags} onChange={e => setForm(f => ({...f, tags: e.target.value}))} placeholder="Law firm, US, High priority" />
-                  </div>
-                  <div className="profile-field profile-field-tall">
-                    <span className="profile-field-label">Notes</span>
-                    <textarea className="form-textarea" rows={3} value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} />
-                  </div>
-                  {/* Links edit */}
-                  <div className="profile-field profile-field-tall">
-                    <span className="profile-field-label">Links</span>
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {form.links.map((lk, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <a href={lk.url} target="_blank" rel="noopener noreferrer" style={{ flex: 1, fontSize: 12, color: 'var(--gold)' }}>{lk.label}</a>
-                          <button className="btn-icon btn-danger" style={{ padding: '2px 6px', fontSize: 11 }} onClick={() => removeLink(i)}><IconX size={12} /></button>
-                        </div>
-                      ))}
-                      <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-                        <input className="form-input form-input-sm" value={newLinkLabel} onChange={e => setNewLinkLabel(e.target.value)} placeholder="Label" style={{ flex: 1 }} />
-                        <input className="form-input form-input-sm" value={newLinkUrl} onChange={e => setNewLinkUrl(e.target.value)} placeholder="https://..." style={{ flex: 2 }} />
-                        <button className="btn-ghost btn-sm" onClick={addLink} disabled={!newLinkLabel.trim() || !newLinkUrl.trim()}>+ Add</button>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  {[
-                    { label: 'Company',         value: clientNN.company },
-                    { label: 'Stage',           value: clientNN.status || 'Lead' },
-                    { label: 'Email',           value: clientNN.email },
-                    { label: 'Phone',           value: clientNN.phone },
-                    { label: 'Address',         value: clientNN.address },
-                    { label: 'Timezone',        value: clientNN.timezone },
-                    { label: 'Default Rate',    value: clientNN.defaultRate ? `$${clientNN.defaultRate}/hr` : undefined },
-                    { label: 'Payment Terms',   value: clientNN.paymentTerms },
-                    {
-                      label: 'AutoPay',
-                      value: portalBilling.autoPayEnabled
-                        ? `On${fmtDateTime(portalBilling.autoPayAuthorizedAt) ? ` since ${fmtDateTime(portalBilling.autoPayAuthorizedAt)}` : ''}`
-                        : portalBilling.hasSavedPaymentMethod
-                          ? 'Off — saved card available'
-                          : portalBilling.hasPortalAccount
-                            ? 'Off'
-                            : 'No portal account',
-                    },
-                    { label: 'Saved Card', value: portalCardLabel(portalBilling) },
-                    {
-                      label: 'Last Payment',
-                      value: portalBilling.lastSuccessfulAttempt
-                        ? `${fmtUSD(portalBilling.lastSuccessfulAttempt.amount)} on ${fmtAttemptDate(portalBilling.lastSuccessfulAttempt.attemptedAt)}`
-                        : undefined,
-                    },
-                    {
-                      label: 'Last Attempt',
-                      value: portalBilling.lastAttempt
-                        ? `${portalBilling.lastAttempt.status.replace(/_/g, ' ')} · ${fmtAttemptDate(portalBilling.lastAttempt.attemptedAt)}`
-                        : undefined,
-                    },
-                    { label: 'Contract End',    value: clientNN.contractEnd },
-                    { label: 'Tags',            value: clientNN.tags },
-                  ].map(({ label, value }) => value ? (
-                    <div key={label} className="profile-field">
-                      <span className="profile-field-label">{label}</span>
-                      <span className="profile-field-value">{value}</span>
-                    </div>
-                  ) : null)}
-                  {clientNN.notes && (
-                    <div className="profile-field profile-field-tall">
-                      <span className="profile-field-label">Notes</span>
-                      <span className="profile-field-value" style={{ whiteSpace: 'pre-wrap' }}>{clientNN.notes}</span>
-                    </div>
-                  )}
-                  {(clientNN.links ?? []).length > 0 && (
-                    <div className="profile-field profile-field-tall">
-                      <span className="profile-field-label">Links</span>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {(clientNN.links ?? []).map((lk, i) => (
-                          <a key={i} href={lk.url} target="_blank" rel="noopener noreferrer" className="card-link-pill">{lk.label}</a>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Billing activity */}
-          {(portalBilling.hasPortalAccount || portalBilling.recentAttempts.length > 0) && (
-            <div className="data-card">
-              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
-                <div className="data-card-title" style={{ marginBottom: 0 }}>Billing Activity</div>
-                {hiddenSetupAttemptCount > 0 && visiblePaymentAttempts.length > 0 && (
-                  <div style={{ color: 'var(--muted)', fontSize: 11, textAlign: 'right', lineHeight: 1.4 }}>
-                    {hiddenSetupAttemptCount} setup {hiddenSetupAttemptCount === 1 ? 'attempt' : 'attempts'} hidden
-                  </div>
-                )}
-              </div>
-              {billingActivityAttempts.length === 0 ? (
-                <div style={{ color: 'var(--muted)', fontSize: 13, textAlign: 'center', padding: '16px 0' }}>
-                  No payment attempts recorded yet.
-                </div>
-              ) : (
-                <div className="table-wrap">
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Invoice</th>
-                        <th>Source</th>
-                        <th>Status</th>
-                        <th>Amount</th>
-                        <th>Date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {billingActivityAttempts.map(attempt => {
-                        const setupOnly = isSetupOnlyPaymentAttempt(attempt)
-                        return (
-                        <tr key={attempt.id} style={{ opacity: setupOnly ? 0.58 : 1 }}>
-                          <td className="td-name">{attempt.invoiceNumber || '—'}</td>
-                          <td className="td-muted" style={{ textTransform: 'capitalize' }}>{attempt.source}</td>
-                          <td>
-                            <span className={`badge ${paymentAttemptBadge(attempt)}`} style={{ fontSize: 11, textTransform: 'capitalize' }}>
-                              {setupOnly ? 'started' : attempt.status.replace(/_/g, ' ')}
-                            </span>
-                            {setupOnly && (
-                              <div style={{ color: 'var(--muted)', fontSize: 11, marginTop: 3 }}>
-                                Card confirmation was started but not completed.
-                              </div>
-                            )}
-                            {attempt.failureReason && (
-                              <div style={{ color: '#dc2626', fontSize: 11, marginTop: 3, maxWidth: 220, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {attempt.failureReason}
-                              </div>
-                            )}
-                          </td>
-                          <td style={{ color: 'var(--gold)', fontWeight: 700 }}>{fmtUSD(attempt.amount)}</td>
-                          <td className="td-muted">{fmtAttemptDate(attempt.attemptedAt)}</td>
-                        </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Projects */}
-          {clientProjects.length > 0 && (
-            <div className="data-card">
-              <div className="data-card-title">Projects</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, paddingTop: 4 }}>
-                {clientProjects.map(p => (
-                  <button key={p.id} className="btn-ghost btn-sm" onClick={() => navigate('/projects/' + p.id)} style={{ fontSize: 12 }}>
-                    {p.name}
-                    {p.status && <span style={{ marginLeft: 6, color: 'var(--muted)', fontSize: 11 }}>{p.status}</span>}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Invoice history */}
-          {clientInvoices.length > 0 && (
-            <div className="data-card">
-              <div className="data-card-title">Invoice History</div>
-              <div className="table-wrap">
-                <table className="data-table">
-                  <thead><tr><th>Invoice</th><th>Date</th><th>Status</th><th>Amount</th></tr></thead>
-                  <tbody>
-                    {clientInvoices.slice(0, 10).map(inv => (
-                      <tr key={inv.id}>
-                        <td className="td-name">{inv.number}</td>
-                        <td className="td-muted">{inv.date || '—'}</td>
-                        <td><span className="badge badge-gray" style={{ fontSize: 11 }}>{inv.status || 'draft'}</span></td>
-                        <td style={{ color: 'var(--gold)', fontWeight: 700 }}>${(Number(inv.subtotal)||0).toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Right — Comms Hub */}
-        <div className="data-card profile-comm-card">
-          <div className="data-card-title">Communications</div>
-
-          {/* Type selector + input */}
-          <div className="profile-comm-type-row">
-            {(['note','call','email','meeting'] as CommEntryType[]).map(t => {
-              const icons: Record<string, React.ReactNode> = { note: <IconMessage size={12} />, call: <IconPhone size={12} />, email: <IconMail size={12} />, meeting: <IconHandshake size={12} /> }
-              const active = activityType === t
-              return (
-                <button key={t} onClick={() => setActivityType(t)} style={{
-                  padding: '4px 10px', fontSize: 11, fontWeight: 700, borderRadius: 6, cursor: 'pointer',
-                  border: active ? '1.5px solid var(--gold)' : '1.5px solid var(--border)',
-                  background: active ? 'rgba(250,204,21,.12)' : 'transparent',
-                  color: active ? 'var(--goldd)' : 'var(--muted)',
-                }}>
-                  {icons[t]} {t.charAt(0).toUpperCase() + t.slice(1)}
-                </button>
-              )
-            })}
-          </div>
-          <div className="profile-comm-input-row">
-            <input
-              className="form-input"
-              value={activityNote}
-              onChange={e => setActivityNote(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); addActivity() } }}
-              placeholder={
-                activityType === 'call' ? 'Call summary...' :
-                activityType === 'email' ? 'Email summary...' :
-                activityType === 'meeting' ? 'Meeting notes...' :
-                'Add a note...'
-              }
-            />
-            <button className="btn-primary btn-sm" onClick={addActivity} disabled={!activityNote.trim()}>Log</button>
-          </div>
-
-          {/* Timeline */}
-          {activityLog.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--muted)', fontSize: 13 }}>
-              No communications yet.
-            </div>
-          ) : (
-            <div className="profile-timeline">
-              {activityLog.map((entry, idx) => {
-                const type = entry.type || 'note'
-                const cfg: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
-                  note:    { icon: <IconMessage size={12} />, color: '#64748b', bg: '#f8fafc' },
-                  call:    { icon: <IconPhone size={12} />, color: '#3b82f6', bg: '#eff6ff' },
-                  email:   { icon: <IconMail size={12} />, color: '#a16207', bg: '#fefce8' },
-                  meeting: { icon: <IconHandshake size={12} />, color: '#7e22ce', bg: '#faf5ff' },
-                  system:  { icon: <IconZap size={12} />, color: '#15803d', bg: '#f0fdf4' },
-                }
-                const c = cfg[type] || cfg.note
+      {tab === 'overview' && (
+        <div className="grid-auto">
+          <section className="card card--pad stack">
+            <h2 className="card__title">Client information</h2>
+            <div className="info-grid">{info.map(i => <div key={i.k} className="info"><span className="info__label">{i.k}</span><span className="info__value">{i.v}</span></div>)}</div>
+            {tags.length > 0 && <div className="crm-tagrow">{tags.map(t => <TagBadge key={t} label={t} color={tagColor(t)} />)}</div>}
+            {clientNN.notes && <div className="crm-notes">{clientNN.notes}</div>}
+            {(clientNN.links ?? []).length > 0 && <div className="crm-tagrow">{(clientNN.links ?? []).map((lk, i) => <a key={i} href={lk.url} target="_blank" rel="noopener noreferrer" className="crm-linkpill">{lk.label}</a>)}</div>}
+          </section>
+          <div className="stack stack--lg">
+            <section className="card">
+              <div className="card__head"><h2 className="card__title">Projects</h2><button type="button" className="link" onClick={() => navigate('/projects')}>All projects →</button></div>
+              {clientProjects.length === 0 ? <div className="card-empty">No projects yet.</div> : clientProjects.map(p => {
+                const n = (p.employeeIds ?? []).length
                 return (
-                  <div key={entry.id} style={{
-                    display: 'flex', gap: 10, paddingBottom: 12,
-                    borderLeft: idx < activityLog.length - 1 ? '2px solid var(--border)' : '2px solid transparent',
-                    marginLeft: 10, paddingLeft: 14, position: 'relative',
-                  }}>
-                    {/* Dot */}
-                    <div style={{
-                      position: 'absolute', left: -9, top: 2, width: 16, height: 16,
-                      borderRadius: '50%', background: c.bg, border: `2px solid ${c.color}`,
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 8, flexShrink: 0,
-                    }}>
-                      {c.icon}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 13, color: 'var(--text)', lineHeight: 1.5 }}>{entry.note}</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
-                        <span style={{ fontSize: 11, color: c.color, fontWeight: 600, background: c.bg, borderRadius: 4, padding: '1px 6px' }}>
-                          {type === 'system' ? 'Auto' : type.charAt(0).toUpperCase() + type.slice(1)}
-                        </span>
-                        <span style={{ fontSize: 11, color: 'var(--muted)' }}>{fmtTimestamp(entry.createdAt)}</span>
-                      </div>
-                    </div>
-                    {!entry.auto && (
-                      <button className="btn-icon" style={{ fontSize: 12, color: 'var(--muted)', padding: '2px 5px', alignSelf: 'flex-start' }}
-                        onClick={() => deleteActivity(entry.id)}><IconX size={12} /></button>
-                    )}
-                  </div>
+                  <button key={p.id} type="button" className="list-row crm-btnrow" onClick={() => navigate('/projects/' + p.id)}>
+                    <div className="list-row__main"><span className="list-row__title">{p.name}</span><span className="list-row__meta">{[`${n} ${n === 1 ? 'person' : 'people'}`, PAY_LABEL[p.paySchedule || 'weekly'], p.status].filter(Boolean).join(' · ')}</span></div>
+                    {p.rate ? <span className="num crm-td-strong">${Number(p.rate).toFixed(2).replace(/\.00$/, '')}/hr</span> : null}
+                  </button>
                 )
               })}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Contracts */}
-      <div className="data-card" style={{ marginTop: 16 }}>
-        <div className="profile-section-heading">
-          <div className="data-card-title" style={{ marginBottom: 0 }}>Contracts</div>
-          <button className="btn-primary btn-sm" onClick={openAddContractPanel}>+ Add Contract</button>
-        </div>
-        {(clientNN.contracts ?? []).length === 0 ? (
-          <div style={{ color: 'var(--muted)', fontSize: 13, textAlign: 'center', padding: '16px 0' }}>
-            No contracts yet.
-          </div>
-        ) : (
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Title</th>
-                  <th>Status</th>
-                  <th>Date Range</th>
-                  <th>Value</th>
-                  <th>Notes</th>
-                  <th>File</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {(clientNN.contracts ?? []).map(c => (
-                  <tr key={c.id}>
-                    <td className="td-name">{c.title}</td>
-                    <td>
-                      <span className={`badge ${contractStatusBadge(c.status)}`} style={{ fontSize: 11 }}>
-                        {c.status}
-                      </span>
-                    </td>
-                    <td className="td-muted" style={{ fontSize: 12 }}>
-                      {c.startDate || c.endDate
-                        ? `${c.startDate || '—'} → ${c.endDate || '—'}`
-                        : '—'}
-                    </td>
-                    <td style={{ color: 'var(--gold)', fontWeight: 700 }}>
-                      {c.value != null ? `$${c.value.toLocaleString()}` : '—'}
-                    </td>
-                    <td className="td-muted" style={{ fontSize: 12, maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {c.notes || '—'}
-                    </td>
-                    <td>
-                      {c.fileUrl
-                        ? <a href={c.fileUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'var(--gold)' }}>{c.fileName || 'Download'}</a>
-                        : <span style={{ color: 'var(--muted)', fontSize: 12 }}>—</span>
-                      }
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <button className="btn-ghost btn-sm" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => openEditContractPanel(c)}>Edit</button>
-                        <button className="btn-icon btn-danger" style={{ fontSize: 11, padding: '2px 6px' }} onClick={() => { if (window.confirm(`Delete contract "${c.title}"?`)) deleteContract(c) }}><IconTrash size={12} /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Shared Documents (portal-visible) */}
-      <div className="data-card" style={{ marginTop: 16 }}>
-        <div className="profile-section-heading" style={{ marginBottom: 14 }}>
-          <div>
-            <div className="data-card-title" style={{ marginBottom: 2 }}>Shared Documents</div>
-            <div style={{ fontSize: 12, color: 'var(--muted)' }}>Visible to this client in their portal</div>
-          </div>
-        </div>
-
-        {/* Upload row */}
-        <div className="profile-upload-row">
-          <input
-            ref={docFileRef}
-            type="file"
-            accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
-            style={{ display: 'none' }}
-            onChange={e => setDocFile(e.target.files?.[0] ?? null)}
-          />
-          <button className="btn-ghost btn-sm" onClick={() => docFileRef.current?.click()} style={{ fontSize: 12 }}>
-            Choose File
-          </button>
-          <span className="profile-upload-name">
-            {docFile ? docFile.name : 'No file selected'}
-          </span>
-          <select
-            value={docCategory}
-            onChange={e => setDocCategory(e.target.value as ClientDocument['category'])}
-            style={{ fontSize: 12, padding: '5px 8px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--surface)', color: 'var(--text)', cursor: 'pointer' }}
-          >
-            <option value="contract">Contract</option>
-            <option value="nda">NDA</option>
-            <option value="report">Report</option>
-            <option value="invoice">Invoice</option>
-            <option value="other">Other</option>
-          </select>
-          <button
-            className="btn-primary btn-sm"
-            onClick={() => void uploadClientDoc()}
-            disabled={!docFile || docUploading}
-            style={{ fontSize: 12, whiteSpace: 'nowrap' }}
-          >
-            {docUploading ? 'Uploading…' : 'Share'}
-          </button>
-        </div>
-
-        {docError && (
-          <div style={{ fontSize: 12, color: '#ef4444', padding: '8px 12px', background: 'rgba(239,68,68,.08)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 8, marginBottom: 10 }}>
-            {docError}
-          </div>
-        )}
-
-        {clientDocs.length === 0 ? (
-          <div style={{ color: 'var(--muted)', fontSize: 13, textAlign: 'center', padding: '12px 0' }}>
-            No documents shared yet.
-          </div>
-        ) : (
-          <div className="profile-doc-list">
-            {clientDocs.map(doc => (
-              <div key={doc.id} className="profile-doc-item">
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div className="profile-doc-name">{doc.name}</div>
-                  <div className="profile-doc-meta">
-                    {doc.category.toUpperCase()} · {new Date(doc.uploadedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    {doc.uploadedBy ? ` · ${doc.uploadedBy}` : ''}
-                  </div>
-                </div>
-                <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: 'var(--gold)', textDecoration: 'none', fontWeight: 600, flexShrink: 0 }}>
-                  View
-                </a>
-                <button
-                  className="btn-icon btn-danger"
-                  style={{ fontSize: 11, padding: '2px 6px', flexShrink: 0 }}
-                  onClick={() => { if (window.confirm(`Remove "${doc.name}"?`)) void deleteClientDoc(doc) }}
-                ><IconX size={12} /></button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Contract slide panel */}
-      {contractPanelOpen && (
-        <>
-          <div
-            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.25)', zIndex: 299 }}
-            onClick={() => setContractPanelOpen(false)}
-          />
-          <div className="profile-slide-panel">
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 14px', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text)' }}>
-                {contractEditId ? 'Edit Contract' : 'Add Contract'}
-              </div>
-              <button className="btn-icon" style={{ fontSize: 18, color: 'var(--muted)' }} onClick={() => setContractPanelOpen(false)}><IconX size={16} /></button>
-            </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Title *</label>
-                <input
-                  className="form-input"
-                  value={contractForm.title}
-                  onChange={e => setContractForm(f => ({ ...f, title: e.target.value }))}
-                  placeholder="e.g. Service Agreement 2026"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Status</label>
-                <select
-                  className="form-select"
-                  value={contractForm.status}
-                  onChange={e => setContractForm(f => ({ ...f, status: e.target.value as ContractStatus }))}
-                >
-                  <option value="draft">Draft</option>
-                  <option value="active">Active</option>
-                  <option value="expired">Expired</option>
-                  <option value="terminated">Terminated</option>
-                </select>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Start Date</label>
-                  <input
-                    className="form-input"
-                    type="date"
-                    value={contractForm.startDate}
-                    onChange={e => setContractForm(f => ({ ...f, startDate: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>End Date</label>
-                  <input
-                    className="form-input"
-                    type="date"
-                    value={contractForm.endDate}
-                    onChange={e => setContractForm(f => ({ ...f, endDate: e.target.value }))}
-                  />
-                </div>
-              </div>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Contract Value (USD)</label>
-                <input
-                  className="form-input"
-                  type="number"
-                  value={contractForm.value}
-                  onChange={e => setContractForm(f => ({ ...f, value: e.target.value }))}
-                  placeholder="Optional"
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Notes</label>
-                <textarea
-                  className="form-textarea"
-                  rows={2}
-                  value={contractForm.notes}
-                  onChange={e => setContractForm(f => ({ ...f, notes: e.target.value }))}
-                  placeholder="Optional notes about this contract..."
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
-                  File Upload (.pdf, .doc, .docx)
-                </label>
-                <input
-                  ref={contractFileRef}
-                  type="file"
-                  accept=".pdf,.doc,.docx"
-                  style={{ display: 'none' }}
-                  onChange={e => setContractFile(e.target.files?.[0] ?? null)}
-                />
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <button className="btn-ghost btn-sm" onClick={() => contractFileRef.current?.click()}>
-                    Choose File
-                  </button>
-                  <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-                    {contractFile ? contractFile.name : 'No file selected'}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button className="btn-ghost" onClick={() => setContractPanelOpen(false)}>Cancel</button>
-              <button
-                className="btn-primary"
-                onClick={saveContract}
-                disabled={!contractForm.title.trim() || contractUploading}
-              >
-                {contractUploading ? 'Saving...' : (contractEditId ? 'Save Changes' : 'Add Contract')}
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-
-      {confirmDelete && (
-        <div className="modal-overlay" onClick={() => setConfirmDelete(false)}>
-          <div className="confirm-dialog" onClick={e => e.stopPropagation()}>
-            <div className="confirm-title">Delete {clientNN.name}?</div>
-            <div className="confirm-body">This cannot be undone.</div>
-            <div className="confirm-actions">
-              <button className="btn-ghost" onClick={() => setConfirmDelete(false)}>Cancel</button>
-              <button className="btn-danger" onClick={handleDelete}>Delete</button>
-            </div>
+            </section>
+            <ClientContacts clientId={clientNN.id} />
           </div>
         </div>
       )}
-      <div style={{ marginTop: 20 }}><ClientContacts clientId={clientNN.id} /></div>
-      <RecordHistory table="clients" recordId={clientNN.id} />
+      {tab === 'billing' && <BillingTab invoices={clientInvoices} billing={portalBilling} canOpenInvoices={can.viewInvoices(role)} />}
+      {tab === 'comms' && <CommsTab clientId={clientNN.id} log={activityLog} setLog={setActivityLog} />}
+      {tab === 'contracts' && <ContractsTab client={clientNN} persist={persistUpdate} />}
+      {tab === 'docs' && <DocumentsTab client={clientNN} docs={clientDocs} setDocs={setClientDocs} />}
+      {tab === 'history' && allowed('history.view') && <section className="card card--pad crm-narrow"><HistoryList table="clients" recordId={clientNN.id} limit={50} /></section>}
+
+      <ClientFormDrawer open={editing} client={clientNN} allTags={allTags} onTagCreated={handleTagCreated} onClose={() => setEditing(false)}
+        onSave={async patch => { await persistUpdate({ ...clientNN, ...patch }); setMsg({ ok: true, text: 'Client saved.' }) }} />
+      <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)} title={`Delete ${clientNN.name}?`} sub="This cannot be undone."
+        footer={<><button type="button" className="btn" onClick={() => setConfirmDelete(false)}>Cancel</button><button type="button" className="btn btn--danger" onClick={() => void handleDelete()}>Delete</button></>} />
     </div>
   )
 }

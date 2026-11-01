@@ -1,0 +1,220 @@
+import { useEffect, useState, type ReactNode } from 'react'
+import { supabase } from '../../lib/supabase'
+import { disconnectGmail, initiateGmailAuth } from '../../services/gmail'
+import { pushState, type PushState } from '../../services/notifications'
+import { Ic, P } from '../Icon'
+import { Banner, Field } from '../ui'
+import { dateMed } from '../../utils/format'
+import type { GmailStatus } from './gmailStatus'
+
+/** The booking link the website's booking form opens (index.html, landing pages) */
+export const CALENDLY_URL = 'https://calendly.com/contact-yvastaffing-vuu8/new-meeting'
+
+type Tone = 'ok' | 'warn' | 'bad' | 'off' | 'soon'
+const Status = ({ tone, children }: { tone: Tone; children: ReactNode }) => <span className={`set-status set-status--${tone}`}>{children}</span>
+const Fact = ({ k, v }: { k: string; v: ReactNode }) => <div className="set-int__fact"><span>{k}</span><span>{v}</span></div>
+
+function newestVersion(versions: string[]): string | null {
+  const parse = (v: string) => v.split('.').map(n => parseInt(n, 10) || 0)
+  return versions.reduce<string | null>((best, v) => {
+    if (!best) return v
+    const a = parse(v), b = parse(best)
+    for (let i = 0; i < Math.max(a.length, b.length); i++) { if ((a[i] ?? 0) !== (b[i] ?? 0)) return (a[i] ?? 0) > (b[i] ?? 0) ? v : best }
+    return best
+  }, null)
+}
+
+type Facts = {
+  stripeLast?: { at: string; amount: number } | null
+  calendlyBooked?: number | null
+  devices?: { connected: number; newest: string | null } | null
+  push?: { ok: boolean; text: string } | null
+  pushHere?: PushState | null
+}
+
+export default function IntegrationsTab({ clientId, onClientId, saveClientId, gmail, recheck, onGmailChange, notify }: {
+  clientId: string
+  onClientId: (v: string) => void
+  /** Saves the Client ID if it changed; resolves false when the save failed */
+  saveClientId: () => Promise<boolean>
+  gmail: GmailStatus
+  recheck: () => Promise<void>
+  onGmailChange: (s: GmailStatus) => void
+  notify: (tone: 'success' | 'danger', text: string) => void
+}) {
+  const [facts, setFacts] = useState<Facts>({})
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    const set = (patch: Facts) => { if (alive) setFacts(f => ({ ...f, ...patch })) }
+    // Each read is best-effort: a missing table or a role without access just shows "—"
+    void supabase.from('client_payments').select('created_at,amount').eq('source', 'stripe').order('created_at', { ascending: false }).limit(1)
+      .then(({ data, error }) => set({ stripeLast: error ? undefined : (data?.[0] ? { at: data[0].created_at as string, amount: Number(data[0].amount) || 0 } : null) }))
+    void supabase.from('leads').select('id', { count: 'exact', head: true }).eq('calendly_booked', true)
+      .then(({ count, error }) => set({ calendlyBooked: error ? undefined : (count ?? 0) }))
+    void supabase.from('desktop_devices').select('app_version,signed_out_at,revoked_at')
+      .then(({ data, error }) => {
+        if (error) return set({ devices: undefined })
+        const rows = (data || []) as { app_version: string | null; signed_out_at: string | null; revoked_at: string | null }[]
+        set({ devices: { connected: rows.filter(r => !r.signed_out_at && !r.revoked_at).length, newest: newestVersion(rows.map(r => r.app_version || '').filter(Boolean)) } })
+      })
+    void fetch('/.netlify/functions/push-config')
+      .then(async res => {
+        const data = await res.json().catch(() => ({}))
+        set({ push: res.ok && data?.publicKey ? { ok: true, text: 'Public key published' } : { ok: false, text: data?.error || `Not available (HTTP ${res.status})` } })
+      })
+      .catch(() => set({ push: { ok: false, text: 'Could not reach the push service.' } }))
+    void pushState().then(s => set({ pushHere: s })).catch(() => set({ pushHere: null }))
+    return () => { alive = false }
+  }, [])
+
+  async function connect() {
+    if (!clientId.trim()) return
+    setBusy(true)
+    // The OAuth callback reads the Client ID back from settings, so it must be saved first
+    if (!(await saveClientId())) { setBusy(false); return }
+    try { await initiateGmailAuth(clientId.trim()) } catch (e) { setBusy(false); notify('danger', `Could not start the Google sign-in: ${(e as Error).message}`) }
+  }
+
+  async function disconnect() {
+    setBusy(true)
+    try {
+      await disconnectGmail()
+      onGmailChange({ state: 'off' })
+      notify('success', 'Gmail disconnected.')
+    } catch (e) {
+      notify('danger', (e as Error).message)
+    }
+    setBusy(false)
+  }
+
+  const pk = (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined) || ''
+  const stripeMode = pk.startsWith('pk_live') ? 'Live' : pk.startsWith('pk_test') ? 'Test mode' : pk ? 'Configured' : ''
+  const downloadUrl = (import.meta.env.VITE_YVA_TIME_DOWNLOAD_URL as string | undefined) || ''
+  const dash = <span className="soft">—</span>
+
+  const g = gmail.state
+  const gmailPill = g === 'ok' ? <Status tone="ok">Connected</Status>
+    : g === 'reconnect' ? <Status tone="warn">Reconnect needed</Status>
+    : g === 'problem' ? <Status tone="bad">Connection problem</Status>
+    : g === 'checking' ? <Status tone="off">Checking…</Status>
+    : <Status tone="off">Not connected</Status>
+  const pushHereText: Record<PushState, string> = { on: 'On', off: 'Off', denied: 'Blocked in this browser', unsupported: 'Not supported here', 'needs-install': 'Install the app first (iPhone)' }
+
+  return (
+    <div className="set-int-grid">
+      {/* ── Gmail ── */}
+      <section className="set-int set-int--wide" aria-label="Gmail">
+        <div className="set-int__head">
+          <span className="set-int__name"><Ic d={P.mail} /> Gmail</span>
+          {gmailPill}
+        </div>
+        <span className="set-int__desc">Sends invoices, reminders and automatic emails as you. Each person connects their own Gmail.</span>
+
+        {g === 'ok' && <div className="set-int__facts"><Fact k="Connected account" v={gmail.email} /></div>}
+        {g === 'reconnect' && (
+          <Banner tone="warning">
+            <strong>Reconnect needed.</strong> {gmail.reason} Connect Gmail again to keep sending from {gmail.email || 'your account'}.
+          </Banner>
+        )}
+        {g === 'problem' && <Banner tone="danger"><strong>Connection problem.</strong> {gmail.reason}</Banner>}
+
+        {(g === 'off' || g === 'reconnect' || g === 'problem') && (
+          <div className="set-int__setup">
+            <Field label="Google OAuth Client ID" hint={<>From Google Cloud Console → APIs &amp; Services → Credentials → OAuth 2.0 Client ID (Web application). Authorized Redirect URI: <code className="set-code">{window.location.origin}/oauth-callback</code></>}>
+              <input className="input" placeholder="123456789-abc123.apps.googleusercontent.com" value={clientId} onChange={e => onClientId(e.target.value)} />
+            </Field>
+            {g === 'off' && (
+              <span className="set-hint">
+                <strong>Setup guide:</strong> Go to <strong>console.cloud.google.com</strong> → New Project → Enable <strong>Gmail API</strong> →
+                Create <strong>OAuth 2.0 Client ID</strong> (Web application) → add the redirect URI above →
+                paste the Client ID here → add the Google client secret to Netlify as <code>GMAIL_CLIENT_SECRET</code> → click Connect.
+                All emails (invoices, statements, reminders) will be sent directly via your Gmail.
+              </span>
+            )}
+          </div>
+        )}
+
+        <div className="set-actions set-actions--split">
+          <div className="set-actions">
+            {g === 'off' && <button type="button" className="btn btn--primary" disabled={busy || !clientId.trim()} onClick={() => void connect()}>Connect Gmail →</button>}
+            {(g === 'reconnect' || g === 'problem') && <button type="button" className="btn btn--primary" disabled={busy || !clientId.trim()} onClick={() => void connect()}>Reconnect Gmail</button>}
+            {(g === 'ok' || g === 'problem' || g === 'reconnect') && <button type="button" className="btn" disabled={busy} onClick={() => void recheck()}><Ic d={P.refresh} size={14} /> Check again</button>}
+          </div>
+          {(g === 'ok' || g === 'reconnect' || g === 'problem') && (
+            <button type="button" className="btn btn--sm btn--ghost btn--danger" disabled={busy} onClick={() => void disconnect()}>Disconnect Gmail</button>
+          )}
+        </div>
+      </section>
+
+      {/* ── Stripe ── */}
+      <section className="set-int" aria-label="Stripe">
+        <div className="set-int__head">
+          <span className="set-int__name"><Ic d={P.card} /> Stripe</span>
+          {pk ? <Status tone="ok">{stripeMode === 'Configured' ? 'Connected' : `Connected · ${stripeMode}`}</Status> : <Status tone="off">Not set up</Status>}
+        </div>
+        <span className="set-int__desc">Card payments and AutoPay in the client portal. The webhook marks invoices paid.</span>
+        <div className="set-int__facts">
+          <Fact k="Publishable key" v={pk ? `Set (${stripeMode.toLowerCase()})` : 'Missing'} />
+          <Fact k="Webhook" v="Set on the server" />
+          <Fact k="Last card payment" v={facts.stripeLast === undefined ? dash : facts.stripeLast ? `$${facts.stripeLast.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} · ${dateMed(facts.stripeLast.at)}` : 'None yet'} />
+        </div>
+        <span className="set-hint">
+          {pk ? 'Keys and the webhook secret (STRIPE_WEBHOOK_SECRET) live in Netlify; they are never shown here.'
+            : <>Add <code>VITE_STRIPE_PUBLISHABLE_KEY</code> in Netlify and redeploy to turn on card payments.</>}
+        </span>
+      </section>
+
+      {/* ── Calendly ── */}
+      <section className="set-int" aria-label="Calendly">
+        <div className="set-int__head">
+          <span className="set-int__name"><Ic d={P.calendar} /> Calendly</span>
+          <Status tone="ok">On the website</Status>
+        </div>
+        <span className="set-int__desc">Marks leads as “call booked” when they schedule from the website.</span>
+        <div className="set-int__facts">
+          <Fact k="Booking link" v={<a href={CALENDLY_URL} target="_blank" rel="noreferrer">Open booking page</a>} />
+          <Fact k="Leads with a call booked" v={facts.calendlyBooked == null ? dash : facts.calendlyBooked} />
+        </div>
+      </section>
+
+      {/* ── YVA Time ── */}
+      <section className="set-int" aria-label="YVA Time for Windows">
+        <div className="set-int__head">
+          <span className="set-int__name"><Ic d={P.time} /> YVA Time for Windows</span>
+          {downloadUrl ? <Status tone="ok">Live</Status> : <Status tone="warn">No download link</Status>}
+        </div>
+        <span className="set-int__desc">Desktop tracker. Installed apps update themselves from GitHub Releases.</span>
+        <div className="set-int__facts">
+          <Fact k="Newest version in use" v={facts.devices?.newest ?? dash} />
+          <Fact k="Computers connected" v={facts.devices ? facts.devices.connected : dash} />
+          <Fact k="Download" v={downloadUrl ? <a href={downloadUrl} target="_blank" rel="noreferrer">YVA-Time-Setup.exe</a> : 'Not set'} />
+        </div>
+        {!downloadUrl && <span className="set-hint">Set <code>VITE_YVA_TIME_DOWNLOAD_URL</code> in Netlify to show the Download button in My workspace.</span>}
+      </section>
+
+      {/* ── Web push ── */}
+      <section className="set-int" aria-label="Web push">
+        <div className="set-int__head">
+          <span className="set-int__name"><Ic d={P.bell} /> Web push</span>
+          {facts.push == null ? <Status tone="off">Checking…</Status> : facts.push.ok ? <Status tone="ok">On</Status> : <Status tone="bad">Not set up</Status>}
+        </div>
+        <span className="set-int__desc">Phone notifications for the installed YVA OS app. Each person turns them on under Notifications.</span>
+        <div className="set-int__facts">
+          <Fact k="Server" v={facts.push?.text ?? dash} />
+          <Fact k="This device" v={facts.pushHere ? pushHereText[facts.pushHere] : dash} />
+        </div>
+      </section>
+
+      {/* ── Crisp ── */}
+      <section className="set-int set-int--soon" aria-label="Crisp chat">
+        <div className="set-int__head">
+          <span className="set-int__name"><Ic d={P.message} /> Crisp chat</span>
+          <Status tone="soon">Coming soon</Status>
+        </div>
+        <span className="set-int__desc">Messages tab in the client portal. Needs a Crisp account (website ID) before it can be switched on.</span>
+      </section>
+    </div>
+  )
+}

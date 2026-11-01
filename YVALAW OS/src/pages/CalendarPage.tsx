@@ -1,104 +1,69 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import type { Invoice, Project, Task, Estimate } from '../data/types'
+import type { Client, Employee, Estimate, Invoice, Project, Task } from '../data/types'
 import { loadSnapshot, loadTasks, loadEstimates } from '../services/storage'
-import { IconReceipt, IconFolder, IconClipboard, IconCheck, IconCalendar, IconSparkles } from '../components/Icon'
+import { loadHolidays, loadTimeOff, type Holiday, type TimeOffRequest } from '../services/workspace'
+import { Drawer, EmptyState, PageHeader, Pill, Skel, Stepper, useIsMobile } from '../components/ui'
+import { Ic, P } from '../components/Icon'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type EventType = 'invoice' | 'project' | 'task' | 'estimate'
-
-type FilterType = 'all' | EventType
+type Kind = 'money' | 'off' | 'holiday' | 'due' | 'contract' | 'project' | 'task' | 'estimate'
 
 interface CalendarEvent {
   id: string
-  type: EventType
+  kind: Kind
   date: string        // YYYY-MM-DD
   title: string
   subtitle: string
-  entityId: string
+  to: string          // where "Open" goes
   meta?: string       // e.g. invoice status
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const TYPE_COLORS: Record<EventType, string> = {
-  invoice:  '#ef4444',
-  project:  '#8b5cf6',
-  estimate: '#f59e0b',
-  task:     '#3b82f6',
-}
-
-const TYPE_LABELS: Record<EventType, string> = {
-  invoice:  'Invoice Due',
-  project:  'Project End',
-  estimate: 'Estimate Expiry',
-  task:     'Task Due',
-}
-
-const TYPE_ICONS: Record<EventType, React.ReactNode> = {
-  invoice:  <IconReceipt size={14} />,
-  project:  <IconFolder size={14} />,
-  estimate: <IconClipboard size={14} />,
-  task:     <IconCheck size={14} />,
-}
-
-const MONTH_NAMES = [
-  'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December',
+/** Legend chips (toggleable). Money cycle = Mon weekly close · Wed payroll reminder · Fri payday */
+const KINDS: { key: Kind; label: string; open: string }[] = [
+  { key: 'money', label: 'Money cycle', open: 'Open' },
+  { key: 'off', label: 'Time off', open: 'Open person' },
+  { key: 'holiday', label: 'Holidays', open: 'Announcements' },
+  { key: 'due', label: 'Invoice due', open: 'Open invoice' },
+  { key: 'contract', label: 'Contracts', open: 'Open client' },
+  { key: 'project', label: 'Project ends', open: 'Open project' },
+  { key: 'task', label: 'Tasks', open: 'Open project' },
+  { key: 'estimate', label: 'Estimates', open: 'Open estimates' },
 ]
-
+const ORDER: Kind[] = KINDS.map(k => k.key)
 const DAY_HEADERS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const HIDE_KEY = 'yva_calendar_hidden'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function toDateKey(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
+const shortName = (n: string) => { const [a, b] = n.split(/\s+/); return b ? `${a} ${b[0]}.` : a }
 
-function todayKey(): string {
-  return toDateKey(new Date())
-}
-
-// Build a 6-week grid (42 cells) for the given year+month, Mon-first.
+// Build the month grid (Mon-first), padded to whole weeks.
 function buildGridDays(year: number, month: number): { date: Date; isCurrentMonth: boolean }[] {
-  // month is 0-based
-  const firstOfMonth = new Date(year, month, 1)
-  const lastOfMonth  = new Date(year, month + 1, 0)
-
-  // Day of week (0=Sun..6=Sat) → convert to Mon-first (0=Mon..6=Sun)
-  const firstDow = (firstOfMonth.getDay() + 6) % 7
-  const lastDow  = (lastOfMonth.getDay() + 6) % 7
-
+  const first = new Date(year, month, 1)
+  const last = new Date(year, month + 1, 0)
+  const firstDow = (first.getDay() + 6) % 7
   const days: { date: Date; isCurrentMonth: boolean }[] = []
-
-  // Pad from previous month
-  for (let i = firstDow - 1; i >= 0; i--) {
-    const d = new Date(year, month, -i)
-    days.push({ date: d, isCurrentMonth: false })
-  }
-
-  // Current month days
-  for (let d = 1; d <= lastOfMonth.getDate(); d++) {
-    days.push({ date: new Date(year, month, d), isCurrentMonth: true })
-  }
-
-  // Pad to end (fill remaining cells up to 42)
-  const remaining = 42 - days.length
-  for (let d = 1; d <= remaining; d++) {
-    days.push({ date: new Date(year, month + 1, d), isCurrentMonth: false })
-  }
-
+  for (let i = firstDow - 1; i >= 0; i--) days.push({ date: new Date(year, month, -i), isCurrentMonth: false })
+  for (let d = 1; d <= last.getDate(); d++) days.push({ date: new Date(year, month, d), isCurrentMonth: true })
+  let n = 1
+  while (days.length % 7 !== 0) days.push({ date: new Date(year, month + 1, n++), isCurrentMonth: false })
   return days
+}
+
+function readHidden(): Set<Kind> {
+  try { return new Set(JSON.parse(localStorage.getItem(HIDE_KEY) || '[]') as Kind[]) } catch { return new Set() }
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function CalendarPage() {
   const navigate = useNavigate()
+  const mobile = useIsMobile()
   const now = new Date()
 
   const [year, setYear]   = useState(now.getFullYear())
@@ -106,14 +71,18 @@ export default function CalendarPage() {
 
   const [invoices,  setInvoices]  = useState<Invoice[]>([])
   const [projects,  setProjects]  = useState<Project[]>([])
+  const [clients,   setClients]   = useState<Client[]>([])
+  const [employees, setEmployees] = useState<Employee[]>([])
   const [tasks,     setTasks]     = useState<Task[]>([])
   const [estimates, setEstimates] = useState<Estimate[]>([])
+  const [timeOff,   setTimeOff]   = useState<TimeOffRequest[]>([])
+  const [holidays,  setHolidays]  = useState<Holiday[]>([])
   const [loading,   setLoading]   = useState(true)
 
-  const [filter,      setFilter]      = useState<FilterType>('all')
+  const [hidden, setHidden] = useState<Set<Kind>>(readHidden)
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
 
-  // ─── Load data ─────────────────────────────────────────────────────────────
+  // ─── Load data (each source may fail on its own: RLS hides what a role can't see) ─────
 
   useEffect(() => {
     let cancelled = false
@@ -126,592 +95,200 @@ export default function CalendarPage() {
           loadEstimates().catch(() => [] as Estimate[]),
         ])
         if (cancelled) return
-        setInvoices(snap.invoices)
-        setProjects(snap.projects)
-        setTasks(taskList)
-        setEstimates(estimateList)
+        setInvoices(snap.invoices); setProjects(snap.projects); setClients(snap.clients); setEmployees(snap.employees)
+        setTasks(taskList); setEstimates(estimateList)
       } catch (err) {
         console.error('CalendarPage load error', err)
       } finally {
         if (!cancelled) setLoading(false)
       }
     }
-    load()
+    void load()
     return () => { cancelled = true }
   }, [])
 
+  // Approved time off + holidays for the visible month
+  useEffect(() => {
+    let alive = true
+    const from = toDateKey(new Date(year, month, 1)), to = toDateKey(new Date(year, month + 1, 0))
+    void loadTimeOff({ status: 'approved', from, to }).then(r => { if (alive) setTimeOff(r.rows) }).catch(() => {})
+    void loadHolidays(from).then(h => { if (alive) setHolidays(h.filter(x => x.day <= to)) }).catch(() => {})
+    return () => { alive = false }
+  }, [year, month])
+
+  function toggle(k: Kind) {
+    setHidden(prev => {
+      const next = new Set(prev)
+      if (next.has(k)) next.delete(k); else next.add(k)
+      try { localStorage.setItem(HIDE_KEY, JSON.stringify([...next])) } catch { /* per-device convenience only */ }
+      return next
+    })
+  }
+
   // ─── Build events ──────────────────────────────────────────────────────────
+
+  const gridDays = useMemo(() => buildGridDays(year, month), [year, month])
 
   const allEvents = useMemo<CalendarEvent[]>(() => {
     const events: CalendarEvent[] = []
+    const gridKeys = gridDays.map(g => toDateKey(g.date))
+
+    // Money cycle on every visible Mon / Wed / Fri (weekly close prepares Monday 12:05 am; payroll reminder Wednesday; payday Friday)
+    for (const g of gridDays) {
+      const key = toDateKey(g.date), dow = g.date.getDay()
+      if (dow === 1) events.push({ id: `wc-${key}`, kind: 'money', date: key, title: 'Weekly close', subtitle: 'Last week’s hours become draft invoices (12:05 am)', to: '/weekly-close' })
+      if (dow === 3) events.push({ id: `pr-${key}`, kind: 'money', date: key, title: 'Payroll reminder', subtitle: 'Friday’s payroll is prepared for review', to: '/payroll' })
+      if (dow === 5) events.push({ id: `pd-${key}`, kind: 'money', date: key, title: 'Payday', subtitle: 'Pay in DOP, payslips sent', to: '/payroll' })
+    }
+
+    // Approved time off, one chip per day
+    for (const r of timeOff) {
+      const emp = employees.find(e => e.id === r.employee_id)
+      const name = emp ? shortName(emp.name) : 'Someone'
+      for (const key of gridKeys) {
+        if (key < r.start_date || key > r.end_date) continue
+        events.push({ id: `off-${r.id}-${key}`, kind: 'off', date: key, title: `${name} off`, subtitle: `${r.kind === 'sick' ? 'Sick day' : r.kind.replace(/^./, c => c.toUpperCase())}${r.half_day ? ' · half day' : ''}${r.note ? ` · ${r.note}` : ''}`, to: emp ? `/employees/${emp.id}` : '/approvals' })
+      }
+    }
+
+    for (const h of holidays) events.push({ id: `hol-${h.id}`, kind: 'holiday', date: h.day, title: h.name, subtitle: h.paid ? 'Paid holiday' : 'Holiday', to: '/announcements' })
 
     // Invoices — only actionable statuses
     const invoiceStatuses = new Set(['sent', 'viewed', 'partial', 'overdue'])
     for (const inv of invoices) {
-      if (!inv.dueDate) continue
-      if (!invoiceStatuses.has(inv.status ?? '')) continue
-      events.push({
-        id:       `inv-${inv.id}`,
-        type:     'invoice',
-        date:     inv.dueDate,
-        title:    inv.number,
-        subtitle: inv.clientName ?? inv.projectName ?? '',
-        entityId: inv.id,
-        meta:     inv.status,
-      })
+      if (!inv.dueDate || !invoiceStatuses.has(inv.status ?? '')) continue
+      events.push({ id: `inv-${inv.id}`, kind: 'due', date: inv.dueDate, title: inv.number, subtitle: inv.clientName ?? inv.projectName ?? '', to: `/invoice?open=${inv.id}`, meta: inv.status })
     }
 
-    // Projects — end dates
+    for (const c of clients) {
+      if (!c.contractEnd) continue
+      events.push({ id: `con-${c.id}`, kind: 'contract', date: c.contractEnd, title: `${c.name} contract ends`, subtitle: c.company ?? '', to: `/clients/${c.id}` })
+    }
+
     for (const proj of projects) {
       if (!proj.endDate) continue
-      events.push({
-        id:       `proj-${proj.id}`,
-        type:     'project',
-        date:     proj.endDate,
-        title:    proj.name,
-        subtitle: proj.status ?? '',
-        entityId: proj.id,
-      })
+      events.push({ id: `proj-${proj.id}`, kind: 'project', date: proj.endDate, title: `${proj.name} ends`, subtitle: proj.status ?? '', to: `/projects/${proj.id}` })
     }
 
     // Tasks — due dates, exclude done
     for (const task of tasks) {
-      if (!task.dueDate) continue
-      if (task.status === 'done') continue
-      events.push({
-        id:       `task-${task.id}`,
-        type:     'task',
-        date:     task.dueDate,
-        title:    task.title,
-        subtitle: task.assigneeName ?? '',
-        entityId: task.projectId,
-        meta:     task.status,
-      })
+      if (!task.dueDate || task.status === 'done') continue
+      const proj = projects.find(p => p.id === task.projectId)
+      events.push({ id: `task-${task.id}`, kind: 'task', date: task.dueDate, title: task.title, subtitle: [proj?.name, task.assigneeName].filter(Boolean).join(' · '), to: `/projects/${task.projectId}?tab=tasks`, meta: task.status })
     }
 
     // Estimates — expiry dates, exclude accepted/declined
     for (const est of estimates) {
-      if (!est.expiryDate) continue
-      if (est.status === 'accepted' || est.status === 'declined') continue
-      events.push({
-        id:       `est-${est.id}`,
-        type:     'estimate',
-        date:     est.expiryDate,
-        title:    est.number,
-        subtitle: est.clientName ?? est.projectName ?? '',
-        entityId: est.id,
-        meta:     est.status,
-      })
+      if (!est.expiryDate || est.status === 'accepted' || est.status === 'declined') continue
+      events.push({ id: `est-${est.id}`, kind: 'estimate', date: est.expiryDate, title: `${est.number} expires`, subtitle: est.clientName ?? est.projectName ?? '', to: '/estimates', meta: est.status })
     }
 
-    return events
-  }, [invoices, projects, tasks, estimates])
-
-  // ─── Filter events ─────────────────────────────────────────────────────────
-
-  const visibleEvents = useMemo<CalendarEvent[]>(() => {
-    if (filter === 'all') return allEvents
-    return allEvents.filter(e => e.type === filter)
-  }, [allEvents, filter])
-
-  // ─── Index events by date ──────────────────────────────────────────────────
+    return events.sort((a, b) => ORDER.indexOf(a.kind) - ORDER.indexOf(b.kind))
+  }, [gridDays, invoices, projects, clients, employees, tasks, estimates, timeOff, holidays])
 
   const eventsByDate = useMemo<Map<string, CalendarEvent[]>>(() => {
     const map = new Map<string, CalendarEvent[]>()
-    for (const ev of visibleEvents) {
-      if (!ev.date) continue
+    for (const ev of allEvents) {
+      if (hidden.has(ev.kind)) continue
       const list = map.get(ev.date) ?? []
       list.push(ev)
       map.set(ev.date, list)
     }
     return map
-  }, [visibleEvents])
+  }, [allEvents, hidden])
 
-  // ─── Grid ──────────────────────────────────────────────────────────────────
+  function prevMonth() { if (month === 0) { setYear(y => y - 1); setMonth(11) } else setMonth(m => m - 1); setSelectedDay(null) }
+  function nextMonth() { if (month === 11) { setYear(y => y + 1); setMonth(0) } else setMonth(m => m + 1); setSelectedDay(null) }
+  function goToday() { setYear(now.getFullYear()); setMonth(now.getMonth()); setSelectedDay(null) }
 
-  const gridDays = useMemo(() => buildGridDays(year, month), [year, month])
-
-  // ─── Navigation ────────────────────────────────────────────────────────────
-
-  function prevMonth() {
-    if (month === 0) { setYear(y => y - 1); setMonth(11) }
-    else              setMonth(m => m - 1)
-    setSelectedDay(null)
-  }
-
-  function nextMonth() {
-    if (month === 11) { setYear(y => y + 1); setMonth(0) }
-    else               setMonth(m => m + 1)
-    setSelectedDay(null)
-  }
-
-  // ─── Selected day events ───────────────────────────────────────────────────
-
+  const today = toDateKey(now)
+  const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`
+  const monthTitle = new Date(year, month, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  const monthCount = [...eventsByDate.entries()].filter(([d]) => d.startsWith(monthKey)).reduce((s, [, l]) => s + l.length, 0)
   const selectedEvents = selectedDay ? (eventsByDate.get(selectedDay) ?? []) : []
+  const fullDay = (key: string) => { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) }
 
-  // Group selected day events by type
-  const selectedByType = useMemo<Partial<Record<EventType, CalendarEvent[]>>>(() => {
-    const grouped: Partial<Record<EventType, CalendarEvent[]>> = {}
-    for (const ev of selectedEvents) {
-      if (!grouped[ev.type]) grouped[ev.type] = []
-      grouped[ev.type]!.push(ev)
-    }
-    return grouped
-  }, [selectedEvents])
+  const legend = (
+    <div className="ops-legend" role="group" aria-label="Show on the calendar">
+      {KINDS.map(k => (
+        <button key={k.key} type="button" className={`ops-legend__chip${hidden.has(k.key) ? ' ops-legend__chip--off' : ''}`} aria-pressed={!hidden.has(k.key)} onClick={() => toggle(k.key)}>
+          <span className={`ops-legend__dot ops-k-${k.key}`} aria-hidden />{k.label}
+        </button>
+      ))}
+    </div>
+  )
 
-  const today = todayKey()
-
-  // ─── Navigation to entities ────────────────────────────────────────────────
-
-  function navigateToEvent(ev: CalendarEvent) {
-    switch (ev.type) {
-      case 'invoice':  navigate('/invoice'); break
-      case 'project':  navigate(`/projects/${ev.entityId}`); break
-      case 'task':     navigate(`/projects/${ev.entityId}`); break
-      case 'estimate': navigate('/estimates'); break
-    }
-  }
-
-  // ─── Format selected day label ─────────────────────────────────────────────
-
-  function formatSelectedDay(key: string): string {
-    const [y, m, d] = key.split('-').map(Number)
-    const date = new Date(y, m - 1, d)
-    return date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
-  }
-
-  // ─── Render ────────────────────────────────────────────────────────────────
+  const agendaDays = [...eventsByDate.entries()].filter(([d]) => d.startsWith(monthKey)).sort(([a], [b]) => a.localeCompare(b))
 
   return (
-    <div className="calendar-page">
+    <div className="page">
+      <PageHeader keepTitleOnPhone title={monthTitle} sub="Money cycle, time off, holidays, due dates and contract ends" actions={<>
+        <Stepper label={<span className="ops-cal-count">{loading ? 'Loading…' : `${monthCount} event${monthCount === 1 ? '' : 's'}`}</span>} onPrev={prevMonth} onNext={nextMonth} prevLabel="Previous month" nextLabel="Next month" />
+        <button type="button" className="btn btn--sm" onClick={goToday}>Today</button>
+      </>} />
+      {legend}
 
-      {/* Page header */}
-      <div className="page-header" style={{ marginBottom: 16 }}>
-        <div className="page-header-left">
-          <h1 className="page-title">Calendar</h1>
-          <p className="page-sub">Invoice dues, project deadlines, tasks, and estimate expirations</p>
-        </div>
-        {/* Month navigation */}
-        <div className="page-header-actions">
-          <button
-            onClick={prevMonth}
-            style={{
-              background: 'var(--surface)', border: '1px solid var(--border)',
-              borderRadius: 8, padding: '7px 14px', cursor: 'pointer',
-              fontSize: 14, color: 'var(--text)', fontWeight: 600,
-            }}
-          >
-            ← Prev
-          </button>
-          <span style={{
-            fontSize: 16, fontWeight: 800, color: 'var(--text)',
-            minWidth: 160, textAlign: 'center', letterSpacing: '-0.01em',
-          }}>
-            {MONTH_NAMES[month]} {year}
-          </span>
-          <button
-            onClick={nextMonth}
-            style={{
-              background: 'var(--surface)', border: '1px solid var(--border)',
-              borderRadius: 8, padding: '7px 14px', cursor: 'pointer',
-              fontSize: 14, color: 'var(--text)', fontWeight: 600,
-            }}
-          >
-            Next →
-          </button>
-        </div>
-      </div>
-
-      {/* Filter pills */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
-        {(['all', 'invoice', 'project', 'task', 'estimate'] as FilterType[]).map(f => {
-          const active = filter === f
-          const color  = f === 'all' ? '#64748b' : TYPE_COLORS[f as EventType]
-          return (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              style={{
-                padding: '5px 14px',
-                borderRadius: 20,
-                border: active ? `2px solid ${color}` : '1.5px solid var(--border)',
-                background: active ? `${color}18` : 'var(--surface)',
-                color: active ? color : 'var(--muted)',
-                fontWeight: active ? 700 : 500,
-                fontSize: 13,
-                cursor: 'pointer',
-                transition: 'all .15s',
-              }}
-            >
-              {f === 'all' ? 'All' : TYPE_LABELS[f as EventType]}
-            </button>
-          )
-        })}
-
-        {/* Event count summary */}
-        <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--muted)', alignSelf: 'center' }}>
-          {loading ? 'Loading...' : `${visibleEvents.length} event${visibleEvents.length !== 1 ? 's' : ''} this calendar`}
-        </span>
-      </div>
-
-      {/* Main layout: calendar + detail panel */}
-      <div className="calendar-layout">
-
-        {/* Calendar grid */}
-        <div className="calendar-panel" style={{
-          flex: 1,
-          minWidth: 0,
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 12,
-          overflow: 'hidden',
-          boxShadow: '0 1px 4px rgba(0,0,0,.06)',
-        }}>
-          {/* Day-of-week headers */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(7, 1fr)',
-            borderBottom: '1px solid var(--border)',
-          }}>
-            {DAY_HEADERS.map(d => (
-              <div key={d} style={{
-                padding: '10px 0',
-                textAlign: 'center',
-                fontSize: 11,
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '.07em',
-                color: 'var(--muted)',
-              }}>
-                {d}
-              </div>
-            ))}
-          </div>
-
-          {/* Day cells */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(7, 1fr)',
-          }}>
-            {gridDays.map(({ date, isCurrentMonth }, idx) => {
-              const key      = toDateKey(date)
-              const dayEvs   = eventsByDate.get(key) ?? []
-              const isToday  = key === today
-              const isSel    = key === selectedDay
-              const showDots = dayEvs.slice(0, 3)
-              const overflow = dayEvs.length - 3
-
-              // Border logic: right border except last column, bottom border except last row
-              const col = idx % 7
-              const row = Math.floor(idx / 7)
-              const totalRows = Math.ceil(gridDays.length / 7)
-              const borderRight  = col < 6 ? '1px solid var(--border)' : 'none'
-              const borderBottom = row < totalRows - 1 ? '1px solid var(--border)' : 'none'
-
+      {loading ? (
+        <Skel h={mobile ? 320 : 560} r={14} />
+      ) : mobile ? (
+        agendaDays.length === 0 ? <EmptyState>Nothing on the calendar this month.</EmptyState> : (
+          <div className="ops-agenda">
+            {agendaDays.map(([key, evs]) => {
+              const d = new Date(`${key}T12:00:00`)
               return (
-                <div
-                  key={key}
-                  onClick={() => setSelectedDay(isSel ? null : key)}
-                  style={{
-                    minHeight: 90,
-                    padding: '6px 8px',
-                    cursor: 'pointer',
-                    borderRight,
-                    borderBottom,
-                    background: isToday
-                      ? '#fef9c3'
-                      : isSel
-                      ? 'rgba(59,130,246,.06)'
-                      : 'transparent',
-                    outline: isSel ? '2px solid #3b82f6' : 'none',
-                    outlineOffset: -2,
-                    transition: 'background .1s',
-                    position: 'relative',
-                  }}
-                >
-                  {/* Day number */}
-                  <div style={{
-                    fontSize: 13,
-                    fontWeight: isToday ? 800 : 500,
-                    color: isToday
-                      ? '#854d0e'
-                      : isCurrentMonth
-                      ? 'var(--text)'
-                      : 'var(--muted)',
-                    marginBottom: 4,
-                    lineHeight: 1,
-                  }}>
-                    {isToday ? (
-                      <span style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: 22,
-                        height: 22,
-                        borderRadius: '50%',
-                        background: '#facc15',
-                        color: '#1b1e2b',
-                        fontWeight: 900,
-                        fontSize: 12,
-                      }}>
-                        {date.getDate()}
-                      </span>
-                    ) : (
-                      date.getDate()
-                    )}
-                  </div>
-
-                  {/* Event pills */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                    {showDots.map(ev => (
-                      <div
-                        key={ev.id}
-                        title={`${TYPE_LABELS[ev.type]}: ${ev.title}${ev.subtitle ? ` — ${ev.subtitle}` : ''}`}
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 600,
-                          color: '#fff',
-                          background: TYPE_COLORS[ev.type],
-                          borderRadius: 4,
-                          padding: '1px 5px',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          maxWidth: '100%',
-                        }}
-                      >
-                        {ev.title}
-                      </div>
+                <div key={key} className={`ops-agenda__day${key === today ? ' ops-agenda__day--today' : ''}`}>
+                  <div className="ops-agenda__date"><span>{d.toLocaleDateString('en-US', { weekday: 'short' })}</span><b>{d.getDate()}</b></div>
+                  <div className="ops-agenda__events">
+                    {evs.map(ev => (
+                      <button key={ev.id} type="button" className={`ops-ev ops-ev--lg ops-k-${ev.kind}`} onClick={() => navigate(ev.to)}>
+                        <span className="ops-ev__t">{ev.title}</span>
+                        {ev.subtitle && <span className="ops-ev__s">{ev.subtitle}</span>}
+                      </button>
                     ))}
-                    {overflow > 0 && (
-                      <div style={{
-                        fontSize: 10,
-                        color: 'var(--muted)',
-                        fontWeight: 600,
-                        paddingLeft: 2,
-                      }}>
-                        +{overflow} more
-                      </div>
-                    )}
                   </div>
                 </div>
               )
             })}
           </div>
-        </div>
-
-        {/* Detail panel */}
-        <div className="calendar-detail" style={{
-          width: 380,
-          flexShrink: 0,
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 12,
-          boxShadow: '0 1px 4px rgba(0,0,0,.06)',
-          overflow: 'hidden',
-          // Keep a fixed height and scroll inside
-          maxHeight: 'calc(100vh - 180px)',
-          display: 'flex',
-          flexDirection: 'column',
-        }}>
-          {/* Panel header */}
-          <div style={{
-            padding: '14px 18px',
-            borderBottom: '1px solid var(--border)',
-            background: 'var(--surface)',
-            flexShrink: 0,
-          }}>
-            {selectedDay ? (
-              <>
-                <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)', marginBottom: 2 }}>
-                  {formatSelectedDay(selectedDay)}
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                  {selectedEvents.length === 0
-                    ? 'No events on this day'
-                    : `${selectedEvents.length} event${selectedEvents.length !== 1 ? 's' : ''}`}
-                </div>
-              </>
-            ) : (
-              <>
-                <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)', marginBottom: 2 }}>
-                  Event Details
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                  Click a day to see its events
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* Panel body */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '12px 0' }}>
-            {!selectedDay ? (
-              <div style={{ padding: '32px 18px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-                <div style={{ fontSize: 28, marginBottom: 10 }}><IconCalendar size={28} /></div>
-                Select a day on the calendar to view events
-              </div>
-            ) : selectedEvents.length === 0 ? (
-              <div style={{ padding: '32px 18px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-                <div style={{ fontSize: 28, marginBottom: 10 }}><IconSparkles size={28} /></div>
-                No events on this day
-              </div>
-            ) : (
-              // Group by type
-              (['invoice', 'project', 'task', 'estimate'] as EventType[])
-                .filter(t => selectedByType[t] && selectedByType[t]!.length > 0)
-                .map(t => (
-                  <div key={t} style={{ marginBottom: 16 }}>
-                    {/* Type section header */}
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      padding: '4px 18px 8px',
-                    }}>
-                      <span style={{
-                        display: 'inline-block',
-                        width: 8,
-                        height: 8,
-                        borderRadius: '50%',
-                        background: TYPE_COLORS[t],
-                        flexShrink: 0,
-                      }} />
-                      <span style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        textTransform: 'uppercase',
-                        letterSpacing: '.07em',
-                        color: TYPE_COLORS[t],
-                      }}>
-                        {TYPE_LABELS[t]}
-                      </span>
-                    </div>
-
-                    {/* Events for this type */}
-                    {selectedByType[t]!.map(ev => (
-                      <div
-                        key={ev.id}
-                        style={{
-                          margin: '0 12px 6px',
-                          padding: '10px 12px',
-                          border: '1px solid var(--border)',
-                          borderRadius: 8,
-                          background: '#fafbfd',
-                          cursor: 'pointer',
-                          transition: 'border-color .15s, box-shadow .15s',
-                        }}
-                        onMouseEnter={e => {
-                          const el = e.currentTarget as HTMLDivElement
-                          el.style.borderColor = TYPE_COLORS[t]
-                          el.style.boxShadow = `0 0 0 3px ${TYPE_COLORS[t]}18`
-                        }}
-                        onMouseLeave={e => {
-                          const el = e.currentTarget as HTMLDivElement
-                          el.style.borderColor = 'var(--border)'
-                          el.style.boxShadow = 'none'
-                        }}
-                        onClick={() => navigateToEvent(ev)}
-                      >
-                        {/* Icon + title row */}
-                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                          <span style={{ fontSize: 16, lineHeight: 1, flexShrink: 0, marginTop: 1 }}>
-                            {TYPE_ICONS[t]}
-                          </span>
-                          <div style={{ minWidth: 0, flex: 1 }}>
-                            <div style={{
-                              fontSize: 13,
-                              fontWeight: 700,
-                              color: 'var(--text)',
-                              whiteSpace: 'nowrap',
-                              overflow: 'hidden',
-                              textOverflow: 'ellipsis',
-                            }}>
-                              {ev.title}
-                            </div>
-                            {ev.subtitle && (
-                              <div style={{
-                                fontSize: 11,
-                                color: 'var(--muted)',
-                                marginTop: 2,
-                                whiteSpace: 'nowrap',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                              }}>
-                                {ev.subtitle}
-                              </div>
-                            )}
-                          </div>
-                          {/* Status badge */}
-                          {ev.meta && (
-                            <span style={{
-                              flexShrink: 0,
-                              fontSize: 10,
-                              fontWeight: 600,
-                              padding: '2px 6px',
-                              borderRadius: 4,
-                              background: `${TYPE_COLORS[t]}18`,
-                              color: TYPE_COLORS[t],
-                              border: `1px solid ${TYPE_COLORS[t]}30`,
-                              textTransform: 'capitalize',
-                            }}>
-                              {ev.meta}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Go-to link */}
-                        <div style={{
-                          marginTop: 8,
-                          paddingTop: 7,
-                          borderTop: '1px solid var(--border)',
-                          display: 'flex',
-                          justifyContent: 'flex-end',
-                        }}>
-                          <span style={{
-                            fontSize: 11,
-                            fontWeight: 600,
-                            color: TYPE_COLORS[t],
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 3,
-                          }}>
-                            View {t === 'task' ? 'project' : t} →
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ))
-            )}
+        )
+      ) : (
+        <div className="card ops-cal">
+          <div className="ops-cal__dows">{DAY_HEADERS.map(d => <span key={d}>{d}</span>)}</div>
+          <div className="ops-cal__grid">
+            {gridDays.map(({ date, isCurrentMonth }) => {
+              const key = toDateKey(date)
+              const evs = eventsByDate.get(key) ?? []
+              const shown = evs.slice(0, 3)
+              return (
+                <button key={key} type="button" className={`ops-cal__cell${isCurrentMonth ? '' : ' ops-cal__cell--out'}${key === selectedDay ? ' ops-cal__cell--sel' : ''}`}
+                  onClick={() => setSelectedDay(key)} aria-label={`${fullDay(key)}: ${evs.length} event${evs.length === 1 ? '' : 's'}`}>
+                  <span className={`ops-cal__n${key === today ? ' ops-cal__n--today' : ''}`}>{date.getDate()}</span>
+                  {shown.map(ev => <span key={ev.id} className={`ops-ev ops-k-${ev.kind}`} title={`${ev.title}${ev.subtitle ? ` — ${ev.subtitle}` : ''}`}>{ev.title}</span>)}
+                  {evs.length > 3 && <span className="ops-cal__more">+{evs.length - 3} more</span>}
+                </button>
+              )
+            })}
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Color legend */}
-      <div style={{
-        marginTop: 16,
-        display: 'flex',
-        gap: 16,
-        flexWrap: 'wrap',
-        alignItems: 'center',
-      }}>
-        <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.06em' }}>
-          Legend:
-        </span>
-        {(['invoice', 'project', 'estimate', 'task'] as EventType[]).map(t => (
-          <div key={t} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-            <div style={{
-              width: 10,
-              height: 10,
-              borderRadius: 3,
-              background: TYPE_COLORS[t],
-              flexShrink: 0,
-            }} />
-            <span style={{ fontSize: 12, color: 'var(--muted)' }}>{TYPE_LABELS[t]}</span>
-          </div>
-        ))}
-      </div>
+      <Drawer open={!!selectedDay} onClose={() => setSelectedDay(null)} size="narrow" title={selectedDay ? fullDay(selectedDay) : ''}
+        sub={selectedEvents.length === 0 ? 'No events on this day' : `${selectedEvents.length} event${selectedEvents.length === 1 ? '' : 's'}`}>
+        {selectedEvents.length === 0 ? <div className="card card-empty">Nothing on this day{hidden.size ? ' (some types are hidden in the legend)' : ''}.</div> : (
+          KINDS.filter(k => selectedEvents.some(e => e.kind === k.key)).map(k => (
+            <div key={k.key} className="stack ops-dayk">
+              <div className="section-label ops-dayk__label"><span className={`ops-legend__dot ops-k-${k.key}`} aria-hidden />{k.label}</div>
+              {selectedEvents.filter(e => e.kind === k.key).map(ev => (
+                <button key={ev.id} type="button" className="ops-dayev" onClick={() => navigate(ev.to)}>
+                  <span className="ops-dayev__main"><span className="ops-dayev__t">{ev.title}</span>{ev.subtitle && <span className="ops-dayev__s">{ev.subtitle}</span>}</span>
+                  {ev.meta && <Pill status={ev.meta} />}
+                  <span className="link ops-dayev__go">{k.open}<Ic d={P.chevR} size={13} /></span>
+                </button>
+              ))}
+            </div>
+          ))
+        )}
+      </Drawer>
     </div>
   )
 }

@@ -1,21 +1,17 @@
-import React, { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import type { Attachment, Employee, Invoice, TimeEntry } from '../data/types'
-import {
-  loadSnapshot, saveEmployees, saveInvoices,
-  loadEmployeeCounter, saveEmployeeCounter, loadSettings, loadTimeEntries,
-} from '../services/storage'
-import { formatMoney, fmtHoursHM } from '../utils/money'
-import { useRole } from '../context/RoleContext'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import type { Attachment, Client, Employee, Invoice, Project } from '../data/types'
+import { loadSnapshot, saveEmployees, loadEmployeeCounter, saveEmployeeCounter } from '../services/storage'
+import { formatMoney } from '../utils/money'
+import { usePermission, useRole } from '../context/RoleContext'
 import { can } from '../lib/roles'
-import { sendEmail } from '../services/gmail'
-import { buildStatementHTML } from '../utils/statementHtml'
-import { trackedHoursOf, trackedPayEntries } from '../utils/trackedPay'
-import {
-  IconMail, IconPrinter, IconX, IconTrash, IconCheck,
-  IconImage, IconFile, IconMusic, IconPaperclip,
-} from '../components/Icon'
-import { employeePremiumConfig, normalizeClockInput, payrollFromInvoiceItem } from '../utils/payroll'
+import { Ic, P } from '../components/Icon'
+import { Banner, Drawer, EmptyState, Modal, Menu, PageHeader, Pill, SearchInput, Segmented, Skel, useIsMobile } from '../components/ui'
+import EmployeeStatements from '../components/people/EmployeeStatements'
+import { EMPTY_EMPLOYEE_FORM, EmployeeFields, STATUS_OPTIONS, employeeToForm, formToEmployee, type EmployeeFormData } from '../components/people/EmployeeForm'
+import { AttachmentList } from '../components/people/attachments'
+import { PersonAvatar, employeeStatusTone, payScheduleOf, placementOf, projectsOf } from '../components/people/common'
+import { TIME_STATUS, loadTimeActivity, timeStatusOf } from '../components/people/teamStatus'
 
 function uid() { return crypto.randomUUID() }
 
@@ -26,980 +22,311 @@ async function generateEmployeeNumber(): Promise<string> {
   return `YVA${year}${String(counter).padStart(3, '0')}`
 }
 
-const AVATAR_COLORS = ['#a16207','#3b82f6','#22c55e','#a855f7','#14b8a6','#f97316','#ec4899']
-function avatarColor(name: string) {
-  let h = 0
-  for (const c of name) h = (h * 31 + c.charCodeAt(0)) % AVATAR_COLORS.length
-  return AVATAR_COLORS[Math.abs(h)]
-}
-function initials(name: string) {
-  return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
-}
-function statusBadge(s?: string) {
-  switch ((s || '').toLowerCase()) {
-    case 'inactive': return 'badge-red'
-    case 'on hold': return 'badge-yellow'
-    case 'onboarding': return 'badge-blue'
-    case 'trial': return 'badge-purple'
-    default: return 'badge-green'
-  }
-}
-function statusColor(s?: string): string {
-  switch ((s || '').toLowerCase()) {
-    case 'inactive': return '#ef4444'
-    case 'on hold': return '#a16207'
-    case 'onboarding': return '#3b82f6'
-    case 'trial': return '#a855f7'
-    default: return '#22c55e'
-  }
-}
+type Team = 'all' | 'client' | 'yva'
+type View = 'table' | 'projects' | 'capacity'
+const isYva = (e: Employee) => e.worksFor === 'yva'
 
-const STATUS_OPTIONS = ['Active', 'Onboarding', 'Trial', 'On hold', 'Inactive']
-const TYPE_OPTIONS   = ['', 'Full-time', 'Part-time', 'Project-based']
-
-type FormData = {
-  name: string; email: string; phone: string; payRate: string
-  defaultShiftStart: string; defaultShiftEnd: string
-  premiumEnabled: boolean; premiumStartTime: string; premiumPercent: string
-  role: string; employmentType: string; location: string
-  timezone: string; startYear: string; status: string; notes: string
-  worksFor: 'client' | 'yva'; manualTimeAllowed: boolean
-}
-const EMPTY: FormData = {
-  name: '', email: '', phone: '', payRate: '', defaultShiftStart: '', defaultShiftEnd: '', premiumEnabled: false, premiumStartTime: '21:00', premiumPercent: '15', role: '', employmentType: '',
-  location: '', timezone: '', startYear: '', status: 'Active', notes: '', worksFor: 'client', manualTimeAllowed: false,
-}
-
-function getEmployeeInvoices(empName: string, invoices: Invoice[], from?: string, to?: string) {
-  return invoices.filter(inv => {
-    const hasEmp = (inv.items || []).some(it => it.employeeName?.toLowerCase() === empName.toLowerCase())
-    if (!hasEmp) return false
-    if (!from && !to) return true
-    const d = inv.date || inv.billingEnd || inv.billingStart
-    if (!d) return true
-    if (from && d < from) return false
-    if (to   && d > to)   return false
-    return true
-  })
-}
-
-function getEmployeeInvoiceItems(emp: Employee, inv: Invoice) {
-  return (inv.items || []).filter(it =>
-    (it.employeeId && it.employeeId === emp.id) ||
-    it.employeeName?.toLowerCase() === emp.name.toLowerCase()
-  )
-}
-
-function summarizeEmployeeInvoices(emp: Employee, invoices: Invoice[]) {
-  return invoices.reduce((summary, inv) => {
-    for (const item of getEmployeeInvoiceItems(emp, inv)) {
-      const payroll = payrollFromInvoiceItem(item, emp)
-      summary.hours += payroll.totalHours
-      summary.regularHours += payroll.regularHours
-      summary.premiumHours += payroll.premiumHours
-      summary.totalPay += payroll.totalPay
-    }
-    return summary
-  }, { hours: 0, regularHours: 0, premiumHours: 0, totalPay: 0 })
-}
-
-
-async function printPayslip(emp: Employee, empInvoices: Invoice[], dateFrom: string, dateTo: string, tracked: TimeEntry[] = []) {
-  const settings = await loadSettings()
-  const html = buildStatementHTML(emp, empInvoices, dateFrom, dateTo, settings.usdToDop || 0, true, tracked)
-  const win = window.open('', '_blank', 'width=800,height=600')
-  if (!win) return
-  win.document.write(html)
-  win.document.close()
-}
-
-async function emailStatement(emp: Employee, empInvoices: Invoice[], dateFrom: string, dateTo: string, tracked: TimeEntry[] = []) {
-  const settings = await loadSettings()
-  const payRate = Number(emp.payRate) || 0
-  const dopRate = settings.usdToDop || 0
-  const summary = summarizeEmployeeInvoices(emp, empInvoices)
-  const totalHours = summary.hours + trackedHoursOf(tracked)
-  const totalUSD = summary.totalPay + trackedHoursOf(tracked) * payRate
-  const totalDOP = dopRate > 0 ? totalUSD * dopRate : 0
-  const period = dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : dateFrom || dateTo || 'All time'
-  const companyName = settings.companyName || 'YVA Staffing'
-  const subject = `Your Earnings Statement — ${period} — ${companyName}`
-
-  let bodyText: string
-  if (settings.statementEmailTemplate) {
-    bodyText = settings.statementEmailTemplate
-      .replace(/\{employeeName\}/g, emp.name)
-      .replace(/\{period\}/g, period)
-      .replace(/\{companyName\}/g, companyName)
-  } else {
-    bodyText =
-      `Hi ${emp.name},\n\nHere is your earnings summary for the period ${period}:\n\n` +
-      `  Total Hours: ${totalHours.toFixed(1)}h\n` +
-      `  Total Earned: $${totalUSD.toFixed(2)} USD` +
-      (totalDOP > 0 ? ` / RD$${totalDOP.toLocaleString('en-US',{maximumFractionDigits:0})} DOP\n` : '\n') +
-      `  Invoices: ${empInvoices.length}\n\n` +
-      `Please reach out if you have any questions.\n\n${settings.emailSignature || companyName}`
-  }
-
-  const statementHtml = buildStatementHTML(emp, empInvoices, dateFrom, dateTo, dopRate, false, tracked)
-  const safeName = emp.name.replace(/\s+/g, '-').toLowerCase()
-  const periodSlug = period.replace(/\s/g, '').replace(/[^a-zA-Z0-9-]/g, '-')
-  await sendEmail(emp.email || '', subject, bodyText, {
-    name:     `statement-${safeName}-${periodSlug}.html`,
-    content:  statementHtml,
-    mimeType: 'text/html',
-  })
-}
-
-function EmployeeStatementsPanel({ emp, invoices, onInvoicesChange }: {
-  emp: Employee
-  invoices: Invoice[]
-  onInvoicesChange: (updated: Invoice[]) => void
-}) {
-  const [dateFrom,  setDateFrom]  = useState('')
-  const [dateTo,    setDateTo]    = useState('')
-  const [payModal,  setPayModal]  = useState<{ inv: Invoice } | null>(null)
-  const [payDate,   setPayDate]   = useState('')
-  const [payNotes,  setPayNotes]  = useState('')
-  const [toast,     setToast]     = useState<string | null>(null)
-  const [sending,   setSending]   = useState(false)
-  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
-  useEffect(() => { void loadTimeEntries().then(setTimeEntries) }, [])
-
-  function showToast(msg: string) {
-    setToast(msg)
-    setTimeout(() => setToast(null), 4000)
-  }
-
-  const empInvoices = getEmployeeInvoices(emp.name, invoices, dateFrom || undefined, dateTo || undefined)
-  const payRate = Number(emp.payRate) || 0
-
-  const premiumConfig = employeePremiumConfig(emp)
-  const summary = summarizeEmployeeInvoices(emp, empInvoices)
-  const empTracked = trackedPayEntries(emp, timeEntries, dateFrom || undefined, dateTo || undefined)
-  const totalHours = summary.hours + trackedHoursOf(empTracked)
-  const totalEarned = summary.totalPay + trackedHoursOf(empTracked) * payRate
-
-  const paidCount   = empInvoices.filter(inv => (inv.employeePayments?.[emp.id] || inv.employeePayments?.[emp.name])?.status === 'paid').length
-  const pendingCount = empInvoices.length - paidCount
-  const totalPaid   = empInvoices.reduce((s, inv) => {
-    if ((inv.employeePayments?.[emp.id] || inv.employeePayments?.[emp.name])?.status !== 'paid') return s
-    return s + getEmployeeInvoiceItems(emp, inv).reduce((itemTotal, item) => itemTotal + payrollFromInvoiceItem(item, emp).totalPay, 0)
-  }, 0)
-
-  function getEmpPayment(inv: Invoice) {
-    return inv.employeePayments?.[emp.id] || inv.employeePayments?.[emp.name]
-  }
-
-  async function markPaid(inv: Invoice) {
-    const amount = getEmployeeInvoiceItems(emp, inv).reduce((sum, item) => sum + payrollFromInvoiceItem(item, emp).totalPay, 0)
-    const existingPayments = { ...(inv.employeePayments || {}) }
-    if (emp.name in existingPayments && emp.id !== emp.name) delete existingPayments[emp.name]
-    const updated = invoices.map(i => i.id === inv.id ? {
-      ...i,
-      employeePayments: {
-        ...(i.id === inv.id ? existingPayments : i.employeePayments || {}),
-        [emp.id]: { status: 'paid' as const, paidDate: payDate || new Date().toISOString().slice(0,10), amount, notes: payNotes || undefined }
-      }
-    } : i)
-    onInvoicesChange(updated)
-    await saveInvoices(updated)
-    setPayModal(null)
-    setPayDate('')
-    setPayNotes('')
-  }
-
-  async function markPending(inv: Invoice) {
-    const existingPayments = { ...(inv.employeePayments || {}) }
-    if (emp.name in existingPayments && emp.id !== emp.name) delete existingPayments[emp.name]
-    const updated = invoices.map(i => i.id === inv.id ? {
-      ...i,
-      employeePayments: {
-        ...(i.id === inv.id ? existingPayments : i.employeePayments || {}),
-        [emp.id]: { status: 'pending' as const }
-      }
-    } : i)
-    onInvoicesChange(updated)
-    await saveInvoices(updated)
-  }
-
-  const byProject = new Map<string, { hours: number; earned: number }>()
-  for (const inv of empInvoices) {
-      const items = getEmployeeInvoiceItems(emp, inv)
-      const projName = inv.projectName || 'No project'
-      const pp = byProject.get(projName) || { hours: 0, earned: 0 }
-      for (const it of items) {
-      const payroll = payrollFromInvoiceItem(it, emp)
-      pp.hours  += payroll.totalHours
-      pp.earned += payroll.totalPay
-      }
-      byProject.set(projName, pp)
-  }
-  const projectTotals = Array.from(byProject.entries()).map(([name, pp]) => ({ name, ...pp }))
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {toast && (
-        <div className="profile-toast">
-          <IconCheck size={14} /> {toast}
-        </div>
-      )}
-      {/* Date range filter + action buttons */}
-      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-        <div className="form-group" style={{ flex: 1, minWidth: 140 }}>
-          <label className="form-label">From</label>
-          <input className="form-input" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-        </div>
-        <div className="form-group" style={{ flex: 1, minWidth: 140 }}>
-          <label className="form-label">To</label>
-          <input className="form-input" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
-        </div>
-        {(dateFrom || dateTo) && (
-          <button className="btn-ghost btn-sm" onClick={() => { setDateFrom(''); setDateTo('') }}>Clear</button>
-        )}
-        <div style={{ display: 'flex', gap: 6, marginLeft: 'auto' }}>
-          <button
-            className="btn-ghost btn-sm"
-            disabled={(empInvoices.length === 0 && empTracked.length === 0) || !emp.email || sending}
-            title={!emp.email ? 'No email address on file — add one in the employee profile' : ''}
-            onClick={async () => {
-              setSending(true)
-              try {
-                await emailStatement(emp, empInvoices, dateFrom, dateTo, empTracked)
-                showToast(`Statement sent to ${emp.email}`)
-              } catch {
-                showToast('Failed to send — check Gmail connection in Settings')
-              } finally {
-                setSending(false)
-              }
-            }}
-          >
-            {sending ? 'Sending…' : <><span style={{ marginRight: 5, display: 'inline-flex', verticalAlign: 'middle' }}><IconMail size={13} /></span> Email Statement</>}
-          </button>
-          <button className="btn-ghost btn-sm" onClick={() => printPayslip(emp, empInvoices, dateFrom, dateTo, empTracked)} disabled={empInvoices.length === 0 && empTracked.length === 0}>
-            <span style={{ marginRight: 5, display: 'inline-flex', verticalAlign: 'middle' }}><IconPrinter size={13} /></span> PDF Payslip
-          </button>
-        </div>
-      </div>
-
-      {/* Summary KPIs */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10 }}>
-        <div className="settings-stat-card">
-          <div className="settings-stat-count">{empInvoices.length}</div>
-          <div className="settings-stat-label">Invoices</div>
-        </div>
-        <div className="settings-stat-card">
-          <div className="settings-stat-count">{fmtHoursHM(totalHours)}</div>
-          <div className="settings-stat-label">Total Hours</div>
-        </div>
-        <div className="settings-stat-card">
-          <div className="settings-stat-count" style={{ fontSize: 15 }}>{payRate > 0 ? `$${payRate}/hr` : '—'}</div>
-          <div className="settings-stat-label">Pay Rate</div>
-        </div>
-        <div className="settings-stat-card">
-          <div className="settings-stat-count" style={{ fontSize: 15 }}>{payRate > 0 ? formatMoney(totalEarned) : '—'}</div>
-          <div className="settings-stat-label">Total Earned</div>
-        </div>
-        <div className="settings-stat-card" style={{ borderColor: paidCount > 0 ? 'var(--gold)' : undefined }}>
-          <div className="settings-stat-count" style={{ fontSize: 15, color: paidCount > 0 ? 'var(--gold)' : undefined }}>{payRate > 0 ? formatMoney(totalPaid) : paidCount}</div>
-          <div className="settings-stat-label">{paidCount} Paid</div>
-        </div>
-        <div className="settings-stat-card" style={{ borderColor: pendingCount > 0 ? 'var(--muted)' : undefined }}>
-          <div className="settings-stat-count" style={{ fontSize: 15, color: pendingCount > 0 ? 'var(--muted)' : undefined }}>{pendingCount}</div>
-          <div className="settings-stat-label">Pending</div>
-        </div>
-      </div>
-
-      {empInvoices.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '20px', color: 'var(--muted)', fontSize: 13 }}>
-          No invoices found for this period.
-        </div>
-      ) : (
-        <>
-          <div>
-            {empInvoices.map(inv => {
-              const items = getEmployeeInvoiceItems(emp, inv)
-              const payrollSummary = items.reduce((acc, item) => {
-                const payroll = payrollFromInvoiceItem(item, emp)
-                acc.hours += payroll.totalHours
-                acc.totalPay += payroll.totalPay
-                return acc
-              }, { hours: 0, totalPay: 0 })
-              const hrs = payrollSummary.hours
-              const invPeriod = inv.billingStart
-                ? `${inv.billingStart}${inv.billingEnd ? ' – ' + inv.billingEnd : ''}`
-                : (inv.date || '—')
-              const daily = items[0]?.daily
-              const DA = ['Su','Mo','Tu','We','Th','Fr','Sa']
-              let allDates: string[] = []
-              if (daily) {
-                if (inv.billingStart && inv.billingEnd) {
-                  const cur = new Date(inv.billingStart + 'T12:00:00')
-                  const end = new Date(inv.billingEnd + 'T12:00:00')
-                  while (cur <= end) { allDates.push(cur.toISOString().slice(0, 10)); cur.setDate(cur.getDate() + 1) }
-                } else {
-                  allDates = Object.keys(daily).filter(d => parseFloat(daily[d]) > 0).sort()
-                }
-              }
-              const payment = getEmpPayment(inv)
-              const isPaid = payment?.status === 'paid'
-              return (
-                <div key={inv.id} style={{ marginBottom: 10, border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
-                  <div style={{ background: 'var(--surf2)', padding: '7px 12px', fontSize: 12, borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <strong>{inv.number}</strong>
-                    <span style={{ color: 'var(--muted)' }}>·</span>
-                    {inv.projectName || '—'}
-                    <span style={{ color: 'var(--muted)' }}>·</span>
-                    <span style={{ color: 'var(--muted)', fontSize: 11 }}>{invPeriod}</span>
-                    <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-                      {isPaid ? (
-                        <>
-                          <span style={{ fontSize: 11, color: '#22c55e', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                            <IconCheck size={12} /> Paid {payment?.paidDate ? new Date(payment.paidDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}
-                          </span>
-                          <button className="btn-ghost btn-sm" style={{ fontSize: 10, padding: '2px 8px' }} onClick={() => markPending(inv)}>Undo</button>
-                        </>
-                      ) : (
-                        <button className="btn-ghost btn-sm" style={{ fontSize: 11, padding: '3px 10px', borderColor: 'var(--gold)', color: 'var(--gold)' }}
-                          onClick={() => { setPayModal({ inv }); setPayDate(new Date().toISOString().slice(0,10)); setPayNotes('') }}>
-                          Mark as Paid
-                        </button>
-                      )}
-                    </span>
-                  </div>
-                  <div className="table-wrap">
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          {allDates.map(d => {
-                            const dt = new Date(d + 'T12:00:00')
-                            return (
-                              <th key={d} style={{ textAlign: 'center', fontSize: 9, minWidth: 24, whiteSpace: 'nowrap', padding: '5px 3px' }}>
-                                {DA[dt.getDay()]}<br /><span style={{ color: 'var(--muted)' }}>{dt.getMonth()+1}/{dt.getDate()}</span>
-                              </th>
-                            )
-                          })}
-                          <th style={{ textAlign: 'right' }}>Hours</th>
-                          <th style={{ textAlign: 'right' }}>Rate</th>
-                          <th style={{ textAlign: 'right' }}>Earned</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          {allDates.map(d => {
-                            const h = daily ? (parseFloat(daily[d] || '') || 0) : 0
-                            return (
-                              <td key={d} style={{ textAlign: 'center', fontSize: 12, color: h > 0 ? undefined : 'var(--muted)', padding: '7px 3px' }}>
-                                {h > 0 ? (h % 1 === 0 ? h : h.toFixed(1)) : '—'}
-                              </td>
-                            )
-                          })}
-                          <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmtHoursHM(hrs)}</td>
-                          <td style={{ textAlign: 'right', color: 'var(--muted)', fontSize: 11 }}>{payRate > 0 ? `$${payRate}/hr` : '—'}</td>
-                            <td style={{ textAlign: 'right', color: 'var(--gold)', fontWeight: 700 }}>{payRate > 0 ? formatMoney(payrollSummary.totalPay) : '—'}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )
-            })}
-            <div style={{ textAlign: 'right', fontWeight: 800, fontSize: 13, padding: '8px 4px', borderTop: '2px solid var(--border)', marginTop: 4 }}>
-              Total &nbsp; {fmtHoursHM(totalHours)} &nbsp;&nbsp; {payRate > 0 ? formatMoney(totalEarned) : '—'}
-            </div>
-          </div>
-
-          {projectTotals.length > 0 && (
-            <div>
-              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--muted)', marginBottom: 8 }}>Totals by Project</div>
-              <div className="table-wrap">
-                <table className="data-table">
-                  <thead><tr><th>Project</th><th>Hours</th><th>Total Pay</th></tr></thead>
-                  <tbody>
-                    {projectTotals.map(pt => (
-                      <tr key={pt.name}>
-                        <td className="td-name">{pt.name}</td>
-                        <td className="td-muted">{fmtHoursHM(pt.hours)}</td>
-                        <td style={{ color: 'var(--gold)', fontWeight: 700 }}>{payRate > 0 ? formatMoney(pt.earned) : '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Mark as Paid modal */}
-      {payModal && (
-        <div className="modal-overlay" onClick={() => setPayModal(null)}>
-          <div className="modal-dialog" style={{ maxWidth: 360 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="modal-title">Mark as Paid — {payModal.inv.number}</div>
-              <button className="modal-close btn-icon" onClick={() => setPayModal(null)}><IconX size={14} /></button>
-            </div>
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div className="form-group">
-                <label className="form-label">Payment Date</label>
-                <input className="form-input" type="date" value={payDate} onChange={e => setPayDate(e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Notes (optional)</label>
-                <input className="form-input" type="text" placeholder="e.g. Bank transfer, Ref #1234" value={payNotes} onChange={e => setPayNotes(e.target.value)} />
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn-ghost" onClick={() => setPayModal(null)}>Cancel</button>
-              <button className="btn-primary" onClick={() => markPaid(payModal.inv)}>Confirm Payment</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
+function TimeDot({ e, activity }: { e: Employee; activity: Awaited<ReturnType<typeof loadTimeActivity>> | null }) {
+  const s = TIME_STATUS[timeStatusOf(e, activity)]
+  return <span className="ppl-time"><span className={`ppl-time__dot ppl-time__dot--${s.tone}${s.live ? ' ppl-time__dot--live' : ''}`} />{s.label}</span>
 }
 
 export default function EmployeesPage() {
   const navigate = useNavigate()
+  const [params, setParams] = useSearchParams()
   const { role } = useRole()
+  const allowed = usePermission()
+  const mobile = useIsMobile()
   const showPayRates = can.viewPayRates(role)
+  const canSchedule = allowed('rates.manage')
+
+  const [loaded, setLoaded] = useState(false)
   const [employees, setEmployees] = useState<Employee[]>([])
-  const [invoices,  setInvoices]  = useState<Invoice[]>([])
-  const [projects,  setProjects]  = useState<{ id: string; name: string; employeeIds?: string[]; status?: string }[]>([])
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [clients, setClients] = useState<Client[]>([])
+  const [activity, setActivity] = useState<Awaited<ReturnType<typeof loadTimeActivity>> | null>(null)
   useEffect(() => {
     loadSnapshot().then(snap => {
-      setEmployees(snap.employees)
-      setInvoices(snap.invoices)
-      setProjects(snap.projects)
-    })
+      setEmployees(snap.employees); setInvoices(snap.invoices); setProjects(snap.projects); setClients(snap.clients); setLoaded(true)
+    }).catch(e => { setError(`Could not load the team: ${(e as Error).message}`); setLoaded(true) })
+    void loadTimeActivity().then(setActivity).catch(() => setActivity(null))
   }, [])
-  const [modal, setModal]       = useState<null | 'add' | 'edit' | 'statements'>(null)
-  const [showCapacity, setShowCapacity] = useState(false)
-  const [form, setForm]         = useState<FormData>(EMPTY)
-  const [editId, setEditId]     = useState<string | null>(null)
-  const [attachments, setAttachments] = useState<Attachment[]>([])
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const [selectedEmp, setSelectedEmp]   = useState<Employee | null>(null)
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
-  const [search, setSearch]     = useState('')
+
+  const [team, setTeam] = useState<Team>('all')
+  const [view, setView] = useState<View>('table')
+  const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
-  const [teamView, setTeamView] = useState<'projects' | 'cards'>('projects')
+  const [modal, setModal] = useState<null | 'add' | 'edit'>(null)
+  const [form, setForm] = useState<EmployeeFormData>(EMPTY_EMPLOYEE_FORM)
+  const [editId, setEditId] = useState<string | null>(null)
+  const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [statementsFor, setStatementsFor] = useState<Employee | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<Employee | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
-  function persist(next: Employee[]) { setEmployees(next); void saveEmployees(next) }
+  // Create menu deep link: /employees?create=1
+  useEffect(() => {
+    if (params.get('create')) { openAdd(); setParams({}, { replace: true }) }
+  }, [params])   // eslint-disable-line react-hooks/exhaustive-deps
 
-  function openAdd() { setForm({ ...EMPTY }); setAttachments([]); setEditId(null); setModal('add') }
-  function openEdit(e: Employee) {
-    setForm({
-      name: e.name, email: e.email ?? '', phone: e.phone ?? '',
-      payRate: e.payRate != null ? String(e.payRate) : '',
-      defaultShiftStart: e.defaultShiftStart || '',
-      defaultShiftEnd: e.defaultShiftEnd || '',
-      premiumEnabled: Boolean(e.premiumEnabled),
-      premiumStartTime: e.premiumStartTime || '21:00',
-      premiumPercent: e.premiumPercent != null ? String(e.premiumPercent) : '15',
-      role: (e as { role?: string }).role ?? '',
-      employmentType: (e as { employmentType?: string }).employmentType ?? '',
-      location: (e as { location?: string }).location ?? '',
-      timezone: e.timezone ?? '',
-      startYear: e.startYear != null ? String(e.startYear) : '',
-      status: e.status ?? 'Active',
-      notes: (e as { notes?: string }).notes ?? '',
-      worksFor: e.worksFor === 'yva' ? 'yva' : 'client',
-      manualTimeAllowed: e.manualTimeAllowed === true,
-    })
-    setAttachments(e.attachments || [])
-    setEditId(e.id); setModal('edit')
+  async function persist(next: Employee[], ok: string) {
+    const before = employees
+    setEmployees(next); setError(null)
+    try { await saveEmployees(next); setNotice(ok); return true }
+    catch (e) { setEmployees(before); setError(`Could not save: ${(e as Error).message}`); return false }
   }
+
+  function openAdd() { setForm({ ...EMPTY_EMPLOYEE_FORM }); setAttachments([]); setEditId(null); setModal('add') }
+  function openEdit(e: Employee) { setForm(employeeToForm(e)); setAttachments(e.attachments || []); setEditId(e.id); setModal('edit') }
 
   function handleFileUpload(file: File) {
     const MAX = 5 * 1024 * 1024
     if (file.size > MAX) { alert('File too large (max 5 MB). For videos, paste a link in Resume URL instead.'); return }
     const reader = new FileReader()
     reader.onload = ev => {
-      const att: Attachment = {
-        id: uid(), name: file.name, mimeType: file.type,
-        size: file.size, dataUrl: ev.target?.result as string, uploadedAt: Date.now(),
-      }
+      const att: Attachment = { id: uid(), name: file.name, mimeType: file.type, size: file.size, dataUrl: ev.target?.result as string, uploadedAt: Date.now() }
       setAttachments(prev => [...prev, att])
     }
     reader.readAsDataURL(file)
   }
-  function openStatements(e: Employee) { setSelectedEmp(e); setModal('statements') }
 
   async function saveForm() {
-    if (!form.name.trim()) return
-    const employeePayload: Omit<Employee, 'id'> = {
-      ...form,
-      payRate: form.payRate ? Number(form.payRate) : undefined,
-      defaultShiftStart: form.defaultShiftStart || undefined,
-      defaultShiftEnd: form.defaultShiftEnd || undefined,
-      premiumEnabled: form.premiumEnabled || undefined,
-      premiumStartTime: form.premiumEnabled ? (form.premiumStartTime || '21:00') : undefined,
-      premiumPercent: form.premiumEnabled ? Number(form.premiumPercent || 0) : undefined,
-      startYear: form.startYear ? Number(form.startYear) : undefined,
-      notes: form.notes || undefined,
-      email: form.email || undefined,
-      phone: form.phone || undefined,
-      role: form.role || undefined,
-      employmentType: form.employmentType || undefined,
-      location: form.location || undefined,
-      timezone: form.timezone || undefined,
-    }
+    if (!form.name.trim() || saving) return
+    setSaving(true)
+    const payload = formToEmployee(form, { schedule: canSchedule })
+    let ok = false
     if (modal === 'add') {
       const empNum = await generateEmployeeNumber()
-      persist([...employees, { ...employeePayload, id: uid(), employeeNumber: empNum, attachments }])
+      ok = await persist([...employees, { ...payload, id: uid(), employeeNumber: empNum, attachments }], `${form.name.trim()} added as ${empNum}.`)
     } else if (editId) {
-      persist(employees.map((e) => e.id === editId ? { ...e, ...employeePayload, attachments } : e))
+      ok = await persist(employees.map(e => e.id === editId ? { ...e, ...payload, attachments } : e), 'Changes saved.')
     }
-    setModal(null)
+    setSaving(false)
+    if (ok) setModal(null)
   }
-  function doDelete(id: string) { persist(employees.filter((e) => e.id !== id)); setConfirmDelete(null) }
 
-  const groupedProjects = projects
-    .map(project => ({
-      project,
-      employees: employees.filter(e => (project.employeeIds || []).includes(e.id)),
-    }))
-    .filter(group => group.employees.length > 0)
-    .sort((a, b) => a.project.name.localeCompare(b.project.name))
+  async function doDelete(emp: Employee) {
+    setConfirmDelete(null)
+    await persist(employees.filter(e => e.id !== emp.id), `${emp.name} removed.`)
+  }
 
-  const unassignedEmployees = employees.filter(emp => !projects.some(project => (project.employeeIds || []).includes(emp.id)))
-
-  const filtered = employees.filter((e) => {
-    const matchSearch = `${e.name} ${e.email ?? ''} ${(e as {role?:string}).role ?? ''}`.toLowerCase().includes(search.toLowerCase())
+  const counts = useMemo(() => ({ all: employees.length, client: employees.filter(e => !isYva(e)).length, yva: employees.filter(isYva).length }), [employees])
+  const filtered = employees.filter(e => {
+    if (team === 'client' && isYva(e)) return false
+    if (team === 'yva' && !isYva(e)) return false
+    const matchSearch = `${e.name} ${e.email ?? ''} ${e.role ?? ''} ${e.employeeNumber ?? ''}`.toLowerCase().includes(search.toLowerCase())
     const matchStatus = !filterStatus || (e.status || 'Active') === filterStatus
     return matchSearch && matchStatus
-  })
+  }).sort((a, b) => a.name.localeCompare(b.name))
 
-  return (
-    <div className="page-wrap">
-      <div className="page-header">
-        <div className="page-header-left">
-          <h1 className="page-title">Team</h1>
-          <p className="page-sub">{employees.length} member{employees.length !== 1 ? 's' : ''}</p>
-        </div>
-        <div className="page-header-actions">
-          <div className="view-toggle">
-            <button className={`view-toggle-btn ${teamView === 'projects' ? 'active' : ''}`} onClick={() => setTeamView('projects')}>Projects</button>
-            <button className={`view-toggle-btn ${teamView === 'cards' ? 'active' : ''}`} onClick={() => setTeamView('cards')}>Cards</button>
-          </div>
-          <input className="form-input" style={{ width: 190 }} placeholder="Search team..." value={search} onChange={(e) => setSearch(e.target.value)} />
-          <select className="form-select" style={{ width: 130 }} value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
-            <option value="">All statuses</option>
-            {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-          <button className="btn-primary" onClick={openAdd}>+ Add Member</button>
-        </div>
-      </div>
+  const rowMenu = (e: Employee) => (
+    <Menu label={`More actions for ${e.name}`} items={[
+      { label: 'Open profile', icon: P.user, onClick: () => navigate('/employees/' + e.id) },
+      { label: 'Edit', icon: P.edit, onClick: () => openEdit(e) },
+      { label: 'Statements', icon: P.file, onClick: () => setStatementsFor(e), hidden: !showPayRates },
+      'sep',
+      { label: 'Remove', icon: P.trash, danger: true, onClick: () => setConfirmDelete(e) },
+    ]} />
+  )
 
-      {/* Capacity toggle */}
-      <div style={{ marginBottom: 12 }}>
-        <button className="btn-ghost btn-sm" onClick={() => setShowCapacity(v => !v)}>
-          {showCapacity ? 'Hide' : 'Show'} Capacity View
+  const invoiceCount = (e: Employee) => invoices.filter(inv => (inv.items || []).some(it => it.employeeName?.toLowerCase() === e.name.toLowerCase())).length
+  const payCell = (e: Employee) => {
+    const s = payScheduleOf(e, projects)
+    return <>{s.label}{showPayRates && e.payRate ? <span className="t-sub">${e.payRate}/hr</span> : null}</>
+  }
+
+  /* ── Views ───────────────────────────────────────────────────────── */
+  const tableView = mobile ? (
+    <div className="mcards">
+      {filtered.map(e => (
+        <button type="button" key={e.id} className="ppl-mrow" onClick={() => navigate('/employees/' + e.id)}>
+          <PersonAvatar name={e.name} photo={e.photoUrl} size="lg" />
+          <span className="ppl-mrow__main">
+            <span className="ppl-mrow__title">{e.name}</span>
+            <span className="ppl-mrow__meta">{placementOf(e, projects, clients)}</span>
+          </span>
+          <span className={`ppl-time__dot ppl-time__dot--${TIME_STATUS[timeStatusOf(e, activity)].tone}${TIME_STATUS[timeStatusOf(e, activity)].live ? ' ppl-time__dot--live' : ''}`} aria-label={TIME_STATUS[timeStatusOf(e, activity)].label} />
         </button>
-      </div>
-
-      {/* Capacity View */}
-      {showCapacity && (() => {
-        const now = new Date()
-        const monthStart = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`
-        const monthEnd   = new Date(now.getFullYear(), now.getMonth()+1, 0).toISOString().slice(0,10)
-        const activeEmps = employees.filter(e => (e.status || 'Active').toLowerCase() === 'active')
-
-        return (
-          <div className="data-card" style={{ marginBottom: 16 }}>
-            <div className="data-card-title">Team Capacity — {now.toLocaleString('en-US',{month:'long',year:'numeric'})}</div>
-            <div className="table-wrap">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Employee</th>
-                    <th>Role</th>
-                    <th>Assigned Projects</th>
-                    <th style={{textAlign:'right'}}>Hrs This Month</th>
-                    {showPayRates && <th style={{textAlign:'right'}}>Earned (USD)</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {activeEmps.map(e => {
-                    const empProjects = projects.filter(p => (p.employeeIds||[]).includes(e.id) && (p.status||'').toLowerCase() === 'active')
-                    const monthInvs   = invoices.filter(inv => {
-                      const d = inv.date || inv.billingEnd || ''
-                      return d >= monthStart && d <= monthEnd && (inv.items||[]).some(it => it.employeeName?.toLowerCase() === e.name.toLowerCase())
-                    })
-                    const monthHours  = monthInvs.reduce((s, inv) =>
-                      s + (inv.items||[]).filter(it=>it.employeeName?.toLowerCase()===e.name.toLowerCase())
-                        .reduce((h,it)=>h+(Number(it.hoursTotal)||0),0), 0)
-                    const payRate = Number(e.payRate) || 0
-                    return (
-                      <tr key={e.id}>
-                        <td className="td-name">{e.name}</td>
-                        <td className="td-muted">{(e as {role?:string}).role || '—'}</td>
-                        <td>
-                          {empProjects.length === 0
-                            ? <span className="td-muted">None</span>
-                            : empProjects.map(p => (
-                              <span key={p.id} style={{fontSize:11,background:'var(--surf2)',border:'1px solid var(--border)',borderRadius:4,padding:'2px 6px',marginRight:4}}>{p.name}</span>
-                            ))}
-                        </td>
-                        <td style={{textAlign:'right',fontWeight:600}}>{monthHours > 0 ? `${monthHours.toFixed(1)}h` : '—'}</td>
-                        {showPayRates && <td style={{textAlign:'right',color:'var(--gold)',fontWeight:700}}>{monthHours > 0 && payRate > 0 ? formatMoney(monthHours*payRate) : '—'}</td>}
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )
-      })()}
-
-      {teamView === 'projects' ? (
-        <div className="project-board-grid">
-          {groupedProjects.map(({ project, employees: projectEmployees }) => (
-            <div key={project.id} className="project-lane">
-              <div className="project-lane-header">
-                <div>
-                  <div className="project-lane-title">{project.name}</div>
-                  <div className="project-lane-sub">{projectEmployees.length} employee{projectEmployees.length !== 1 ? 's' : ''}</div>
+      ))}
+    </div>
+  ) : (
+    <div className="table-card">
+      <table className="table ppl-team-table">
+        <thead><tr><th>Person</th><th>Placement</th><th>Works for</th><th>YVA Time</th><th>Pay</th><th>Since</th><th aria-label="Actions" /></tr></thead>
+        <tbody>
+          {filtered.map(e => (
+            <tr key={e.id} className="is-clickable" onClick={() => navigate('/employees/' + e.id)}>
+              <td>
+                <div className="ppl-person">
+                  <PersonAvatar name={e.name} photo={e.photoUrl} />
+                  <div className="ppl-person__text">
+                    <span className="ppl-person__name">{e.name}{(e.status || 'Active') !== 'Active' && <Pill tone={employeeStatusTone(e.status)}>{e.status}</Pill>}</span>
+                    <span className="ppl-person__sub">{e.role || e.email || 'No role set'}{e.employeeNumber ? <> · <span className="mono">{e.employeeNumber}</span></> : null}</span>
+                  </div>
                 </div>
-                <span className="badge badge-blue">{project.status || 'Active'}</span>
-              </div>
-              <div className="project-lane-body">
-                {projectEmployees.map((e) => {
-                  const color = avatarColor(e.name)
-                  const empInvoiceCount = invoices.filter(inv => (inv.items||[]).some(it => it.employeeName?.toLowerCase() === e.name.toLowerCase())).length
-                  return (
-                    <div key={`${project.id}-${e.id}`} className="project-employee-card" onClick={() => navigate('/employees/' + e.id)}>
-                      <div className="card-top">
-                        <div className="card-top-left">
-                          <div className="avatar" style={{ background: color }}>{initials(e.name)}</div>
-                          <div>
-                            <div className="card-name">{e.name}</div>
-                            <div className="card-sub">{e.employeeNumber ? `${e.employeeNumber} · ` : ''}{(e as {role?:string}).role || e.email || 'No email'}</div>
-                          </div>
-                        </div>
-                        <span className={`badge ${statusBadge(e.status)}`}>{e.status || 'Active'}</span>
-                      </div>
-                      <div className="project-employee-meta">
-                        {showPayRates && e.payRate && <span className="project-employee-chip">${e.payRate}/hr</span>}
-                        {e.timezone && <span className="project-employee-chip">{e.timezone}</span>}
-                        {empInvoiceCount > 0 && <span className="project-employee-chip">{empInvoiceCount} invoices</span>}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+              </td>
+              <td className="ppl-text-2">{placementOf(e, projects, clients)}</td>
+              <td><Pill tone={isYva(e) ? 'gold' : 'info'}>{isYva(e) ? 'YVA team' : 'Client'}</Pill></td>
+              <td><TimeDot e={e} activity={activity} /></td>
+              <td className="muted">{payCell(e)}</td>
+              <td className="muted">{e.startYear || '—'}</td>
+              <td className="t-actions" onClick={ev => ev.stopPropagation()}>{rowMenu(e)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+
+  const groupedProjects = projects
+    .map(project => ({ project, people: filtered.filter(e => (project.employeeIds || []).includes(e.id)) }))
+    .filter(g => g.people.length > 0)
+    .sort((a, b) => a.project.name.localeCompare(b.project.name))
+  const unassigned = filtered.filter(e => !projects.some(p => (p.employeeIds || []).includes(e.id)))
+  const laneCard = (key: string, title: string, sub: string, people: Employee[], status?: string) => (
+    <section key={key} className="card ppl-lane">
+      <div className="card__head">
+        <div><h2 className="card__title">{title}</h2><span className="card__meta">{sub}</span></div>
+        {status && <Pill status={status} />}
+      </div>
+      {people.map(e => {
+        const n = invoiceCount(e)
+        return (
+          <button type="button" key={`${key}-${e.id}`} className="ppl-lane__row" onClick={() => navigate('/employees/' + e.id)}>
+            <PersonAvatar name={e.name} photo={e.photoUrl} size="sm" />
+            <span className="ppl-lane__main">
+              <span className="ppl-lane__name">{e.name}</span>
+              <span className="ppl-lane__meta">{e.employeeNumber ? `${e.employeeNumber} · ` : ''}{e.role || e.email || 'No email'}</span>
+              <span className="ppl-lane__chips">
+                {showPayRates && e.payRate ? <span className="tag-mono">${e.payRate}/hr</span> : null}
+                {e.timezone && <span className="ppl-chip">{e.timezone}</span>}
+                {n > 0 && <span className="ppl-chip">{n} invoices</span>}
+              </span>
+            </span>
+            <Pill tone={employeeStatusTone(e.status)}>{e.status || 'Active'}</Pill>
+          </button>
+        )
+      })}
+    </section>
+  )
+  const boardView = (
+    <div className="ppl-board">
+      {groupedProjects.map(({ project, people }) => laneCard(project.id, project.name, `${people.length} employee${people.length !== 1 ? 's' : ''}`, people, project.status || 'Active'))}
+      {unassigned.length > 0 && laneCard('unassigned', 'Unassigned', `${unassigned.length} employee${unassigned.length !== 1 ? 's' : ''}`, unassigned)}
+    </div>
+  )
+
+  const now = new Date()
+  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10)
+  const capacityRows = filtered.filter(e => (e.status || 'Active').toLowerCase() === 'active').map(e => {
+    const empProjects = projectsOf(e, projects).filter(p => (p.status || '').toLowerCase() === 'active')
+    const monthInvs = invoices.filter(inv => {
+      const d = inv.date || inv.billingEnd || ''
+      return d >= monthStart && d <= monthEnd && (inv.items || []).some(it => it.employeeName?.toLowerCase() === e.name.toLowerCase())
+    })
+    const monthHours = monthInvs.reduce((s, inv) => s + (inv.items || []).filter(it => it.employeeName?.toLowerCase() === e.name.toLowerCase()).reduce((h, it) => h + (Number(it.hoursTotal) || 0), 0), 0)
+    return { e, empProjects, monthHours, payRate: Number(e.payRate) || 0 }
+  })
+  const capacityView = (
+    <div className="table-card">
+      <div className="card__head"><h2 className="card__title">Team capacity — {now.toLocaleString('en-US', { month: 'long', year: 'numeric' })}</h2><span className="card__meta">Active people · hours on this month's invoices</span></div>
+      {mobile ? (
+        <div className="ppl-cap-cards">
+          {capacityRows.map(({ e, empProjects, monthHours, payRate }) => (
+            <div key={e.id} className="list-row">
+              <PersonAvatar name={e.name} size="sm" />
+              <div className="list-row__main"><span className="list-row__title">{e.name}</span><span className="list-row__meta">{empProjects.map(p => p.name).join(', ') || 'No active project'}</span></div>
+              <div className="ppl-cap-num"><span className="num">{monthHours > 0 ? `${monthHours.toFixed(1)}h` : '—'}</span>{showPayRates && <span className="muted num">{monthHours > 0 && payRate > 0 ? formatMoney(monthHours * payRate) : ''}</span>}</div>
             </div>
           ))}
-          {unassignedEmployees.length > 0 && (
-            <div className="project-lane">
-              <div className="project-lane-header">
-                <div>
-                  <div className="project-lane-title">Unassigned</div>
-                  <div className="project-lane-sub">{unassignedEmployees.length} employee{unassignedEmployees.length !== 1 ? 's' : ''}</div>
-                </div>
-              </div>
-              <div className="project-lane-body">
-                {unassignedEmployees.map((e) => {
-                  const color = avatarColor(e.name)
-                  const empInvoiceCount = invoices.filter(inv => (inv.items||[]).some(it => it.employeeName?.toLowerCase() === e.name.toLowerCase())).length
-                  return (
-                    <div key={`unassigned-${e.id}`} className="project-employee-card" onClick={() => navigate('/employees/' + e.id)}>
-                      <div className="card-top">
-                        <div className="card-top-left">
-                          <div className="avatar" style={{ background: color }}>{initials(e.name)}</div>
-                          <div>
-                            <div className="card-name">{e.name}</div>
-                            <div className="card-sub">{e.employeeNumber ? `${e.employeeNumber} · ` : ''}{(e as {role?:string}).role || e.email || 'No email'}</div>
-                          </div>
-                        </div>
-                        <span className={`badge ${statusBadge(e.status)}`}>{e.status || 'Active'}</span>
-                      </div>
-                      <div className="project-employee-meta">
-                        {showPayRates && e.payRate && <span className="project-employee-chip">${e.payRate}/hr</span>}
-                        {e.timezone && <span className="project-employee-chip">{e.timezone}</span>}
-                        {empInvoiceCount > 0 && <span className="project-employee-chip">{empInvoiceCount} invoices</span>}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
         </div>
       ) : (
-      <div className="card-grid">
-        {filtered.map((e) => {
-          const color = avatarColor(e.name)
-          const empInvoiceCount = invoices.filter(inv => (inv.items||[]).some(it => it.employeeName?.toLowerCase() === e.name.toLowerCase())).length
-          const empNum = e.employeeNumber
-          return (
-            <div key={e.id} className="entity-card" onClick={() => navigate('/employees/' + e.id)}>
-              <div className="card-top">
-                <div className="card-top-left">
-                  <div className="avatar" style={{ background: color }}>{initials(e.name)}</div>
-                  <div>
-                    <div className="card-name">{e.name}</div>
-                    <div className="card-sub">{empNum ? `${empNum} · ` : ''}{(e as {role?:string}).role || e.email || 'No email'}</div>
-                  </div>
-                </div>
-                <span className={`badge ${statusBadge(e.status)}`}>{e.status || 'Active'}</span>
-              </div>
-              <div className="card-stats">
-                {showPayRates && e.payRate && (
-                  <div className="stat-item">
-                    <div className="stat-label">Pay Rate</div>
-                    <div className="stat-value stat-value-gold">${e.payRate}/hr</div>
-                  </div>
-                )}
-                {(e as {employmentType?:string}).employmentType && (
-                  <div className="stat-item">
-                    <div className="stat-label">Type</div>
-                    <div className="stat-value">{(e as {employmentType?:string}).employmentType}</div>
-                  </div>
-                )}
-                {(e as {location?:string}).location && (
-                  <div className="stat-item">
-                    <div className="stat-label">Location</div>
-                    <div className="stat-value" style={{ fontSize: 12 }}>{(e as {location?:string}).location}</div>
-                  </div>
-                )}
-                {e.timezone && (
-                  <div className="stat-item">
-                    <div className="stat-label">Timezone</div>
-                    <div className="stat-value">{e.timezone}</div>
-                  </div>
-                )}
-                {e.startYear && (
-                  <div className="stat-item">
-                    <div className="stat-label">Since</div>
-                    <div className="stat-value">{e.startYear}</div>
-                  </div>
-                )}
-                <div className="stat-item">
-                  <div className="stat-label">Invoices</div>
-                  <div className="stat-value">{empInvoiceCount}</div>
-                </div>
-              </div>
-              {(e as {notes?:string}).notes && (
-                <div className="card-detail" style={{ fontSize: 11, opacity: .75 }}>{(e as {notes?:string}).notes}</div>
-              )}
-              <div className="card-footer">
-                <button className="btn-xs btn-teal" onClick={ev => { ev.stopPropagation(); navigate('/employees/' + e.id) }}>View Profile</button>
-                <button className="btn-xs btn-ghost" onClick={ev => { ev.stopPropagation(); openEdit(e) }}>Edit</button>
-                <button className="btn-xs btn-danger" onClick={ev => { ev.stopPropagation(); setConfirmDelete(e.id) }}>Remove</button>
-              </div>
-            </div>
-          )
-        })}
-        {filtered.length === 0 && (
-          <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '48px 20px', color: 'var(--muted)', fontSize: 14 }}>
-            {search || filterStatus ? 'No results.' : 'No team members yet. Add your first.'}
-          </div>
-        )}
+        <table className="table">
+          <thead><tr><th>Employee</th><th>Role</th><th>Assigned projects</th><th className="t-right">Hrs this month</th>{showPayRates && <th className="t-right">Earned (USD)</th>}</tr></thead>
+          <tbody>
+            {capacityRows.map(({ e, empProjects, monthHours, payRate }) => (
+              <tr key={e.id} className="is-clickable" onClick={() => navigate('/employees/' + e.id)}>
+                <td className="t-strong">{e.name}</td>
+                <td className="muted">{e.role || '—'}</td>
+                <td>{empProjects.length === 0 ? <span className="muted">None</span> : <span className="ppl-chips">{empProjects.map(p => <span key={p.id} className="ppl-chip">{p.name}</span>)}</span>}</td>
+                <td className="t-num t-strong">{monthHours > 0 ? `${monthHours.toFixed(1)}h` : '—'}</td>
+                {showPayRates && <td className="t-num t-strong">{monthHours > 0 && payRate > 0 ? formatMoney(monthHours * payRate) : '—'}</td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {capacityRows.length === 0 && <div className="card-empty">No active people match.</div>}
+    </div>
+  )
+
+  return (
+    <div className="page">
+      <PageHeader
+        title="Team"
+        sub={`${counts.all} ${counts.all === 1 ? 'person' : 'people'} · ${counts.client} on client projects · ${counts.yva} on the YVA team`}
+        actions={<>
+          <Segmented label="Team" value={team} onChange={setTeam} options={[{ value: 'all', label: 'All' }, { value: 'client', label: 'Client team' }, { value: 'yva', label: 'YVA team' }]} />
+          <button type="button" className="btn btn--primary" onClick={openAdd}><Ic d={P.plus} size={15} />Add employee</button>
+        </>}
+      />
+      {notice && <Banner onClose={() => setNotice(null)}>{notice}</Banner>}
+      {error && <Banner tone="danger" onClose={() => setError(null)}>{error}</Banner>}
+
+      <div className="ppl-filterbar">
+        <SearchInput value={search} onChange={setSearch} placeholder="Search team…" label="Search team" />
+        <select className="select select--sm ppl-filterbar__status" aria-label="Status" value={filterStatus} onChange={e => setFilterStatus(e.target.value)}>
+          <option value="">All statuses</option>
+          {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <span className="spacer" />
+        <Segmented label="View" value={view} onChange={setView} options={[{ value: 'table', label: 'List' }, { value: 'projects', label: 'By project' }, { value: 'capacity', label: 'Capacity' }]} />
       </div>
-      )}
 
-      {/* Statements Modal */}
-      {modal === 'statements' && selectedEmp && (
-        <div className="modal-overlay" onClick={() => setModal(null)}>
-          <div className="modal modal-lg" onClick={(ev) => ev.stopPropagation()}>
-            <div className="modal-header">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div className="avatar-sm" style={{ background: avatarColor(selectedEmp.name) }}>{initials(selectedEmp.name)}</div>
-                <div>
-                  <h2 className="modal-title">{selectedEmp.name} — Statements</h2>
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>
-                    {selectedEmp.employeeNumber && `${selectedEmp.employeeNumber} · `}
-                    {selectedEmp.payRate ? `$${selectedEmp.payRate}/hr` : 'No pay rate set'}
-                  </div>
-                </div>
-              </div>
-              <button className="modal-close btn-icon" onClick={() => setModal(null)}><IconX size={14} /></button>
-            </div>
-            <div className="modal-body">
-              <EmployeeStatementsPanel emp={selectedEmp} invoices={invoices} onInvoicesChange={setInvoices} />
-            </div>
-            <div className="modal-footer">
-              <button className="btn-ghost" onClick={() => setModal(null)}>Close</button>
-            </div>
-          </div>
+      {!loaded ? (
+        <div className="table-card ppl-skel">
+          {[0, 1, 2, 3, 4].map(i => <div key={i} className="ppl-skel__row"><Skel w={36} h={36} r={18} /><div className="stack"><Skel w={160} h={12} /><Skel w={110} h={10} /></div><Skel w={140} h={12} /><Skel w={70} h={12} /></div>)}
         </div>
-      )}
+      ) : filtered.length === 0 ? (
+        <EmptyState action={!search && !filterStatus && team === 'all' ? <button type="button" className="btn btn--primary" onClick={openAdd}>Add employee</button> : undefined}>
+          {search || filterStatus || team !== 'all' ? 'No one matches these filters.' : 'No team members yet. Add your first.'}
+        </EmptyState>
+      ) : view === 'projects' ? boardView : view === 'capacity' ? capacityView : tableView}
 
-      {/* Add/Edit Modal */}
-      {(modal === 'add' || modal === 'edit') && (
-        <div className="modal-overlay" onClick={() => setModal(null)}>
-          <div className="modal modal-lg" onClick={(ev) => ev.stopPropagation()}>
-            <div className="modal-header">
-              <h2 className="modal-title">{modal === 'add' ? 'Add Team Member' : 'Edit Member'}</h2>
-              <button className="modal-close btn-icon" onClick={() => setModal(null)}><IconX size={14} /></button>
-            </div>
-            <div className="modal-body">
-              <div className="form-grid-2">
-                <div className="form-group form-group-full">
-                  <label className="form-label">Full Name *</label>
-                  <input className="form-input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Full name" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Role / Position</label>
-                  <input className="form-input" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} placeholder="e.g. Intake Specialist" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Employment Type</label>
-                  <select className="form-select" value={form.employmentType} onChange={(e) => setForm({ ...form, employmentType: e.target.value })}>
-                    {TYPE_OPTIONS.map(t => <option key={t} value={t}>{t || '— Not set —'}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Works For</label>
-                  <select className="form-select" value={form.worksFor} onChange={(e) => setForm({ ...form, worksFor: e.target.value === 'yva' ? 'yva' : 'client' })}>
-                    <option value="client">Client project (screenshots on)</option>
-                    <option value="yva">YVA team (screenshots off)</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Manual Time</label>
-                  <select className="form-select" value={form.manualTimeAllowed ? 'on' : 'off'} onChange={(e) => setForm({ ...form, manualTimeAllowed: e.target.value === 'on' })}>
-                    <option value="off">Off</option>
-                    <option value="on">On — can add time by hand (admin approves)</option>
-                  </select>
-                </div>
-                {showPayRates && (
-                  <div className="form-group">
-                    <label className="form-label">Pay Rate ($/hr)</label>
-                    <input className="form-input" type="number" value={form.payRate} onChange={(e) => setForm({ ...form, payRate: e.target.value })} placeholder="4.50" />
-                  </div>
-                )}
-                {showPayRates && (
-                  <>
-                    <div className="form-group">
-                      <label className="form-label">Default Shift Start</label>
-                      <input className="form-input" value={form.defaultShiftStart} onChange={(e) => setForm({ ...form, defaultShiftStart: e.target.value })} onBlur={(e) => setForm({ ...form, defaultShiftStart: normalizeClockInput(e.target.value) })} placeholder="4:00 pm" />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Default Shift End</label>
-                      <input className="form-input" value={form.defaultShiftEnd} onChange={(e) => setForm({ ...form, defaultShiftEnd: e.target.value })} onBlur={(e) => setForm({ ...form, defaultShiftEnd: normalizeClockInput(e.target.value) })} placeholder="12:00 am" />
-                    </div>
-                    <div className="form-group">
-                      <label className="form-label">Premium Rule</label>
-                      <select className="form-select" value={form.premiumEnabled ? 'night' : ''} onChange={(e) => setForm({ ...form, premiumEnabled: e.target.value === 'night' })}>
-                        <option value="">No premium pay</option>
-                        <option value="night">Night shift premium</option>
-                      </select>
-                    </div>
-                    {form.premiumEnabled && (
-                      <>
-                        <div className="form-group">
-                          <label className="form-label">Premium Starts At</label>
-                          <input className="form-input" value={form.premiumStartTime} onChange={(e) => setForm({ ...form, premiumStartTime: e.target.value })} onBlur={(e) => setForm({ ...form, premiumStartTime: normalizeClockInput(e.target.value) || '21:00' })} placeholder="9:00 pm" />
-                        </div>
-                        <div className="form-group">
-                          <label className="form-label">Premium Increase %</label>
-                          <input className="form-input" type="number" value={form.premiumPercent} onChange={(e) => setForm({ ...form, premiumPercent: e.target.value })} placeholder="15" />
-                        </div>
-                      </>
-                    )}
-                  </>
-                )}
-                <div className="form-group">
-                  <label className="form-label">Status</label>
-                  <select className="form-select" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                    {STATUS_OPTIONS.map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Email</label>
-                  <input className="form-input" type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="name@example.com" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Phone</label>
-                  <input className="form-input" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+1 555 000 0000" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Location</label>
-                  <input className="form-input" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} placeholder="Santo Domingo, DO" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Timezone</label>
-                  <input className="form-input" value={form.timezone} onChange={(e) => setForm({ ...form, timezone: e.target.value })} placeholder="EST / AST" />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Hire Year</label>
-                  <input className="form-input" value={form.startYear} onChange={(e) => setForm({ ...form, startYear: e.target.value })} placeholder="2025" />
-                </div>
-                <div className="form-group form-group-full">
-                  <label className="form-label">Internal Notes</label>
-                  <textarea className="form-textarea" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Performance notes, schedule preferences, etc." />
-                </div>
-              </div>
-              {modal === 'add' && (
-                <div style={{ marginTop: 10, fontSize: 12, color: 'var(--muted)' }}>
-                  Employee number will be auto-assigned (e.g. YVA25001) on save.
-                </div>
-              )}
-
-              {/* Attachments */}
-              <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 14 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--muted)' }}>
-                    Files &amp; Documents {attachments.length > 0 && `(${attachments.length})`}
-                  </div>
-                  <button className="btn-ghost btn-xs" onClick={() => fileInputRef.current?.click()}>+ Upload</button>
-                  <input ref={fileInputRef} type="file" accept="image/*,.pdf,audio/*" style={{ display: 'none' }}
-                    onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = '' }} />
-                </div>
-                {attachments.length === 0 ? (
-                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>No files. Accepts images, PDFs, audio (max 5 MB each). For videos use a URL link.</div>
-                ) : (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {attachments.map(att => (
-                      <div key={att.id} style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--surf2)', border: '1px solid var(--border)', borderRadius: 6, padding: '7px 10px' }}>
-                        <div className={`attachment-icon${att.mimeType.startsWith('image/') ? ' attachment-icon-image' : att.mimeType.startsWith('audio/') ? ' attachment-icon-audio' : att.mimeType === 'application/pdf' ? ' attachment-icon-pdf' : ''}`}>
-                          {att.mimeType.startsWith('image/') ? <IconImage size={16} /> : att.mimeType === 'application/pdf' ? <IconFile size={16} /> : att.mimeType.startsWith('audio/') ? <IconMusic size={16} /> : <IconPaperclip size={16} />}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{att.name}</div>
-                          <div style={{ fontSize: 10, color: 'var(--muted)' }}>{(att.size / 1024).toFixed(0)} KB</div>
-                        </div>
-                        {att.mimeType.startsWith('audio/') && (
-                          <audio controls src={att.dataUrl} style={{ height: 28, maxWidth: 160 }} />
-                        )}
-                        {att.mimeType.startsWith('image/') && (
-                          <img src={att.dataUrl} alt={att.name} style={{ height: 36, width: 36, objectFit: 'cover', borderRadius: 4 }} />
-                        )}
-                        <a href={att.dataUrl} download={att.name} className="btn-ghost btn-xs">↓</a>
-                        <button className="btn-icon btn-danger" style={{ fontSize: 11, padding: '2px 6px' }} onClick={() => setAttachments(prev => prev.filter(a => a.id !== att.id))}><IconX size={12} /></button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn-ghost" onClick={() => setModal(null)}>Cancel</button>
-              <button className="btn-primary" onClick={saveForm} disabled={!form.name.trim()}>
-                {modal === 'add' ? 'Add Member' : 'Save Changes'}
-              </button>
-            </div>
+      {/* Add / Edit */}
+      <Drawer open={modal !== null} onClose={() => setModal(null)} size="wide"
+        title={modal === 'add' ? 'Add employee' : 'Edit employee'}
+        sub={modal === 'add' ? 'The employee number is assigned automatically on save (e.g. YVA26001).' : form.name}
+        footer={<>
+          <span className="spacer" />
+          <button type="button" className="btn" onClick={() => setModal(null)}>Cancel</button>
+          <button type="button" className="btn btn--primary" onClick={() => void saveForm()} disabled={!form.name.trim() || saving}>{saving ? 'Saving…' : modal === 'add' ? 'Add employee' : 'Save changes'}</button>
+        </>}>
+        <EmployeeFields form={form} setForm={setForm} pay={showPayRates} schedule={canSchedule} />
+        <section className="form-section">
+          <div className="row row--between">
+            <h3 className="form-section__title">Files &amp; documents {attachments.length > 0 && `(${attachments.length})`}</h3>
+            <button type="button" className="btn btn--sm" onClick={() => fileInputRef.current?.click()}><Ic d={P.upload} size={14} />Upload</button>
+            <input ref={fileInputRef} type="file" accept="image/*,.pdf,audio/*" hidden onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = '' }} />
           </div>
-        </div>
-      )}
+          <AttachmentList compact items={attachments} onRemove={id => setAttachments(prev => prev.filter(a => a.id !== id))} empty="No files. Accepts images, PDFs, audio (max 5 MB each). For videos use a URL link." />
+        </section>
+      </Drawer>
 
-      {confirmDelete && (
-        <div className="modal-overlay" onClick={() => setConfirmDelete(null)}>
-          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="confirm-title">Remove team member?</div>
-            <div className="confirm-body">This cannot be undone.</div>
-            <div className="confirm-actions">
-              <button className="btn-ghost" onClick={() => setConfirmDelete(null)}>Cancel</button>
-              <button className="btn-danger" onClick={() => doDelete(confirmDelete)}>Remove</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Statements */}
+      <Drawer open={!!statementsFor} onClose={() => setStatementsFor(null)} size="wide"
+        title={`${statementsFor?.name ?? ''} — Statements`}
+        sub={statementsFor ? `${statementsFor.employeeNumber ? `${statementsFor.employeeNumber} · ` : ''}${statementsFor.payRate ? `$${statementsFor.payRate}/hr` : 'No pay rate set'}` : undefined}>
+        {statementsFor && <EmployeeStatements emp={statementsFor} invoices={invoices} onInvoicesChange={setInvoices} />}
+      </Drawer>
+
+      <Modal open={!!confirmDelete} onClose={() => setConfirmDelete(null)} title={`Remove ${confirmDelete?.name ?? 'team member'}?`} sub="This cannot be undone."
+        footer={<><button type="button" className="btn" onClick={() => setConfirmDelete(null)}>Cancel</button><button type="button" className="btn btn--danger" onClick={() => confirmDelete && void doDelete(confirmDelete)}>Remove</button></>} />
     </div>
   )
 }

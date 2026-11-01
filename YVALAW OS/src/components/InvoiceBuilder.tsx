@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { loadRatesForInvoicing, rateClient, rateEmployee, rateProject, type PlacementRate } from '../services/rates'
 import { localParts, resolveRates } from '../utils/moneyRules'
 import type { AppSettings, Client, Employee, Invoice, InvoiceItem, InvoiceTemplate, Project } from '../data/types'
@@ -9,7 +9,9 @@ import {
   loadInvoiceTemplates, saveInvoiceTemplates,
 } from '../services/storage'
 import { computePayrollBreakdown, computePremiumAdjustedAmount, employeePremiumConfig } from '../utils/payroll'
-import { IconTrash, IconX } from './Icon'
+import { Ic, P } from './Icon'
+import { Banner, Field, Menu, Modal } from './ui'
+import { printInvoice } from '../utils/invoiceHtml'
 import { hoursToHM, loadTrackerEntriesForProject } from '../services/trackerStorage'
 
 function projectPrefix(name: string): string {
@@ -40,8 +42,8 @@ function generateDateRange(start: string, end: string): string[] {
 
 function dateLabel(d: string): string {
   const dt = new Date(d + 'T12:00:00')
-  const day = ['Su','Mo','Tu','We','Th','Fr','Sa'][dt.getDay()]
-  return `${day}\n${dt.getMonth() + 1}/${dt.getDate()}`
+  const day = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dt.getDay()]
+  return `${day} ${dt.getDate()}`
 }
 
 /** Parse hours from various formats: "8", "8.5", "8,5", "8:30" → decimal */
@@ -89,7 +91,8 @@ function emptyRow(): BuilderRow {
 }
 
 type Props = {
-  onCreated: (inv: Invoice) => void
+  /** send = the person pressed "Save & send" (the page emails it and marks it sent) */
+  onCreated: (inv: Invoice, send: boolean) => void
   onCancel: () => void
   initialProjectId?: string
   editInvoice?: Invoice
@@ -181,6 +184,8 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
   const [saveTemplateModal, setSaveTemplateModal] = useState(false)
   const [templateName, setTemplateName] = useState('')
   const [loadTemplateModal, setLoadTemplateModal] = useState(false)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const dates = useMemo(() => generateDateRange(billingStart, billingEnd), [billingStart, billingEnd])
 
@@ -316,7 +321,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
   }
 
   // ── Import approved YVA Time hours into the daily grid ──
-  const [importMsg, setImportMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [importMsg, setImportMsg] = useState<{ ok: boolean; text: string; label?: string } | null>(null)
   async function importTrackerHours() {
     if (!projectId || dates.length === 0) return
     const entries = await loadTrackerEntriesForProject(projectId, dates[0], dates[dates.length - 1])
@@ -355,7 +360,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
       return next.length ? next : [emptyRow()]
     })
     const total = entries.reduce((s, e) => s + e.hours, 0)
-    setImportMsg({ ok: true, text: `Imported ${total.toFixed(2)} approved hours for ${byEmployee.size} team member${byEmployee.size === 1 ? '' : 's'}. Check the grid before creating the invoice.` })
+    setImportMsg({ ok: true, label: `✓ Imported ${hoursToHM(total)} from YVA Time`, text: `Imported ${hoursToHM(total)} (h:mm) of approved hours for ${byEmployee.size} team member${byEmployee.size === 1 ? '' : 's'}. Check the grid before creating the invoice.` })
   }
 
   function addRow() { setRows(prev => [...prev, emptyRow()]) }
@@ -389,7 +394,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
     setTemplates(next)
     setTemplateName('')
     setSaveTemplateModal(false)
-    alert(`Template "${t.name}" saved!`)
+    setNotice(`Template "${t.name}" saved.`)
   }
 
   function deleteTemplate(id: string) {
@@ -398,11 +403,8 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
     setTemplates(next)
   }
 
-  function createInvoice() {
-    if (!selectedClient && !rows.some(r => r.employeeName)) return
-    setSaving(true)
-    void (async () => {
-      const items: InvoiceItem[] = rows
+  function buildItems(): InvoiceItem[] {
+    return rows
         .filter(r => r.employeeName.trim())
         .map(r => {
           const employee = employees.find(e => e.id === r.employeeId) || employees.find(e => e.name === r.employeeName)
@@ -423,6 +425,25 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
             daily:        dates.length > 0 ? { ...r.daily } : undefined,
           }
         })
+  }
+
+  /** Preview PDF of what's on screen — nothing is saved */
+  function previewPdf() {
+    const inv: Invoice = {
+      id: editInvoice?.id || 'preview', number: editInvoice?.number || nextNumberLabel || 'DRAFT', date, dueDate: dueDate || undefined,
+      clientName: selectedClient?.name || editInvoice?.clientName || '', clientEmail: selectedClient?.email || '', clientAddress: selectedClient?.address || '',
+      billingStart: billingStart || undefined, billingEnd: billingEnd || undefined, projectId: selectedProject?.id || null, projectName: selectedProject?.name || '',
+      status: editInvoice?.status || 'draft', subtotal: grandTotal, notes: notes || undefined, items: buildItems(),
+    }
+    printInvoice(inv, { rate: 0, companyName: settings.companyName, companyAddress: settings.companyAddress, companyEmail: settings.companyEmail, companyPhone: settings.companyPhone })
+  }
+
+  function createInvoice(send: boolean) {
+    if (!selectedClient && !rows.some(r => r.employeeName)) return
+    setSaving(true); setSaveError(null)
+    void (async () => {
+     try {
+      const items = buildItems()
 
       if (editInvoice) {
         // Update existing invoice
@@ -445,7 +466,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
         const existing = await loadInvoices()
         await saveInvoices(existing.map(i => i.id === inv.id ? inv : i))
         setSaving(false)
-        onCreated(inv)
+        onCreated(inv, send)
         return
       }
 
@@ -493,360 +514,233 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
       await saveInvoices([inv, ...existing])
       setInvoices([inv, ...existing])
       setSaving(false)
-      onCreated(inv)
+      onCreated(inv, send)
+     } catch (e) {
+      setSaving(false)
+      setSaveError(`The invoice was not saved: ${(e as Error).message}`)
+     }
     })()
   }
 
-  const dopStr = settings.usdToDop > 0
-    ? ` · RD$${(grandTotal * settings.usdToDop).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
-    : ''
+  const nextNumberLabel = editInvoice?.number
+    || (selectedProject ? `${projectPrefix(selectedProject.name)}${String(nextProjectInvoiceSeq(selectedProject, invoices)).padStart(4, '0')}` : '')
+  const totalHours = rows.reduce((s, r) => s + rowComp(r, dates).hours, 0)
+  const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const canSave = !saving && grandTotal !== 0 && !!clientId
+  const saveHint = !clientId ? 'Pick a client first' : grandTotal === 0 ? 'Add hours and a rate first' : undefined
+  const canImport = dates.length > 0 && !!projectId
+  const isDraftEdit = !editInvoice || (editInvoice.status || 'draft') === 'draft'
+
+  function removeButton(row: BuilderRow) {
+    if (rows.length <= 1) return null
+    return <button type="button" className="btn btn--ghost btn--icon btn--sm fin-builder__remove" aria-label={`Remove ${row.employeeName || 'row'}`} onClick={() => removeRow(row._id)}><Ic d={P.trash} size={15} /></button>
+  }
+  function employeeSelect(row: BuilderRow) {
+    return (
+      <select className="select select--sm" aria-label="Employee" value={row.employeeName} onChange={e => handleEmpSelect(row._id, e.target.value)}>
+        <option value="">— Select —</option>
+        {projectEmployees.map(e => <option key={e.id} value={e.name}>{e.name}</option>)}
+      </select>
+    )
+  }
+  function premiumNote(row: BuilderRow, colSpan: number) {
+    const employee = rowEmployee(row)
+    const premiumConfig = employeePremiumConfig(employee)
+    if (!employee || !premiumConfig.enabled) return null
+    const comp = rowComp(row, dates)
+    return (
+      <tr className="fin-grid__note"><td colSpan={colSpan}>
+        {comp.shift.linked
+          ? `Using saved employee shift ${comp.shift.shiftStart} to ${comp.shift.shiftEnd}. `
+          : 'No saved shift on the employee profile, so this row is using the regular rate only. '}
+        Premium split: {comp.regularHours.toFixed(2)}h regular + {comp.premiumHours.toFixed(2)}h at +{premiumConfig.percent}% after {premiumConfig.startTime}. Bill: ${comp.billAmount.toFixed(2)}. Payroll: ${comp.payrollAmount.toFixed(2)}.
+      </td></tr>
+    )
+  }
 
   return (
-    <div className="invoice-builder">
-
-      {/* ── Template bar ── */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 4, alignItems: 'center' }}>
-        {templates.length > 0 && (
-          <button className="btn-ghost btn-sm" onClick={() => setLoadTemplateModal(true)}>Load Template</button>
-        )}
-        <button className="btn-ghost btn-sm" onClick={() => setSaveTemplateModal(true)}>Save as Template</button>
+    <div className="fin-builder">
+      <div className="fin-builder__bar">
+        <button type="button" className="back-link" onClick={onCancel}><Ic d={P.chevL} size={15} /> Invoices</button>
+        <span className="spacer" />
+        <Menu label="Templates" buttonClass="btn" trigger={<>Templates <Ic d={P.chevD} size={14} /></>} items={[
+          { label: 'Load template…', onClick: () => setLoadTemplateModal(true), icon: P.file },
+          { label: 'Save as template…', onClick: () => setSaveTemplateModal(true), icon: P.copy },
+        ]} />
+        <button type="button" className="btn" onClick={previewPdf}>Preview PDF</button>
+        <button type="button" className="btn" disabled={!canSave} title={saveHint} onClick={() => createInvoice(false)}>{saving ? 'Saving…' : editInvoice ? 'Save changes' : 'Save draft'}</button>
+        {isDraftEdit && <button type="button" className="btn btn--primary" disabled={!canSave} title={saveHint} onClick={() => createInvoice(true)}>Save &amp; send</button>}
       </div>
 
-      {/* ── Header Info ── */}
-      <div className="builder-section">
-        <div className="builder-section-title">Invoice Details</div>
-        <div className="form-grid-2">
-          <div className="form-group">
-            <label className="form-label">Client *</label>
-            <select className="form-select" value={clientId} onChange={e => handleClientChange(e.target.value)}>
-              <option value="">— Select client —</option>
-              {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Project</label>
-            <select className="form-select" value={projectId} onChange={e => setProjectId(e.target.value)}>
-              <option value="">— No project —</option>
-              {projects
-                .filter(p => !clientId || p.clientId === clientId)
-                .map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </div>
-          <div className="form-group">
-            <label className="form-label">Invoice Date</label>
-            <input className="form-input" type="date" value={date} onChange={e => setDate(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Due Date</label>
-            <input className="form-input" type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
-          </div>
-        </div>
+      {saveError && <Banner tone="danger" onClose={() => setSaveError(null)}>{saveError}</Banner>}
+      {notice && <Banner tone="success" onClose={() => setNotice(null)}>{notice}</Banner>}
 
-        {/* From / Bill To preview */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
-          <div style={{ background: 'var(--surf2)', border: '1px solid var(--border)', borderRadius: 8, padding: '12px 14px' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 6 }}>From</div>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--soft)' }}>{settings.companyName || 'YVA Staffing'}</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{settings.companyAddress || 'Santo Domingo, Dominican Republic'}</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)' }}>{settings.companyEmail || 'Contact@yvastaffing.net'}</div>
-            <div style={{ fontSize: 11, color: 'var(--muted)' }}>{settings.companyPhone || '+1 (717) 281-8676'}</div>
-          </div>
-          <div style={{ background: 'var(--surf2)', border: `1px solid ${selectedClient ? 'var(--gold)' : 'var(--border)'}`, borderRadius: 8, padding: '12px 14px' }}>
-            <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.07em', marginBottom: 6 }}>Bill To</div>
-            {selectedClient ? (
-              <>
-                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--soft)' }}>{selectedClient.name}</div>
-                {selectedClient.email   && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{selectedClient.email}</div>}
-                {selectedClient.address && <div style={{ fontSize: 11, color: 'var(--muted)' }}>{selectedClient.address}</div>}
-                {selectedProject && (
-                  <div style={{ fontSize: 11, color: 'var(--gold)', marginTop: 4 }}>
-                    Next #: {projectPrefix(selectedProject.name)}{String(nextProjectInvoiceSeq(selectedProject, invoices)).padStart(4, '0')}
-                  </div>
-                )}
-              </>
-            ) : (
-              <div style={{ fontSize: 12, color: 'var(--muted)' }}>Select a client above</div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* ── Billing Period ── */}
-      <div className="builder-section">
-        <div className="builder-section-title">Billing Period <span style={{ color: 'var(--muted)', textTransform: 'none', letterSpacing: 0, fontSize: 11 }}>(optional — enables daily hours grid)</span></div>
-        <div className="form-grid-2">
-          <div className="form-group">
-            <label className="form-label">From</label>
-            <input className="form-input" type="date" value={billingStart} onChange={e => setBillingStart(e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label className="form-label">To</label>
-            <input className="form-input" type="date" value={billingEnd} onChange={e => setBillingEnd(e.target.value)} />
-          </div>
-        </div>
-        {billingStart && billingEnd && dates.length === 0 && (
-          <div className="settings-notice settings-notice-error" style={{ marginTop: 8 }}>Invalid date range.</div>
-        )}
-        {dates.length > 0 && (
-          <div className="settings-notice settings-notice-success" style={{ marginTop: 8 }}>
-            {dates.length}-day billing period · Enter hours per day in the grid below. (Formats: 8, 8.5, 8:30)
-          </div>
-        )}
-        {dates.length > 0 && projectId && (
-          <div style={{ marginTop: 10, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-            <button className="btn-ghost btn-sm" onClick={() => void importTrackerHours()}>Import YVA Time hours</button>
-            <span style={{ fontSize: 12, color: 'var(--muted)' }}>Fills the grid with approved hours for this project and period.</span>
-          </div>
-        )}
-        {importMsg && (
-          <div className={`settings-notice ${importMsg.ok ? 'settings-notice-success' : 'settings-notice-error'}`} style={{ marginTop: 8 }}>{importMsg.text}</div>
-        )}
-      </div>
-
-      {/* ── Line Items ── */}
-      <div className="builder-section">
-        <div className="builder-section-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span>Services / Team Members</span>
-          <button className="btn-ghost btn-xs" onClick={addRow}>+ Add Row</button>
-        </div>
-
-        {/* Daily grid mode */}
-        {dates.length > 0 ? (
-          <div className="builder-daily-wrap">
-            <table className="builder-daily-table">
-              <thead>
-                <tr>
-                  <th style={{ minWidth: 160 }}>Employee</th>
-                  <th style={{ minWidth: 120 }}>Position</th>
-                  <th style={{ minWidth: 72 }}>Rate/hr</th>
-                  {dates.map(d => (
-                    <th key={d} style={{ minWidth: 46, whiteSpace: 'pre-line', textAlign: 'center', fontSize: 10, padding: '4px 2px' }}>
-                      {dateLabel(d)}
-                    </th>
-                  ))}
-                  <th style={{ minWidth: 64, textAlign: 'right' }}>Hours</th>
-                  <th style={{ minWidth: 90, textAlign: 'right' }}>Amount</th>
-                  <th style={{ width: 28 }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(row => {
-                  const comp = rowComp(row, dates)
-                  const hrs = comp.hours
-                  const amt = comp.billAmount
-                  return (
-                    <tr key={row._id}>
-                      <td>
-                        <select
-                          className="form-select"
-                          style={{ fontSize: 12, padding: '5px 8px' }}
-                          value={row.employeeName}
-                          onChange={e => handleEmpSelect(row._id, e.target.value)}
-                        >
-                          <option value="">— Select —</option>
-                          {projectEmployees.map(e => <option key={e.id} value={e.name}>{e.name}</option>)}
-                        </select>
-                      </td>
-                      <td>
-                        <input
-                          className="form-input"
-                          style={{ fontSize: 12, padding: '5px 8px' }}
-                          value={row.position}
-                          onChange={e => updateRow(row._id, { position: e.target.value })}
-                          placeholder="Role..."
-                        />
-                      </td>
-                      <td>
-                        <input
-                          className="form-input"
-                          style={{ fontSize: 12, padding: '5px 8px', width: 64 }}
-                          type="number"
-                          value={row.rate}
-                          onChange={e => updateRow(row._id, { rate: e.target.value })}
-                          placeholder="0"
-                        />
-                      </td>
-                      {dates.map(d => (
-                        <td key={d} style={{ padding: '2px 1px' }}>
-                          <input
-                            className="daily-cell"
-                            type="text"
-                            inputMode="decimal"
-                            value={row.daily[d] || ''}
-                            onChange={e => updateDaily(row._id, d, e.target.value)}
-                            placeholder="—"
-                          />
-                        </td>
-                      ))}
-                      <td style={{ textAlign: 'right', fontWeight: 700, fontSize: 13, paddingRight: 8 }}>
-                        {hrs > 0 ? hrs.toFixed(1) : '—'}
-                      </td>
-                      <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--gold)', fontSize: 13, paddingRight: 8 }}>
-                        {amt > 0 ? `$${amt.toFixed(2)}` : '—'}
-                      </td>
-                      <td>
-                        {rows.length > 1 && (
-                          <button className="btn-icon btn-danger" style={{ fontSize: 12, padding: '3px 6px' }} onClick={() => removeRow(row._id)}><IconTrash size={12} /></button>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          /* Simple total hours mode */
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {rows.map(row => {
-              const comp = rowComp(row, dates)
-              const employee = rowEmployee(row)
-              const premiumConfig = employeePremiumConfig(employee)
-              const hrs = comp.hours
-              const amt = comp.billAmount
-              return (
-                <div key={row._id} className="builder-simple-row">
-                  <div className="form-group" style={{ flex: 2 }}>
-                    {rows.indexOf(row) === 0 && <label className="form-label">Employee</label>}
-                    <select className="form-select" value={row.employeeName} onChange={e => handleEmpSelect(row._id, e.target.value)}>
-                      <option value="">— Select employee —</option>
-                      {projectEmployees.map(e => <option key={e.id} value={e.name}>{e.name}</option>)}
-                    </select>
-                  </div>
-                  <div className="form-group" style={{ flex: 2 }}>
-                    {rows.indexOf(row) === 0 && <label className="form-label">Position</label>}
-                    <input className="form-input" value={row.position} onChange={e => updateRow(row._id, { position: e.target.value })} placeholder="Role / position" />
-                  </div>
-                  <div className="form-group" style={{ flex: 1 }}>
-                    {rows.indexOf(row) === 0 && <label className="form-label">Rate/hr</label>}
-                    <input className="form-input" type="number" value={row.rate} onChange={e => updateRow(row._id, { rate: e.target.value })} placeholder="0" />
-                  </div>
-                  <div className="form-group" style={{ flex: 1 }}>
-                    {rows.indexOf(row) === 0 && <label className="form-label">Total Hrs</label>}
-                    <input className="form-input" type="text" inputMode="decimal" value={row.hoursManual} onChange={e => updateRow(row._id, { hoursManual: e.target.value })} placeholder="0" />
-                  </div>
-                  <div className="form-group" style={{ flex: 1 }}>
-                    {rows.indexOf(row) === 0 && <label className="form-label">Bill Amount</label>}
-                    <div className="builder-amount-display">{amt > 0 ? `$${amt.toFixed(2)}` : '—'}</div>
-                  </div>
-                  <div className="form-group" style={{ flex: 1 }}>
-                    {rows.indexOf(row) === 0 && <label className="form-label">Payroll Est.</label>}
-                    <div className="builder-amount-display" style={{ color: comp.payrollAmount > 0 ? 'var(--soft)' : 'var(--muted)' }}>
-                      {comp.payrollAmount > 0 ? `$${comp.payrollAmount.toFixed(2)}` : '—'}
-                    </div>
-                  </div>
-                  <div style={{ alignSelf: 'flex-end', paddingBottom: 2 }}>
-                    {rows.length > 1 && (
-                      <button className="btn-icon btn-danger btn-xs" onClick={() => removeRow(row._id)}><IconTrash size={12} /></button>
-                    )}
-                  </div>
-                  {employee && premiumConfig.enabled && (
-                    <div className="form-group" style={{ flexBasis: '100%', marginTop: -2 }}>
-                      <div className="settings-notice settings-notice-info" style={{ margin: 0 }}>
-                        {comp.shift.linked
-                          ? `Using saved employee shift ${comp.shift.shiftStart} to ${comp.shift.shiftEnd}. `
-                          : 'No saved shift on the employee profile, so this row is using the regular rate only. '}
-                        Premium split: {comp.regularHours.toFixed(2)}h regular + {comp.premiumHours.toFixed(2)}h at +{premiumConfig.percent}% after {premiumConfig.startTime}. Bill: ${comp.billAmount.toFixed(2)}. Payroll: ${comp.payrollAmount.toFixed(2)}.
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* ── Notes ── */}
-      <div className="builder-section">
-        <div className="builder-section-title">Notes / Message to Client</div>
-        <textarea
-          className="form-textarea"
-          rows={3}
-          value={notes}
-          onChange={e => setNotes(e.target.value)}
-          placeholder="Payment instructions, thank you note, or any additional info..."
-        />
-      </div>
-
-      {/* ── Grand Total ── */}
-      <div className="builder-total-bar">
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-          <div style={{ fontSize: 12, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.07em', fontWeight: 600 }}>Total Due</div>
-          <div className="builder-total-amount">${grandTotal.toFixed(2)}</div>
-          {dopStr && <div style={{ fontSize: 12, color: 'var(--muted)' }}>{dopStr}</div>}
-        </div>
-      </div>
-
-      {/* ── Actions ── */}
-      <div className="modal-footer" style={{ borderTop: '1px solid var(--border)', paddingTop: 16 }}>
-        <button className="btn-ghost" onClick={onCancel}>Cancel</button>
-        <button
-          className="btn-primary"
-          onClick={createInvoice}
-          disabled={saving || grandTotal === 0 || !clientId}
-        >
-          {saving ? 'Saving…' : (editInvoice ? 'Update Invoice' : 'Create Invoice')}
-        </button>
-      </div>
-
-      {/* ── Save Template Modal ── */}
-      {saveTemplateModal && (
-        <div className="modal-overlay" onClick={() => setSaveTemplateModal(false)}>
-          <div className="modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2 className="modal-title">Save as Template</h2>
-              <button className="modal-close btn-icon" onClick={() => setSaveTemplateModal(false)}><IconX size={14} /></button>
+      <div className="fin-builder__grid">
+        <div className="fin-builder__main">
+          <section className="card card--pad fin-builder__head">
+            <h2 className="fin-builder__title">{editInvoice ? 'Edit invoice' : 'New invoice'} {nextNumberLabel && <span className="mono fin-builder__num">{nextNumberLabel}</span>}</h2>
+            <div className="fin-builder__fields">
+              <Field label="Client *">
+                <select className="select" aria-label="Client" value={clientId} onChange={e => handleClientChange(e.target.value)}>
+                  <option value="">— Select client —</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </Field>
+              <Field label="Project">
+                <select className="select" aria-label="Project" value={projectId} onChange={e => setProjectId(e.target.value)}>
+                  <option value="">— No project —</option>
+                  {projects.filter(p => !clientId || p.clientId === clientId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </Field>
+              <Field label="Billing start"><input className="input" type="date" aria-label="Billing start" value={billingStart} onChange={e => setBillingStart(e.target.value)} /></Field>
+              <Field label="Billing end"><input className="input" type="date" aria-label="Billing end" value={billingEnd} onChange={e => setBillingEnd(e.target.value)} /></Field>
+              <Field label="Invoice date"><input className="input" type="date" aria-label="Invoice date" value={date} onChange={e => setDate(e.target.value)} /></Field>
+              <Field label="Due date"><input className="input" type="date" aria-label="Due date" value={dueDate} onChange={e => setDueDate(e.target.value)} /></Field>
+              <Field label="Terms"><input className="input fin-readonly" readOnly tabIndex={-1} value={selectedClient?.paymentTerms || '—'} /></Field>
+              <Field label="Send to"><input className="input fin-readonly" readOnly tabIndex={-1} value={selectedClient?.email || (selectedClient ? 'No email on file' : '—')} /></Field>
             </div>
-            <div className="modal-body">
-              <div className="form-group">
-                <label className="form-label">Template Name *</label>
-                <input className="form-input" value={templateName} onChange={e => setTemplateName(e.target.value)} placeholder="e.g. Standard Law Assist Invoice" autoFocus />
+            {billingStart && billingEnd && dates.length === 0 && <Banner tone="danger">Invalid date range.</Banner>}
+          </section>
+
+          <section className="card fin-builder__hours">
+            <div className="card__head">
+              <div className="fin-builder__hours-title">
+                <h2 className="card__title">{dates.length > 0 ? 'Daily hours' : 'Hours'}</h2>
+                <span className="card__meta">{dates.length > 0
+                  ? `${dates.length}-day billing period · type hours as h:mm (7:15 = 7 h 15 min), or 7.25`
+                  : 'Total hours per person. Set a billing start and end for a day-by-day grid.'}</span>
               </div>
-              <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>
-                Saves current client, project, billing period, notes, and all employee rows (without daily hours).
-              </p>
+              <button type="button" className="btn btn--sm btn--soft-gold" disabled={!canImport}
+                title={canImport ? 'Fills the grid with approved hours for this project and period' : 'Pick a project and a billing period first'}
+                onClick={() => void importTrackerHours()}>{importMsg?.label ?? 'Import YVA Time hours'}</button>
             </div>
-            <div className="modal-footer">
-              <button className="btn-ghost" onClick={() => setSaveTemplateModal(false)}>Cancel</button>
-              <button className="btn-primary" onClick={saveTemplate} disabled={!templateName.trim()}>Save Template</button>
-            </div>
-          </div>
-        </div>
-      )}
+            {importMsg && <div className="fin-builder__msg"><Banner tone={importMsg.ok ? 'success' : 'warning'} onClose={() => setImportMsg(null)}>{importMsg.text}</Banner></div>}
 
-      {/* ── Load Template Modal ── */}
-      {loadTemplateModal && (
-        <div className="modal-overlay" onClick={() => setLoadTemplateModal(false)}>
-          <div className="modal" style={{ maxWidth: 480 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2 className="modal-title">Load Template</h2>
-              <button className="modal-close btn-icon" onClick={() => setLoadTemplateModal(false)}><IconX size={14} /></button>
-            </div>
-            <div className="modal-body" style={{ padding: 0 }}>
-              {templates.length === 0 ? (
-                <div style={{ padding: '24px 20px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>No templates saved yet.</div>
+            <div className="fin-grid-wrap">
+              {dates.length > 0 ? (
+                <table className="fin-grid" style={{ minWidth: 360 + dates.length * 66 }}>
+                  <thead>
+                    <tr>
+                      <th className="fin-grid__emp">Employee</th>
+                      {dates.map(d => <th key={d} className="fin-grid__day">{dateLabel(d)}</th>)}
+                      <th className="t-right">Total</th>
+                      <th className="t-right">Rate</th>
+                      <th className="t-right">Amount</th>
+                      <th aria-label="Remove" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map(row => {
+                      const comp = rowComp(row, dates)
+                      return [
+                        <tr key={row._id}>
+                          <td className="fin-grid__emp">
+                            {employeeSelect(row)}
+                            <input className="input input--sm fin-grid__pos" aria-label="Position" value={row.position} onChange={e => updateRow(row._id, { position: e.target.value })} placeholder="Position" />
+                          </td>
+                          {dates.map(d => (
+                            <td key={d} className="fin-grid__day">
+                              <input className="fin-cell mono" type="text" inputMode="decimal" aria-label={`${row.employeeName || 'Row'} ${d}`} value={row.daily[d] || ''} onChange={e => updateDaily(row._id, d, e.target.value)} placeholder="—" />
+                            </td>
+                          ))}
+                          <td className="t-right mono fin-grid__total">{comp.hours > 0 ? hoursToHM(comp.hours) : '—'}</td>
+                          <td className="t-right"><input className="input input--sm fin-grid__rate" type="number" aria-label="Rate" value={row.rate} onChange={e => updateRow(row._id, { rate: e.target.value })} placeholder="0" /></td>
+                          <td className="t-right fin-grid__amt">{comp.billAmount > 0 ? money(comp.billAmount) : '—'}</td>
+                          <td>{removeButton(row)}</td>
+                        </tr>,
+                        <PremiumRow key={`${row._id}-p`}>{premiumNote(row, dates.length + 5)}</PremiumRow>,
+                      ]
+                    })}
+                  </tbody>
+                </table>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  {templates.map(t => (
-                    <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px', borderBottom: '1px solid var(--border)' }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: 14 }}>{t.name}</div>
-                        <div style={{ fontSize: 12, color: 'var(--muted)' }}>{t.rows.length} employee{t.rows.length !== 1 ? 's' : ''} · {new Date(t.createdAt).toLocaleDateString()}</div>
-                      </div>
-                      <button className="btn-ghost btn-sm" onClick={() => loadTemplate(t)}>Load</button>
-                      <button className="btn-icon btn-danger" style={{ fontSize: 12, padding: '3px 6px' }} onClick={() => deleteTemplate(t.id)}><IconTrash size={12} /></button>
-                    </div>
-                  ))}
-                </div>
+                <table className="fin-grid fin-grid--simple">
+                  <thead>
+                    <tr><th className="fin-grid__emp">Employee</th><th>Position</th><th className="t-right">Rate/hr</th><th className="t-right">Total hrs</th><th className="t-right">Bill amount</th><th className="t-right">Payroll est.</th><th aria-label="Remove" /></tr>
+                  </thead>
+                  <tbody>
+                    {rows.map(row => {
+                      const comp = rowComp(row, dates)
+                      return [
+                        <tr key={row._id}>
+                          <td className="fin-grid__emp">{employeeSelect(row)}</td>
+                          <td><input className="input input--sm" aria-label="Position" value={row.position} onChange={e => updateRow(row._id, { position: e.target.value })} placeholder="Role / position" /></td>
+                          <td className="t-right"><input className="input input--sm fin-grid__rate" type="number" aria-label="Rate" value={row.rate} onChange={e => updateRow(row._id, { rate: e.target.value })} placeholder="0" /></td>
+                          <td className="t-right"><input className="input input--sm fin-grid__rate mono" type="text" inputMode="decimal" aria-label="Total hours" value={row.hoursManual} onChange={e => updateRow(row._id, { hoursManual: e.target.value })} placeholder="0" /></td>
+                          <td className="t-right fin-grid__amt">{comp.billAmount > 0 ? money(comp.billAmount) : '—'}</td>
+                          <td className="t-right muted">{comp.payrollAmount > 0 ? money(comp.payrollAmount) : '—'}</td>
+                          <td>{removeButton(row)}</td>
+                        </tr>,
+                        <PremiumRow key={`${row._id}-p`}>{premiumNote(row, 7)}</PremiumRow>,
+                      ]
+                    })}
+                  </tbody>
+                </table>
               )}
             </div>
-            <div className="modal-footer">
-              <button className="btn-ghost" onClick={() => setLoadTemplateModal(false)}>Close</button>
+            <button type="button" className="fin-builder__add" onClick={addRow}>+ Add employee row</button>
+          </section>
+        </div>
+
+        <aside className="card card--pad fin-builder__summary">
+          <h2 className="card__title">Summary</h2>
+          <div className="fin-sum-line"><span>Hours</span><span className="mono">{hoursToHM(totalHours)}</span></div>
+          <div className="fin-sum-line"><span>Subtotal</span><span className="num">{money(grandTotal)}</span></div>
+          <div className="fin-sum-line fin-sum-line--total"><span>Total due</span><span className="num">{money(grandTotal)}</span></div>
+          {settings.usdToDop > 0 && <div className="fin-sum-dop">RD${(grandTotal * settings.usdToDop).toLocaleString('en-US', { maximumFractionDigits: 0 })} at RD${settings.usdToDop} (internal only, never on the client's invoice)</div>}
+          <div className="fin-billto">
+            <div className="fin-billto__col">
+              <span className="info__label">From</span>
+              <span className="fin-billto__name">{settings.companyName || 'YVA Staffing'}</span>
+              <span className="fin-billto__meta">{settings.companyAddress || 'Santo Domingo, Dominican Republic'}</span>
+              <span className="fin-billto__meta">{settings.companyEmail || 'Contact@yvastaffing.net'}</span>
+              <span className="fin-billto__meta">{settings.companyPhone || '+1 (717) 281-8676'}</span>
+            </div>
+            <div className="fin-billto__col">
+              <span className="info__label">Bill to</span>
+              {selectedClient ? <>
+                <span className="fin-billto__name">{selectedClient.name}</span>
+                {selectedClient.email && <span className="fin-billto__meta">{selectedClient.email}</span>}
+                {selectedClient.address && <span className="fin-billto__meta">{selectedClient.address}</span>}
+              </> : <span className="fin-billto__meta">Select a client</span>}
             </div>
           </div>
-        </div>
-      )}
+          <Field label="Notes on invoice">
+            <textarea className="textarea" rows={3} aria-label="Notes on invoice" value={notes} onChange={e => setNotes(e.target.value)} placeholder="Payment instructions, thank you note, or any additional info…" />
+          </Field>
+          <span className="fin-sum-help">Payroll for these hours uses each person's pay rate. Bill rates come from placement → project → client default.</span>
+        </aside>
+      </div>
+
+      <Modal open={saveTemplateModal} onClose={() => setSaveTemplateModal(false)} title="Save as template"
+        sub="Saves the client, project, billing period, notes and every employee row (without daily hours)."
+        footer={<>
+          <button type="button" className="btn" onClick={() => setSaveTemplateModal(false)}>Cancel</button>
+          <button type="button" className="btn btn--primary" onClick={saveTemplate} disabled={!templateName.trim()}>Save template</button>
+        </>}>
+        <Field label="Template name *"><input className="input" aria-label="Template name" value={templateName} onChange={e => setTemplateName(e.target.value)} placeholder="e.g. Standard Law Assist Invoice" autoFocus /></Field>
+      </Modal>
+
+      <Modal open={loadTemplateModal} onClose={() => setLoadTemplateModal(false)} title="Load template"
+        footer={<button type="button" className="btn" onClick={() => setLoadTemplateModal(false)}>Close</button>}>
+        {templates.length === 0 ? <div className="muted">No templates saved yet.</div> : (
+          <div className="fin-list">
+            {templates.map(t => (
+              <div key={t.id} className="list-row">
+                <div className="list-row__main">
+                  <span className="list-row__title">{t.name}</span>
+                  <span className="list-row__meta">{t.rows.length} employee{t.rows.length !== 1 ? 's' : ''} · {new Date(t.createdAt).toLocaleDateString()}</span>
+                </div>
+                <button type="button" className="btn btn--sm" onClick={() => loadTemplate(t)}>Load</button>
+                <Menu items={[{ label: 'Delete template', danger: true, icon: P.trash, onClick: () => { if (window.confirm(`Delete the template "${t.name}"?`)) deleteTemplate(t.id) } }]} />
+              </div>
+            ))}
+          </div>
+        )}
+      </Modal>
     </div>
   )
 }
+
+/** A premium explanation row only when there is one (keeps the tbody free of empty rows) */
+function PremiumRow({ children }: { children: ReactNode }) { return <>{children}</> }

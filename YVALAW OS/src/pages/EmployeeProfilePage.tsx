@@ -1,368 +1,135 @@
-import React, { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import EmployeePayRates from '../components/EmployeePayRates'
 import EmployeePayoutMethod from '../components/EmployeePayoutMethod'
 import EmployeeDocuments from '../components/EmployeeDocuments'
 import RecordHistory from '../components/RecordHistory'
-import { useNavigate, useParams } from 'react-router-dom'
-import type { Attachment, Employee, Invoice, Project, TimeEntry } from '../data/types'
-import { loadSnapshot, saveEmployees, saveInvoices, loadSettings, loadTimeEntries } from '../services/storage'
+import type { Attachment, Client, Employee, Invoice, Project, TimeEntry } from '../data/types'
+import { loadSnapshot, saveEmployees, loadTimeEntries } from '../services/storage'
 import { uploadFile, deleteFile } from '../services/fileStorage'
-import { sendEmail } from '../services/gmail'
-import { buildStatementHTML } from '../utils/statementHtml'
-import { trackedHoursOf, trackedPayEntries } from '../utils/trackedPay'
-import { loadLatestConsent } from '../services/trackerStorage'
-import EmployeeDevices from './time/EmployeeDevices'
-import { useRole } from '../context/RoleContext'
+import { usePermission, useRole } from '../context/RoleContext'
 import { can } from '../lib/roles'
-import {
-  IconImage, IconMusic, IconFile, IconX, IconTrash, IconCheck,
-  IconMail, IconPrinter, IconCamera, IconPlay, IconLink, IconLock,
-} from '../components/Icon'
-import { supabase } from '../lib/supabase'
-import { APP_URL } from '../lib/appUrl'
-import { formatMoney, fmtHoursHM } from '../utils/money'
-import { employeePremiumConfig, normalizeClockInput, payrollFromInvoiceItem } from '../utils/payroll'
+import { fmtHoursHM } from '../utils/money'
+import { Ic, P } from '../components/Icon'
+import { Banner, Card, EmptyState, KpiStrip, Menu, Modal, Pill, Skel, Tabs } from '../components/ui'
+import EmployeeStatements from '../components/people/EmployeeStatements'
+import EmployeePayslips from '../components/people/EmployeePayslips'
+import YvaTimeLogin from '../components/people/YvaTimeLogin'
+import { AttachmentList } from '../components/people/attachments'
+import { EmployeeFields, employeeToForm, formToEmployee, EMPTY_EMPLOYEE_FORM, type EmployeeFormData } from '../components/people/EmployeeForm'
+import { PersonAvatar, employeeStatusTone, firstName, payScheduleOf, placementOf, projectsOf } from '../components/people/common'
 
 function uid() { return crypto.randomUUID() }
 
-const VIDEO_EXTS = ['mp4','mov','avi','webm','mkv','m4v','wmv','3gp']
-const AUDIO_EXTS = ['mp3','wav','ogg','m4a','aac','flac','wma']
-function fileExt(name: string) { return name.split('.').pop()?.toLowerCase() ?? '' }
-function isVideo(att: Attachment) { return att.mimeType.startsWith('video') || VIDEO_EXTS.includes(fileExt(att.name)) }
-function isAudio(att: Attachment) { return att.mimeType.startsWith('audio') || AUDIO_EXTS.includes(fileExt(att.name)) }
-function attIcon(att: Attachment) {
-  if (att.mimeType.startsWith('image')) return <IconImage size={16} />
-  if (isVideo(att)) return <IconCamera size={16} />
-  if (isAudio(att)) return <IconMusic size={16} />
-  return <IconFile size={16} />
-}
-
-function VideoPlayer({ url }: { url: string }) {
-  const [blobUrl, setBlobUrl] = useState<string | null>(null)
-  const [loading, setLoading] = useState(false)
-  useEffect(() => () => { if (blobUrl) URL.revokeObjectURL(blobUrl) }, [blobUrl])
-  async function load() {
-    setLoading(true)
-    try {
-      const resp = await fetch(url)
-      const blob = await resp.blob()
-      setBlobUrl(URL.createObjectURL(blob))
-    } catch { /* ignore */ } finally { setLoading(false) }
-  }
-  if (blobUrl) return <video controls autoPlay src={blobUrl} style={{ width: '100%', maxHeight: 220, borderRadius: 6, marginTop: 4 }} />
-  return (
-    <button onClick={load} disabled={loading} style={{ marginTop: 4, width: '100%', background: 'var(--surf2)', border: '1px solid var(--border)', borderRadius: 6, padding: '10px', color: 'var(--muted)', cursor: loading ? 'wait' : 'pointer', fontSize: 13 }}>
-      {loading ? 'Loading video…' : <><IconPlay size={14} /> Click to load video</>}
-    </button>
-  )
-}
-
-const AVATAR_COLORS = ['#a16207','#3b82f6','#22c55e','#a855f7','#14b8a6','#f97316','#ec4899']
-function avatarColor(name: string) {
-  let h = 0
-  for (const c of name) h = (h * 31 + c.charCodeAt(0)) % AVATAR_COLORS.length
-  return AVATAR_COLORS[Math.abs(h)]
-}
-function initials(name: string) {
-  return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
-}
-function statusBadge(s?: string) {
-  switch ((s || '').toLowerCase()) {
-    case 'inactive':   return 'badge-red'
-    case 'on hold':    return 'badge-yellow'
-    case 'onboarding': return 'badge-blue'
-    case 'trial':      return 'badge-purple'
-    default:           return 'badge-green'
-  }
-}
-
-const STATUS_OPTIONS = ['Active', 'Onboarding', 'Trial', 'On hold', 'Inactive']
-const TYPE_OPTIONS   = ['', 'Full-time', 'Part-time', 'Project-based']
-
-function getEmpInvoices(name: string, invoices: Invoice[], from?: string, to?: string) {
-  return invoices.filter(inv => {
-    const has = (inv.items || []).some(it => it.employeeName?.toLowerCase() === name.toLowerCase())
-    if (!has) return false
-    const d = inv.date || inv.billingEnd || inv.billingStart
-    if (!d) return true
-    if (from && d < from) return false
-    if (to   && d > to)   return false
-    return true
-  })
-}
-
-function getEmployeeInvoiceItems(emp: Employee, inv: Invoice) {
-  return (inv.items || []).filter(it =>
-    (it.employeeId && it.employeeId === emp.id) ||
-    it.employeeName?.toLowerCase() === emp.name.toLowerCase()
-  )
-}
-
-function summarizeEmployeeInvoices(emp: Employee, invoices: Invoice[]) {
-  return invoices.reduce((summary, inv) => {
-    for (const item of getEmployeeInvoiceItems(emp, inv)) {
-      const payroll = payrollFromInvoiceItem(item, emp)
-      summary.hours += payroll.totalHours
-      summary.regularHours += payroll.regularHours
-      summary.premiumHours += payroll.premiumHours
-      summary.totalPay += payroll.totalPay
-    }
-    return summary
-  }, { hours: 0, regularHours: 0, premiumHours: 0, totalPay: 0 })
-}
-
-async function emailStatement(emp: Employee, empInvoices: Invoice[], dateFrom: string, dateTo: string, tracked: TimeEntry[] = []) {
-  const settings = await loadSettings()
-  const payRate  = Number(emp.payRate) || 0
-  const dopRate  = settings.usdToDop || 0
-  const summary = summarizeEmployeeInvoices(emp, empInvoices)
-  const totalHours = summary.hours + trackedHoursOf(tracked)
-  const totalUSD = summary.totalPay + trackedHoursOf(tracked) * payRate
-  const totalDOP = dopRate > 0 ? totalUSD * dopRate : 0
-  const period   = dateFrom && dateTo ? `${dateFrom} – ${dateTo}` : dateFrom || dateTo || 'All time'
-  const companyName = settings.companyName || 'YVA Staffing'
-  const subject  = `Your Earnings Statement — ${period} — ${companyName}`
-  let bodyText: string
-  if (settings.statementEmailTemplate) {
-    bodyText = settings.statementEmailTemplate
-      .replace(/\{employeeName\}/g, emp.name)
-      .replace(/\{period\}/g, period)
-      .replace(/\{companyName\}/g, companyName)
-  } else {
-    bodyText =
-      `Hi ${emp.name},\n\nHere is your earnings summary for the period ${period}:\n\n` +
-      `  Total Hours: ${totalHours.toFixed(1)}h\n` +
-      `  Total Earned: $${totalUSD.toFixed(2)} USD` +
-      (totalDOP > 0 ? ` / RD$${totalDOP.toLocaleString('en-US',{maximumFractionDigits:0})} DOP\n` : '\n') +
-      `  Invoices: ${empInvoices.length}\n\n` +
-      `Please reach out if you have any questions.\n\n${settings.emailSignature || companyName}`
-  }
-  const statementHtml = buildStatementHTML(emp, empInvoices, dateFrom, dateTo, dopRate, false, tracked)
-  const safeName   = emp.name.replace(/\s+/g, '-').toLowerCase()
-  const periodSlug = period.replace(/\s/g, '').replace(/[^a-zA-Z0-9-]/g, '-')
-  await sendEmail(emp.email || '', subject, bodyText, {
-    name:     `statement-${safeName}-${periodSlug}.html`,
-    content:  statementHtml,
-    mimeType: 'text/html',
-  })
-}
-
-async function printPayslip(emp: Employee, empInvoices: Invoice[], dateFrom: string, dateTo: string, tracked: TimeEntry[] = []) {
-  const settings = await loadSettings()
-  const html = buildStatementHTML(emp, empInvoices, dateFrom, dateTo, settings.usdToDop || 0, true, tracked)
-  const win = window.open('', '_blank', 'width=800,height=600')
-  if (!win) return
-  win.document.write(html)
-  win.document.close()
-}
+type Tab = 'overview' | 'pay' | 'time' | 'docs' | 'history'
+const TABS: Tab[] = ['overview', 'pay', 'time', 'docs', 'history']
 
 export default function EmployeeProfilePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const [params, setParams] = useSearchParams()
   const { role: myRole } = useRole()
+  const allowed = usePermission()
+  const showPayRates = can.viewPayRates(myRole)
+  const canSchedule = allowed('rates.manage')
 
-  const [employees,   setEmployeesState] = useState<Employee[]>([])
-  const [invoices,    setInvoices]       = useState<Invoice[]>([])
-  const [projects,    setProjects]       = useState<Project[]>([])
-  const [timeEntries, setTimeEntries]    = useState<TimeEntry[]>([])
+  const [loaded, setLoaded] = useState(false)
+  const [employees, setEmployeesState] = useState<Employee[]>([])
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [clients, setClients] = useState<Client[]>([])
+  const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   useEffect(() => {
     loadSnapshot().then(snap => {
-      setEmployeesState(snap.employees)
-      setInvoices(snap.invoices)
-      setProjects(snap.projects)
-    })
-    loadTimeEntries().then(setTimeEntries)
+      setEmployeesState(snap.employees); setInvoices(snap.invoices); setProjects(snap.projects); setClients(snap.clients); setLoaded(true)
+    }).catch(e => { setError(`Could not load: ${(e as Error).message}`); setLoaded(true) })
+    void loadTimeEntries().then(setTimeEntries)
   }, [])
 
   const emp = employees.find(e => e.id === id)
+  const tabParam = params.get('tab') as Tab | null
+  const [tab, setTabState] = useState<Tab>(tabParam && TABS.includes(tabParam) ? tabParam : 'overview')
+  function setTab(t: Tab) { setTabState(t); setParams(t === 'overview' ? {} : { tab: t }, { replace: true }) }
 
   const [editing, setEditing] = useState(false)
-  const [form, setForm] = useState({
-    name: '', email: '', phone: '', payRate: '', defaultShiftStart: '', defaultShiftEnd: '', premiumEnabled: false, premiumStartTime: '21:00', premiumPercent: '15', role: '',
-    employmentType: '', location: '', timezone: '', startYear: '', status: 'Active', notes: '',
-    worksFor: 'client' as 'client' | 'yva', manualTimeAllowed: false,
-  })
+  const [form, setForm] = useState<EmployeeFormData>(EMPTY_EMPLOYEE_FORM)
   const [attachments, setAttachments] = useState<Attachment[]>([])
-  const [inviteLoading, setInviteLoading] = useState<'email' | 'link' | 'reset' | null>(null)
-  const [inviteMsg,     setInviteMsg]     = useState<{ ok: boolean; text: string } | null>(null)
-  const [consent,       setConsent]       = useState<{ at: number; version: number } | null>(null)
-  useEffect(() => { if (id) void loadLatestConsent(id).then(setConsent) }, [id])
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const photoInputRef = useRef<HTMLInputElement>(null)
 
   // Sync form/attachments/photo from emp once data loads
   useEffect(() => {
     if (emp && !editing) {
-      setForm({
-        name:           emp.name ?? '',
-        email:          emp.email ?? '',
-        phone:          emp.phone ?? '',
-        payRate:        emp.payRate != null ? String(emp.payRate) : '',
-        defaultShiftStart: emp.defaultShiftStart ?? '',
-        defaultShiftEnd: emp.defaultShiftEnd ?? '',
-        premiumEnabled: Boolean(emp.premiumEnabled),
-        premiumStartTime: emp.premiumStartTime ?? '21:00',
-        premiumPercent: emp.premiumPercent != null ? String(emp.premiumPercent) : '15',
-        role:           emp.role ?? '',
-        employmentType: emp.employmentType ?? '',
-        location:       emp.location ?? '',
-        timezone:       emp.timezone ?? '',
-        startYear:      emp.startYear != null ? String(emp.startYear) : '',
-        status:         emp.status ?? 'Active',
-        notes:          emp.notes ?? '',
-        worksFor:       emp.worksFor === 'yva' ? 'yva' : 'client',
-        manualTimeAllowed: emp.manualTimeAllowed === true,
-      })
+      setForm(employeeToForm(emp))
       setAttachments(emp.attachments ?? [])
       setPhotoUrl(emp.photoUrl)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [emp?.id])
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const photoInputRef = useRef<HTMLInputElement>(null)
-  const [confirmDelete, setConfirmDelete] = useState(false)
 
-  // Statements state
-  const [dateFrom,  setDateFrom]  = useState('')
-  const [dateTo,    setDateTo]    = useState('')
-  const [payModal,  setPayModal]  = useState<{ inv: Invoice } | null>(null)
-  const [payDate,   setPayDate]   = useState('')
-  const [payNotes,  setPayNotes]  = useState('')
-  const [toast,     setToast]     = useState<string | null>(null)
-  const [sending,   setSending]   = useState(false)
-
-  function showToast(msg: string) {
-    setToast(msg)
-    setTimeout(() => setToast(null), 4000)
+  if (!loaded) {
+    return (
+      <div className="page">
+        <Skel w={80} h={14} />
+        <div className="ppl-prof-head"><Skel w={64} h={64} r={32} /><div className="stack"><Skel w={220} h={24} /><Skel w={300} h={14} /></div></div>
+        <div className="grid-auto"><div className="card card--pad stack"><Skel h={14} /><Skel h={14} w="70%" /><Skel h={14} w="80%" /></div><div className="card card--pad stack"><Skel h={14} /><Skel h={14} w="60%" /></div></div>
+      </div>
+    )
   }
-
   if (!emp) {
     return (
-      <div className="page-wrap">
-        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--muted)' }}>
-          Employee not found.
-          <br /><button className="btn-ghost btn-sm" style={{ marginTop: 12 }} onClick={() => navigate('/employees')}>← Back to Team</button>
-        </div>
+      <div className="page">
+        <EmptyState action={<button type="button" className="btn" onClick={() => navigate('/employees')}>← Back to Team</button>}>Employee not found.</EmptyState>
       </div>
     )
   }
 
   // emp is guaranteed non-null here (early return above handles null case)
   const empNN = emp!
+  const first = firstName(empNN.name)
+  const assignedProjects = projectsOf(empNN, projects)
+  const client = empNN.worksFor !== 'yva'
+  const canScreens = !!empNN.userId && client && can.viewScreenshots(myRole)
+  const viewScreens = () => navigate(`/time?tab=screens&employee=${empNN.id}`)
+  const payTab = showPayRates || canSchedule || allowed('bank.view') || allowed('bank.manage') || allowed('payroll.view') || allowed('payroll.manage')
 
-  const empInvoices = getEmpInvoices(empNN.name, invoices, dateFrom || undefined, dateTo || undefined)
-  const payRate     = Number(empNN.payRate) || 0
-  const premiumConfig = employeePremiumConfig(empNN)
-  const summary = summarizeEmployeeInvoices(empNN, empInvoices)
-  const empTracked   = trackedPayEntries(empNN, timeEntries, dateFrom || undefined, dateTo || undefined)
-  const trackedHours = trackedHoursOf(empTracked)
-  const totalHours  = summary.hours + trackedHours
-  const totalEarned  = summary.totalPay + trackedHours * payRate
-  const paidCount    = empInvoices.filter(inv => (inv.employeePayments?.[empNN.id] || inv.employeePayments?.[empNN.name])?.status === 'paid').length
-  const pendingCount = empInvoices.length - paidCount
-  const totalPaid    = empInvoices.reduce((s, inv) => {
-    if ((inv.employeePayments?.[empNN.id] || inv.employeePayments?.[empNN.name])?.status !== 'paid') return s
-    return s + getEmployeeInvoiceItems(empNN, inv).reduce((itemTotal, item) => itemTotal + payrollFromInvoiceItem(item, empNN).totalPay, 0)
-  }, 0)
-
-  async function markPaid(inv: Invoice) {
-    const amount = getEmployeeInvoiceItems(empNN, inv).reduce((sum, item) => sum + payrollFromInvoiceItem(item, empNN).totalPay, 0)
-    const existingPayments = { ...(inv.employeePayments || {}) }
-    if (empNN.name in existingPayments && empNN.id !== empNN.name) delete existingPayments[empNN.name]
-    const updated = invoices.map(i => i.id === inv.id ? {
-      ...i,
-      employeePayments: {
-        ...(i.id === inv.id ? existingPayments : i.employeePayments || {}),
-        [empNN.id]: { status: 'paid' as const, paidDate: payDate || new Date().toISOString().slice(0,10), amount, notes: payNotes || undefined }
-      }
-    } : i)
-    setInvoices(updated)
-    await saveInvoices(updated)
-    setPayModal(null); setPayDate(''); setPayNotes('')
-  }
-
-  async function markPending(inv: Invoice) {
-    const existingPayments = { ...(inv.employeePayments || {}) }
-    if (empNN.name in existingPayments && empNN.id !== empNN.name) delete existingPayments[empNN.name]
-    const updated = invoices.map(i => i.id === inv.id ? {
-      ...i,
-      employeePayments: { ...(i.id === inv.id ? existingPayments : i.employeePayments || {}), [empNN.id]: { status: 'pending' as const } }
-    } : i)
-    setInvoices(updated)
-    await saveInvoices(updated)
-  }
-
-  const assignedProjects = projects.filter(p => (p.employeeIds || []).includes(empNN.id))
-
-  function persistUpdate(updated: Employee) {
+  async function persistUpdate(updated: Employee, ok?: string) {
+    const before = employees
     const next = employees.map(e => e.id === updated.id ? updated : e)
-    setEmployeesState(next)
-    void saveEmployees(next)
+    setEmployeesState(next); setError(null)
+    try { await saveEmployees(next); if (ok) setNotice(ok); return true }
+    catch (e) { setEmployeesState(before); setError(`Could not save: ${(e as Error).message}`); return false }
   }
 
-  function handleSave() {
-    if (!form.name.trim()) return
-    const updated: Employee = {
-      ...empNN,
-      name: form.name,
-      email: form.email || undefined,
-      phone: form.phone || undefined,
-      payRate: form.payRate ? Number(form.payRate) : undefined,
-      defaultShiftStart: form.defaultShiftStart || undefined,
-      defaultShiftEnd: form.defaultShiftEnd || undefined,
-      premiumEnabled: form.premiumEnabled || undefined,
-      premiumStartTime: form.premiumEnabled ? (form.premiumStartTime || '21:00') : undefined,
-      premiumPercent: form.premiumEnabled ? Number(form.premiumPercent || 0) : undefined,
-      role: form.role || undefined,
-      employmentType: form.employmentType || undefined,
-      location: form.location || undefined,
-      timezone: form.timezone || undefined,
-      startYear: form.startYear ? Number(form.startYear) : undefined,
-      status: form.status,
-      notes: form.notes || undefined,
-      worksFor: form.worksFor,
-      manualTimeAllowed: form.manualTimeAllowed,
-      photoUrl,
-      attachments,
-    }
-    persistUpdate(updated)
+  async function handleSave() {
+    if (!form.name.trim() || saving) return
+    setSaving(true)
+    const updated: Employee = { ...empNN, ...formToEmployee(form, { schedule: canSchedule }), status: form.status, photoUrl, attachments }
+    const ok = await persistUpdate(updated, 'Profile saved.')
+    setSaving(false)
+    if (ok) setEditing(false)
+  }
+
+  function handleCancel() {
+    setForm(employeeToForm(empNN))
+    setAttachments(empNN.attachments ?? [])
     setEditing(false)
   }
 
-  // YVA Time / My workspace login — created server-side by invite-employee.
-  // 'reset' = they already have a login: a one-time link that opens "Choose a new password".
-  async function sendEmployeeInvite(mode: 'email' | 'link' | 'reset') {
-    if (!empNN.email && mode !== 'reset') { setInviteMsg({ ok: false, text: 'Add an email address to this employee before inviting.' }); return }
-    setInviteLoading(mode)
-    setInviteMsg(null)
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { setInviteLoading(null); setInviteMsg({ ok: false, text: 'You must be logged in.' }); return }
-    try {
-      const res = await fetch('/.netlify/functions/invite-employee', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ employeeId: empNN.id, mode, redirectTo: `${APP_URL}${mode === 'reset' ? 'reset-password' : 'me/set-password'}` }),
-      })
-      const data = await res.json()
-      if (!res.ok) { setInviteMsg({ ok: false, text: data.error || 'Failed to create the link.' }); return }
-      // The server linked the login; mirror it locally (whole-table saves never write userId)
-      if (mode !== 'reset') setEmployeesState(prev => prev.map(e => e.id === empNN.id ? { ...e, userId: data.userId } : e))
-      if (mode === 'link' || mode === 'reset') {
-        const what = mode === 'reset' ? 'New sign-in link' : 'Invite link'
-        try {
-          await navigator.clipboard.writeText(data.inviteLink)
-          setInviteMsg({ ok: true, text: `${what} copied for ${data.email}. Paste it into your own email or message — it works once.` })
-        } catch {
-          window.prompt(`Copy this ${what.toLowerCase()}:`, data.inviteLink)
-          setInviteMsg({ ok: true, text: `${what} created for ${data.email}.` })
-        }
-      } else {
-        setInviteMsg({ ok: true, text: `Invitation email sent to ${data.email}` })
-      }
-    } catch {
-      setInviteMsg({ ok: false, text: 'Network error — could not create the invitation.' })
-    } finally {
-      setInviteLoading(null)
-    }
+  function startEdit() { setForm(employeeToForm(empNN)); setTab('overview'); setEditing(true) }
+
+  async function handleDelete() {
+    setConfirmDelete(false)
+    const before = employees
+    const next = employees.filter(e => e.id !== empNN.id)
+    setEmployeesState(next)
+    try { await saveEmployees(next); navigate('/employees') }
+    catch (e) { setEmployeesState(before); setError(`Could not delete: ${(e as Error).message}`) }
   }
 
   function handlePhotoUpload(file: File) {
@@ -371,57 +138,11 @@ export default function EmployeeProfilePage() {
     const reader = new FileReader()
     reader.onload = ev => {
       const url = ev.target?.result as string
+      const prev = photoUrl
       setPhotoUrl(url)
-      persistUpdate({ ...empNN, photoUrl: url, attachments })
+      void persistUpdate({ ...empNN, photoUrl: url, attachments }, 'Photo updated.').then(ok => { if (!ok) setPhotoUrl(prev) })
     }
     reader.readAsDataURL(file)
-  }
-
-  function handleCancel() {
-    setForm({
-      name: empNN.name,
-      email: empNN.email ?? '',
-      phone: empNN.phone ?? '',
-      payRate: empNN.payRate != null ? String(empNN.payRate) : '',
-      defaultShiftStart: empNN.defaultShiftStart ?? '',
-      defaultShiftEnd: empNN.defaultShiftEnd ?? '',
-      premiumEnabled: Boolean(empNN.premiumEnabled),
-      premiumStartTime: empNN.premiumStartTime ?? '21:00',
-      premiumPercent: empNN.premiumPercent != null ? String(empNN.premiumPercent) : '15',
-      role: empNN.role ?? '',
-      employmentType: empNN.employmentType ?? '',
-      location: empNN.location ?? '',
-      timezone: empNN.timezone ?? '',
-      startYear: empNN.startYear != null ? String(empNN.startYear) : '',
-      status: empNN.status ?? 'Active',
-      notes: empNN.notes ?? '',
-      worksFor: empNN.worksFor === 'yva' ? 'yva' : 'client',
-      manualTimeAllowed: empNN.manualTimeAllowed === true,
-    })
-    setAttachments(empNN.attachments ?? [])
-    setEditing(false)
-  }
-
-  function handleDelete() {
-    const next = employees.filter(e => e.id !== empNN.id)
-    setEmployeesState(next)
-    void saveEmployees(next)
-    navigate('/employees')
-  }
-
-  async function downloadAttachment(url: string, name: string) {
-    try {
-      const resp = await fetch(url)
-      const blob = await resp.blob()
-      // Force octet-stream so browser always downloads instead of previewing
-      const forceBlob = new Blob([blob], { type: 'application/octet-stream' })
-      const blobUrl = URL.createObjectURL(forceBlob)
-      const a = document.createElement('a')
-      a.href = blobUrl; a.download = name
-      document.body.appendChild(a); a.click()
-      document.body.removeChild(a)
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 100)
-    } catch { window.open(url, '_blank') }
   }
 
   function handleFileUpload(file: File) {
@@ -429,15 +150,10 @@ export default function EmployeeProfilePage() {
     void (async () => {
       try {
         const { storageUrl, storagePath } = await uploadFile(file, `employees/${empNN.id}`)
-        const att: Attachment = {
-          id: uid(), name: file.name, mimeType: file.type,
-          size: file.size, dataUrl: storageUrl, storageUrl, storagePath, uploadedAt: Date.now(),
-        }
-        setAttachments(prev => {
-          const next = [...prev, att]
-          persistUpdate({ ...empNN, attachments: next })
-          return next
-        })
+        const att: Attachment = { id: uid(), name: file.name, mimeType: file.type, size: file.size, dataUrl: storageUrl, storageUrl, storagePath, uploadedAt: Date.now() }
+        const next = [...attachments, att]
+        setAttachments(next)
+        if (!(await persistUpdate({ ...empNN, attachments: next }, `${file.name} uploaded.`))) setAttachments(attachments)
       } catch (e) {
         console.error('Upload failed', e)
         alert('Upload failed. Please try again.')
@@ -448,583 +164,206 @@ export default function EmployeeProfilePage() {
   function removeAttachment(attId: string) {
     const att = attachments.find(a => a.id === attId)
     if (att?.storagePath) void deleteFile(att.storagePath)
-    setAttachments(prev => {
-      const next = prev.filter(a => a.id !== attId)
-      persistUpdate({ ...empNN, attachments: next })
-      return next
-    })
+    const next = attachments.filter(a => a.id !== attId)
+    setAttachments(next)
+    void persistUpdate({ ...empNN, attachments: next }).then(ok => { if (!ok) setAttachments(attachments) })
   }
 
-  const color = avatarColor(empNN.name)
+  /* ── Overview pieces ─────────────────────────────────────────────── */
+  const sched = payScheduleOf(empNN, projects)
+  const info: { k: string; v?: string | null; mono?: boolean }[] = [
+    { k: 'Employee number', v: empNN.employeeNumber, mono: true },
+    { k: 'Email', v: empNN.email },
+    { k: 'Phone', v: empNN.phone },
+    { k: 'Position', v: empNN.role },
+    { k: 'Status', v: empNN.status || 'Active' },
+    { k: 'Employment type', v: empNN.employmentType },
+    { k: 'Start year', v: empNN.startYear ? String(empNN.startYear) : undefined },
+    { k: 'Default shift', v: empNN.defaultShiftStart || empNN.defaultShiftEnd ? `${empNN.defaultShiftStart || '—'} to ${empNN.defaultShiftEnd || '—'}` : undefined },
+    { k: 'Time zone', v: empNN.timezone },
+    { k: 'Location', v: empNN.location },
+    ...(showPayRates ? [
+      { k: 'Pay rate', v: empNN.payRate ? `$${empNN.payRate}/hr` : undefined },
+      { k: 'Night premium', v: empNN.premiumEnabled ? `+${empNN.premiumPercent || 0}% after ${empNN.premiumStartTime || '21:00'}` : undefined },
+    ] : []),
+    { k: 'Pay schedule', v: sched.own ? sched.label : `Follows project (${sched.label.toLowerCase()})` },
+    { k: 'Works for', v: client ? 'Client project' : 'YVA team' },
+    { k: 'Manual time', v: empNN.manualTimeAllowed ? 'On (admin approves)' : 'Off' },
+  ]
 
-  return (
-    <div className="page-wrap client-profile-page">
-      {toast && (
-        <div className="profile-toast">
-          <IconCheck size={14} /> {toast}
-        </div>
-      )}
-      {/* Back */}
-      <button className="btn-ghost btn-sm" style={{ marginBottom: 16 }} onClick={() => navigate('/employees')}>
-        ← Back to Team
-      </button>
+  const empTime = timeEntries.filter(e => e.employeeId === empNN.id || e.employeeName?.toLowerCase() === empNN.name.toLowerCase()).sort((a, b) => b.date.localeCompare(a.date))
+  const totalTracked = empTime.reduce((s, e) => s + e.hours, 0)
+  const billableTracked = empTime.filter(e => e.billable).reduce((s, e) => s + e.hours, 0)
+  const byProject: Record<string, number> = {}
+  for (const e of empTime) { const k = e.projectName || 'No project'; byProject[k] = (byProject[k] || 0) + e.hours }
+  const now = new Date()
+  const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const monthEntries = empTime.filter(e => e.date.startsWith(monthKey))
+  const monthHours = monthEntries.reduce((s, e) => s + e.hours, 0)
 
-      {/* Profile header */}
-      <input ref={photoInputRef} type="file" accept="image/*" style={{ display: 'none' }}
-        onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f); e.target.value = '' }} />
-
-      <div className="profile-header">
-        <div className="profile-header-left">
-          <div className="avatar-wrap" title="Click to change photo" onClick={() => photoInputRef.current?.click()}>
-            {photoUrl
-              ? <img className="avatar-photo" src={photoUrl} alt={empNN.name} />
-              : <div className="avatar profile-avatar" style={{ background: color }}>{initials(empNN.name)}</div>
-            }
-            <span className="avatar-cam"><IconCamera size={14} /></span>
-          </div>
-          <div>
-            {editing
-              ? <input className="form-input profile-name-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-              : <h1 className="profile-name">{empNN.name}</h1>
-            }
-            <div className="profile-sub">
-              {empNN.employeeNumber && <span style={{ color: 'var(--gold)', fontWeight: 700 }}>{empNN.employeeNumber}</span>}
-              {empNN.employeeNumber && empNN.role && <span style={{ color: 'var(--muted)' }}> · </span>}
-              {empNN.role && <span style={{ color: 'var(--muted)' }}>{empNN.role}</span>}
-            </div>
-          </div>
-        </div>
-        <div className="profile-header-actions">
-          {editing ? (
-            <>
-              <button className="btn-primary btn-sm" onClick={handleSave} disabled={!form.name.trim()}>Save Changes</button>
-              <button className="btn-ghost btn-sm" onClick={handleCancel}>Cancel</button>
-            </>
-          ) : (
-            <>
-              <span className={`badge ${statusBadge(empNN.status)}`} style={{ fontSize: 13 }}>{empNN.status || 'Active'}</span>
-              <button className="btn-ghost btn-sm" onClick={() => setEditing(true)}>Edit Profile</button>
-              <button className="btn-danger btn-sm" onClick={() => setConfirmDelete(true)}>Delete</button>
-            </>
-          )}
-        </div>
-      </div>
-
-      <div className="profile-grid">
-        {/* Left column */}
-        <div className="profile-main-stack">
-
-          {/* Contact & Work Info */}
-          <div className="data-card">
-            <div className="data-card-title">Profile Information</div>
-            <div className="profile-fields">
-              {editing ? (
-                <>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Role</span>
-                    <input className="form-input form-input-sm" value={form.role} onChange={e => setForm(f => ({...f, role: e.target.value}))} placeholder="e.g. Virtual Assistant" />
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Status</span>
-                    <select className="form-select form-input-sm" value={form.status} onChange={e => setForm(f => ({...f, status: e.target.value}))}>
-                      {STATUS_OPTIONS.map(s => <option key={s}>{s}</option>)}
-                    </select>
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Employment Type</span>
-                    <select className="form-select form-input-sm" value={form.employmentType} onChange={e => setForm(f => ({...f, employmentType: e.target.value}))}>
-                      {TYPE_OPTIONS.map(t => <option key={t} value={t}>{t || '— Not set —'}</option>)}
-                    </select>
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Works For</span>
-                    <select className="form-select form-input-sm" value={form.worksFor} onChange={e => setForm(f => ({...f, worksFor: e.target.value === 'yva' ? 'yva' : 'client'}))}>
-                      <option value="client">Client project (screenshots on)</option>
-                      <option value="yva">YVA team (screenshots off)</option>
-                    </select>
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Manual Time</span>
-                    <select className="form-select form-input-sm" value={form.manualTimeAllowed ? 'on' : 'off'} onChange={e => setForm(f => ({...f, manualTimeAllowed: e.target.value === 'on'}))}>
-                      <option value="off">Off</option>
-                      <option value="on">On — can add time by hand (admin approves)</option>
-                    </select>
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Email</span>
-                    <input className="form-input form-input-sm" type="email" value={form.email} onChange={e => setForm(f => ({...f, email: e.target.value}))} placeholder="email@example.com" />
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Phone</span>
-                    <input className="form-input form-input-sm" value={form.phone} onChange={e => setForm(f => ({...f, phone: e.target.value}))} placeholder="+1 555 000 0000" />
-                  </div>
-                    <div className="profile-field">
-                      <span className="profile-field-label">Pay Rate ($/hr)</span>
-                      <input className="form-input form-input-sm" type="number" value={form.payRate} onChange={e => setForm(f => ({...f, payRate: e.target.value}))} placeholder="8.50" />
-                    </div>
-                    <div className="profile-field">
-                      <span className="profile-field-label">Default Shift Start</span>
-                      <input className="form-input form-input-sm" value={form.defaultShiftStart} onChange={e => setForm(f => ({...f, defaultShiftStart: e.target.value}))} onBlur={e => setForm(f => ({...f, defaultShiftStart: normalizeClockInput(e.target.value)}))} placeholder="4:00 pm" />
-                    </div>
-                    <div className="profile-field">
-                      <span className="profile-field-label">Default Shift End</span>
-                      <input className="form-input form-input-sm" value={form.defaultShiftEnd} onChange={e => setForm(f => ({...f, defaultShiftEnd: e.target.value}))} onBlur={e => setForm(f => ({...f, defaultShiftEnd: normalizeClockInput(e.target.value)}))} placeholder="12:00 am" />
-                    </div>
-                    <div className="profile-field">
-                      <span className="profile-field-label">Premium Rule</span>
-                      <select className="form-select form-input-sm" value={form.premiumEnabled ? 'night' : ''} onChange={e => setForm(f => ({...f, premiumEnabled: e.target.value === 'night'}))}>
-                        <option value="">No premium pay</option>
-                        <option value="night">Night shift premium</option>
-                      </select>
-                    </div>
-                    {form.premiumEnabled && (
-                      <>
-                        <div className="profile-field">
-                          <span className="profile-field-label">Premium Starts At</span>
-                          <input className="form-input form-input-sm" value={form.premiumStartTime} onChange={e => setForm(f => ({...f, premiumStartTime: e.target.value}))} onBlur={e => setForm(f => ({...f, premiumStartTime: normalizeClockInput(e.target.value) || '21:00'}))} placeholder="9:00 pm" />
-                        </div>
-                        <div className="profile-field">
-                          <span className="profile-field-label">Premium Increase %</span>
-                          <input className="form-input form-input-sm" type="number" value={form.premiumPercent} onChange={e => setForm(f => ({...f, premiumPercent: e.target.value}))} placeholder="15" />
-                        </div>
-                      </>
-                    )}
-                    <div className="profile-field">
-                      <span className="profile-field-label">Location</span>
-                    <input className="form-input form-input-sm" value={form.location} onChange={e => setForm(f => ({...f, location: e.target.value}))} placeholder="Santo Domingo, DR" />
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Timezone</span>
-                    <input className="form-input form-input-sm" value={form.timezone} onChange={e => setForm(f => ({...f, timezone: e.target.value}))} placeholder="AST / EST" />
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Start Year</span>
-                    <input className="form-input form-input-sm" type="number" value={form.startYear} onChange={e => setForm(f => ({...f, startYear: e.target.value}))} placeholder="2024" />
-                  </div>
-                  <div className="profile-field profile-field-tall">
-                    <span className="profile-field-label">Notes</span>
-                    <textarea className="form-textarea" rows={3} value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} placeholder="Internal notes..." />
-                  </div>
-                </>
-              ) : (
-                <>
-                  {[
-                    { label: 'Role',            value: empNN.role },
-                    { label: 'Status',          value: empNN.status || 'Active' },
-                    { label: 'Employment Type', value: empNN.employmentType },
-                    { label: 'Works For',       value: empNN.worksFor === 'yva' ? 'YVA team' : 'Client project' },
-                    { label: 'Manual Time',     value: empNN.manualTimeAllowed ? 'On (admin approves)' : 'Off' },
-                    { label: 'Email',           value: empNN.email },
-                    { label: 'Phone',           value: empNN.phone },
-                    { label: 'Pay Rate',        value: empNN.payRate ? `$${empNN.payRate}/hr` : undefined },
-                    { label: 'Default Shift',   value: empNN.defaultShiftStart || empNN.defaultShiftEnd ? `${empNN.defaultShiftStart || '—'} to ${empNN.defaultShiftEnd || '—'}` : undefined },
-                    { label: 'Premium Rule',    value: empNN.premiumEnabled ? `+${empNN.premiumPercent || 0}% after ${empNN.premiumStartTime || '21:00'}` : undefined },
-                    { label: 'Location',        value: empNN.location },
-                    { label: 'Timezone',        value: empNN.timezone },
-                    { label: 'Start Year',      value: empNN.startYear ? String(empNN.startYear) : undefined },
-                  ].map(({ label, value }) => value ? (
-                    <div key={label} className="profile-field">
-                      <span className="profile-field-label">{label}</span>
-                      <span className="profile-field-value">{value}</span>
-                    </div>
-                  ) : null)}
-                  {empNN.notes && (
-                    <div className="profile-field profile-field-tall">
-                      <span className="profile-field-label">Notes</span>
-                      <span className="profile-field-value" style={{ whiteSpace: 'pre-wrap' }}>{empNN.notes}</span>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* YVA Time login */}
-          <div className="data-card">
-            <div className="data-card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              YVA Time Login
-              <span className={`badge ${empNN.userId ? 'badge-green' : 'badge-gray'}`} style={{ fontSize: 11 }}>
-                {empNN.userId ? 'Has a login' : 'Not invited'}
-              </span>
-            </div>
-            {empNN.userId ? (
-              <div style={{ color: 'var(--muted)', fontSize: 13, paddingTop: 4 }}>
-                This employee can sign in to My workspace and the YVA Time app.
-                <div style={{ marginTop: 8 }}>
-                  <button className="btn-ghost btn-sm" disabled={inviteLoading !== null} onClick={() => void sendEmployeeInvite('reset')}
-                    title="For an expired invite or a forgotten password: a one-time link that lets them choose a new password">
-                    {inviteLoading === 'reset' ? 'Creating…' : <><IconLink size={12} /> Copy new sign-in link</>}
-                  </button>
-                  {empNN.worksFor !== 'yva' && can.viewScreenshots(myRole) && (
-                    <button className="btn-ghost btn-sm" style={{ marginLeft: 8 }} onClick={() => navigate(`/time?tab=screens&employee=${empNN.id}`)}>
-                      View screenshots
-                    </button>
-                  )}
-                </div>
-                {empNN.worksFor !== 'yva' && (
-                  <div style={{ marginTop: 6 }}>
-                    Screenshot &amp; activity notice: {consent
-                      ? <>
-                          <strong style={{ color: 'var(--text)' }}>accepted {new Date(consent.at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</strong>
-                          {consent.version < 2 && ' (older notice without activity % — the app asks again after updating)'}
-                        </>
-                      : 'not accepted yet (the app asks on first use)'}
-                  </div>
-                )}
-                <EmployeeDevices employeeId={empNN.id} firstName={empNN.name.split(' ')[0]} />
-              </div>
-            ) : (
+  const overview = (
+    <div className="stack stack--lg">
+      <div className="grid-auto ppl-tabgrid">
+        <Card title="Profile" actions={!editing && <button type="button" className="link" onClick={startEdit}>Edit</button>}>
+          <div className="card__body">
+            {editing ? <EmployeeFields form={form} setForm={setForm} pay={showPayRates} schedule={canSchedule} /> : (
               <>
-                <div style={{ color: 'var(--muted)', fontSize: 13, padding: '4px 0 10px' }}>
-                  Send an invitation so {empNN.name.split(' ')[0]} can set a password and use My workspace and YVA Time.
-                  {!empNN.email && ' Add an email address first.'}
+                <div className="info-grid ppl-info">
+                  {info.filter(i => i.v).map(i => (
+                    <div key={i.k} className="info"><span className="info__label">{i.k}</span><span className={`info__value ppl-info__v${i.mono ? ' mono' : ''}`}>{i.v}</span></div>
+                  ))}
                 </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button className="btn-primary btn-sm" disabled={!empNN.email || inviteLoading !== null} onClick={() => void sendEmployeeInvite('email')}>
-                    {inviteLoading === 'email' ? 'Sending…' : <><IconLock size={12} /> Email Invite</>}
-                  </button>
-                  <button className="btn-ghost btn-sm" disabled={!empNN.email || inviteLoading !== null} onClick={() => void sendEmployeeInvite('link')}>
-                    {inviteLoading === 'link' ? 'Creating…' : <><IconLink size={12} /> Copy Invite Link</>}
-                  </button>
-                </div>
+                {empNN.notes && <div className="info ppl-notes"><span className="info__label">Notes</span><span className="info__value ppl-prewrap">{empNN.notes}</span></div>}
               </>
             )}
-            {inviteMsg && (
-              <div className={`portal-message ${inviteMsg.ok ? 'portal-message-success' : 'portal-message-error'}`} style={{ marginTop: 10 }}>{inviteMsg.text}</div>
-            )}
           </div>
-
-          {/* Assigned Projects */}
-          {assignedProjects.length > 0 && (
-            <div className="data-card">
-              <div className="data-card-title">Assigned Projects</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, paddingTop: 4 }}>
-                {assignedProjects.map(p => (
-                  <button key={p.id} className="btn-ghost btn-sm" onClick={() => navigate('/projects/' + p.id)}
-                    style={{ fontSize: 12 }}>
-                    {p.name}
-                    {p.status && <span style={{ marginLeft: 6, color: 'var(--muted)', fontSize: 11 }}>{p.status}</span>}
-                  </button>
-                ))}
-              </div>
+          {editing && (
+            <div className="card__foot">
+              <button type="button" className="btn" onClick={handleCancel}>Cancel</button>
+              <button type="button" className="btn btn--primary" onClick={() => void handleSave()} disabled={!form.name.trim() || saving}>{saving ? 'Saving…' : 'Save changes'}</button>
             </div>
           )}
-
-          {/* Attachments */}
-          <div className="data-card">
-            <div className="data-card-title" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              Attachments
-              <button className="btn-ghost btn-sm" onClick={() => fileInputRef.current?.click()}>+ Upload</button>
-            </div>
-            <input ref={fileInputRef} type="file" accept="image/*,.pdf,audio/*,video/*,.mp4,.mov,.avi,.webm,.mkv,.m4v,.wmv"
-              style={{ display: 'none' }}
-              onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = '' }} />
-            {attachments.length === 0 ? (
-              <div style={{ color: 'var(--muted)', fontSize: 13, padding: '12px 0' }}>No files yet. Upload CVs, audio notes, videos, or documents.</div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-                {attachments.map(att => (
-                  <div key={att.id} style={{ display: 'flex', flexDirection: 'column', gap: 6, background: 'var(--surf3)', borderRadius: 8, padding: '8px 12px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: 18 }}>{attIcon(att)}</span>
-                      <div style={{ flex: 1, overflow: 'hidden' }}>
-                        <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{att.name}</div>
-                        <div style={{ fontSize: 11, color: 'var(--muted)' }}>{att.size >= 1024*1024 ? (att.size/1024/1024).toFixed(1)+' MB' : (att.size/1024).toFixed(1)+' KB'} · {new Date(att.uploadedAt).toLocaleDateString()}</div>
-                      </div>
-                      {isAudio(att) && (
-                        <audio controls src={att.storageUrl || att.dataUrl} style={{ height: 28, maxWidth: 140 }} />
-                      )}
-                      <button className="btn-ghost btn-sm" style={{ fontSize: 11, padding: '3px 8px' }} onClick={() => downloadAttachment(att.storageUrl || att.dataUrl, att.name)}>↓</button>
-                      <button className="btn-icon btn-danger" style={{ fontSize: 11, padding: '3px 6px' }} onClick={() => removeAttachment(att.id)}><IconX size={12} /></button>
-                    </div>
-                    {isVideo(att) && <VideoPlayer url={att.storageUrl || att.dataUrl} />}
-                  </div>
-                ))}
-              </div>
-            )}
+        </Card>
+        <div className="stack stack--lg">
+          <Card title="Assigned projects">
+            {assignedProjects.length === 0 ? <div className="card-empty">{client ? 'Not on a project yet — add them from the project’s Team & rates.' : 'YVA team — no client project.'}</div>
+              : assignedProjects.map(p => (
+                <button type="button" key={p.id} className="list-row ppl-rowbtn" onClick={() => navigate('/projects/' + p.id)}>
+                  <span className="list-row__main">
+                    <span className="list-row__title">{p.name}</span>
+                    <span className="list-row__meta">{clients.find(c => c.id === p.clientId)?.name || 'No client'}{p.paySchedule ? ` · paid ${p.paySchedule}` : ''}</span>
+                  </span>
+                  {p.status && <Pill status={p.status} />}
+                  <Ic d={P.chevR} size={15} />
+                </button>
+              ))}
+          </Card>
+          <div className="card ppl-mini-stats">
+            <div className="ppl-mini-stat"><span className="info__label">Hours, {now.toLocaleString('en-US', { month: 'short' })}</span><span className="ppl-mini-stat__v num">{fmtHoursHM(monthHours)}</span></div>
+            <div className="ppl-mini-stat"><span className="info__label">Entries, {now.toLocaleString('en-US', { month: 'short' })}</span><span className="ppl-mini-stat__v num">{monthEntries.length}</span></div>
+            <div className="ppl-mini-stat"><span className="info__label">Projects</span><span className="ppl-mini-stat__v num">{assignedProjects.length}</span></div>
           </div>
         </div>
+      </div>
 
-        {/* Right column — Statements */}
-        <div className="data-card" style={{ alignSelf: 'start', minWidth: 0 }}>
-          <div className="data-card-title">Earnings Statements</div>
-
-          {/* Date filter */}
-          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 16 }}>
-            <div className="form-group" style={{ flex: 1, minWidth: 120, margin: 0 }}>
-              <label className="form-label">From</label>
-              <input className="form-input form-input-sm" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} />
-            </div>
-            <div className="form-group" style={{ flex: 1, minWidth: 120, margin: 0 }}>
-              <label className="form-label">To</label>
-              <input className="form-input form-input-sm" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} />
-            </div>
-            {(dateFrom || dateTo) && (
-              <button className="btn-ghost btn-sm" onClick={() => { setDateFrom(''); setDateTo('') }}>Clear</button>
-            )}
+      {empTime.length > 0 && (
+        <section className="stack ppl-timelog">
+          <div className="row row--between"><h2 className="ppl-h2">Time log</h2><button type="button" className="link" onClick={() => navigate('/time')}>Open Time tracking →</button></div>
+          <KpiStrip compact items={[
+            { label: 'Total tracked', value: fmtHoursHM(totalTracked), note: `${empTime.length} entries` },
+            { label: 'Billable', value: fmtHoursHM(billableTracked), note: `${totalTracked > 0 ? Math.round(billableTracked / totalTracked * 100) : 0}% of total` },
+            { label: 'Projects', value: Object.keys(byProject).length, note: Object.entries(byProject).sort((a, b) => b[1] - a[1])[0]?.[0] || '—' },
+          ]} />
+          <div className="table-card">
+            <table className="table ppl-timelog__table">
+              <thead><tr><th>Date</th><th>Project</th><th className="t-right">Hours</th><th>Description</th><th>Billable</th></tr></thead>
+              <tbody>
+                {empTime.slice(0, 20).map(e => (
+                  <tr key={e.id}>
+                    <td className="mono muted">{e.date}</td>
+                    <td>{e.projectName || '—'}{e.source === 'tracker' && <> <span className="tag-mono">YVA Time</span></>}</td>
+                    <td className="t-num t-strong">{fmtHoursHM(e.hours)}</td>
+                    <td className="muted ppl-ellipsis">{e.description || '—'}</td>
+                    <td>{e.billable ? <Pill tone="success">Billable</Pill> : <span className="soft">—</span>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {empTime.length > 20 && <div className="pager">Showing 20 of {empTime.length} entries <button type="button" className="link" onClick={() => navigate('/time')}>View all in Time tracking</button></div>}
           </div>
+        </section>
+      )}
+    </div>
+  )
 
-          {/* KPI summary */}
-          <div className="profile-stat-grid">
-            <div className="settings-stat-card">
-              <div className="settings-stat-count" style={{ fontSize: 16 }}>{empInvoices.length}</div>
-              <div className="settings-stat-label">Invoices</div>
-            </div>
-            <div className="settings-stat-card">
-              <div className="settings-stat-count" style={{ fontSize: 16 }}>{fmtHoursHM(totalHours)}</div>
-              <div className="settings-stat-label">Total Hours</div>
-            </div>
-            <div className="settings-stat-card">
-              <div className="settings-stat-count" style={{ fontSize: 15 }}>{payRate > 0 ? formatMoney(totalEarned) : '—'}</div>
-              <div className="settings-stat-label">Total Earned</div>
-            </div>
-            <div className="settings-stat-card" style={{ borderColor: paidCount > 0 ? 'var(--gold)' : undefined }}>
-              <div className="settings-stat-count" style={{ fontSize: 15, color: paidCount > 0 ? 'var(--gold)' : undefined }}>{payRate > 0 ? formatMoney(totalPaid) : paidCount}</div>
-              <div className="settings-stat-label">{paidCount} Paid</div>
-            </div>
-            <div className="settings-stat-card">
-              <div className="settings-stat-count" style={{ fontSize: 15, color: pendingCount > 0 ? 'var(--muted)' : undefined }}>{pendingCount}</div>
-              <div className="settings-stat-label">Pending</div>
+  const pay = (
+    <div className="grid-auto ppl-tabgrid">
+      <EmployeePayRates employee={empNN} />
+      <EmployeePayoutMethod employeeId={empNN.id} employeeName={empNN.name} />
+      <EmployeePayslips employeeId={empNN.id} employeeName={empNN.name} employeeNumber={empNN.employeeNumber} />
+      {showPayRates && (
+        <Card title="Earnings statements" meta="From client invoices and approved YVA Time work" className="ppl-span-all">
+          <div className="card__body"><EmployeeStatements emp={empNN} invoices={invoices} onInvoicesChange={setInvoices} timeEntries={timeEntries} /></div>
+        </Card>
+      )}
+    </div>
+  )
+
+  const docs = (
+    <div className="grid-auto ppl-tabgrid">
+      <EmployeeDocuments employeeId={empNN.id} firstName={first} />
+      <Card title="Internal files" meta="CVs, voice notes, videos — staff only"
+        actions={<button type="button" className="btn btn--sm" onClick={() => fileInputRef.current?.click()}><Ic d={P.upload} size={14} />Upload</button>}>
+        <input ref={fileInputRef} type="file" accept="image/*,.pdf,audio/*,video/*,.mp4,.mov,.avi,.webm,.mkv,.m4v,.wmv" hidden
+          onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f); e.target.value = '' }} />
+        <div className="card__body"><AttachmentList items={attachments} onRemove={removeAttachment} empty="No files yet. Upload CVs, audio notes, videos, or documents." /></div>
+      </Card>
+    </div>
+  )
+
+  const since = empNN.startYear ? `since ${empNN.startYear}` : ''
+  const subParts = [empNN.role, placementOf(empNN, projects, clients), since].filter(Boolean)
+
+  return (
+    <div className="page ppl-profile">
+      <button type="button" className="back-link" onClick={() => navigate('/employees')}><Ic d={P.chevL} size={15} />Team</button>
+      {notice && <Banner onClose={() => setNotice(null)}>{notice}</Banner>}
+      {error && <Banner tone="danger" onClose={() => setError(null)}>{error}</Banner>}
+
+      <input ref={photoInputRef} type="file" accept="image/*" hidden onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f); e.target.value = '' }} />
+      <div className="ppl-prof-head">
+        <div className="ppl-prof-head__who">
+          <button type="button" className="ppl-photo" title="Change photo" aria-label="Change photo" onClick={() => photoInputRef.current?.click()}>
+            <PersonAvatar name={empNN.name} photo={photoUrl} size="xl" />
+            <span className="ppl-photo__cam"><Ic d={P.image} size={13} /></span>
+          </button>
+          <div className="ppl-prof-head__text">
+            <h1 className="page-title">{empNN.name}</h1>
+            <span className="page-sub">{empNN.employeeNumber && <><span className="mono t-gold">{empNN.employeeNumber}</span>{subParts.length ? ' · ' : ''}</>}{subParts.join(' · ')}</span>
+            <div className="row row--wrap ppl-pills">
+              <Pill tone={client ? 'info' : 'gold'}>{client ? 'Client project' : 'YVA team'}</Pill>
+              <Pill tone={empNN.userId ? 'success' : 'neutral'}>{empNN.userId ? 'YVA Time login' : 'No YVA Time login'}</Pill>
+              <Pill tone={employeeStatusTone(empNN.status)}>{empNN.status || 'Active'}</Pill>
             </div>
           </div>
-
-          {/* Action buttons */}
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-            <button
-              className="btn-ghost btn-sm"
-              disabled={(empInvoices.length === 0 && empTracked.length === 0) || !empNN.email || sending}
-              title={!empNN.email ? 'No email on file' : ''}
-              onClick={async () => {
-                setSending(true)
-                try {
-                  await emailStatement(emp, empInvoices, dateFrom, dateTo, empTracked)
-                  showToast(`Statement sent to ${empNN.email}`)
-                } catch {
-                  showToast('Failed to send — check Gmail connection in Settings')
-                } finally {
-                  setSending(false)
-                }
-              }}
-            >
-              {sending ? 'Sending…' : <><span style={{ marginRight: 5, display: 'inline-flex', verticalAlign: 'middle' }}><IconMail size={13} /></span> Email Statement</>}
-            </button>
-            <button className="btn-ghost btn-sm" onClick={() => printPayslip(emp, empInvoices, dateFrom, dateTo, empTracked)}
-              disabled={empInvoices.length === 0 && empTracked.length === 0}>
-              <span style={{ marginRight: 5, display: 'inline-flex', verticalAlign: 'middle' }}><IconPrinter size={13} /></span> PDF Payslip
-            </button>
-          </div>
-
-          {trackedHours > 0 && (
-            <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 10 }}>
-              Includes <strong style={{ color: 'var(--text)' }}>{trackedHours.toFixed(2)} h</strong> of approved YVA Time work (not on client invoices).
-            </div>
-          )}
-
-          {/* Invoice sections */}
-          {empInvoices.length === 0 ? (
-            <div style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 13, padding: '20px 0' }}>No invoices for this period.</div>
+        </div>
+        <div className="page-actions">
+          {editing ? (
+            <>
+              <button type="button" className="btn" onClick={handleCancel}>Cancel</button>
+              <button type="button" className="btn btn--primary" onClick={() => void handleSave()} disabled={!form.name.trim() || saving}>{saving ? 'Saving…' : 'Save changes'}</button>
+            </>
           ) : (
-            <div>
-              {empInvoices.map(inv => {
-                const items = getEmployeeInvoiceItems(empNN, inv)
-                const payrollSummary = items.reduce((acc, item) => {
-                  const payroll = payrollFromInvoiceItem(item, empNN)
-                  acc.hours += payroll.totalHours
-                  acc.totalPay += payroll.totalPay
-                  return acc
-                }, { hours: 0, totalPay: 0 })
-                const hrs   = payrollSummary.hours
-                const period2 = inv.billingStart
-                  ? `${inv.billingStart}${inv.billingEnd ? ' – ' + inv.billingEnd : ''}`
-                  : (inv.date || '—')
-                const daily = items[0]?.daily
-                const DA = ['Su','Mo','Tu','We','Th','Fr','Sa']
-                let allDates: string[] = []
-                if (daily) {
-                  if (inv.billingStart && inv.billingEnd) {
-                    const cur = new Date(inv.billingStart + 'T12:00:00')
-                    const end = new Date(inv.billingEnd + 'T12:00:00')
-                    while (cur <= end) { allDates.push(cur.toISOString().slice(0, 10)); cur.setDate(cur.getDate() + 1) }
-                  } else {
-                    allDates = Object.keys(daily).filter(d => parseFloat(daily[d]) > 0).sort()
-                  }
-                }
-                const payment = inv.employeePayments?.[empNN.id] || inv.employeePayments?.[empNN.name]
-                const isPaid  = payment?.status === 'paid'
-                return (
-                  <div key={inv.id} style={{ marginBottom: 10, border: '1px solid var(--border)', borderRadius: 6, overflow: 'hidden' }}>
-                    <div style={{ background: 'var(--surf2)', padding: '7px 12px', fontSize: 12, borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <strong>{inv.number}</strong>
-                      <span style={{ color: 'var(--muted)' }}>·</span>
-                      {inv.projectName || '—'}
-                      <span style={{ color: 'var(--muted)' }}>·</span>
-                      <span style={{ color: 'var(--muted)', fontSize: 11 }}>{period2}</span>
-                      <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-                        {isPaid ? (
-                          <>
-                            <span style={{ fontSize: 11, color: '#22c55e', fontWeight: 600 }}>
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><IconCheck size={12} /> Paid {payment?.paidDate ? new Date(payment.paidDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : ''}</span>
-                            </span>
-                            <button className="btn-ghost btn-sm" style={{ fontSize: 10, padding: '2px 8px' }} onClick={() => markPending(inv)}>Undo</button>
-                          </>
-                        ) : (
-                          <button className="btn-ghost btn-sm" style={{ fontSize: 11, padding: '3px 10px', borderColor: 'var(--gold)', color: 'var(--gold)' }}
-                            onClick={() => { setPayModal({ inv }); setPayDate(new Date().toISOString().slice(0,10)); setPayNotes('') }}>
-                            Mark as Paid
-                          </button>
-                        )}
-                      </span>
-                    </div>
-                    <div className="table-wrap">
-                      <table className="data-table">
-                        <thead>
-                          <tr>
-                            {allDates.map(d => {
-                              const dt = new Date(d + 'T12:00:00')
-                              return (
-                                <th key={d} style={{ textAlign: 'center', fontSize: 9, minWidth: 24, whiteSpace: 'nowrap', padding: '5px 3px' }}>
-                                  {DA[dt.getDay()]}<br /><span style={{ color: 'var(--muted)' }}>{dt.getMonth()+1}/{dt.getDate()}</span>
-                                </th>
-                              )
-                            })}
-                            <th style={{ textAlign: 'right' }}>Hours</th>
-                            <th style={{ textAlign: 'right' }}>Rate</th>
-                            <th style={{ textAlign: 'right' }}>Earned</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr>
-                            {allDates.map(d => {
-                              const h = daily ? (parseFloat(daily[d] || '') || 0) : 0
-                              return (
-                                <td key={d} style={{ textAlign: 'center', fontSize: 12, color: h > 0 ? undefined : 'var(--muted)', padding: '7px 3px' }}>
-                                  {h > 0 ? (h % 1 === 0 ? h : h.toFixed(1)) : '—'}
-                                </td>
-                              )
-                            })}
-                            <td style={{ textAlign: 'right', fontWeight: 700 }}>{fmtHoursHM(hrs)}</td>
-                            <td style={{ textAlign: 'right', color: 'var(--muted)', fontSize: 11 }}>{payRate > 0 ? `$${payRate}/hr` : '—'}</td>
-                            <td style={{ textAlign: 'right', color: 'var(--gold)', fontWeight: 700 }}>{payRate > 0 ? formatMoney(payrollSummary.totalPay) : '—'}</td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )
-              })}
-              <div style={{ textAlign: 'right', fontWeight: 800, fontSize: 13, padding: '8px 4px', borderTop: '2px solid var(--border)', marginTop: 4 }}>
-                Total &nbsp; {fmtHoursHM(totalHours)} &nbsp;&nbsp; {payRate > 0 ? formatMoney(totalEarned) : '—'}
-              </div>
-            </div>
+            <>
+              {canScreens && tab !== 'time' && <button type="button" className="btn" onClick={viewScreens}>View screenshots</button>}
+              <button type="button" className="btn btn--primary" onClick={startEdit}>Edit profile</button>
+              <Menu label="More profile actions" items={[
+                { label: 'Change photo', icon: P.image, onClick: () => photoInputRef.current?.click() },
+                { label: 'Statements', icon: P.file, onClick: () => setTab('pay'), hidden: !showPayRates },
+                'sep',
+                { label: `Delete ${first}`, icon: P.trash, danger: true, onClick: () => setConfirmDelete(true) },
+              ]} />
+            </>
           )}
         </div>
       </div>
 
-      {/* ── Time Log ─────────────────────────────────────────────────── */}
-      {(() => {
-        const empTime = timeEntries.filter(e =>
-          e.employeeId === empNN.id || e.employeeName?.toLowerCase() === empNN.name.toLowerCase()
-        ).sort((a, b) => b.date.localeCompare(a.date))
-        const totalTracked = empTime.reduce((s, e) => s + e.hours, 0)
-        const billableTracked = empTime.filter(e => e.billable).reduce((s, e) => s + e.hours, 0)
-        const byProject: Record<string, number> = {}
-        for (const e of empTime) {
-          const k = e.projectName || 'No project'
-          byProject[k] = (byProject[k] || 0) + e.hours
-        }
-        if (empTime.length === 0) return null
-        return (
-          <div style={{ marginTop: 24 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 12, opacity: .6 }}>
-              Time Log
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
-              <div className="kpi-card">
-                <div className="kpi-label">Total Tracked</div>
-                <div className="kpi-value">{fmtHoursHM(totalTracked)}</div>
-                <div className="kpi-sub">{empTime.length} entries</div>
-              </div>
-              <div className="kpi-card">
-                <div className="kpi-label">Billable</div>
-                <div className="kpi-value">{fmtHoursHM(billableTracked)}</div>
-                <div className="kpi-sub">{totalTracked > 0 ? Math.round(billableTracked / totalTracked * 100) : 0}% of total</div>
-              </div>
-              <div className="kpi-card">
-                <div className="kpi-label">Projects</div>
-                <div className="kpi-value">{Object.keys(byProject).length}</div>
-                <div className="kpi-sub">{Object.entries(byProject).sort((a,b)=>b[1]-a[1])[0]?.[0] || '—'}</div>
-              </div>
-            </div>
-            <div className="table-wrap">
-              <table className="data-table" style={{ fontSize: 13 }}>
-                <thead>
-                  <tr><th>Date</th><th>Project</th><th>Hours</th><th>Description</th><th>Billable</th></tr>
-                </thead>
-                <tbody>
-                  {empTime.slice(0, 20).map(e => (
-                    <tr key={e.id}>
-                      <td className="td-muted" style={{ whiteSpace: 'nowrap' }}>{e.date}</td>
-                      <td className="td-muted">{e.projectName || '—'}</td>
-                      <td style={{ fontWeight: 600 }}>{fmtHoursHM(e.hours)}</td>
-                      <td className="td-muted" style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.description || '—'}</td>
-                      <td>{e.billable ? <span className="badge-green" style={{ fontSize: 11 }}>Billable</span> : <span style={{ fontSize: 11, color: 'var(--muted)' }}>—</span>}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {empTime.length > 20 && (
-              <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>
-                Showing 20 of {empTime.length} entries — <a href="/time" style={{ color: 'var(--goldd)' }}>View all in Time Tracking</a>
-              </div>
-            )}
-          </div>
-        )
-      })()}
+      <Tabs label="Employee sections" value={tab} onChange={setTab} tabs={[
+        { value: 'overview', label: 'Overview' },
+        { value: 'pay', label: 'Pay & payout', hidden: !payTab },
+        { value: 'time', label: 'YVA Time' },
+        { value: 'docs', label: 'Documents', count: attachments.length || null },
+        { value: 'history', label: 'History', hidden: !allowed('history.view') },
+      ]} />
 
-      {/* Mark as Paid modal */}
-      {payModal && (
-        <div className="modal-overlay" onClick={() => setPayModal(null)}>
-          <div className="modal-dialog" style={{ maxWidth: 360 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="modal-title">Mark as Paid — {payModal.inv.number}</div>
-              <button className="modal-close btn-icon" onClick={() => setPayModal(null)}><IconX size={14} /></button>
-            </div>
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div className="form-group">
-                <label className="form-label">Payment Date</label>
-                <input className="form-input" type="date" value={payDate} onChange={e => setPayDate(e.target.value)} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Notes (optional)</label>
-                <input className="form-input" type="text" placeholder="e.g. Bank transfer, Ref #1234" value={payNotes} onChange={e => setPayNotes(e.target.value)} />
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn-ghost" onClick={() => setPayModal(null)}>Cancel</button>
-              <button className="btn-primary" onClick={() => markPaid(payModal.inv)}>Confirm Payment</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {tab === 'overview' && overview}
+      {tab === 'pay' && payTab && pay}
+      {tab === 'time' && <YvaTimeLogin emp={empNN} onLinked={userId => setEmployeesState(prev => prev.map(e => e.id === empNN.id ? { ...e, userId } : e))} onViewScreens={canScreens ? viewScreens : undefined} />}
+      {tab === 'docs' && docs}
+      {tab === 'history' && <RecordHistory inline table="employees" recordId={empNN.id} />}
 
-      {/* Delete confirm */}
-      {confirmDelete && (
-        <div className="modal-overlay" onClick={() => setConfirmDelete(false)}>
-          <div className="confirm-dialog" onClick={e => e.stopPropagation()}>
-            <div className="confirm-title">Delete {empNN.name}?</div>
-            <div className="confirm-body">This cannot be undone.</div>
-            <div className="confirm-actions">
-              <button className="btn-ghost" onClick={() => setConfirmDelete(false)}>Cancel</button>
-              <button className="btn-danger" onClick={handleDelete}>Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
-      <div style={{ marginTop: 20 }}><EmployeePayRates employee={empNN} /></div>
-      <div style={{ marginTop: 20 }}><EmployeePayoutMethod employeeId={empNN.id} employeeName={empNN.name} /></div>
-      <div style={{ marginTop: 20 }}><EmployeeDocuments employeeId={empNN.id} /></div>
-      <RecordHistory table="employees" recordId={empNN.id} />
+      <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)} title={`Delete ${empNN.name}?`} sub="This cannot be undone."
+        footer={<><button type="button" className="btn" onClick={() => setConfirmDelete(false)}>Cancel</button><button type="button" className="btn btn--danger" onClick={() => void handleDelete()}>Delete</button></>} />
     </div>
   )
 }

@@ -1,723 +1,224 @@
 import { useEffect, useState } from 'react'
-import type { Estimate, EstimateItem, EstimateStatus, Client, Project } from '../data/types'
+import { useNavigate } from 'react-router-dom'
+import type { Estimate, EstimateItem, EstimateStatus, Client, Invoice, Project } from '../data/types'
 import { loadEstimates, saveEstimates, loadSnapshot } from '../services/storage'
-import { formatMoney } from '../utils/money'
-import { IconX, IconEdit, IconTrash } from '../components/Icon'
+import { createInvoiceFromEstimate } from '../services/crm'
+import { sendEmail } from '../services/gmail'
+import { useRole } from '../context/RoleContext'
+import { can } from '../lib/roles'
+import { Banner, Drawer, Field, Menu, Modal, PageHeader, Pill, SearchInput, Skel, Tabs, useIsMobile, type Tone } from '../components/ui'
+import { Ic, P } from '../components/Icon'
+import { dateMed, dateShort, usd } from '../utils/format'
 
-function uid() { return crypto.randomUUID() }
-
-const today = () => new Date().toISOString().slice(0, 10)
-
-function padNum(n: number): string {
-  return String(n).padStart(3, '0')
-}
-
-function autoNumber(estimates: Estimate[]): string {
-  return `EST-${padNum(estimates.length + 1)}`
-}
-
-function statusBadgeClass(status: EstimateStatus): string {
-  switch (status) {
-    case 'draft':    return 'badge badge-gray'
-    case 'sent':     return 'badge badge-blue'
-    case 'accepted': return 'badge badge-green'
-    case 'declined': return 'badge badge-red'
-    case 'expired':  return 'badge badge-orange'
-    default:         return 'badge badge-gray'
-  }
-}
-
-function statusLabel(status: EstimateStatus): string {
-  return status.charAt(0).toUpperCase() + status.slice(1)
-}
-
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 const STATUSES: EstimateStatus[] = ['draft', 'sent', 'accepted', 'declined', 'expired']
-
+const STATUS_TONE: Record<EstimateStatus, Tone> = { draft: 'neutral', sent: 'sent', accepted: 'success', declined: 'danger', expired: 'neutral' }
+const label = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 const EMPTY_ITEM: EstimateItem = { description: '', qty: 1, unitPrice: 0 }
-
-interface PanelState {
-  open: boolean
-  editing: Estimate | null
+const autoNumber = (estimates: Estimate[]) => `EST-${String(estimates.length + 1).padStart(3, '0')}`
+const calcTotal = (items: EstimateItem[]) => items.reduce((sum, it) => sum + (it.qty || 0) * (it.unitPrice || 0), 0)
+/** Whole days from today to a YYYY-MM-DD date (local) */
+function daysTo(day?: string) {
+  if (!day) return null
+  const [y, m, d] = day.slice(0, 10).split('-').map(Number); const t = new Date()
+  return Math.round((new Date(y, (m || 1) - 1, d || 1).getTime() - new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime()) / 86400000)
 }
 
-interface FormState {
-  number: string
-  date: string
-  expiryDate: string
-  clientId: string
-  projectId: string
-  status: EstimateStatus
-  notes: string
-  items: EstimateItem[]
-}
-
+interface FormState { number: string; date: string; expiryDate: string; clientId: string; projectId: string; status: EstimateStatus; notes: string; items: EstimateItem[] }
 function emptyForm(estimates: Estimate[]): FormState {
-  return {
-    number: autoNumber(estimates),
-    date: today(),
-    expiryDate: '',
-    clientId: '',
-    projectId: '',
-    status: 'draft',
-    notes: '',
-    items: [{ ...EMPTY_ITEM }],
-  }
+  return { number: autoNumber(estimates), date: today(), expiryDate: '', clientId: '', projectId: '', status: 'draft', notes: '', items: [{ ...EMPTY_ITEM }] }
 }
 
-function calcTotal(items: EstimateItem[]): number {
-  return items.reduce((sum, it) => sum + (it.qty || 0) * (it.unitPrice || 0), 0)
-}
-
+/** CRM → Estimates: quotes before a deal is signed (redesign 2026-11) */
 export default function EstimatesPage() {
+  const navigate = useNavigate()
+  const mobile = useIsMobile()
+  const { role } = useRole()
+  const canInvoice = can.viewInvoices(role)
   const [estimates, setEstimates] = useState<Estimate[]>([])
-  const [clients, setClients]     = useState<Client[]>([])
-  const [projects, setProjects]   = useState<Project[]>([])
-  const [loading, setLoading]     = useState(true)
-
-  const [filterStatus, setFilterStatus] = useState<EstimateStatus | ''>('')
+  const [clients, setClients] = useState<Client[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filterStatus, setFilterStatus] = useState<EstimateStatus | 'all'>('all')
   const [filterSearch, setFilterSearch] = useState('')
-
-  const [panel, setPanel]   = useState<PanelState>({ open: false, editing: null })
-  const [form, setForm]     = useState<FormState>(emptyForm([]))
+  const [panel, setPanel] = useState<{ open: boolean; editing: Estimate | null }>({ open: false, editing: null })
+  const [form, setForm] = useState<FormState>(emptyForm([]))
   const [saving, setSaving] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState<Estimate | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<{ text: string; invoiceId?: string } | null>(null)
+  const [converting, setConverting] = useState<string | null>(null)
 
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
-  const [toast, setToast]                 = useState<string | null>(null)
-
-  // Load data on mount
   useEffect(() => {
-    Promise.all([loadEstimates(), loadSnapshot()]).then(([ests, snap]) => {
-      setEstimates(ests)
-      setClients(snap.clients)
-      setProjects(snap.projects)
-      setLoading(false)
+    void Promise.all([loadEstimates(), loadSnapshot()]).then(([ests, snap]) => {
+      setEstimates(ests); setClients(snap.clients); setProjects(snap.projects); setInvoices(snap.invoices); setLoading(false)
     })
   }, [])
 
-  function persist(next: Estimate[]) {
+  /** Optimistic update → await the save → roll back with a message if it fails */
+  async function persist(next: Estimate[]) {
+    const prev = estimates
     setEstimates(next)
-    void saveEstimates(next)
+    try { await saveEstimates(next) } catch (e) { setEstimates(prev); setError(`Could not save: ${(e as Error).message}`); throw e }
   }
 
-  // ── Panel helpers ──────────────────────────────────────────────────────────
-
-  function openNew() {
-    setForm(emptyForm(estimates))
-    setPanel({ open: true, editing: null })
-  }
-
+  function openNew() { setForm(emptyForm(estimates)); setPanel({ open: true, editing: null }) }
   function openEdit(est: Estimate) {
-    setForm({
-      number:     est.number,
-      date:       est.date,
-      expiryDate: est.expiryDate ?? '',
-      clientId:   est.clientId  ?? '',
-      projectId:  est.projectId ?? '',
-      status:     est.status,
-      notes:      est.notes ?? '',
-      items:      est.items.length > 0 ? est.items.map(i => ({ ...i })) : [{ ...EMPTY_ITEM }],
-    })
+    setForm({ number: est.number, date: est.date, expiryDate: est.expiryDate ?? '', clientId: est.clientId ?? '', projectId: est.projectId ?? '', status: est.status, notes: est.notes ?? '', items: est.items.length > 0 ? est.items.map(i => ({ ...i })) : [{ ...EMPTY_ITEM }] })
     setPanel({ open: true, editing: est })
   }
+  const closePanel = () => setPanel({ open: false, editing: null })
+  const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => setForm(f => ({ ...f, [key]: value }))
+  const setItemField = (index: number, key: keyof EstimateItem, value: string | number) => setForm(f => ({ ...f, items: f.items.map((it, i) => (i === index ? { ...it, [key]: value } : it)) }))
 
-  function closePanel() {
-    setPanel({ open: false, editing: null })
-  }
-
-  // ── Form field helpers ─────────────────────────────────────────────────────
-
-  function setField<K extends keyof FormState>(key: K, value: FormState[K]) {
-    setForm(f => ({ ...f, [key]: value }))
-  }
-
-  function setItemField(index: number, key: keyof EstimateItem, value: string | number) {
-    setForm(f => {
-      const items = f.items.map((it, i) => i === index ? { ...it, [key]: value } : it)
-      return { ...f, items }
-    })
-  }
-
-  function addLine() {
-    setForm(f => ({ ...f, items: [...f.items, { ...EMPTY_ITEM }] }))
-  }
-
-  function removeLine(index: number) {
-    setForm(f => ({ ...f, items: f.items.filter((_, i) => i !== index) }))
-  }
-
-  // ── Save ──────────────────────────────────────────────────────────────────
-
-  function handleSave() {
-    if (!form.number.trim()) return
-    setSaving(true)
-
+  /** send = also email the estimate to the client and mark it Sent */
+  async function handleSave(send = false) {
+    if (!form.number.trim() || saving) return
     const selectedClient = clients.find(c => c.id === form.clientId)
     const selectedProject = projects.find(p => p.id === form.projectId)
-    const total = calcTotal(form.items)
-
-    if (panel.editing) {
-      const updated: Estimate = {
-        ...panel.editing,
-        number:      form.number.trim(),
-        date:        form.date,
-        expiryDate:  form.expiryDate || undefined,
-        clientId:    form.clientId   || undefined,
-        clientName:  selectedClient?.name,
-        projectId:   form.projectId  || undefined,
-        projectName: selectedProject?.name,
-        status:      form.status,
-        notes:       form.notes.trim() || undefined,
-        items:       form.items,
-        total,
-      }
-      const next = estimates.map(e => e.id === updated.id ? updated : e)
-      persist(next)
-    } else {
-      const created: Estimate = {
-        id:          uid(),
-        number:      form.number.trim(),
-        date:        form.date,
-        expiryDate:  form.expiryDate || undefined,
-        clientId:    form.clientId   || undefined,
-        clientName:  selectedClient?.name,
-        projectId:   form.projectId  || undefined,
-        projectName: selectedProject?.name,
-        status:      form.status,
-        notes:       form.notes.trim() || undefined,
-        items:       form.items,
-        total,
-        createdAt:   Date.now(),
-      }
-      persist([...estimates, created])
+    if (send && !selectedClient?.email) { setError('Pick a client with an email address to send the estimate.'); return }
+    setSaving(true); setError(null)
+    const status: EstimateStatus = send && form.status === 'draft' ? 'sent' : form.status
+    const fields = {
+      number: form.number.trim(), date: form.date, expiryDate: form.expiryDate || undefined,
+      clientId: form.clientId || undefined, clientName: selectedClient?.name, projectId: form.projectId || undefined, projectName: selectedProject?.name,
+      status, notes: form.notes.trim() || undefined, items: form.items, total: calcTotal(form.items),
     }
-
-    setSaving(false)
-    closePanel()
+    const saved: Estimate = panel.editing ? { ...panel.editing, ...fields } : { id: crypto.randomUUID(), ...fields, createdAt: Date.now() }
+    try {
+      await persist(panel.editing ? estimates.map(e => (e.id === saved.id ? saved : e)) : [...estimates, saved])
+      closePanel()
+      if (send && selectedClient?.email) {
+        const lines = saved.items.filter(i => i.description || i.unitPrice).map(i => `  • ${i.description || 'Item'} — ${i.qty} × ${usd(i.unitPrice)} = ${usd((i.qty || 0) * (i.unitPrice || 0))}`).join('\n')
+        const body = `Hi ${selectedClient.name},\n\nHere is estimate ${saved.number}${saved.projectName ? ` for ${saved.projectName}` : ''}:\n\n${lines}\n\nTotal: ${usd(saved.total)}${saved.expiryDate ? `\nValid until ${dateMed(saved.expiryDate)}.` : ''}${saved.notes ? `\n\n${saved.notes}` : ''}\n\nReply to this email to accept or ask questions.\n\nYVA Staffing`
+        const r = await sendEmail(selectedClient.email, `Estimate ${saved.number} — YVA Staffing`, body)
+        if (r.mode === 'gmail') setNotice({ text: `Estimate ${saved.number} saved and emailed to ${selectedClient.email}.` })
+        else if (r.mode === 'mailto') setNotice({ text: `Estimate ${saved.number} saved and opened in your email app.` })
+        else setError(`Estimate saved, but the email was not sent: ${r.fallbackReason ?? 'Gmail could not send it.'}`)
+      } else setNotice({ text: `Estimate ${saved.number} saved.` })
+    } catch { /* persist already showed the error */ }
+    finally { setSaving(false) }
   }
-
-  // ── Delete ────────────────────────────────────────────────────────────────
-
-  function doDelete(id: string) {
-    persist(estimates.filter(e => e.id !== id))
+  async function doDelete(est: Estimate) {
     setConfirmDelete(null)
+    await persist(estimates.filter(e => e.id !== est.id)).then(() => setNotice({ text: `Estimate ${est.number} deleted.` })).catch(() => {})
+  }
+  async function convertToInvoice(est: Estimate) {
+    if (converting) return
+    const prior = invoices.find(i => (i.notes || '').startsWith(`From estimate ${est.number}`))
+    if (!window.confirm(prior ? `Estimate ${est.number} was already turned into invoice ${prior.number}. Create another draft invoice?` : `Create a draft invoice for ${usd(est.total)} from ${est.number}? Finance reviews and sends it from Invoices.`)) return
+    setConverting(est.id); setError(null)
+    try {
+      const r = await createInvoiceFromEstimate(est, clients.find(c => c.id === est.clientId), projects.find(p => p.id === est.projectId))
+      setInvoices(prev => [{ id: r.id, number: r.number, notes: `From estimate ${est.number}` } as Invoice, ...prev])
+      setNotice({ text: `Draft invoice ${r.number} created from ${est.number}.`, invoiceId: r.id })
+    } catch (e) { setError(`Could not create the invoice: ${(e as Error).message}`) }
+    finally { setConverting(null) }
   }
 
-  // ── Convert to Invoice ────────────────────────────────────────────────────
-
-  function convertToInvoice() {
-    showToast('Invoice creation coming soon — Recurring Invoices tab handles auto-billing.')
-  }
-
-  function showToast(msg: string) {
-    setToast(msg)
-    setTimeout(() => setToast(null), 4000)
-  }
-
-  // ── Filtering ─────────────────────────────────────────────────────────────
-
-  const filtered = estimates.filter(e => {
-    if (filterStatus && e.status !== filterStatus) return false
-    const q = filterSearch.trim().toLowerCase()
-    if (q) {
-      const matchClient  = (e.clientName  ?? '').toLowerCase().includes(q)
-      const matchNumber  = e.number.toLowerCase().includes(q)
-      if (!matchClient && !matchNumber) return false
-    }
-    return true
-  })
-
-  // ── KPI values ────────────────────────────────────────────────────────────
-
-  const totalCount    = estimates.length
-  const totalValue    = estimates.reduce((s, e) => s + e.total, 0)
+  const q = filterSearch.trim().toLowerCase()
+  const searched = estimates.filter(e => !q || (e.clientName ?? '').toLowerCase().includes(q) || e.number.toLowerCase().includes(q) || (e.projectName ?? '').toLowerCase().includes(q))
+  const filtered = searched.filter(e => filterStatus === 'all' || e.status === filterStatus).sort((a, b) => String(b.date).localeCompare(String(a.date)) || b.number.localeCompare(a.number))
+  const totalValue = estimates.reduce((s, e) => s + (Number(e.total) || 0), 0)
   const acceptedCount = estimates.filter(e => e.status === 'accepted').length
-
-  // ── Project filter by client ──────────────────────────────────────────────
-
-  const filteredProjects = form.clientId
-    ? projects.filter(p => p.clientId === form.clientId)
-    : projects
-
-  // ── Derived panel total ───────────────────────────────────────────────────
-
-  const panelTotal = calcTotal(form.items)
-
-  // ── Render ────────────────────────────────────────────────────────────────
+  const filteredProjects = form.clientId ? projects.filter(p => p.clientId === form.clientId) : projects
+  const expTone = (e: Estimate) => { const d = daysTo(e.expiryDate); return d !== null && (e.status === 'sent' || e.status === 'draft') && d <= 3 ? (d < 0 ? 't-danger' : 't-warning') : 'muted' }
+  const menu = (e: Estimate) => [{ label: 'Edit', onClick: () => openEdit(e) }, 'sep' as const, { label: 'Delete estimate', danger: true, onClick: () => setConfirmDelete(e) }]
+  const toInvoiceBtn = (e: Estimate, big?: boolean) => e.status === 'accepted' && canInvoice
+    ? <button type="button" className={`btn btn--soft-gold ${big ? 'btn--block' : 'btn--xs'}`} disabled={converting === e.id} onClick={ev => { ev.stopPropagation(); void convertToInvoice(e) }}>{converting === e.id ? 'Creating…' : big ? 'Convert to invoice' : '→ Invoice'}</button>
+    : null
 
   return (
-    <div className="page-wrap">
+    <div className="page crm-page">
+      <PageHeader title="Estimates" sub={`${estimates.length} estimate${estimates.length === 1 ? '' : 's'} · ${usd(totalValue, { cents: false })} total · ${acceptedCount} accepted`}
+        actions={<>
+          <SearchInput value={filterSearch} onChange={setFilterSearch} placeholder="Search client or #" width={mobile ? '100%' : 220} />
+          <button type="button" className="btn btn--primary" onClick={openNew}>+ New estimate</button>
+        </>} />
+      {error && <Banner tone="danger" onClose={() => setError(null)}>{error}</Banner>}
+      {notice && <Banner tone="success" onClose={() => setNotice(null)} action={notice.invoiceId ? <button type="button" className="btn btn--sm" onClick={() => navigate(`/invoice?open=${notice.invoiceId}`)}>Open invoice</button> : undefined}>{notice.text}</Banner>}
+      <Tabs label="Estimate status" value={filterStatus} onChange={setFilterStatus} tabs={[
+        { value: 'all', label: 'All', count: searched.length },
+        ...STATUSES.map(s => ({ value: s, label: label(s), count: searched.filter(e => e.status === s).length })),
+      ]} />
 
-      {/* Page header */}
-      <div className="page-header">
-        <div className="page-header-left">
-          <h1 className="page-title">Estimates</h1>
-        </div>
-        <div className="page-header-actions">
-          <button className="btn-primary" onClick={openNew}>
-            + New Estimate
-          </button>
-        </div>
-      </div>
-
-      {/* KPI cards */}
-      <div className="kpi-grid">
-        <div className="kpi-card">
-          <div className="kpi-label">Total Estimates</div>
-          <div className="kpi-value">{totalCount}</div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-label">Total Value</div>
-          <div className="kpi-value">{formatMoney(totalValue)}</div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-label">Accepted</div>
-          <div className="kpi-value">{acceptedCount}</div>
-        </div>
-      </div>
-
-      {/* Filter row */}
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-        <select
-          className="form-select"
-          style={{ width: 160, fontSize: 13 }}
-          value={filterStatus}
-          onChange={e => setFilterStatus(e.target.value as EstimateStatus | '')}
-        >
-          <option value="">All Statuses</option>
-          {STATUSES.map(s => (
-            <option key={s} value={s}>{statusLabel(s)}</option>
+      {loading ? (
+        <div className="table-card crm-skel">{[0, 1, 2, 3].map(i => <div key={i} className="crm-skel__row"><Skel w={90} /><Skel w="25%" /><Skel w="20%" /><Skel w={80} /></div>)}</div>
+      ) : filtered.length === 0 ? (
+        <div className="card card-empty">{estimates.length === 0 ? 'No estimates yet. Create your first estimate.' : 'No estimates match the current filters.'}</div>
+      ) : mobile ? (
+        <div className="mcards">
+          {filtered.map(e => (
+            <div key={e.id} className="mcard" role="button" tabIndex={0} onClick={() => openEdit(e)}>
+              <div className="mcard__top"><span className="mcard__title">{e.clientName ?? 'No client'}</span><span className="num crm-td-strong">{usd(e.total)}</span></div>
+              <div className="mcard__top"><span className="mcard__meta"><span className="mono">{e.number}</span>{e.expiryDate ? ` · expires ${dateShort(e.expiryDate)}` : ''}</span><Pill tone={STATUS_TONE[e.status]} status={e.status} /></div>
+              {toInvoiceBtn(e, true)}
+            </div>
           ))}
-        </select>
-        <input
-          className="form-input"
-          style={{ width: 240, fontSize: 13 }}
-          placeholder="Search by client or estimate #..."
-          value={filterSearch}
-          onChange={e => setFilterSearch(e.target.value)}
-        />
-        {(filterStatus || filterSearch) && (
-          <button
-            className="btn-ghost btn-sm"
-            onClick={() => { setFilterStatus(''); setFilterSearch('') }}
-          >
-            Clear
-          </button>
-        )}
-      </div>
-
-      {/* Main table card */}
-      <div style={{
-        background: '#ffffff',
-        borderRadius: 12,
-        boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-        border: '1px solid var(--border)',
-        overflow: 'hidden',
-      }}>
-        {loading ? (
-          <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-            Loading estimates...
-          </div>
-        ) : filtered.length === 0 ? (
-          <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
-            {estimates.length === 0
-              ? 'No estimates yet. Create your first estimate.'
-              : 'No estimates match the current filters.'}
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Client</th>
-                  <th>Project</th>
-                  <th>Date</th>
-                  <th>Expiry</th>
-                  <th style={{ textAlign: 'right' }}>Total</th>
-                  <th>Status</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
+        </div>
+      ) : (
+        <div className="table-card">
+          <table className="table crm-est-table">
+            <thead><tr><th>#</th><th>Client</th><th>Project</th><th>Date</th><th>Expires</th><th className="t-right">Total</th><th>Status</th><th><span className="sr-only">Actions</span></th></tr></thead>
+            <tbody>
+              {filtered.map(e => (
+                <tr key={e.id} className="is-clickable" onClick={() => openEdit(e)}>
+                  <td className="mono crm-td-mono">{e.number}</td>
+                  <td className="crm-td-strong">{e.clientName ?? <span className="soft">—</span>}</td>
+                  <td className="muted">{e.projectName ?? '—'}</td>
+                  <td className="muted">{dateShort(e.date)}</td>
+                  <td className={expTone(e)}>{e.expiryDate ? dateShort(e.expiryDate) : '—'}</td>
+                  <td className="t-num crm-td-strong">{usd(e.total)}</td>
+                  <td><Pill tone={STATUS_TONE[e.status]} status={e.status} /></td>
+                  <td className="t-actions" onClick={ev => ev.stopPropagation()}>
+                    <span className="crm-row-actions">{toInvoiceBtn(e)}<button type="button" className="btn btn--xs" onClick={() => openEdit(e)}>Edit</button><Menu items={menu(e)} label={`Actions for ${e.number}`} buttonClass="btn btn--icon btn--ghost btn--xs" /></span>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {filtered.map(est => (
-                  <tr key={est.id}>
-                    <td className="td-name" style={{ fontFamily: 'monospace', fontSize: 12 }}>{est.number}</td>
-                    <td className="td-name">{est.clientName ?? <span style={{ color: 'var(--muted)' }}>—</span>}</td>
-                    <td className="td-muted">{est.projectName ?? '—'}</td>
-                    <td className="td-muted">{est.date}</td>
-                    <td className="td-muted">{est.expiryDate ?? '—'}</td>
-                    <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatMoney(est.total)}</td>
-                    <td>
-                      <span className={statusBadgeClass(est.status)}>
-                        {statusLabel(est.status)}
-                      </span>
-                    </td>
-                    <td className="td-actions">
-                      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', alignItems: 'center' }}>
-                        {est.status === 'accepted' && (
-                          <button
-                            className="btn-ghost btn-sm"
-                            style={{ fontSize: 11 }}
-                            onClick={() => convertToInvoice()}
-                            title="Convert to Invoice"
-                          >
-                            → Invoice
-                          </button>
-                        )}
-                        <button
-                          className="btn-ghost btn-sm"
-                          title="Edit"
-                          onClick={() => openEdit(est)}
-                          style={{ padding: '5px 9px' }}
-                        >
-                          <IconEdit size={13} />
-                        </button>
-                        <button
-                          className="btn-ghost btn-sm"
-                          title="Delete"
-                          onClick={() => setConfirmDelete(est.id)}
-                          style={{ padding: '5px 9px', color: 'var(--danger)' }}
-                        >
-                          <IconTrash size={13} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* ── Slide panel ─────────────────────────────────────────────────────── */}
-      {panel.open && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 200,
-            pointerEvents: 'none',
-          }}
-        >
-          {/* Backdrop (click to close) */}
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background: 'rgba(15,18,30,0.35)',
-              pointerEvents: 'all',
-            }}
-            onClick={closePanel}
-          />
-
-          {/* Panel */}
-          <div
-            style={{
-              position: 'absolute',
-              top: 0,
-              right: 0,
-              width: 520,
-              height: '100%',
-              background: '#ffffff',
-              boxShadow: '-4px 0 32px rgba(0,0,0,0.14)',
-              zIndex: 300,
-              display: 'flex',
-              flexDirection: 'column',
-              pointerEvents: 'all',
-              overflowY: 'auto',
-            }}
-          >
-            {/* Panel header */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '18px 22px 14px',
-              borderBottom: '1px solid var(--border)',
-              background: '#ffffff',
-              position: 'sticky',
-              top: 0,
-              zIndex: 1,
-            }}>
-              <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)' }}>
-                {panel.editing ? 'Edit Estimate' : 'New Estimate'}
-              </span>
-              <button className="modal-close" onClick={closePanel} title="Close"><IconX size={16} /></button>
-            </div>
-
-            {/* Panel body */}
-            <div style={{ padding: '20px 22px', flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-              {/* Row: Number + Date */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div className="form-group">
-                  <label className="form-label">Estimate #</label>
-                  <input
-                    className="form-input"
-                    value={form.number}
-                    onChange={e => setField('number', e.target.value)}
-                    placeholder="EST-001"
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Date</label>
-                  <input
-                    className="form-input"
-                    type="date"
-                    value={form.date}
-                    onChange={e => setField('date', e.target.value)}
-                  />
-                </div>
-              </div>
-
-              {/* Row: Expiry + Status */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                <div className="form-group">
-                  <label className="form-label">Expiry Date</label>
-                  <input
-                    className="form-input"
-                    type="date"
-                    value={form.expiryDate}
-                    onChange={e => setField('expiryDate', e.target.value)}
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Status</label>
-                  <select
-                    className="form-select"
-                    value={form.status}
-                    onChange={e => setField('status', e.target.value as EstimateStatus)}
-                  >
-                    {STATUSES.map(s => (
-                      <option key={s} value={s}>{statusLabel(s)}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Client */}
-              <div className="form-group">
-                <label className="form-label">Client</label>
-                <select
-                  className="form-select"
-                  value={form.clientId}
-                  onChange={e => {
-                    setField('clientId', e.target.value)
-                    setField('projectId', '')
-                  }}
-                >
-                  <option value="">— No Client —</option>
-                  {clients.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Project */}
-              <div className="form-group">
-                <label className="form-label">Project</label>
-                <select
-                  className="form-select"
-                  value={form.projectId}
-                  onChange={e => setField('projectId', e.target.value)}
-                >
-                  <option value="">— No Project —</option>
-                  {filteredProjects.map(p => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Notes */}
-              <div className="form-group">
-                <label className="form-label">Notes</label>
-                <textarea
-                  className="form-textarea"
-                  rows={3}
-                  value={form.notes}
-                  onChange={e => setField('notes', e.target.value)}
-                  placeholder="Optional notes or terms..."
-                />
-              </div>
-
-              {/* Line items */}
-              <div>
-                <div style={{
-                  fontSize: 12,
-                  fontWeight: 700,
-                  textTransform: 'uppercase',
-                  letterSpacing: '.07em',
-                  color: 'var(--muted)',
-                  marginBottom: 10,
-                }}>
-                  Line Items
-                </div>
-
-                {/* Items table */}
-                <div style={{ overflowX: 'auto', marginBottom: 8 }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                    <thead>
-                      <tr style={{ background: 'var(--surf2)', borderBottom: '1px solid var(--border)' }}>
-                        <th style={{ textAlign: 'left', padding: '8px 10px', fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.06em' }}>
-                          Description
-                        </th>
-                        <th style={{ textAlign: 'right', padding: '8px 10px', fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.06em', width: 64 }}>
-                          Qty
-                        </th>
-                        <th style={{ textAlign: 'right', padding: '8px 10px', fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.06em', width: 100 }}>
-                          Unit Price
-                        </th>
-                        <th style={{ textAlign: 'right', padding: '8px 10px', fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.06em', width: 90 }}>
-                          Subtotal
-                        </th>
-                        <th style={{ width: 32 }}></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {form.items.map((item, idx) => (
-                        <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
-                          <td style={{ padding: '6px 6px 6px 0' }}>
-                            <input
-                              className="form-input"
-                              style={{ fontSize: 12, padding: '6px 8px' }}
-                              value={item.description}
-                              onChange={e => setItemField(idx, 'description', e.target.value)}
-                              placeholder="Description..."
-                            />
-                          </td>
-                          <td style={{ padding: '6px 4px' }}>
-                            <input
-                              className="form-input"
-                              type="number"
-                              min="0"
-                              step="1"
-                              style={{ fontSize: 12, padding: '6px 8px', textAlign: 'right' }}
-                              value={item.qty}
-                              onChange={e => setItemField(idx, 'qty', parseFloat(e.target.value) || 0)}
-                            />
-                          </td>
-                          <td style={{ padding: '6px 4px' }}>
-                            <input
-                              className="form-input"
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              style={{ fontSize: 12, padding: '6px 8px', textAlign: 'right' }}
-                              value={item.unitPrice}
-                              onChange={e => setItemField(idx, 'unitPrice', parseFloat(e.target.value) || 0)}
-                            />
-                          </td>
-                          <td style={{ padding: '6px 4px', textAlign: 'right', fontWeight: 600, fontSize: 12, color: 'var(--text)', whiteSpace: 'nowrap' }}>
-                            {formatMoney(item.qty * item.unitPrice)}
-                          </td>
-                          <td style={{ padding: '6px 0 6px 4px', textAlign: 'center' }}>
-                            <button
-                              type="button"
-                              onClick={() => removeLine(idx)}
-                              disabled={form.items.length <= 1}
-                              style={{
-                                background: 'none',
-                                border: 'none',
-                                cursor: form.items.length <= 1 ? 'not-allowed' : 'pointer',
-                                color: form.items.length <= 1 ? 'var(--soft)' : 'var(--danger)',
-                                fontSize: 16,
-                                lineHeight: 1,
-                                padding: '2px 4px',
-                                borderRadius: 4,
-                              }}
-                              title="Remove line"
-                            >
-                              <IconX size={12} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-
-                <button className="btn-ghost btn-sm" onClick={addLine} type="button">
-                  + Add Line
-                </button>
-
-                {/* Total */}
-                <div style={{
-                  display: 'flex',
-                  justifyContent: 'flex-end',
-                  alignItems: 'center',
-                  gap: 12,
-                  marginTop: 14,
-                  paddingTop: 12,
-                  borderTop: '2px solid var(--border)',
-                }}>
-                  <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.07em' }}>
-                    Total
-                  </span>
-                  <span style={{ fontSize: 20, fontWeight: 900, color: 'var(--text)' }}>
-                    {formatMoney(panelTotal)}
-                  </span>
-                </div>
-              </div>
-
-            </div>
-
-            {/* Save button */}
-            <div style={{
-              padding: '14px 22px',
-              borderTop: '1px solid var(--border)',
-              background: 'var(--surf2)',
-              flexShrink: 0,
-            }}>
-              <button
-                className="btn-primary"
-                style={{ width: '100%', justifyContent: 'center' }}
-                onClick={handleSave}
-                disabled={saving || !form.number.trim()}
-              >
-                {saving ? 'Saving…' : panel.editing ? 'Save Changes' : 'Create Estimate'}
-              </button>
-            </div>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
-      {/* ── Confirm delete dialog ────────────────────────────────────────────── */}
-      {confirmDelete && (
-        <div className="modal-overlay" onClick={() => setConfirmDelete(null)}>
-          <div className="confirm-dialog" onClick={e => e.stopPropagation()}>
-            <div className="confirm-title">Delete estimate?</div>
-            <div className="confirm-body">This cannot be undone.</div>
-            <div className="confirm-actions">
-              <button className="btn-ghost" onClick={() => setConfirmDelete(null)}>Cancel</button>
-              <button className="btn-danger" onClick={() => doDelete(confirmDelete)}>Delete</button>
+      <Drawer open={panel.open} onClose={closePanel} size="wide" title={panel.editing ? `Estimate ${panel.editing.number}` : 'New estimate'}
+        footer={<>
+          {panel.editing && <button type="button" className="btn btn--ghost btn--danger" onClick={() => { const e = panel.editing!; closePanel(); setConfirmDelete(e) }}>Delete</button>}
+          <span className="spacer" />
+          <button type="button" className="btn" disabled={saving || !form.number.trim()} onClick={() => void handleSave(false)}>{!panel.editing && form.status === 'draft' ? 'Save draft' : 'Save'}</button>
+          <button type="button" className="btn btn--primary" disabled={saving || !form.number.trim()} title="Saves, marks a draft as Sent and emails the estimate to the client" onClick={() => void handleSave(true)}>{saving ? 'Saving…' : 'Save & send'}</button>
+        </>}>
+        <div className="form-grid crm-est-head">
+          <Field label="Estimate #"><input className="input mono" aria-label="Estimate number" value={form.number} onChange={e => setField('number', e.target.value)} placeholder="EST-001" /></Field>
+          <Field label="Date"><input className="input" type="date" aria-label="Date" value={form.date} onChange={e => setField('date', e.target.value)} /></Field>
+          <Field label="Expires"><input className="input" type="date" aria-label="Expiry date" value={form.expiryDate} onChange={e => setField('expiryDate', e.target.value)} /></Field>
+          <Field label="Status"><select className="select" aria-label="Status" value={form.status} onChange={e => setField('status', e.target.value as EstimateStatus)}>{STATUSES.map(s => <option key={s} value={s}>{label(s)}</option>)}</select></Field>
+          <Field label="Client"><select className="select" aria-label="Client" value={form.clientId} onChange={e => setForm(f => ({ ...f, clientId: e.target.value, projectId: '' }))}>
+            <option value="">— No client —</option>{clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
+          <Field label="Project"><select className="select" aria-label="Project" value={form.projectId} onChange={e => setField('projectId', e.target.value)}>
+            <option value="">— No project —</option>{filteredProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></Field>
+        </div>
+        <div className="crm-lines">
+          <div className="crm-lines__row crm-lines__row--head"><span>Item</span><span className="t-right">Qty</span><span className="t-right">Rate</span><span className="t-right">Amount</span><span /></div>
+          {form.items.map((item, idx) => (
+            <div key={idx} className="crm-lines__row">
+              <input className="input input--sm" aria-label={`Line ${idx + 1} description`} value={item.description} onChange={e => setItemField(idx, 'description', e.target.value)} placeholder="Description…" />
+              <input className="input input--sm crm-num-input" aria-label={`Line ${idx + 1} quantity`} type="number" min="0" step="1" value={item.qty} onChange={e => setItemField(idx, 'qty', parseFloat(e.target.value) || 0)} />
+              <input className="input input--sm crm-num-input" aria-label={`Line ${idx + 1} rate`} type="number" min="0" step="0.01" value={item.unitPrice} onChange={e => setItemField(idx, 'unitPrice', parseFloat(e.target.value) || 0)} />
+              <span className="num crm-td-strong t-right crm-lines__amt">{usd(item.qty * item.unitPrice)}</span>
+              <button type="button" className="btn btn--ghost btn--xs" aria-label={`Remove line ${idx + 1}`} disabled={form.items.length <= 1} onClick={() => setForm(f => ({ ...f, items: f.items.filter((_, i) => i !== idx) }))}><Ic d={P.x} size={14} /></button>
             </div>
+          ))}
+          <div className="crm-lines__foot">
+            <button type="button" className="link" onClick={() => setForm(f => ({ ...f, items: [...f.items, { ...EMPTY_ITEM }] }))}>+ Add line</button>
+            <span className="crm-lines__total">Total <span className="num">{usd(calcTotal(form.items))}</span></span>
           </div>
         </div>
-      )}
+        <Field label="Notes"><textarea className="textarea" rows={3} aria-label="Notes" value={form.notes} onChange={e => setField('notes', e.target.value)} placeholder="Optional notes or terms..." /></Field>
+      </Drawer>
 
-      {/* ── Toast ───────────────────────────────────────────────────────────── */}
-      {toast && (
-        <div style={{
-          position: 'fixed',
-          bottom: 28,
-          left: '50%',
-          transform: 'translateX(-50%)',
-          background: '#1b1e2b',
-          color: '#ffffff',
-          padding: '12px 22px',
-          borderRadius: 10,
-          fontSize: 13,
-          fontWeight: 600,
-          boxShadow: '0 8px 28px rgba(0,0,0,0.25)',
-          zIndex: 999,
-          maxWidth: 480,
-          textAlign: 'center',
-          lineHeight: 1.5,
-        }}>
-          {toast}
-        </div>
-      )}
+      <Modal open={!!confirmDelete} onClose={() => setConfirmDelete(null)} title="Delete estimate?" sub={`${confirmDelete?.number ?? ''} · This cannot be undone.`}
+        footer={<><button type="button" className="btn" onClick={() => setConfirmDelete(null)}>Cancel</button><button type="button" className="btn btn--danger" onClick={() => confirmDelete && void doDelete(confirmDelete)}>Delete</button></>} />
     </div>
   )
 }

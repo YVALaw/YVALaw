@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import type { Employee, Project } from '../../data/types'
 import { loadEmployees, loadProjects } from '../../services/storage'
+import { Activity, EmptyState, Field, Modal, Skel } from '../../components/ui'
 import {
-  activityColor, activityPct, blocksActivity, deleteTrackerShot, loadTrackerBlocks, loadTrackerShots, signScreenshotUrls,
+  activityPct, blocksActivity, deleteTrackerShot, loadTrackerBlocks, loadTrackerShots, signScreenshotUrls,
   type TrackerBlock, type TrackerShot,
 } from '../../services/trackerStorage'
 
@@ -28,8 +29,8 @@ type Props = {
   lang?: 'en' | 'es'
 }
 const L = {
-  en: { day: 'Day', tracked: 'Tracked', activity: 'Activity', shot: 'screenshot', shots: 'screenshots', none: 'No tracked time on this day.', noShot: 'No screenshot', deleted: 'Deleted by employee', removed: '(time removed)', active: 'active', screen: 'Screen', taken: 'taken', close: 'Close', loading: 'Loading…' },
-  es: { day: 'Día', tracked: 'Registrado', activity: 'Actividad', shot: 'captura', shots: 'capturas', none: 'No hay tiempo registrado este día.', noShot: 'Sin captura', deleted: 'Borrada por ti', removed: '(tiempo quitado)', active: 'activo', screen: 'Pantalla', taken: 'tomada', close: 'Cerrar', loading: 'Cargando…' },
+  en: { day: 'Day', tracked: 'Tracked', activity: 'Activity', shot: 'screenshot', shots: 'screenshots', none: 'No tracked time on this day.', noShot: 'No screenshot', deleted: 'Deleted by employee', removed: '(time removed)', active: 'active', screen: 'Screen', taken: 'taken', close: 'Close', loading: 'Loading…', min: 'min', policy: 'CEO/Admin only · kept 60 days · never shown to clients', selfPolicy: 'Kept 60 days · never shown to clients', noTime: 'no time', del: 'Delete screenshots', employee: 'Employee (client team)', open: 'Open screenshot' },
+  es: { day: 'Día', tracked: 'Registrado', activity: 'Actividad', shot: 'captura', shots: 'capturas', none: 'No hay tiempo registrado este día.', noShot: 'Sin captura', deleted: 'Borrada por ti', removed: '(tiempo quitado)', active: 'activo', screen: 'Pantalla', taken: 'tomada', close: 'Cerrar', loading: 'Cargando…', min: 'min', policy: 'Solo CEO/Admin · se guardan 60 días · nunca se muestran a clientes', selfPolicy: 'Se guardan 60 días · nunca se muestran al cliente', noTime: 'sin tiempo', del: 'Borrar capturas', employee: 'Empleado (equipo del cliente)', open: 'Abrir captura' },
 }
 
 /** Time Tracking → Screenshots (CEO/Admin), and My workspace → My screenshots: one person's day in 10-minute blocks */
@@ -42,7 +43,7 @@ export default function ScreenshotDay({ initialEmployee, initialDay, self, lang 
   const [blocks, setBlocks] = useState<TrackerBlock[]>([])
   const [shots,  setShots]  = useState<TrackerShot[]>([])
   const [urls,   setUrls]   = useState<Record<string, string>>({})
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [open, setOpen] = useState<Cell | null>(null)
 
   useEffect(() => {
@@ -56,7 +57,7 @@ export default function ScreenshotDay({ initialEmployee, initialDay, self, lang 
   }, [])
 
   async function load() {
-    if (!employeeId) return
+    if (!employeeId) { setLoading(false); return }
     setLoading(true)
     const from = new Date(`${day}T00:00:00`).getTime()
     const [b, s] = await Promise.all([loadTrackerBlocks(from, from + DAY_MS, employeeId), loadTrackerShots(employeeId, from, from + DAY_MS)])
@@ -90,110 +91,102 @@ export default function ScreenshotDay({ initialEmployee, initialDay, self, lang 
   const total = [...cells.values()].reduce((s, c) => s + (c.removed ? 0 : c.seconds), 0)
   const dayActivity = blocksActivity(blocks)
 
+  const [delError, setDelError] = useState<string | null>(null)
   async function removeShots(cell: Cell) {
     if (!window.confirm('Delete these screenshots? The tracked time is not changed.')) return
-    for (const s of cell.shots) await deleteTrackerShot(s)
+    setDelError(null)
+    let failed = 0
+    for (const s of cell.shots) if (!(await deleteTrackerShot(s))) failed++
+    if (failed) { setDelError(`${failed} screenshot${failed === 1 ? '' : 's'} could not be deleted.`); await load(); return }
     setOpen(null)
     await load()
+  }
+  const barClass = (c?: Cell) => {
+    if (!c || c.removed) return 'ops-shot__bar'
+    const a = activityPct(c.active, c.measured)
+    return `ops-shot__bar ${a === null ? 'ops-shot__bar--none' : a >= 60 ? 'ops-shot__bar--high' : a >= 30 ? 'ops-shot__bar--mid' : 'ops-shot__bar--low'}`
   }
 
   return (
     <>
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end', marginBottom: 16 }}>
+      <div className="ops-shot-tools">
         {!self && (
-          <div className="form-group" style={{ minWidth: 220, margin: 0 }}>
-            <label className="form-label">Employee (client team)</label>
-            <select className="form-select" value={employeeId} onChange={e => setEmployeeId(e.target.value)}>
+          <Field label={tx.employee}>
+            <select className="select" aria-label={tx.employee} value={employeeId} onChange={e => setEmployeeId(e.target.value)}>
               {employees.length === 0 && <option value="">No client-team employees with a login</option>}
               {employees.length > 0 && !employees.some(e => e.id === employeeId) && <option value={employeeId}>Pick an employee</option>}
               {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
             </select>
-          </div>
+          </Field>
         )}
-        <div className="form-group" style={{ margin: 0 }}>
-          <label className="form-label">{tx.day}</label>
-          <input className="form-input" type="date" value={day} onChange={e => setDay(e.target.value || todayInput())} />
-        </div>
-        <div style={{ marginLeft: 'auto', fontSize: 13, color: 'var(--muted)' }}>
+        <Field label={tx.day}>
+          <input className="input" type="date" aria-label={tx.day} value={day} onChange={e => setDay(e.target.value || todayInput())} />
+        </Field>
+        <p className="ops-shot-sum">
           {loading ? tx.loading : <>
-            {tx.tracked} <strong style={{ color: 'var(--text)' }}>{hm(total)}</strong>
-            {dayActivity !== null && <> · {tx.activity} <strong style={{ color: activityColor(dayActivity) }}>{dayActivity}%</strong></>}
-            {' '}· {shots.length} {shots.length === 1 ? tx.shot : tx.shots}
+            <b className="num">{hm(total)}</b> {tx.tracked.toLowerCase()}
+            {dayActivity !== null && <> · <Activity pct={dayActivity} /> {tx.activity.toLowerCase()}</>}
+            {' '}· {shots.length} {shots.length === 1 ? tx.shot : tx.shots} · {self ? tx.selfPolicy : tx.policy}
           </>}
-        </div>
+        </p>
       </div>
 
-      {!loading && hours.length === 0 && (
-        <div className="data-card" style={{ color: 'var(--muted)', fontSize: 14 }}>{tx.none}</div>
-      )}
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {hours.map(h => (
-          <div key={h} className="data-card" style={{ padding: 14 }}>
-            <div style={{ fontWeight: 700, marginBottom: 10 }}>{clock(dayStart + h * 3_600_000, lang)}</div>
-            <div className="tracker-hour-grid">
+      {loading ? (
+        <div className="card card--pad stack">{[0, 1].map(i => <Skel key={i} h={90} />)}</div>
+      ) : hours.length === 0 ? (
+        <EmptyState>{tx.none}</EmptyState>
+      ) : (
+        <div className="card ops-shots">
+          {hours.map(h => (
+            <div key={h} className="ops-shot-hour tracker-hour-grid">
+              <span className="ops-shot-hour__label mono">{clock(dayStart + h * 3_600_000, lang).replace(':00', '')}</span>
               {Array.from({ length: 6 }, (_, i) => {
                 const bs = dayStart + h * 3_600_000 + i * BLOCK_MS
                 const c = cells.get(bs)
                 const first = c?.shots.find(s => s.monitor === 0) ?? c?.shots[0]
+                const act = c ? activityPct(c.active, c.measured) : null
                 return (
-                  <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: 8, fontSize: 12, background: c ? 'var(--surface)' : 'var(--surf2)', opacity: c ? 1 : 0.6 }}>
-                    <div style={{ color: 'var(--muted)', marginBottom: 6 }}>{clock(bs, lang)}</div>
+                  <div key={i} className={`ops-shot${c ? '' : ' ops-shot--empty'}`}>
                     {c?.removed ? (
-                      <div style={{ height: 84, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)', textAlign: 'center' }}>{tx.deleted}<br />{tx.removed}</div>
+                      <div className="ops-shot__img ops-shot__img--note">{tx.deleted}<br />{tx.removed}</div>
                     ) : first && urls[first.storagePath] ? (
-                      <img src={urls[first.storagePath]} alt={`Screenshot ${clock(first.takenAt, lang)}`} onClick={() => setOpen(c!)}
-                        style={{ width: '100%', height: 84, objectFit: 'cover', borderRadius: 6, cursor: 'zoom-in', background: '#111' }} />
+                      <button type="button" className="ops-shot__img ops-shot__img--btn" onClick={() => setOpen(c!)} aria-label={`${tx.open} ${clock(first.takenAt, lang)}`}>
+                        <img src={urls[first.storagePath]} alt={`Screenshot ${clock(first.takenAt, lang)}`} />
+                        {c!.shots.length > 1 && <span className="ops-shot__count">{c!.shots.length}</span>}
+                      </button>
                     ) : (
-                      <div style={{ height: 84, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)' }}>{c ? tx.noShot : '—'}</div>
+                      <div className="ops-shot__img ops-shot__img--note">{c ? tx.noShot : tx.noTime}</div>
                     )}
-                    {c && !c.removed && (
-                      <div style={{ marginTop: 6 }}>
-                        <strong>{Math.round(c.seconds / 60)} min</strong>
-                        {activityPct(c.active, c.measured) !== null && (
-                          <span title="Keyboard/mouse use in this block" style={{ marginLeft: 6, fontWeight: 600, color: activityColor(activityPct(c.active, c.measured)!) }}>
-                            {activityPct(c.active, c.measured)}%
-                          </span>
-                        )}
-                        <div style={{ color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={[...c.labels, ...c.notes].join(' — ')}>
-                          {c.labels.join(', ')}
-                        </div>
-                      </div>
-                    )}
+                    <div className={barClass(c)} aria-hidden />
+                    <div className="ops-shot__cap">
+                      <span className="mono">{clock(bs, lang)}</span>
+                      {c && !c.removed && <span>{Math.round(c.seconds / 60)} {tx.min}{act !== null && <> · <Activity pct={act} /></>}</span>}
+                    </div>
+                    {c && !c.removed && c.labels.length > 0 && <div className="ops-shot__label" title={[...c.labels, ...c.notes].join(' — ')}>{c.labels.join(', ')}</div>}
                   </div>
                 )
               })}
             </div>
-          </div>
-        ))}
-      </div>
-
-      {open && (
-        <div className="modal-overlay" onClick={() => setOpen(null)}>
-          <div className="modal" style={{ maxWidth: 1100, width: '95vw' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <div className="modal-title">
-                {clock(open.blockStart, lang)} – {clock(open.blockStart + BLOCK_MS, lang)} · {Math.round(open.seconds / 60)} min
-                {activityPct(open.active, open.measured) !== null && ` · ${activityPct(open.active, open.measured)}% ${tx.active}`} · {open.labels.join(', ')}
-              </div>
-              <button className="modal-close btn-icon" onClick={() => setOpen(null)}>✕</button>
-            </div>
-            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {open.notes.length > 0 && <div style={{ fontSize: 13, color: 'var(--muted)' }}>{open.notes.join(' — ')}</div>}
-              {open.shots.map(s => urls[s.storagePath] && (
-                <div key={s.id}>
-                  <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 4 }}>{tx.screen} {s.monitor + 1} · {tx.taken} {clock(s.takenAt, lang)}</div>
-                  <img src={urls[s.storagePath]} alt={`Screen ${s.monitor + 1}`} style={{ width: '100%', borderRadius: 8, border: '1px solid var(--border)' }} />
-                </div>
-              ))}
-            </div>
-            <div className="modal-footer">
-              {!self && <button className="btn-danger btn-sm" onClick={() => void removeShots(open)}>Delete screenshots</button>}
-              <button className="btn-ghost btn-sm" onClick={() => setOpen(null)}>{tx.close}</button>
-            </div>
-          </div>
+          ))}
         </div>
       )}
+
+      <Modal open={!!open} onClose={() => { setOpen(null); setDelError(null) }} size="xl"
+        title={open ? `${clock(open.blockStart, lang)} – ${clock(open.blockStart + BLOCK_MS, lang)} · ${Math.round(open.seconds / 60)} ${tx.min}${activityPct(open.active, open.measured) !== null ? ` · ${activityPct(open.active, open.measured)}% ${tx.active}` : ''}` : ''}
+        sub={open ? [open.labels.join(', '), open.notes.join(' — ')].filter(Boolean).join(' · ') : undefined}
+        footer={<>
+          {!self && open && <button type="button" className="btn ops-btn-danger-text" onClick={() => void removeShots(open)}>{tx.del}</button>}
+          <span className="spacer" />
+          <button type="button" className="btn" onClick={() => setOpen(null)}>{tx.close}</button>
+        </>}>
+        {delError && <p className="t-danger">{delError}</p>}
+        {open?.shots.map(s => urls[s.storagePath] && (
+          <figure key={s.id} className="ops-shot-full">
+            <figcaption>{tx.screen} {s.monitor + 1} · {tx.taken} {clock(s.takenAt, lang)}</figcaption>
+            <img src={urls[s.storagePath]} alt={`Screen ${s.monitor + 1}`} />
+          </figure>
+        ))}
+      </Modal>
     </>
   )
 }

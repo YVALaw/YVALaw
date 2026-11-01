@@ -1,15 +1,17 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import type { Client, Employee, Project, TimeEntry } from '../data/types'
 import { loadTimeEntries, upsertTimeEntry, deleteTimeEntry, loadEmployees, loadProjects, loadClients } from '../services/storage'
+import { loadManualRequests, loadTrackerBlocks } from '../services/trackerStorage'
 import { supabase } from '../lib/supabase'
-import { IconCheck, IconEdit, IconTrash } from '../components/Icon'
 import { useRole } from '../context/RoleContext'
 import { can } from '../lib/roles'
 import LiveBoard from './time/LiveBoard'
 import ScreenshotDay from './time/ScreenshotDay'
 import ApproveTime from './time/ApproveTime'
 import ScheduleReport from './time/ScheduleReport'
+import { Banner, Checkbox, Drawer, EmptyState, Field, KpiStrip, Menu, Modal, PageHeader, Pill, Segmented, Skel, Tabs, useIsMobile } from '../components/ui'
+import { dateMed, hmClock } from '../utils/format'
 
 function uid() { return crypto.randomUUID() }
 function getToday() { return new Date().toISOString().slice(0, 10) }
@@ -20,8 +22,18 @@ function fmtHours(h: number): string {
   const min = total % 60
   return min === 0 ? `${hrs}h` : `${hrs}h ${min}m`
 }
+const clockH = (h: number) => hmClock(h * 3600)
 
 type BillableFilter = 'all' | 'billable' | 'unbillable'
+const TABS = ['live', 'approve', 'schedule', 'screens', 'log'] as const
+type Tab = typeof TABS[number]
+const SUB: Record<Tab, string> = {
+  live: 'Live from the YVA Time desktop app · refreshes every minute',
+  approve: 'Approve YVA Time hours and missing-time requests',
+  schedule: 'Shift vs. when people actually started and stopped (YVA Time)',
+  screens: 'Client-team screenshots, one per 10-minute block · kept 60 days · never shown to clients',
+  log: 'Every time entry. YVA Time rows are read-only.',
+}
 
 interface FormState {
   date: string
@@ -35,13 +47,18 @@ interface FormState {
   billable: boolean
 }
 
+function startOfToday(): number { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime() }
+function mondayOf(ms: number): number { const d = new Date(ms); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.getTime() }
+
 export default function TimeTrackingPage() {
+  const mobile = useIsMobile()
   const [entries,   setEntries]   = useState<TimeEntry[]>([])
+  const [loaded,    setLoaded]    = useState(false)
   const [employees, setEmployees] = useState<Employee[]>([])
   const [projects,  setProjects]  = useState<Project[]>([])
   const [clients,   setClients]   = useState<Client[]>([])
 
-  // The person whose timer this is
+  // The person whose manual entries these are
   const [linkedEmployee,  setLinkedEmployee]  = useState<Employee | null>(null)
   const [authDisplayName, setAuthDisplayName] = useState('')   // fallback for unlinked users
 
@@ -56,34 +73,49 @@ export default function TimeTrackingPage() {
   const [panelOpen, setPanelOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form,      setForm]      = useState<FormState>(blankForm(null, ''))
+  const [saving,    setSaving]    = useState(false)
+  const [panelError, setPanelError] = useState<string | null>(null)
+  const [flash,     setFlash]     = useState<{ tone: 'success' | 'danger'; text: string } | null>(null)
 
   // Delete confirm
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<TimeEntry | null>(null)
 
   // YVA Time views
   const { role } = useRole()
+  const canTracker = can.viewTracker(role)
+  const canApprove = can.approveTime(role)
+  const canShots = can.viewScreenshots(role)
   // ?tab=screens&employee=ID&day=YYYY-MM-DD opens a person's screenshots (links from profiles / Live)
-  const [params] = useSearchParams()
-  const TABS = ['log', 'live', 'approve', 'schedule', 'screens'] as const
-  type Tab = typeof TABS[number]
+  const [params, setParams] = useSearchParams()
   const tabFromUrl = (): Tab | null => (TABS as readonly string[]).includes(params.get('tab') ?? '') ? params.get('tab') as Tab : null
-  const [tab, setTab] = useState<Tab>(() => tabFromUrl() ?? 'log')
-  useEffect(() => { const t = tabFromUrl(); if (t) setTab(t) }, [params])   // eslint-disable-line react-hooks/exhaustive-deps
+  const [tab, setTabState] = useState<Tab>(() => tabFromUrl() ?? (canTracker ? 'live' : 'log'))
+  const picked = useRef(!!tabFromUrl())
+  const setTab = (t: Tab) => { picked.current = true; setTabState(t) }
+  useEffect(() => { const t = tabFromUrl(); if (t) { picked.current = true; setTabState(t) } }, [params])   // eslint-disable-line react-hooks/exhaustive-deps
+  // The role can arrive after the first render: tracker roles land on Live unless they picked a tab
+  useEffect(() => { if (!picked.current) setTabState(canTracker ? 'live' : 'log') }, [canTracker])
+
+  // Approve tab badge: people with finished days waiting this week + missing-time requests
+  const [approveCount, setApproveCount] = useState<number | null>(null)
+  const loadApproveCount = useCallback(async () => {
+    if (!canApprove) { setApproveCount(null); return }
+    const [b, r] = await Promise.all([loadTrackerBlocks(mondayOf(Date.now()), startOfToday()), loadManualRequests('pending')])
+    setApproveCount(new Set(b.filter(x => x.status === 'tracked').map(x => x.employeeId)).size + r.length)
+  }, [canApprove])
+  useEffect(() => { void loadApproveCount() }, [loadApproveCount])
 
   // Approvals add YVA Time entries server-side: reload the log when coming back to it
-  useEffect(() => { if (tab === 'log') void loadTimeEntries().then(setEntries) }, [tab])
+  useEffect(() => { if (tab === 'log') void loadTimeEntries().then(e => { setEntries(e); setLoaded(true) }) }, [tab])
 
   useEffect(() => {
     void (async () => {
-      const [ents, emps, projs, clts, { data: { user } }] = await Promise.all([
-        loadTimeEntries(),
+      const [emps, projs, clts, { data: { user } }] = await Promise.all([
         loadEmployees(),
         loadProjects(),
         loadClients(),
         supabase.auth.getUser(),
       ])
 
-      setEntries(ents)
       setEmployees(emps)
       setProjects(projs)
       setClients(clts)
@@ -104,6 +136,11 @@ export default function TimeTrackingPage() {
     })()
   }, [])
 
+  // Create menu deep link: /time?create=1 opens Log manual time
+  useEffect(() => {
+    if (params.get('create')) { picked.current = true; setTabState('log'); openCreate(); setParams({}, { replace: true }) }
+  }, [params])   // eslint-disable-line react-hooks/exhaustive-deps
+
   function blankForm(linked: Employee | null, fallbackName: string): FormState {
     return {
       date: getToday(),
@@ -117,11 +154,6 @@ export default function TimeTrackingPage() {
   // Current user's display name (linked employee takes priority over auth name)
   const currentName = linkedEmployee?.name ?? authDisplayName
 
-  function persistOne(entry: TimeEntry, next: TimeEntry[]) {
-    setEntries(next)
-    void upsertTimeEntry(entry).catch(err => console.error(err))
-  }
-
   // ─── Filtering ─────────────────────────────────────────────────────────────
 
   const filtered = entries.filter(e => {
@@ -132,7 +164,7 @@ export default function TimeTrackingPage() {
     if (filterBillable === 'billable'   && !e.billable)     return false
     if (filterBillable === 'unbillable' &&  e.billable)     return false
     return true
-  })
+  }).sort((a, b) => b.date.localeCompare(a.date))
 
   // ─── KPIs ──────────────────────────────────────────────────────────────────
 
@@ -146,6 +178,7 @@ export default function TimeTrackingPage() {
   function openCreate() {
     setEditingId(null)
     setForm(blankForm(linkedEmployee, authDisplayName))
+    setPanelError(null)
     setPanelOpen(true)
   }
 
@@ -157,6 +190,7 @@ export default function TimeTrackingPage() {
       clientName: entry.clientName ?? '', hours: String(entry.hours),
       description: entry.description ?? '', billable: entry.billable,
     })
+    setPanelError(null)
     setPanelOpen(true)
   }
 
@@ -177,308 +211,202 @@ export default function TimeTrackingPage() {
     setForm(f => ({ ...f, employeeId, employeeName: emp?.name ?? '' }))
   }
 
-  function saveEntry() {
+  /** One entry at a time (never a whole-table save — approved YVA Time rows are written server-side) */
+  async function saveEntry() {
     const hoursNum = parseFloat(form.hours)
     if (!form.employeeName.trim() || isNaN(hoursNum) || hoursNum <= 0) return
     const existing = editingId ? entries.find(e => e.id === editingId) : undefined
     if (existing?.source === 'tracker') { closePanel(); return }   // approved YVA Time hours are read-only
-    if (existing) {
-      const updated: TimeEntry = { ...existing, date: form.date, employeeId: form.employeeId || undefined, employeeName: form.employeeName.trim(),
-        projectId: form.projectId || undefined, projectName: form.projectName || undefined,
-        clientName: form.clientName || undefined, hours: hoursNum,
-        description: form.description.trim() || undefined, billable: form.billable }
-      persistOne(updated, entries.map(e => e.id === existing.id ? updated : e))
-    } else {
-      const created: TimeEntry = { id: uid(), date: form.date, employeeId: form.employeeId || undefined,
-        employeeName: form.employeeName.trim(), projectId: form.projectId || undefined,
-        projectName: form.projectName || undefined, clientName: form.clientName || undefined,
-        hours: hoursNum, description: form.description.trim() || undefined,
-        billable: form.billable, source: 'manual', createdAt: Date.now() }
-      persistOne(created, [created, ...entries])
-    }
-    closePanel()
+    const entry: TimeEntry = existing
+      ? { ...existing, date: form.date, employeeId: form.employeeId || undefined, employeeName: form.employeeName.trim(),
+          projectId: form.projectId || undefined, projectName: form.projectName || undefined,
+          clientName: form.clientName || undefined, hours: hoursNum,
+          description: form.description.trim() || undefined, billable: form.billable }
+      : { id: uid(), date: form.date, employeeId: form.employeeId || undefined,
+          employeeName: form.employeeName.trim(), projectId: form.projectId || undefined,
+          projectName: form.projectName || undefined, clientName: form.clientName || undefined,
+          hours: hoursNum, description: form.description.trim() || undefined,
+          billable: form.billable, source: 'manual', createdAt: Date.now() }
+    const prev = entries
+    setEntries(existing ? entries.map(e => (e.id === existing.id ? entry : e)) : [entry, ...entries])
+    setSaving(true); setPanelError(null)
+    try {
+      await upsertTimeEntry(entry)
+      setFlash({ tone: 'success', text: `${existing ? 'Saved' : 'Logged'} ${fmtHours(hoursNum)} for ${entry.employeeName} on ${dateMed(entry.date)}.` })
+      closePanel()
+    } catch (err) {
+      setEntries(prev)
+      setPanelError(`Could not save: ${(err as Error).message}`)
+    } finally { setSaving(false) }
   }
 
-  function doDelete(id: string) {
-    if (entries.find(e => e.id === id)?.source === 'tracker') { setConfirmDelete(null); return }
-    setEntries(entries.filter(e => e.id !== id))
-    void deleteTimeEntry(id).catch(err => console.error(err))
+  async function doDelete(entry: TimeEntry) {
     setConfirmDelete(null)
+    if (entry.source === 'tracker') return
+    const prev = entries
+    setEntries(entries.filter(e => e.id !== entry.id))
+    try { await deleteTimeEntry(entry.id); setFlash({ tone: 'success', text: 'Time entry deleted.' }) }
+    catch (err) { setEntries(prev); setFlash({ tone: 'danger', text: `Could not delete: ${(err as Error).message}` }) }
   }
 
   const hasFilters = filterFrom || filterTo || filterEmployee || filterProject || filterBillable !== 'all'
+  const hoursValid = !!form.hours && !isNaN(parseFloat(form.hours)) && parseFloat(form.hours) > 0
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
-  const header = (
+  const source = (e: TimeEntry) => (e.source === 'tracker'
+    ? <Pill tone="gold" className="ops-src" >YVA Time</Pill>
+    : <Pill tone="neutral" className="ops-src">Manual</Pill>)
+  const rowMenu = (e: TimeEntry) => e.source === 'tracker' ? null : (
+    <Menu label={`Actions for ${e.employeeName} ${e.date}`} buttonClass="btn btn--xs btn--icon ops-xs-icon" items={[
+      { label: 'Edit', onClick: () => openEdit(e) },
+      { label: 'Delete', danger: true, onClick: () => setConfirmDelete(e) },
+    ]} />
+  )
+
+  const logView = (
     <>
-      <div className="page-header">
-        <div className="page-header-left">
-          <h1 className="page-title">Time Tracking</h1>
-          {tab === 'log' && currentName && <p className="page-sub">Manual entries are logged as <strong>{currentName}</strong></p>}
-          {tab === 'live' && <p className="page-sub">Live from the YVA Time desktop app · refreshes every minute</p>}
-          {tab === 'screens' && <p className="page-sub">Client-team screenshots · kept 60 days · never shown to clients</p>}
-          {tab === 'approve' && <p className="page-sub">Approve YVA Time hours and manual time requests</p>}
-          {tab === 'schedule' && <p className="page-sub">Shift vs. when people actually started and stopped (YVA Time)</p>}
-        </div>
-        {tab === 'log' && (
-          <div className="page-actions">
-            <button className="btn-primary btn-sm" onClick={openCreate}>+ Log Manual</button>
-          </div>
-        )}
+      <KpiStrip items={[
+        { label: 'Total hours', value: fmtHours(totalHours), note: `${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}` },
+        { label: 'Billable hours', value: fmtHours(billableHours), note: `${entries.filter(e => e.billable).length} entries` },
+        { label: 'Unbillable hours', value: fmtHours(unbillableHours), note: `${entries.filter(e => !e.billable).length} entries` },
+        { label: 'Billable %', value: `${billablePct}%`, note: 'of all logged hours', tone: totalHours === 0 ? undefined : billablePct >= 70 ? 'success' : billablePct >= 40 ? 'warning' : 'danger' },
+      ]} />
+
+      <div className="card ops-filters">
+        <Field label="From"><input className="input input--sm" type="date" aria-label="From" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} /></Field>
+        <Field label="To"><input className="input input--sm" type="date" aria-label="To" value={filterTo} onChange={e => setFilterTo(e.target.value)} /></Field>
+        <Field label="Person">
+          <select className="select select--sm" aria-label="Person" value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)}>
+            <option value="">Everyone</option>
+            {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
+          </select>
+        </Field>
+        <Field label="Project">
+          <select className="select select--sm" aria-label="Project" value={filterProject} onChange={e => setFilterProject(e.target.value)}>
+            <option value="">All projects</option>
+            {projects.map(proj => <option key={proj.id} value={proj.id}>{proj.name}</option>)}
+          </select>
+        </Field>
+        <Field label="Billable">
+          <Segmented label="Billable" value={filterBillable} onChange={setFilterBillable} options={[{ value: 'all', label: 'All' }, { value: 'billable', label: 'Billable' }, { value: 'unbillable', label: 'Unbillable' }]} />
+        </Field>
+        {hasFilters && <button type="button" className="btn btn--sm btn--ghost ops-filters__clear" onClick={() => { setFilterFrom(''); setFilterTo(''); setFilterEmployee(''); setFilterProject(''); setFilterBillable('all') }}>Clear</button>}
+        <span className="ops-filters__count">{filtered.length} entries · {fmtHours(filtered.reduce((s, e) => s + e.hours, 0))}</span>
       </div>
-      {can.viewTracker(role) && (
-        <div className="filter-tabs">
-          <button className={`filter-tab${tab === 'log' ? ' active' : ''}`} onClick={() => setTab('log')}>Time log</button>
-          <button className={`filter-tab${tab === 'live' ? ' active' : ''}`} onClick={() => setTab('live')}>Live</button>
-          {can.approveTime(role) && (
-            <button className={`filter-tab${tab === 'approve' ? ' active' : ''}`} onClick={() => setTab('approve')}>Approve</button>
-          )}
-          <button className={`filter-tab${tab === 'schedule' ? ' active' : ''}`} onClick={() => setTab('schedule')}>Schedule</button>
-          {can.viewScreenshots(role) && (
-            <button className={`filter-tab${tab === 'screens' ? ' active' : ''}`} onClick={() => setTab('screens')}>Screenshots</button>
-          )}
+
+      {!loaded ? (
+        <div className="card card--pad stack">{[0, 1, 2, 3].map(i => <Skel key={i} h={36} />)}</div>
+      ) : filtered.length === 0 ? (
+        <EmptyState>{entries.length === 0 ? 'No time entries yet. Use + Log manual time to add one.' : 'No entries match the current filters.'}</EmptyState>
+      ) : mobile ? (
+        <div className="mcards">
+          {filtered.map(e => (
+            <div key={e.id} className="mcard">
+              <div className="mcard__top">
+                <div><div className="mcard__title">{e.employeeName}</div><div className="mcard__meta">{dateMed(e.date)} · {e.projectName ?? 'No project'}{e.clientName ? ` · ${e.clientName}` : ''}</div></div>
+                <span className="mono t-strong">{clockH(e.hours)}</span>
+              </div>
+              {e.description && <div className="mcard__meta">{e.description}</div>}
+              <div className="row row--between">
+                <span className="row">{source(e)}{e.billable ? <Pill tone="success">Billable</Pill> : <span className="mcard__meta">Unbillable</span>}</span>
+                {rowMenu(e)}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="table-card">
+          <table className="table ops-min-860">
+            <thead>
+              <tr><th>Date</th><th>Person</th><th>Project</th><th>Hours</th><th>Note</th><th>Billable</th><th>Source</th><th aria-label="Actions" /></tr>
+            </thead>
+            <tbody>
+              {filtered.map(e => (
+                <tr key={e.id}>
+                  <td className="muted ops-nowrap">{dateMed(e.date)}</td>
+                  <td className="t-strong">{e.employeeName}</td>
+                  <td>{e.projectName ?? '—'}{e.clientName && <span className="t-sub">{e.clientName}</span>}</td>
+                  <td className="mono">{clockH(e.hours)}</td>
+                  <td className="muted"><span className="ops-ellipsis" title={e.description}>{e.description ?? '—'}</span></td>
+                  <td>{e.billable ? <Pill tone="success">Billable</Pill> : <span className="muted">Unbillable</span>}</td>
+                  <td title={e.source === 'tracker' ? 'Approved hours from the YVA Time app — read-only' : undefined}>{source(e)}</td>
+                  <td className="t-actions">{rowMenu(e)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </>
   )
 
-  if (tab !== 'log') {
-    return (
-      <div className="page-wrap">
-        {header}
-        {tab === 'live' ? <LiveBoard /> : tab === 'approve' ? <ApproveTime /> : tab === 'schedule' ? <ScheduleReport />
-          : can.viewScreenshots(role) ? <ScreenshotDay key={params.toString()} initialEmployee={params.get('employee') ?? undefined} initialDay={params.get('day') ?? undefined} />
-          : <div className="data-card" style={{ color: 'var(--muted)' }}>Screenshots are only visible to the CEO and admins.</div>}
-      </div>
-    )
-  }
+  const showTabs = canTracker
+  const sub = tab === 'log' && currentName ? `${SUB.log} Manual entries are logged as ${currentName}.` : SUB[tab]
 
   return (
-    <div className="page-wrap">
+    <div className="page">
+      <PageHeader title="Time tracking" sub={sub}
+        actions={tab === 'log' ? <button type="button" className="btn btn--primary" onClick={openCreate}>+ Log manual time</button> : undefined} />
 
-      {header}
+      {showTabs && (
+        <Tabs label="Time tracking views" value={tab} onChange={setTab} tabs={[
+          { value: 'live', label: 'Live' },
+          { value: 'approve', label: 'Approve', badge: approveCount || null, hidden: !canApprove },
+          { value: 'schedule', label: 'Schedule' },
+          { value: 'screens', label: 'Screenshots', hidden: !canShots },
+          { value: 'log', label: 'Time log' },
+        ]} />
+      )}
 
-      {/* KPI Cards */}
-      <div className="kpi-grid" style={{ marginBottom: 20 }}>
-        <div className="kpi-card">
-          <div className="kpi-label">Total Hours</div>
-          <div className="kpi-value">{fmtHours(totalHours)}</div>
-          <div className="kpi-sub">{entries.length} {entries.length === 1 ? 'entry' : 'entries'}</div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-label">Billable Hours</div>
-          <div className="kpi-value">{fmtHours(billableHours)}</div>
-          <div className="kpi-sub">{entries.filter(e => e.billable).length} entries</div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-label">Unbillable Hours</div>
-          <div className="kpi-value" style={{ color: 'var(--muted)' }}>{fmtHours(unbillableHours)}</div>
-          <div className="kpi-sub">{entries.filter(e => !e.billable).length} entries</div>
-        </div>
-        <div className="kpi-card">
-          <div className="kpi-label">Billable %</div>
-          <div className="kpi-value" style={{ color: totalHours === 0 ? 'var(--muted)' : billablePct >= 70 ? 'var(--success)' : billablePct >= 40 ? 'var(--gold)' : 'var(--danger)' }}>
-            {billablePct}%
-          </div>
-          <div className="kpi-sub">of all logged hours</div>
-        </div>
-      </div>
+      {flash && tab === 'log' && <Banner tone={flash.tone} onClose={() => setFlash(null)}>{flash.text}</Banner>}
 
-      {/* Filters + table */}
-      <div style={{ background: '#fff', borderRadius: 12, boxShadow: '0 1px 4px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'flex-end', padding: '14px 16px', borderBottom: '1px solid var(--border, #e5e7eb)' }}>
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">From</label>
-            <input className="form-input" type="date" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} style={{ fontSize: 12, width: 130 }} />
-          </div>
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">To</label>
-            <input className="form-input" type="date" value={filterTo} onChange={e => setFilterTo(e.target.value)} style={{ fontSize: 12, width: 130 }} />
-          </div>
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Employee</label>
-            <select className="form-select" value={filterEmployee} onChange={e => setFilterEmployee(e.target.value)} style={{ fontSize: 12, width: 160 }}>
-              <option value="">All employees</option>
-              {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
-            </select>
-          </div>
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Project</label>
-            <select className="form-select" value={filterProject} onChange={e => setFilterProject(e.target.value)} style={{ fontSize: 12, width: 160 }}>
-              <option value="">All projects</option>
-              {projects.map(proj => <option key={proj.id} value={proj.id}>{proj.name}</option>)}
-            </select>
-          </div>
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label className="form-label">Billable</label>
-            <div style={{ display: 'flex', border: '1px solid var(--border, #e5e7eb)', borderRadius: 6, overflow: 'hidden' }}>
-              {(['all', 'billable', 'unbillable'] as BillableFilter[]).map(val => (
-                <button key={val} onClick={() => setFilterBillable(val)} style={{
-                  padding: '5px 10px', fontSize: 12, border: 'none',
-                  borderRight: val !== 'unbillable' ? '1px solid var(--border, #e5e7eb)' : 'none',
-                  background: filterBillable === val ? 'var(--brand)' : '#fff',
-                  color: filterBillable === val ? '#1a1a1a' : 'var(--muted, #6b7280)',
-                  cursor: 'pointer', fontWeight: filterBillable === val ? 600 : 400,
-                }}>
-                  {val.charAt(0).toUpperCase() + val.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
-          {hasFilters && (
-            <button className="btn-ghost btn-sm" style={{ alignSelf: 'flex-end', marginBottom: 2 }}
-              onClick={() => { setFilterFrom(''); setFilterTo(''); setFilterEmployee(''); setFilterProject(''); setFilterBillable('all') }}>
-              Clear
-            </button>
-          )}
-          <div style={{ flex: 1 }} />
-          <div style={{ alignSelf: 'flex-end', fontSize: 12, color: 'var(--muted)', marginBottom: 2, whiteSpace: 'nowrap' }}>
-            {filtered.length} entries &middot; {fmtHours(filtered.reduce((s, e) => s + e.hours, 0))}
-          </div>
-        </div>
+      {tab === 'live' ? <LiveBoard />
+        : tab === 'approve' ? <ApproveTime onChanged={() => void loadApproveCount()} />
+        : tab === 'schedule' ? <ScheduleReport />
+        : tab === 'screens' ? (canShots
+            ? <ScreenshotDay key={params.toString()} initialEmployee={params.get('employee') ?? undefined} initialDay={params.get('day') ?? undefined} />
+            : <EmptyState>Screenshots are only visible to the CEO and admins.</EmptyState>)
+        : logView}
 
-        {filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--muted)', fontSize: 13 }}>
-            {entries.length === 0 ? "No time entries yet. Use + Log Manual to add one." : 'No entries match the current filters.'}
-          </div>
-        ) : (
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Date</th><th>Employee</th><th>Project</th><th>Client</th>
-                  <th>Hours</th><th>Description</th><th>Billable</th><th style={{ width: 80 }}></th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.slice().sort((a, b) => b.date.localeCompare(a.date)).map(entry => (
-                  <tr key={entry.id}>
-                    <td className="td-muted" style={{ whiteSpace: 'nowrap' }}>{entry.date}</td>
-                    <td className="td-name">{entry.employeeName}</td>
-                    <td className="td-muted">{entry.projectName ?? '—'}</td>
-                    <td className="td-muted">{entry.clientName ?? '—'}</td>
-                    <td style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{fmtHours(entry.hours)}</td>
-                    <td className="td-muted" style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={entry.description}>
-                      {entry.description ?? '—'}
-                    </td>
-                    <td>
-                      {entry.billable
-                        ? <span className="badge-green" style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 3 }}><IconCheck size={10} /> Billable</span>
-                        : <span style={{ fontSize: 11, color: 'var(--muted)' }}>Unbillable</span>}
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                        {entry.source === 'tracker' ? (
-                          <span className="badge badge-blue" style={{ fontSize: 10 }} title="Approved hours from the YVA Time app — read-only">YVA Time</span>
-                        ) : (
-                          <>
-                            <button className="btn-ghost btn-sm" onClick={() => openEdit(entry)} style={{ padding: '3px 7px', fontSize: 13 }}><IconEdit size={13} /></button>
-                            <button className="btn-ghost btn-sm" onClick={() => setConfirmDelete(entry.id)} style={{ padding: '3px 7px', fontSize: 13, color: '#ef4444' }}><IconTrash size={13} /></button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Slide panel overlay */}
-      {panelOpen && <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.18)', zIndex: 299 }} onClick={closePanel} />}
-
-      {/* Log Time slide panel */}
-      <div style={{
-        position: 'fixed', top: 0, right: 0, bottom: 0, width: 460, background: '#fff',
-        zIndex: 300, boxShadow: '-4px 0 24px rgba(0,0,0,0.12)',
-        transform: panelOpen ? 'translateX(0)' : 'translateX(100%)',
-        transition: 'transform 0.25s cubic-bezier(0.4,0,0.2,1)',
-        display: 'flex', flexDirection: 'column', overflow: 'hidden',
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-          <span style={{ fontWeight: 700, fontSize: 16 }}>{editingId ? 'Edit Time Entry' : 'Log Time'}</span>
-          <button className="btn-ghost btn-sm" onClick={closePanel} style={{ fontSize: 18, lineHeight: 1, padding: '2px 8px' }}>&times;</button>
-        </div>
-
-        <div style={{ flex: 1, overflowY: 'auto', padding: '20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div className="form-group">
-            <label className="form-label">Date *</label>
-            <input className="form-input" type="date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Employee *</label>
-            {/* Locked to linked employee when creating; editable when editing or no link */}
+      <Drawer open={panelOpen} onClose={closePanel} size="narrow" title={editingId ? 'Edit time entry' : 'Log manual time'}
+        sub={editingId ? undefined : 'Hours typed here go straight into the time log.'}
+        footer={<><span className="spacer" /><button type="button" className="btn" onClick={closePanel}>Cancel</button>
+          <button type="button" className="btn btn--primary" onClick={() => void saveEntry()} disabled={saving || !form.employeeName.trim() || !hoursValid}>{saving ? 'Saving…' : editingId ? 'Save changes' : 'Log time'}</button></>}>
+        {panelError && <Banner tone="danger">{panelError}</Banner>}
+        <div className="form-grid form-grid--2">
+          <Field label="Date *"><input className="input" type="date" aria-label="Date" value={form.date} onChange={e => setForm(f => ({ ...f, date: e.target.value }))} /></Field>
+          <Field label="Hours *" hint="Decimal hours, e.g. 2.5 = 2h 30m">
+            <input className="input" type="number" step={0.25} min={0} aria-label="Hours" value={form.hours} onChange={e => setForm(f => ({ ...f, hours: e.target.value }))} placeholder="e.g. 2.5" />
+          </Field>
+          <Field label="Person *" full>
+            {/* Locked to the linked employee when creating; editable when editing or not linked */}
             {linkedEmployee && !editingId ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', background: 'var(--bg)', borderRadius: 8, border: '1px solid var(--border)' }}>
-                <span style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)' }}>{linkedEmployee.name}</span>
-                <span style={{ fontSize: 11, background: 'rgba(250,204,21,.15)', color: '#a16207', padding: '1px 7px', borderRadius: 999, marginLeft: 4 }}>You</span>
-              </div>
+              <div className="ops-locked">{linkedEmployee.name}<Pill tone="gold">You</Pill></div>
             ) : employees.length > 0 ? (
-              <select className="form-select" value={form.employeeId} onChange={e => handlePanelEmployee(e.target.value)}>
+              <select className="select" aria-label="Person" value={form.employeeId} onChange={e => handlePanelEmployee(e.target.value)}>
                 <option value="">— Select employee —</option>
                 {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.name}</option>)}
               </select>
             ) : (
-              <input className="form-input" value={form.employeeName} onChange={e => setForm(f => ({ ...f, employeeName: e.target.value, employeeId: '' }))} placeholder="Employee name" />
+              <input className="input" aria-label="Person" value={form.employeeName} onChange={e => setForm(f => ({ ...f, employeeName: e.target.value, employeeId: '' }))} placeholder="Employee name" />
             )}
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Project <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional)</span></label>
-            <select className="form-select" value={form.projectId} onChange={e => handlePanelProject(e.target.value)}>
+          </Field>
+          <Field label="Project (optional)" hint={form.clientName ? `Client: ${form.clientName}` : undefined} full>
+            <select className="select" aria-label="Project" value={form.projectId} onChange={e => handlePanelProject(e.target.value)}>
               <option value="">— No project —</option>
               {projects.map(proj => <option key={proj.id} value={proj.id}>{proj.name}</option>)}
             </select>
-            {form.clientName && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>Client: <strong>{form.clientName}</strong></div>}
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Hours *</label>
-            <input className="form-input" type="number" step={0.25} min={0} value={form.hours}
-              onChange={e => setForm(f => ({ ...f, hours: e.target.value }))} placeholder="e.g. 2.5" />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label">Description <span style={{ color: 'var(--muted)', fontWeight: 400 }}>(optional)</span></label>
-            <textarea className="form-input" rows={2} value={form.description}
-              onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-              placeholder="What was worked on..." style={{ resize: 'vertical', minHeight: 60 }} />
-          </div>
-
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, fontWeight: 500, userSelect: 'none' }}>
-              <input type="checkbox" checked={form.billable} onChange={e => setForm(f => ({ ...f, billable: e.target.checked }))} style={{ width: 16, height: 16, cursor: 'pointer' }} />
-              Billable
-            </label>
-          </div>
+          </Field>
+          <Field label="Description (optional)" full>
+            <textarea className="textarea" rows={2} aria-label="Description" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="What was worked on…" />
+          </Field>
+          <div className="field--full"><Checkbox checked={form.billable} onChange={v => setForm(f => ({ ...f, billable: v }))} label="Billable" /></div>
         </div>
+      </Drawer>
 
-        <div style={{ display: 'flex', gap: 8, padding: '16px 20px', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
-          <button className="btn-primary" style={{ flex: 1 }} onClick={saveEntry}
-            disabled={!form.employeeName.trim() || !form.hours || isNaN(parseFloat(form.hours)) || parseFloat(form.hours) <= 0}>
-            {editingId ? 'Save Changes' : 'Log Time'}
-          </button>
-          <button className="btn-ghost" onClick={closePanel}>Cancel</button>
-        </div>
-      </div>
-
-      {/* Delete confirm */}
-      {confirmDelete && (
-        <div className="modal-overlay" onClick={() => setConfirmDelete(null)}>
-          <div className="confirm-dialog" onClick={e => e.stopPropagation()}>
-            <div className="confirm-title">Delete time entry?</div>
-            <div className="confirm-body">This cannot be undone.</div>
-            <div className="confirm-actions">
-              <button className="btn-ghost" onClick={() => setConfirmDelete(null)}>Cancel</button>
-              <button className="btn-danger" onClick={() => doDelete(confirmDelete)}>Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal open={!!confirmDelete} onClose={() => setConfirmDelete(null)} title="Delete time entry?" sub="This cannot be undone."
+        footer={<><button type="button" className="btn" onClick={() => setConfirmDelete(null)}>Cancel</button><button type="button" className="btn ops-btn-danger" onClick={() => confirmDelete && void doDelete(confirmDelete)}>Delete</button></>} />
     </div>
   )
 }

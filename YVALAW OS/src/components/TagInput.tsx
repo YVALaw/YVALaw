@@ -64,115 +64,36 @@ export function TagInput({ tags, onChange, allTags, onTagCreated }: TagInputProp
   }
 
   return (
-    <div style={{ position: 'relative' }}>
-      {/* Tag pills + input in one row */}
-      <div
-        style={{
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: 4,
-          alignItems: 'center',
-          padding: '5px 8px',
-          border: '1px solid var(--border)',
-          borderRadius: 8,
-          background: 'var(--surface)',
-          minHeight: 38,
-          cursor: 'text',
-        }}
-        onClick={() => inputRef.current?.focus()}
-      >
+    <div className="ops-combo">
+      <div className="ops-taginput" onClick={() => inputRef.current?.focus()}>
         {tags.map((label) => (
-          <TagBadge
-            key={label}
-            label={label}
-            color={getColor(label)}
-            onRemove={() => removeTag(label)}
-          />
+          <TagBadge key={label} label={label} color={getColor(label)} onRemove={() => removeTag(label)} />
         ))}
         <input
           ref={inputRef}
+          className="ops-taginput__field"
+          aria-label="Add tag"
           value={input}
           onChange={(e) => { setInput(e.target.value); setOpen(true) }}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           onKeyDown={handleKeyDown}
-          placeholder={tags.length === 0 ? 'Add tags...' : ''}
-          style={{
-            border: 'none',
-            outline: 'none',
-            background: 'transparent',
-            fontSize: 13,
-            color: 'var(--soft)',
-            minWidth: 80,
-            flex: 1,
-          }}
+          placeholder={tags.length === 0 ? 'Add tags…' : ''}
         />
       </div>
 
-      {/* Dropdown */}
       {open && (suggestions.length > 0 || showAddNew) && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            right: 0,
-            zIndex: 60,
-            background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            borderRadius: 8,
-            boxShadow: '0 8px 24px rgba(0,0,0,.25)',
-            marginTop: 2,
-            maxHeight: 200,
-            overflowY: 'auto',
-          }}
-        >
+        <div className="ops-combo__list" role="listbox">
           {suggestions.map((tag) => (
-            <div
-              key={tag.id}
-              onMouseDown={() => addTag(tag.label)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '8px 12px',
-                cursor: 'pointer',
-                borderBottom: '1px solid var(--border)',
-                fontSize: 13,
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surf2)')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-            >
-              <span
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: '50%',
-                  background: tag.color,
-                  flexShrink: 0,
-                }}
-              />
+            <button type="button" key={tag.id} className="ops-combo__opt" onMouseDown={() => addTag(tag.label)}>
+              <span className="ops-tag__dot" style={{ background: tag.color }} aria-hidden />
               {tag.label}
-            </div>
+            </button>
           ))}
           {showAddNew && (
-            <div
-              onMouseDown={createAndAdd}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '8px 12px',
-                cursor: 'pointer',
-                fontSize: 13,
-                color: 'var(--gold)',
-                fontWeight: 600,
-              }}
-              onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surf2)')}
-              onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-            >
+            <button type="button" className="ops-combo__opt ops-combo__opt--add" onMouseDown={createAndAdd}>
               + Add "{input.trim()}" as new tag
-            </div>
+            </button>
           )}
         </div>
       )}

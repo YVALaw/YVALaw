@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useRole } from '../../context/RoleContext'
 import { can } from '../../lib/roles'
 import { disconnectDevice, loadDevices, type DesktopDevice } from '../../services/trackerStorage'
+import { Banner, Dot } from '../../components/ui'
+import { Ic, P } from '../../components/Icon'
 
 const ONLINE_MS = 5 * 60_000      // the app checks in about once a minute while signed in
 
@@ -33,32 +35,33 @@ export default function EmployeeDevices({ employeeId, firstName }: { employeeId:
   if (!devices) return null
   const now = Date.now()
   return (
-    <div style={{ marginTop: 12 }}>
-      <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)', marginBottom: 6 }}>Computers</div>
+    <div className="ops-devices">
+      <div className="section-label">Computers</div>
       {devices.length === 0 ? (
-        <div style={{ fontSize: 13 }}>Not signed in to the YVA Time app on any computer yet.</div>
+        <p className="ops-devices__empty">Not signed in to the YVA Time app on any computer yet.</p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div className="ops-devices__list">
           {devices.map(d => {
             const active = !d.revokedAt && !d.signedOutAt
             const online = active && now - d.lastSeenAt < ONLINE_MS
             return (
-              <div key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', border: '1px solid var(--border)', borderRadius: 10, padding: '8px 10px' }}>
-                <div style={{ flex: 1, minWidth: 180 }}>
-                  <div style={{ fontWeight: 600, color: 'var(--text)', overflowWrap: 'anywhere' }}>
+              <div key={d.id} className="ops-device">
+                <span className="ops-device__icon"><Ic d={P.monitor} size={16} /></span>
+                <div className="ops-device__main">
+                  <div className="ops-device__name">
                     {d.name}
-                    {d.appVersion && <span style={{ fontWeight: 400, color: 'var(--muted)', marginLeft: 6, fontSize: 12 }}>YVA Time {d.appVersion}</span>}
+                    {d.appVersion && <span className="ops-device__ver">YVA Time {d.appVersion}</span>}
                   </div>
-                  <div style={{ fontSize: 12 }}>
-                    {d.revokedAt ? <span style={{ color: '#b91c1c' }}>Disconnected by YVA {date(d.revokedAt)}</span>
+                  <div className="ops-device__meta">
+                    {d.revokedAt ? <span className="t-danger">Disconnected by YVA {date(d.revokedAt)}</span>
                       : d.signedOutAt ? <>Signed out {date(d.signedOutAt)}</>
-                      : online ? <span style={{ color: '#047857' }}>● Online now</span>
+                      : online ? <span className="t-success ops-device__online"><Dot tone="success" /> Online now</span>
                       : <>Last seen {date(d.lastSeenAt)}</>}
                     {' · '}signed in {date(d.createdAt)}
                   </div>
                 </div>
                 {active && can.manageDevices(role) && (
-                  <button className="btn-ghost btn-sm" disabled={busy !== null} onClick={() => void disconnect(d)}>
+                  <button type="button" className="btn btn--sm ops-btn-danger-text" disabled={busy !== null} onClick={() => void disconnect(d)}>
                     {busy === d.id ? 'Disconnecting…' : 'Disconnect'}
                   </button>
                 )}
@@ -67,9 +70,7 @@ export default function EmployeeDevices({ employeeId, firstName }: { employeeId:
           })}
         </div>
       )}
-      {message && (
-        <div className={`portal-message ${message.ok ? 'portal-message-success' : 'portal-message-error'}`} style={{ marginTop: 8 }}>{message.text}</div>
-      )}
+      {message && <Banner tone={message.ok ? 'success' : 'danger'} onClose={() => setMessage(null)}>{message.text}</Banner>}
     </div>
   )
 }

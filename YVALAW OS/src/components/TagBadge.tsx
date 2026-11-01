@@ -1,4 +1,4 @@
-import { IconX } from './Icon'
+import { Ic, P } from './Icon'
 
 // Predefined tag color palette
 export const TAG_COLORS = [
@@ -12,31 +12,16 @@ interface TagBadgeProps {
   onRemove?: () => void
 }
 
+/** A tag chip: the dot carries the tag's own colour (a data colour, so it stays inline) */
 export function TagBadge({ label, color, onRemove }: TagBadgeProps) {
   return (
-    <span
-      style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 4,
-        background: color + '20',
-        border: `1px solid ${color}40`,
-        color,
-        borderRadius: 999,
-        padding: '2px 8px',
-        fontSize: 11,
-        fontWeight: 600,
-        whiteSpace: 'nowrap',
-      }}
-    >
+    <span className="ops-tag">
+      <span className="ops-tag__dot" style={{ background: color }} aria-hidden />
       {label}
       {onRemove && (
-        <span
-          onClick={onRemove}
-          style={{ cursor: 'pointer', lineHeight: 1, fontSize: 13, marginLeft: 2 }}
-        >
-          <IconX size={12} />
-        </span>
+        <button type="button" className="ops-tag__x" onClick={e => { e.stopPropagation(); onRemove() }} aria-label={`Remove tag ${label}`}>
+          <Ic d={P.x} size={11} stroke={2.4} />
+        </button>
       )}
     </span>
   )

@@ -11,6 +11,7 @@ import SignupPage from './pages/SignupPage'
 import PortalPage from './pages/PortalPage'
 import OAuthCallbackPage from './pages/OAuthCallbackPage'
 import ReportsPage from './pages/ReportsPage'
+import HomePage from './pages/HomePage'
 import InvoicePage from './pages/InvoicePage'
 import EmployeesPage from './pages/EmployeesPage'
 import EmployeeProfilePage from './pages/EmployeeProfilePage'
@@ -36,6 +37,7 @@ import PortalProjects from './pages/portal/PortalProjects'
 import PortalTeam from './pages/portal/PortalTeam'
 import PortalDocuments from './pages/portal/PortalDocuments'
 import PortalSettings from './pages/portal/PortalSettings'
+import PortalMessages from './pages/portal/PortalMessages'
 import RequestsPage from './pages/RequestsPage'
 import PortalSetPassword from './pages/portal/PortalSetPassword'
 import EmployeeWorkspace from './pages/me/EmployeeWorkspace'
@@ -158,7 +160,7 @@ function AuthenticatedRouter() {
           <Route path="/portal/team"      element={<PortalTeam />} />
           <Route path="/portal/projects"  element={<PortalProjects />} />
           <Route path="/portal/documents" element={<PortalDocuments />} />
-          <Route path="/portal/messages"  element={<ComingSoon title="Messages"    sub="Live chat and communication center — coming in Phase 7." />} />
+          <Route path="/portal/messages"  element={<PortalMessages />} />
           <Route path="/portal/settings"  element={<PortalSettings />} />
           <Route path="*"                 element={<Navigate to={`/portal/dashboard?preview=${previewClientId}`} replace />} />
         </Routes>
@@ -186,7 +188,7 @@ function AuthenticatedRouter() {
           <Route path="/portal/team"      element={<PortalTeam />} />
           <Route path="/portal/projects"  element={<PortalProjects />} />
           <Route path="/portal/documents" element={<PortalDocuments />} />
-          <Route path="/portal/messages"  element={<ComingSoon title="Messages"    sub="Live chat and communication center — coming in Phase 7." />} />
+          <Route path="/portal/messages"  element={<PortalMessages />} />
           <Route path="/portal/settings"  element={<PortalSettings />} />
           <Route path="*"                 element={<Navigate to="/portal/dashboard" replace />} />
         </Routes>
@@ -201,7 +203,7 @@ function AuthenticatedRouter() {
   return (
     <Shell>
       <Routes>
-        <Route path="/" element={<ReportsPage />} />
+        <Route path="/" element={<HomePage />} />
         <Route path="/reports"       element={<RoleGuard allow={can.viewReports}><ReportsPage /></RoleGuard>} />
         <Route path="/invoice"       element={<RoleGuard allow={can.viewInvoices}><InvoicePage /></RoleGuard>} />
         <Route path="/employees"     element={<RoleGuard allow={can.viewEmployees}><EmployeesPage /></RoleGuard>} />

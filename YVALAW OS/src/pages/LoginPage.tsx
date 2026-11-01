@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { APP_URL } from '../lib/appUrl'
+import AuthLayout from '../components/settings/AuthLayout'
+import { Banner, Checkbox, Field } from '../components/ui'
 
 type ResetState = 'idle' | 'sending' | 'sent' | 'error'
 
@@ -95,145 +97,40 @@ export default function LoginPage() {
     }
   }
 
+  const lockText = `Too many failed attempts. Try again in ${Math.ceil(lockRemaining / 60000)}m ${Math.ceil((lockRemaining % 60000) / 1000)}s.`
+
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'var(--bg)',
-      padding: '20px',
-      fontFamily: "'Inter', system-ui, sans-serif",
-    }}>
-      {/* Background accent */}
-      <div style={{
-        position: 'fixed', inset: 0, overflow: 'hidden', zIndex: 0, pointerEvents: 'none',
-      }}>
-        <div style={{
-          position: 'absolute', top: '-20%', left: '50%', transform: 'translateX(-50%)',
-          width: 600, height: 600,
-          background: 'radial-gradient(ellipse, rgba(250,204,21,0.08) 0%, transparent 70%)',
-          borderRadius: '50%',
-        }} />
-      </div>
+    <AuthLayout
+      brand="YVA Staffing"
+      title="Sign in"
+      sub="Welcome back. Sign in to YVA OS to continue."
+      foot="Access is by invitation only. Contact your administrator."
+    >
+      <form className="set-auth__form" onSubmit={handleSubmit}>
+        <Field label="Email address">
+          <input className="input" type="email" autoComplete="username" value={email}
+            onChange={e => setEmail(e.target.value)} placeholder="you@yvastaffing.net" required autoFocus />
+        </Field>
+        <Field label="Password">
+          <input className="input" type="password" autoComplete="current-password" value={password}
+            onChange={e => setPassword(e.target.value)} placeholder="••••••••" required />
+        </Field>
 
-      <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420 }}>
-        {/* Logo / brand */}
-        <div style={{ textAlign: 'center', marginBottom: 36 }}>
-          <img
-            src={`${import.meta.env.BASE_URL}yva-logo.png`}
-            alt="YVA Staffing"
-            style={{
-              width: 64, height: 64, borderRadius: 16,
-              objectFit: 'contain',
-              margin: '0 auto 16px',
-              display: 'block',
-            }}
-            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-          />
-          <div style={{ fontSize: 26, fontWeight: 900, color: 'var(--text)', letterSpacing: '-.02em' }}>
-            YVA Staffing
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 5 }}>
-            Sign in to continue
-          </div>
+        <div className="set-auth__row">
+          <Checkbox checked={rememberMe} onChange={setRememberMe} label="Keep me signed in" />
+          <button type="button" className="link" disabled={resetState === 'sending'} onClick={() => void handleForgotPassword()}>
+            {resetState === 'sending' ? 'Sending…' : 'Forgot password?'}
+          </button>
         </div>
 
-        {/* Card */}
-        <div style={{
-          background: 'var(--surface)',
-          border: '1px solid var(--border)',
-          borderRadius: 24,
-          padding: '36px 32px',
-          boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
-        }}>
-          <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--text)', marginBottom: 24 }}>
-            Sign in to your account
-          </div>
+        {resetMsg && <Banner tone={resetState === 'sent' ? 'success' : 'danger'}>{resetMsg}</Banner>}
+        {lockRemaining > 0 && <Banner tone="danger">{lockText}</Banner>}
+        {error && <Banner tone="danger">{error}</Banner>}
 
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div className="form-group">
-              <label className="form-label">Email address</label>
-              <input
-                className="form-input"
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="you@yvastaffing.net"
-                required
-                autoFocus
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Password</label>
-              <input
-                className="form-input"
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-              />
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--muted)', cursor: 'pointer' }}>
-                <input type="checkbox" checked={rememberMe} onChange={e => setRememberMe(e.target.checked)} />
-                Keep me signed in
-              </label>
-              <button
-                type="button"
-                disabled={resetState === 'sending'}
-                onClick={() => void handleForgotPassword()}
-                style={{
-                  background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                  fontSize: 12, color: 'var(--gold)', textDecoration: 'underline',
-                  opacity: resetState === 'sending' ? 0.5 : 1,
-                }}
-              >
-                {resetState === 'sending' ? 'Sending…' : 'Forgot password?'}
-              </button>
-            </div>
-
-            {resetMsg && (
-              <div style={{
-                background: resetState === 'sent' ? 'rgba(34,197,94,.1)' : 'rgba(239,68,68,.1)',
-                border: `1px solid ${resetState === 'sent' ? 'rgba(34,197,94,.2)' : 'rgba(239,68,68,.2)'}`,
-                borderRadius: 12, padding: '10px 14px', fontSize: 13,
-                color: resetState === 'sent' ? '#059669' : '#dc2626',
-              }}>
-                {resetMsg}
-              </div>
-            )}
-
-            {lockRemaining > 0 && (
-              <div style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 12, padding: '10px 14px', fontSize: 13, color: '#dc2626' }}>
-                Too many failed attempts. Try again in {Math.ceil(lockRemaining / 60000)}m {Math.ceil((lockRemaining % 60000) / 1000)}s.
-              </div>
-            )}
-
-            {error && (
-              <div style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 12, padding: '10px 14px', fontSize: 13, color: '#dc2626' }}>
-                {error}
-              </div>
-            )}
-
-            <button
-              className="btn-primary"
-              type="submit"
-              disabled={loading || lockRemaining > 0}
-              style={{ marginTop: 4, width: '100%', justifyContent: 'center', padding: '12px 20px', fontSize: 14, fontWeight: 800 }}
-            >
-              {loading ? 'Signing in…' : 'Sign in'}
-            </button>
-          </form>
-        </div>
-
-        <div style={{ textAlign: 'center', marginTop: 20, fontSize: 12, color: 'var(--muted)' }}>
-          Access is by invitation only. Contact your administrator.
-        </div>
-      </div>
-    </div>
+        <button className="btn btn--primary btn--lg btn--block" type="submit" disabled={loading || lockRemaining > 0}>
+          {loading ? 'Signing in…' : 'Sign in'}
+        </button>
+      </form>
+    </AuthLayout>
   )
 }

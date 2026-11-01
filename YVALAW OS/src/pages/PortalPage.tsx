@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { Invoice } from '../data/types'
-import { IconAlert } from '../components/Icon'
+import { Ic, P } from '../components/Icon'
+import { Pill, useIsMobile } from '../components/ui'
+import { dateMed } from '../utils/format'
 
+// The share link may still carry dopRate (older links); it is ignored — DOP is never shown to clients.
 type Payload = { inv: Invoice; dopRate?: number }
 
 function decodePayload(hash: string): Payload | null {
@@ -15,9 +18,19 @@ function fmtMoney(n: number) {
   return `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
+/** Same as the invoice PDF: "7h 20m" (exact minutes), never a long decimal */
+function fmtHours(h: unknown): string {
+  const m = Math.round((Number(h) || 0) * 60)
+  return m % 60 === 0 ? `${m / 60}h` : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`
+}
+
+const fmtDate = (d?: string) => (d ? dateMed(d) : '—')
+
+/** /invoice-view — read-only invoice someone shared with a client (no login) */
 export default function PortalPage() {
   const [payload, setPayload] = useState<Payload | null>(null)
   const [error,   setError]   = useState(false)
+  const mobile = useIsMobile()
 
   useEffect(() => {
     const p = decodePayload(window.location.hash)
@@ -27,128 +40,102 @@ export default function PortalPage() {
 
   if (error || !payload) {
     return (
-      <div style={{ minHeight: '100vh', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Arial, sans-serif' }}>
-        <div style={{ textAlign: 'center', color: '#888' }}>
-          <div style={{ fontSize: 48, marginBottom: 16, color: '#a16207' }}><IconAlert size={48} /></div>
-          <div style={{ fontSize: 20, fontWeight: 700, color: '#333' }}>Invalid invoice link</div>
-          <div style={{ fontSize: 14, marginTop: 8 }}>This link may be expired or malformed.</div>
+      <main className="set-iv__empty">
+        <div className="set-auth__card set-auth__center">
+          <span className="set-auth__icon set-auth__icon--gold"><Ic d={P.alert} size={24} /></span>
+          <div className="set-auth__head">
+            <h1 className="set-auth__title">Invalid invoice link</h1>
+            <p className="set-auth__sub">This link may be expired or malformed.</p>
+          </div>
         </div>
-      </div>
+      </main>
     )
   }
 
-  const { inv, dopRate } = payload
+  const { inv } = payload
   const total = Number(inv.subtotal) || 0
-  const dop = dopRate && dopRate > 0 ? (total * dopRate).toLocaleString('en-US', { maximumFractionDigits: 0 }) : null
+  const items = inv.items ?? []
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'Arial, Helvetica, sans-serif', color: '#111', padding: '40px 20px' }}>
-      <div style={{ maxWidth: 760, margin: '0 auto', background: '#fff', borderRadius: 12, boxShadow: '0 4px 32px rgba(0,0,0,.10)', padding: '48px 52px' }}>
+    <main className="set-iv">
+      <article className="set-iv__doc">
+        <header className="set-iv__top">
+          <div className="set-iv__brand">
+            <img className="set-iv__logo" src={`${import.meta.env.BASE_URL}yva-logo.png`} alt="YVA Staffing"
+              onError={e => { (e.target as HTMLImageElement).style.visibility = 'hidden' }} />
+            <div>
+              <div className="set-iv__company">YVA Staffing</div>
+              <div className="set-iv__tagline">Bilingual Virtual Professionals</div>
+            </div>
+          </div>
+          <div className="set-iv__id">
+            <span className="set-iv__kicker">Invoice</span>
+            <span className="set-iv__number">{inv.number}</span>
+            {inv.status && <Pill status={inv.status} />}
+          </div>
+        </header>
 
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 40 }}>
-          <img
-            src={`${import.meta.env.BASE_URL}yva-logo.png`}
-            alt="YVA Staffing"
-            style={{ height: 52 }}
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-          />
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 30, fontWeight: 900, color: '#a16207', letterSpacing: '-0.02em' }}>INVOICE</div>
-            <div style={{ fontSize: 14, color: '#888', marginTop: 4 }}>{inv.number}</div>
-            {inv.status && (
-              <div style={{ marginTop: 6, display: 'inline-block', padding: '3px 12px', borderRadius: 999, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em',
-                background: inv.status === 'paid' ? '#dcfce7' : '#fef9ec',
-                color: inv.status === 'paid' ? '#15803d' : '#92400e',
-                border: `1px solid ${inv.status === 'paid' ? '#86efac' : '#fcd34d'}` }}>
-                {inv.status}
+        <section className="set-iv__meta">
+          <div className="set-iv__block">
+            <span className="set-iv__label">Bill to</span>
+            <span className="set-iv__strong">{inv.clientName || '—'}</span>
+            {inv.clientEmail   && <span className="set-iv__line">{inv.clientEmail}</span>}
+            {inv.clientAddress && <span className="set-iv__line">{inv.clientAddress}</span>}
+          </div>
+          <div className="set-iv__block">
+            <span className="set-iv__label">Invoice details</span>
+            <span className="set-iv__line"><b>Date</b> {fmtDate(inv.date)}</span>
+            {inv.dueDate && <span className="set-iv__line"><b>Due</b> {fmtDate(inv.dueDate)}</span>}
+            {inv.billingStart && <span className="set-iv__line"><b>Period</b> {fmtDate(inv.billingStart)} – {inv.billingEnd ? fmtDate(inv.billingEnd) : ''}</span>}
+            {inv.projectName && <span className="set-iv__line"><b>Project</b> {inv.projectName}</span>}
+          </div>
+        </section>
+
+        {items.length > 0 && (mobile ? (
+          <section className="set-iv__items" aria-label="Line items">
+            {items.map((it, i) => (
+              <div key={i} className="set-iv__item">
+                <div>
+                  <div className="t-strong">{it.employeeName}</div>
+                  {it.position && <div className="set-iv__item-meta">{it.position}</div>}
+                  <div className="set-iv__item-meta">{fmtHours(it.hoursTotal)} × ${it.rate}/hr</div>
+                </div>
+                <strong className="num">{fmtMoney(it.hoursTotal * it.rate)}</strong>
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* Meta grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, marginBottom: 36 }}>
-          <div>
-            <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.07em', color: '#999', marginBottom: 6, fontWeight: 700 }}>Bill To</div>
-            <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 2 }}>{inv.clientName || '—'}</div>
-            {inv.clientEmail   && <div style={{ fontSize: 13, color: '#555' }}>{inv.clientEmail}</div>}
-            {inv.clientAddress && <div style={{ fontSize: 13, color: '#555', marginTop: 2 }}>{inv.clientAddress}</div>}
-          </div>
-          <div>
-            <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.07em', color: '#999', marginBottom: 6, fontWeight: 700 }}>Invoice Details</div>
-            <div style={{ fontSize: 13, marginBottom: 3 }}><strong>Date:</strong> {inv.date || '—'}</div>
-            {inv.billingStart && (
-              <div style={{ fontSize: 13, marginBottom: 3 }}><strong>Period:</strong> {inv.billingStart} – {inv.billingEnd || ''}</div>
-            )}
-            {inv.projectName && (
-              <div style={{ fontSize: 13 }}><strong>Project:</strong> {inv.projectName}</div>
-            )}
-          </div>
-        </div>
-
-        {/* Line items */}
-        {(inv.items ?? []).length > 0 ? (
-          <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 24 }}>
+            ))}
+          </section>
+        ) : (
+          <table className="set-iv__table">
             <thead>
-              <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
-                {['Description', 'Hours', 'Rate', 'Amount'].map((h, i) => (
-                  <th key={h} style={{ padding: '8px 10px', fontSize: 11, textTransform: 'uppercase', letterSpacing: '.06em', color: '#888', fontWeight: 700, textAlign: i === 0 ? 'left' : 'right' }}>{h}</th>
-                ))}
-              </tr>
+              <tr><th>Description</th><th className="t-num">Hours</th><th className="t-num">Rate</th><th className="t-num">Amount</th></tr>
             </thead>
             <tbody>
-              {(inv.items ?? []).map((it, i) => (
-                <tr key={i} style={{ borderBottom: '1px solid #f1f5f9' }}>
-                  <td style={{ padding: '12px 10px', fontSize: 14 }}>
-                    <strong>{it.employeeName}</strong>
-                    {it.position && <span style={{ color: '#888', fontWeight: 400 }}> — {it.position}</span>}
-                  </td>
-                  <td style={{ padding: '12px 10px', textAlign: 'right', fontSize: 14, color: '#555' }}>{it.hoursTotal}h</td>
-                  <td style={{ padding: '12px 10px', textAlign: 'right', fontSize: 14, color: '#555' }}>${it.rate}/hr</td>
-                  <td style={{ padding: '12px 10px', textAlign: 'right', fontSize: 14, fontWeight: 700 }}>{fmtMoney(it.hoursTotal * it.rate)}</td>
+              {items.map((it, i) => (
+                <tr key={i}>
+                  <td><strong>{it.employeeName}</strong>{it.position && <span className="set-iv__pos">{it.position}</span>}</td>
+                  <td className="t-num">{fmtHours(it.hoursTotal)}</td>
+                  <td className="t-num">${it.rate}/hr</td>
+                  <td className="t-num"><strong>{fmtMoney(it.hoursTotal * it.rate)}</strong></td>
                 </tr>
               ))}
             </tbody>
-            <tfoot>
-              <tr style={{ borderTop: '2px solid #111' }}>
-                <td colSpan={3} style={{ padding: '14px 10px', fontWeight: 800, fontSize: 15 }}>Total Due</td>
-                <td style={{ padding: '14px 10px', textAlign: 'right', fontWeight: 900, fontSize: 20, color: '#a16207' }}>{fmtMoney(total)}</td>
-              </tr>
-              {dop && (
-                <tr>
-                  <td colSpan={4} style={{ textAlign: 'right', fontSize: 12, color: '#aaa', paddingRight: 10, paddingBottom: 6 }}>RD${dop}</td>
-                </tr>
-              )}
-            </tfoot>
           </table>
-        ) : (
-          <div style={{ textAlign: 'center', padding: '32px 0', borderTop: '2px solid #111', borderBottom: '1px solid #e5e7eb', marginBottom: 24 }}>
-            <div style={{ fontSize: 13, color: '#888', marginBottom: 8 }}>Amount Due</div>
-            <div style={{ fontSize: 40, fontWeight: 900, color: '#a16207' }}>{fmtMoney(total)}</div>
-            {dop && <div style={{ fontSize: 13, color: '#aaa', marginTop: 4 }}>RD${dop}</div>}
-          </div>
-        )}
+        ))}
 
-        {/* Footer */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 24, borderTop: '1px solid #e5e7eb' }}>
-          <div style={{ fontSize: 12, color: '#aaa' }}>YVA Staffing · Bilingual Virtual Professionals · yvastaffing.net</div>
-          <button
-            onClick={() => window.print()}
-            style={{ padding: '8px 20px', background: '#a16207', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 13, cursor: 'pointer', color: '#111' }}
-          >
-            Print / Save PDF
+        <section className="set-iv__total">
+          <span className="set-iv__total-label">{items.length > 0 ? 'Total due' : 'Amount due'}</span>
+          <span className="set-iv__total-value">{fmtMoney(total)}</span>
+        </section>
+
+        {inv.notes && <p className="set-iv__notes">{inv.notes}</p>}
+
+        <footer className="set-iv__foot">
+          <span>YVA Staffing · Bilingual Virtual Professionals · yvastaffing.net</span>
+          <button type="button" className="btn btn--primary set-iv__print" onClick={() => window.print()}>
+            <Ic d={P.printer} size={15} /> Print / Save PDF
           </button>
-        </div>
-      </div>
-
-      <style>{`
-        @media print {
-          button { display: none !important; }
-          body { background: #fff !important; padding: 0; }
-          div[style*="boxShadow"] { box-shadow: none !important; }
-        }
-      `}</style>
-    </div>
+        </footer>
+      </article>
+    </main>
   )
 }

@@ -31,3 +31,10 @@ export function sendInvoiceEmail(inv: Invoice, settings: AppSettings): Promise<S
   const body = applyInvoiceTemplate(settings.invoiceEmailTemplate || DEFAULT_INVOICE_EMAIL, inv, settings)
   return sendEmail(inv.clientEmail || '', subject, body, { name: `invoice-${inv.number}.html`, content: invoiceHtmlFor(inv, settings), mimeType: 'text/html' })
 }
+
+/** Payment reminder for an unpaid invoice (no attachment, as before) */
+export function sendReminderEmail(inv: Invoice, settings: AppSettings): Promise<SendEmailResult> {
+  const subject = `Payment Reminder — Invoice ${inv.number} — ${settings.companyName || 'YVA Staffing'}`
+  const body = applyInvoiceTemplate(settings.reminderEmailTemplate || DEFAULT_REMINDER_EMAIL, inv, settings)
+  return sendEmail(inv.clientEmail || '', subject, body)
+}
