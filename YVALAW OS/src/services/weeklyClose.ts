@@ -24,7 +24,7 @@ export async function loadWeekCloses(): Promise<{ rows: WeekClose[]; error: stri
   return { rows: (data || []).map(r => toClose(r as Record<string, unknown>)), error: null }
 }
 
-export async function callWeekClose(action: 'prepare' | 'approve', weekStart: string): Promise<unknown> {
+export async function callWeekClose(action: 'prepare' | 'approve' | 'preview', weekStart: string): Promise<unknown> {
   const { data: { session } } = await supabase.auth.getSession()
   const res = await fetch('/.netlify/functions/week-close', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}) },
     body: JSON.stringify({ action, weekStart }) })

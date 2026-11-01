@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePermission, useRole } from '../context/RoleContext'
-import { addActivity, completeActivity, convertLead, deleteLead, loadActivities, loadLeads, loadStaff, saveLead, STAGES, updateLead, type Lead, type LeadActivity, type LeadStage } from '../services/crm'
+import { addActivity, completeActivity, convertLead, deleteLead, importLeads, loadActivities, loadLeads, loadStaff, saveLead, STAGES, updateLead, type Lead, type LeadActivity, type LeadStage } from '../services/crm'
 import { localParts } from '../utils/moneyRules'
+import { csvToLeads } from '../utils/csv'
 
 const SERVICES = ['Legal Intake', 'Legal Assistants', 'Demand Writing', 'Case Managers', 'Other']
 const KIND_LABEL: Record<LeadActivity['kind'], string> = { note: 'Note', call: 'Call', email: 'Email', meeting: 'Meeting', whatsapp: 'WhatsApp', follow_up: 'Follow-up', system: 'YVA OS' }
@@ -33,6 +34,24 @@ export default function LeadsPage() {
   useEffect(() => { setMine(!canAll) }, [canAll])
 
   async function load() { const r = await loadLeads(); setLeads(r.rows); setError(r.error) }
+  // Import older leads from a CSV (Netlify → Forms → lead-backup → Download as CSV, or any spreadsheet with name/email columns)
+  const importInput = useRef<HTMLInputElement>(null)
+  const [importing, setImporting] = useState(false)
+  const [importMsg, setImportMsg] = useState<string | null>(null)
+  async function importCsv(file: File) {
+    setImportMsg(null); setError(null)
+    try {
+      const { leads: rows, columns } = csvToLeads(await file.text())
+      if (!rows.length) { setError('No leads found in that file. It needs a header row with at least a name or email column.'); return }
+      if (!window.confirm(`Import ${rows.length} lead${rows.length === 1 ? '' : 's'} from "${file.name}"?\nColumns used: ${columns.join(', ')}.\nPeople already in your list are skipped.`)) return
+      setImporting(true)
+      let added = 0
+      for (let i = 0; i < rows.length; i += 500) added += await importLeads(rows.slice(i, i + 500))
+      setImportMsg(`${added} lead${added === 1 ? '' : 's'} added${rows.length - added ? ` · ${rows.length - added} already in the list (or repeated in the file) skipped` : ''}.`)
+      await load()
+    } catch (e) { setError(`Import failed: ${(e as Error).message}`) }
+    setImporting(false)
+  }
   useEffect(() => { void load(); void loadStaff().then(setStaff) }, [])
   useEffect(() => { if (open?.id) void loadActivities(open.id).then(setActs); else setActs([]) }, [open?.id])
 
@@ -86,10 +105,15 @@ export default function LeadsPage() {
         <div className="page-header-actions">
           <input aria-label="Search leads" className="form-input" style={{ width: 200 }} placeholder="Search leads…" value={search} onChange={e => setSearch(e.target.value)} />
           {canAll && <div className="view-toggle"><button className={`view-toggle-btn${!mine ? ' active' : ''}`} onClick={() => setMine(false)}>All</button><button className={`view-toggle-btn${mine ? ' active' : ''}`} onClick={() => setMine(true)}>Mine</button></div>}
+          {allowed('leads.manage') && <>
+            <input ref={importInput} type="file" accept=".csv,text/csv" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void importCsv(f) }} />
+            <button className="btn-ghost" disabled={importing} onClick={() => importInput.current?.click()} title="Add older leads from a CSV file, e.g. Netlify → Forms → lead-backup → Download as CSV">{importing ? 'Importing…' : 'Import CSV'}</button>
+          </>}
           <button className="btn-primary" onClick={() => setOpen(empty())}>+ New lead</button>
         </div>
       </div>
       {error && <div className="portal-message portal-message-error" style={{ marginBottom: 12 }}>{error}</div>}
+      {importMsg && <div className="portal-message" style={{ marginBottom: 12, background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', borderRadius: 10, padding: '10px 14px' }}>{importMsg}</div>}
       <div className="lead-board">
         {STAGES.map(s => {
           const list = totals(s.key), value = list.reduce((x, l) => x + (Number(l.value_monthly) || 0), 0)

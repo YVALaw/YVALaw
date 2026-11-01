@@ -40,7 +40,11 @@ export default function WeeklyClosePage() {
   const [editing, setEditing] = useState<{ employeeId: string; target: string; day: string; mode: 'edit' | 'move' } | null>(null)
   const [adjForm, setAdjForm] = useState({ minutes: '', note: '' })
 
-  const close = closes.find(c => c.weekStart === weekStart) ?? null
+  // The week in progress can be previewed (nothing saved); it closes for real on Monday 12:05 am
+  const thisWeek = addDays(lastFinishedWeek(), 7)
+  const isCurrent = weekStart === thisWeek
+  const [previewData, setPreviewData] = useState<{ close: WeekClose; invoices: Invoice[] } | null>(null)
+  const close = isCurrent ? previewData?.close ?? null : closes.find(c => c.weekStart === weekStart) ?? null
   async function loadAll() {
     const r = await loadWeekCloses()
     setCloses(r.rows); setError(r.error)
@@ -49,10 +53,23 @@ export default function WeeklyClosePage() {
     setInvoices(inv); setBlocks(b); setAdjustments(a)
   }
   useEffect(() => { void loadEmployees().then(setEmployees); void loadProjects().then(setProjects); void loadSettings().then(setSettings) }, [])
-  useEffect(() => { void loadAll() }, [weekStart])   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setPreviewData(null); void loadAll() }, [weekStart])   // eslint-disable-line react-hooks/exhaustive-deps
 
   async function run(action: 'prepare' | 'approve') {
     setBusy(action); setMsg(null); setError(null)
+    if (isCurrent) {
+      try {
+        const r = await callWeekClose('preview', weekStart) as { summary: WeekClose['summary']; flags: WeekFlag[]; payroll: WeekClose['payroll']
+          invoices: { clientName: string; projectName: string; subtotal: number; items: Invoice['items'] }[] }
+        setPreviewData({
+          close: { id: 'preview', weekStart, weekEnd: addDays(weekStart, 6), status: 'ready', preparedAt: new Date().toISOString(), approvedAt: null, summary: r.summary, flags: r.flags, payroll: r.payroll },
+          invoices: r.invoices.map((inv, i) => ({ id: `preview-${i}`, number: '(not created yet)', clientName: inv.clientName, projectName: inv.projectName, subtotal: inv.subtotal, items: inv.items, status: 'draft' } as unknown as Invoice)),
+        })
+        await loadAll()
+      } catch (e) { setError((e as Error).message) }
+      setBusy(null)
+      return
+    }
     try {
       await callWeekClose(action, weekStart)
       setMsg(action === 'prepare' ? 'Prepared — invoices and flags are up to date.' : 'Week approved. Hours are final; invoices are ready to send.')
@@ -162,22 +179,23 @@ export default function WeeklyClosePage() {
   }
 
   const s = close?.summary ?? {}
-  const drafts = invoices.filter(i => (i.status || 'draft') === 'draft')
-  const weekOptions = [...new Set([lastFinishedWeek(), ...closes.map(c => c.weekStart)])].sort().reverse()
+  const shown = isCurrent ? previewData?.invoices ?? [] : invoices
+  const drafts = isCurrent ? [] : invoices.filter(i => (i.status || 'draft') === 'draft')
+  const weekOptions = [...new Set([thisWeek, lastFinishedWeek(), ...closes.map(c => c.weekStart)])].sort().reverse()
 
   return (
     <div className="page-wrap">
       <div className="page-header">
         <div className="page-header-left">
           <h1 className="page-title">Weekly close</h1>
-          <p className="page-sub">{rangeLabel(weekStart)} · {close ? (close.status === 'approved' ? 'Approved' : 'Ready for review') : 'Not prepared yet'}{close?.preparedAt ? ` · prepared ${new Date(close.preparedAt).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' })}` : ''}</p>
+          <p className="page-sub">{rangeLabel(weekStart)} · {isCurrent ? 'Week in progress — preview only' : close ? (close.status === 'approved' ? 'Approved' : 'Ready for review') : 'Not prepared yet'}{close?.preparedAt ? ` · prepared ${new Date(close.preparedAt).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' })}` : ''}</p>
         </div>
         <div className="page-header-actions" style={{ flexWrap: 'wrap' }}>
           <select className="form-select" aria-label="Week" value={weekStart} onChange={e => setWeekStart(e.target.value)} style={{ width: 'auto' }}>
-            {weekOptions.map(w => <option key={w} value={w}>{rangeLabel(w)}</option>)}
+            {weekOptions.map(w => <option key={w} value={w}>{w === thisWeek ? `This week so far (${rangeLabel(w)})` : rangeLabel(w)}</option>)}
           </select>
-          <button className="btn-ghost" disabled={!!busy} onClick={() => void run('prepare')}>{busy === 'prepare' ? 'Preparing…' : close ? 'Prepare again' : 'Prepare this week'}</button>
-          {close && close.status !== 'approved' && <button className="btn-primary" disabled={!!busy} onClick={() => void run('approve')}>{busy === 'approve' ? 'Approving…' : 'Approve week'}</button>}
+          <button className="btn-ghost" disabled={!!busy} onClick={() => void run('prepare')}>{busy === 'prepare' ? (isCurrent ? 'Loading…' : 'Preparing…') : isCurrent ? (close ? 'Refresh preview' : 'Preview this week') : close ? 'Prepare again' : 'Prepare this week'}</button>
+          {close && !isCurrent && close.status !== 'approved' && <button className="btn-primary" disabled={!!busy} onClick={() => void run('approve')}>{busy === 'approve' ? 'Approving…' : 'Approve week'}</button>}
           {close && drafts.length > 0 && allowed('invoices.send') && <button className="btn-primary" disabled={!!busy} onClick={() => void sendAll()}>{busy === 'send-all' ? 'Sending…' : `Send all (${drafts.length})`}</button>}
         </div>
       </div>
@@ -186,16 +204,20 @@ export default function WeeklyClosePage() {
       {msg && <div className="portal-message" style={{ marginBottom: 12, background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', borderRadius: 10, padding: '10px 14px' }}>{msg}</div>}
       {lateCount > 0 && <div className="data-card" style={{ borderLeft: '4px solid #d97706', marginBottom: 12, fontSize: 14 }}>{lateCount} block{lateCount === 1 ? '' : 's'} of time arrived after this week was prepared. <button className="btn-ghost btn-sm" onClick={() => void run('prepare')}>Prepare again</button></div>}
 
+      {isCurrent && <div className="data-card" style={{ borderLeft: '4px solid var(--brand)', marginBottom: 12, fontSize: 14 }}>
+        This week isn't over yet, so this is a <strong>preview</strong>: nothing is saved, no invoices are created and nothing can be approved or sent.
+        The week closes automatically on Monday at 12:05 am (Dominican time).</div>}
+
       {!close ? (
         <div className="data-card" style={{ fontSize: 14, color: 'var(--muted)' }}>
-          This week hasn't been prepared. It happens automatically every Monday at 12:05 am (Dominican time), or press <strong>Prepare this week</strong>.
+          {isCurrent ? <>Press <strong>Preview this week</strong> to see the invoices, flags and payroll so far.</> : <>This week hasn't been prepared. It happens automatically every Monday at 12:05 am (Dominican time), or press <strong>Prepare this week</strong>.</>}
         </div>
       ) : (
         <>
           <div className="filter-tabs" style={{ marginBottom: 14 }}>
             {(['summary', 'invoices', 'time', 'flags', 'payroll'] as Tab[]).map(t => (
               <button key={t} className={`filter-tab${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
-                {t === 'summary' ? 'Summary' : t === 'invoices' ? `Invoices (${invoices.length})` : t === 'time' ? 'Time' : t === 'flags' ? `Flags (${close.flags.length})` : 'Payroll preview'}
+                {t === 'summary' ? 'Summary' : t === 'invoices' ? `Invoices (${shown.length})` : t === 'time' ? 'Time' : t === 'flags' ? `Flags (${close.flags.length})` : 'Payroll preview'}
               </button>
             ))}
           </div>
@@ -214,7 +236,7 @@ export default function WeeklyClosePage() {
               <table className="data-table">
                 <thead><tr><th>Invoice</th><th>Client</th><th style={{ textAlign: 'right' }}>Hours</th><th style={{ textAlign: 'right' }}>Total</th><th>Status</th><th></th></tr></thead>
                 <tbody>
-                  {invoices.map(inv => {
+                  {shown.map(inv => {
                     const hours = (inv.items || []).reduce((x, it) => x + (Number(it.hoursTotal) || 0), 0)
                     return (
                       <tr key={inv.id}>
@@ -224,14 +246,14 @@ export default function WeeklyClosePage() {
                         <td style={{ textAlign: 'right', fontWeight: 700 }}>{usd(Number(inv.subtotal) || 0)}</td>
                         <td><span className={`badge ${inv.status === 'paid' ? 'badge-green' : inv.status === 'partial' ? 'badge-orange' : inv.status === 'sent' ? 'badge-blue' : 'badge-gray'}`}>{inv.status || 'draft'}</span></td>
                         <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                          <button className="btn-ghost btn-sm" onClick={() => preview(inv)}>Preview</button>
-                          {(inv.status || 'draft') === 'draft' && allowed('invoices.send') && <button className="btn-ghost btn-sm" style={{ marginLeft: 6 }} disabled={!!busy} onClick={() => void sendOne(inv)}>{busy === `send-${inv.id}` ? 'Sending…' : 'Send'}</button>}
+                          {!isCurrent && <button className="btn-ghost btn-sm" onClick={() => preview(inv)}>Preview</button>}
+                          {!isCurrent && (inv.status || 'draft') === 'draft' && allowed('invoices.send') && <button className="btn-ghost btn-sm" style={{ marginLeft: 6 }} disabled={!!busy} onClick={() => void sendOne(inv)}>{busy === `send-${inv.id}` ? 'Sending…' : 'Send'}</button>}
                           {inv.status && inv.status !== 'draft' && <button className="btn-ghost btn-sm" style={{ marginLeft: 6 }} onClick={() => setPaying(inv)}>Payments</button>}
                         </td>
                       </tr>
                     )
                   })}
-                  {invoices.length === 0 && <tr><td colSpan={6} className="td-muted">No billable client time this week.</td></tr>}
+                  {shown.length === 0 && <tr><td colSpan={6} className="td-muted">No billable client time this week.</td></tr>}
                 </tbody>
               </table>
             </div>

@@ -66,6 +66,13 @@ export async function convertLead(lead: Lead, p: { clientName: string; projectNa
   return { clientId, projectId }
 }
 
+/** Add older leads in one go (skips people already in the list; no notifications). Returns how many were added. */
+export async function importLeads(rows: import('../utils/csv').ImportedLead[]): Promise<number> {
+  const { data, error } = await supabase.rpc('import_leads', { p_rows: rows })
+  if (error) throw new Error(error.code === 'PGRST202' ? 'Run supabase/migrate-step9-crm.sql again to turn on importing.' : error.message)
+  return Number(data) || 0
+}
+
 export async function loadContacts(clientId: string): Promise<{ rows: Contact[]; error: string | null }> {
   const { data, error } = await supabase.from('contacts').select('*').eq('client_id', clientId).order('created_at')
   return { rows: (data || []) as Contact[], error: missing(error) }

@@ -83,6 +83,8 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
+  -- Bulk import (import_leads) doesn't send one notification per old lead
+  IF coalesce(current_setting('yva.importing_leads', true), '') = 'on' THEN RETURN NULL; END IF;
   IF TG_OP = 'INSERT' THEN
     PERFORM private.notify_permission('leads.manage', 'lead_new',
       'New lead: ' || NEW.name || coalesce(' (' || nullif(NEW.company, '') || ')', ''),
@@ -98,6 +100,47 @@ END
 $$;
 DROP TRIGGER IF EXISTS leads_notify ON public.leads;
 CREATE TRIGGER leads_notify AFTER INSERT OR UPDATE OF owner_id ON public.leads FOR EACH ROW EXECUTE FUNCTION private.leads_notify();
+
+-- Import older leads (e.g. the CSV Netlify → Forms → Download gives) in one go: skips anyone
+-- already in the list (same email; without an email: same name + phone), sends no notifications.
+CREATE OR REPLACE FUNCTION public.import_leads(p_rows jsonb)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = public
+AS $$
+DECLARE
+  n integer;
+BEGIN
+  IF NOT private.has_permission('leads.manage') THEN
+    RAISE EXCEPTION 'Only people who manage leads can import them' USING ERRCODE = '42501';
+  END IF;
+  PERFORM set_config('yva.importing_leads', 'on', true);
+  WITH src AS (
+    SELECT left(coalesce(nullif(trim(r.name), ''), nullif(trim(r.email), ''), 'Unknown'), 200) AS name,
+           left(lower(nullif(trim(r.email), '')), 254) AS email, left(nullif(trim(r.phone), ''), 50) AS phone,
+           nullif(trim(r.company), '') AS company, nullif(trim(r.website), '') AS website, nullif(trim(r.service), '') AS service,
+           left(nullif(trim(r.message), ''), 5000) AS message, coalesce(nullif(trim(r.source), ''), 'Imported') AS source,
+           coalesce(r.created_at, now()) AS created_at, coalesce(r.sms_consent, false) AS sms_consent
+    FROM jsonb_to_recordset(p_rows) AS r(name text, email text, phone text, company text, website text, service text,
+                                         message text, source text, created_at timestamptz, sms_consent boolean)
+  ), one AS (
+    SELECT DISTINCT ON (coalesce(email, lower(name) || '|' || coalesce(phone, ''))) *
+    FROM src ORDER BY coalesce(email, lower(name) || '|' || coalesce(phone, '')), created_at
+  )
+  INSERT INTO public.leads (name, email, phone, company, website, service, message, source, created_at, sms_consent, stage)
+  SELECT o.name, o.email, o.phone, o.company, o.website, o.service, o.message, o.source, o.created_at, o.sms_consent, 'new'
+  FROM one o
+  WHERE NOT EXISTS (SELECT 1 FROM public.leads l
+                    WHERE (o.email IS NOT NULL AND lower(l.email) = o.email)
+                       OR (o.email IS NULL AND lower(l.name) = lower(o.name) AND coalesce(l.phone, '') = coalesce(o.phone, '')));
+  GET DIAGNOSTICS n = ROW_COUNT;
+  PERFORM set_config('yva.importing_leads', 'off', true);
+  RETURN n;
+END
+$$;
+REVOKE ALL ON FUNCTION public.import_leads(jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.import_leads(jsonb) TO authenticated;
 
 -- ── Activities + follow-ups ─────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.lead_activities (

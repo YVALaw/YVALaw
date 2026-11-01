@@ -2,10 +2,11 @@
  * week-close — POST, staff with the weekly_close.manage permission (CEO by default).
  *   { action: 'prepare', weekStart? }  prepare (or prepare again) a week; default = last finished week
  *   { action: 'approve', weekStart }   approve all the week's hours (week_close_approve, as the caller)
+ *   { action: 'preview', weekStart }   the current week so far, nothing saved
  * Invoices are sent from the browser with the caller's Gmail (Weekly close → Send).
  */
 const { callerFromEvent, hasPermission, json } = require('./_lib/supa.cjs')
-const { prepareWeek, lastWeekStart } = require('./_lib/weekclose.cjs')
+const { prepareWeek, previewWeek, lastWeekStart } = require('./_lib/weekclose.cjs')
 
 async function rpcAsCaller(event, name, args) {
   const h = event.headers || {}
@@ -31,10 +32,11 @@ exports.handler = async function handler(event) {
     const weekStart = body.weekStart || lastWeekStart()
     if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStart)) return json(400, { error: 'weekStart must be YYYY-MM-DD' })
     if (body.action === 'prepare') return json(200, await prepareWeek(weekStart, { by: user.id }))
+    if (body.action === 'preview') return json(200, await previewWeek(weekStart))
     if (body.action === 'approve') return json(200, await rpcAsCaller(event, 'week_close_approve', { p_week_start: weekStart }))
     return json(400, { error: 'Unknown action' })
   } catch (e) {
     console.error('week-close', e)
-    return json(e.message?.includes('not over') || e.message?.includes('Monday') ? 400 : 500, { error: e.message })
+    return json(e.message?.includes('not over') || e.message?.includes('Monday') || e.message?.includes('not started') ? 400 : 500, { error: e.message })
   }
 }

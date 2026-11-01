@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import PlacementRates from '../components/PlacementRates'
 import { PAY_SCHEDULES, type PaySchedule } from '../utils/moneyRules'
 import RecordHistory from '../components/RecordHistory'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import type { Client, Contract, ContractStatus, Employee, Expense, Invoice, Project, Task, TaskStatus } from '../data/types'
 import { loadSnapshot, saveProjects, loadTasks, saveTasks, loadExpenses, saveExpenses } from '../services/storage'
 import { formatMoney } from '../utils/money'
@@ -66,6 +66,8 @@ export default function ProjectProfilePage() {
   const project = projects.find(p => p.id === id)
 
   const [editing, setEditing] = useState(false)
+  // "Edit" on the Projects page opens this page in edit mode (?edit=1): all settings live here
+  const [params, setParams] = useSearchParams()
   const [form, setForm] = useState({
     name: '', rate: '', budget: '', clientId: '', status: 'planning',
     billingModel: 'hourly', startDate: '', endDate: '', notes: '',
@@ -100,6 +102,7 @@ export default function ProjectProfilePage() {
         supervisorName: project.supervisorName ?? '', supervisorEmail: project.supervisorEmail ?? '',
         supervisorPhone: project.supervisorPhone ?? '', employeeInstructions: project.employeeInstructions ?? '',
       })
+      if (params.get('edit') === '1') { setEditing(true); setParams({}, { replace: true }) }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.id])

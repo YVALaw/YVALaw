@@ -232,6 +232,33 @@ function buildWeek(ctx) {
   return { invoices: [...invoices.values()], flags, payroll, label: prettyRange(weekStart, weekEnd) }
 }
 
+/**
+ * The week so far, without saving anything (no invoices, no week_closes row): lets you check the
+ * current week before it closes on Monday. "No time" only counts days that are already over.
+ */
+async function previewWeek(weekStart, { now = Date.now() } = {}) {
+  if (M.weekdayOf(weekStart) !== 1) throw new Error('A week starts on Monday')
+  const ctx = await loadContext(weekStart)
+  const today = M.localParts(now, ctx.tz).date
+  if (weekStart > today) throw new Error('That week has not started yet')
+  const built = buildWeek({ ...ctx, close: null })
+  const flags = built.flags.flatMap(f => {
+    if (f.kind !== 'no_time') return [f]
+    const days = f.days.filter(d => d < today)
+    return days.length ? [{ ...f, days, message: f.message.replace(/no time on .*$/, `no time on ${days.map(d => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short' })).join(', ')}`) }] : []
+  })
+  const invoices = built.invoices.map(inv => ({
+    clientName: inv.client.name, projectName: [...inv.projects].sort().join(', '), subtotal: inv.subtotal, seconds: inv.seconds,
+    items: inv.items.map(({ projectId, ...it }) => it),
+  }))
+  const summary = {
+    label: built.label, invoices: invoices.length, total: M.round2(invoices.reduce((t, i) => t + i.subtotal, 0)),
+    billableSeconds: built.invoices.reduce((t, i) => t + i.seconds, 0),
+    people: built.payroll.length, payrollTotal: M.round2(built.payroll.reduce((t, p) => t + p.amount, 0)), flags: flags.length,
+  }
+  return { preview: true, weekStart, weekEnd: ctx.weekEnd, summary, flags, payroll: built.payroll, invoices }
+}
+
 /** Load, build and save a week. by = user id (or null for the Sunday job). */
 async function prepareWeek(weekStart, { by = null, now = Date.now() } = {}) {
   if (M.weekdayOf(weekStart) !== 1) throw new Error('A week starts on Monday')
@@ -302,4 +329,4 @@ async function prepareWeek(weekStart, { by = null, now = Date.now() } = {}) {
   return { weekStart, weekEnd: ctx.weekEnd, closeId: close.id, summary, flags: built.flags, payroll: built.payroll, invoices: results }
 }
 
-module.exports = { prepareWeek, buildWeek, loadContext, lastWeekStart, termsDays, hoursToHM }
+module.exports = { prepareWeek, previewWeek, buildWeek, loadContext, lastWeekStart, termsDays, hoursToHM }
