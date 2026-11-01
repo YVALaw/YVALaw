@@ -23,7 +23,7 @@ const en = {
   backToMore: 'More',
   status: { approved: 'approved', waiting: 'not approved yet' },
   home: {
-    trackingNow: 'Tracking now', notTracking: 'Not tracking right now', lastActive: 'Last active', today: 'Today',
+    trackingNow: 'Tracking now', notTracking: 'Not tracking right now', lastActive: 'Last active', lastOn: 'on', today: 'Today',
     payday: 'Next payday', hoursWeek: 'Hours this week', ofTarget: (target: string) => `of ${target} target`,
     nextHoliday: 'Next holiday', noHoliday: 'None coming up', requestsWaiting: 'Requests waiting', noneWaiting: 'Nothing waiting',
     notices: 'Notices', getApp: 'Download YVA Time for Windows',
@@ -85,7 +85,7 @@ const es: Dict = {
   backToMore: 'Más',
   status: { approved: 'aprobadas', waiting: 'sin aprobar' },
   home: {
-    trackingNow: 'Registrando ahora', notTracking: 'No estás registrando tiempo', lastActive: 'Última actividad', today: 'Hoy',
+    trackingNow: 'Registrando ahora', notTracking: 'No estás registrando tiempo', lastActive: 'Última actividad', lastOn: 'en', today: 'Hoy',
     payday: 'Próximo pago', hoursWeek: 'Horas esta semana', ofTarget: (target: string) => `de ${target} de meta`,
     nextHoliday: 'Próximo feriado', noHoliday: 'Ninguno próximo', requestsWaiting: 'Solicitudes pendientes', noneWaiting: 'Nada pendiente',
     notices: 'Avisos', getApp: 'Descargar YVA Time para Windows',

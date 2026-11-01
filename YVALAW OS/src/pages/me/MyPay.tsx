@@ -8,6 +8,7 @@ export type Earnings = {
   today: { date: string; seconds: number; amount: number }
   trackingNow?: boolean
   lastActivityAt?: string | null
+  lastActivityOn?: string | null
   periods: { key: string; label: string; schedule: string; start: string; end: string; payday: string; seconds: number; premiumSeconds: number
              amount: number; approvedAmount: number; pendingAmount: number; payRate: number; missingRate: boolean }[]
   totals: { seconds: number; amount: number; approvedAmount: number }

@@ -33,6 +33,13 @@ If you ever re-run the YVA Time phase 2 script, run `migrate-step4-weekly-close.
 **Netlify → Forms:** if you have an email notification on the `lead-backup` form, add one for the new
 `application-backup` form too (careers applications when EmailJS is blocked). They also land in YVA OS → Candidates.
 
+## 2b. After the redesign (November) is live — 3 more small scripts
+
+Same way as step 1, in this order (each is safe to run again):
+1. `supabase/migrate-redesign-portal.sql` — "Request more staff" saves how many people and which project
+2. `supabase/migrate-redesign-finance.sql` — receipts on expenses
+3. `supabase/migrate-redesign-people.sql` — scheduled announcements notify the team when they go live
+
 ## 3. Connect Gmail (for invoices, payslips and automatic emails)
 
 1. Google Cloud Console → your OAuth client (Web application) → **Authorized redirect URIs** → add

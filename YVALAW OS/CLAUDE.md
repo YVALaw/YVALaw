@@ -6,6 +6,15 @@
 ## Roadmap
 **`PLAN.md`** (agreed 2026-10-31, not built yet): automatic weekly close (tracked hours → one combined draft invoice per client), live employee earnings, Friday payroll in DOP, per-person bill/pay rates (from the old CRM YVALaw/YVA-OS), permissions + change history, Gmail sending, notifications (bell + email + phone), installable "YVA OS" phone app, My workspace redesign, CRM. Read it before starting any of that work — it lists every decision Hans made.
 
+## UI redesign (2026-11) — read `REDESIGN.md` before touching any screen
+- The whole UI follows the owner's mockup `design_handoff_yva_os_redesign` (Geist/Geist Mono, navy + gold, floating dock). **Design system:** `src/styles/ds.css` (tokens + primitives, BEM-ish `.btn.btn--primary`), `src/components/ui/index.tsx` (PageHeader, Card, KpiStrip, Segmented, Tabs, Chips, Field, Drawer, Modal, Sheet, Menu, Pill/toneFor, Banner, Avatar, Skel, useIsMobile…), icons `<Ic d={P.name} />` in `components/Icon.tsx`, formatters `src/utils/format.ts`. Screen CSS lives per hub in `src/styles/<hub>.css` with a class prefix (`home- fin- crm- ops- ppl- set- por- mw-`). No inline styles except dynamic values. The legacy `styles.css` was cut to the rules still in use (586 lines).
+- **Shell** (`components/Shell.tsx`, `styles/shell.css`): breadcrumb header, bell, account menu (My profile, Settings, Preview client portal with a client picker, Open employee workspace, Install app, Sign out), navy dock with hubs Home / CRM / Finance / Operations / People, hub pop-ups (desktop) / bottom sheets (phone) with live status lines (`services/hubStatus.ts`), "/" search palette (pages + records), gold + Create menu, sibling chips above every hub page. IA and visibility rules: `src/lib/nav.ts` (same rules as the old sidebar). Phone (<760px): bottom dock, the header shows the page title, `PageHeader` hides its H1 unless `keepTitleOnPhone`.
+- **Deep links:** `?create=` (invoice, payment, lead, client, project, manual time, employee, expense) open each page's create flow; `/invoice?open=<id>`, `/invoice?edit=<id>`, `/invoice?create=invoice&project=<id>`, `/leads?open=<id>`, `/clients/:id?tab=`, `/projects/:id?tab=|?edit=1`, `/settings?tab=`, `/time?tab=`.
+- New routes: `/` = `HomePage` (role KPIs, Needs attention, This week, pipeline, tracking now, 6-month chart with goal), `/reports` = Reports (Finance hub; everything the old dashboard had), `/me` for staff with a linked employee (`EmployeeWorkspace staffView`, gold banner).
+- Saved views (Clients, Invoices) are per user in `localStorage` (`yva_views_clients`, `yva_views_invoices`).
+- New SQL (run after the step scripts): `migrate-redesign-portal.sql` (staff_requests headcount/project), `migrate-redesign-finance.sql` (expense receipts), `migrate-redesign-people.sql` (announcements notify when a scheduled post goes live; with the `announcements-publish` scheduled function). Re-run `migrate-redesign-people.sql` after re-running step 7.
+- Browser tests per hub: scratchpad `redesign-<hub>-ui.cjs` (the old `step*-ui.cjs` target the old markup and are retired).
+
 ## Tech Stack
 - React 18 + TypeScript + Vite
 - React Router v6

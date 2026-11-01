@@ -116,7 +116,7 @@ export default function InvoicePage() {
     if (loading) return
     const create = params.get('create'), open = params.get('open'), edit = params.get('edit'), q = params.get('q')
     if (!create && !open && !edit && !q) return
-    if (create === 'invoice') openBuilder()
+    if (create === 'invoice') openBuilder(params.get('project') || undefined)
     if (create === 'payment') { setPickQ(''); setPickPayment(true) }
     if (open) { const inv = invoices.find(i => i.id === open); if (inv) setPreviewInv(inv); else fail('That invoice was not found — it may have been deleted.') }
     if (edit) { const inv = invoices.find(i => i.id === edit); if (inv) openEditInvoice(inv) }

@@ -97,7 +97,7 @@ export function MeHome({ e, lang, go, earnings, earningsError }: { e: MyEmployee
           <span className="mw-status__title">{tracking ? t.home.trackingNow : t.home.notTracking}</span>
           <span className="mw-status__sub">
             {earningsError && !earnings ? t.home.earningsError : <>
-              {!tracking && earnings?.lastActivityAt && <>{t.home.lastActive} {new Date(earnings.lastActivityAt).toLocaleString(locale(lang), { weekday: 'short', hour: 'numeric', minute: '2-digit' })} · </>}
+              {!tracking && earnings?.lastActivityAt && <>{t.home.lastActive} {new Date(earnings.lastActivityAt).toLocaleString(locale(lang), { weekday: 'short', hour: 'numeric', minute: '2-digit' })}{earnings.lastActivityOn ? ` ${t.home.lastOn} ${earnings.lastActivityOn}` : ''} · </>}
               {earnings ? <>{t.home.today} {hm(earnings.today.seconds)} · {money(earnings.today.amount, null)}</> : '…'}
             </>}
           </span>

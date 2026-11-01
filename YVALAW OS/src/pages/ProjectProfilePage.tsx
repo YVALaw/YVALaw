@@ -213,7 +213,7 @@ export default function ProjectProfilePage() {
       <button type="button" className="back-link" onClick={() => navigate('/projects')}><Ic d={P.chevL} size={14} /> Projects</button>
       <PageHeader keepTitleOnPhone title={<span className="ops-title-row">{projectNN.name}<Pill tone={st.tone}>{st.label}</Pill></span>} sub={sub} actions={<>
         <button type="button" className="btn" onClick={openEdit}>Edit project</button>
-        {can.viewInvoices(role) && <button type="button" className="btn btn--primary" onClick={() => navigate('/invoice?create=invoice')}>New invoice</button>}
+        {can.viewInvoices(role) && <button type="button" className="btn btn--primary" onClick={() => navigate(`/invoice?create=invoice&project=${encodeURIComponent(projectNN.id)}`)}>New invoice</button>}
         <Menu label="More project actions" items={[{ label: 'Delete project', danger: true, icon: P.trash, onClick: () => setConfirmDelete(true) }]} />
       </>} />
 

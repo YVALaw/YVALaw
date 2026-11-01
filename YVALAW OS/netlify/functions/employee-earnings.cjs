@@ -91,6 +91,8 @@ exports.handler = async function handler(event) {
       // the desktop app uploads about once a minute while tracking
       lastActivityAt: blocks.reduce((m, b) => (b.updated_at && b.updated_at > m ? b.updated_at : m), '') || null,
       trackingNow: blocks.some(b => b.updated_at && now - Date.parse(b.updated_at) < 3 * 60_000),
+      // what they last worked on (project name or YVA work type), for "Last active … on …"
+      lastActivityOn: (() => { const last = blocks.reduce((m, b) => (b.updated_at && (!m || b.updated_at > m.updated_at) ? b : m), null); return last ? (last.project_id ? projectsById[last.project_id]?.name ?? null : last.work_type || null) : null })(),
       periods,
       totals: { seconds: periods.reduce((s, p) => s + p.seconds, 0), amount: M.round2(periods.reduce((s, p) => s + p.amount, 0)), approvedAmount: M.round2(periods.reduce((s, p) => s + p.approvedAmount, 0)) },
       paid: paid.map(p => ({ payday: p.payday, netUsd: Number(p.net_usd), netDop: p.net_dop == null ? null : Number(p.net_dop), paidAt: p.paid_at })),

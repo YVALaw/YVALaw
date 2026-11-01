@@ -170,6 +170,9 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 
 ## Things Completed
 
+### Session 14 (YVA OS full UI/UX redesign — `YVALAW OS/REDESIGN.md`)
+- Owner's mockup implemented across the staff OS (floating dock, hubs, search, Create menu, new Home + Reports), client portal and My workspace; every existing feature kept, plus saved views, bulk invoice status, expense receipts, scheduled announcements, estimate → invoice, project-aware new invoice. 3 small SQL scripts (`YVALAW OS/SETUP-AFTER-BUILD.md` §2b). Careers page uses contact@ and saves applications to YVA OS first.
+
 ### Session 13 (YVA OS automation & growth plan — Steps 0–9, `YVALAW OS/PLAN.md`)
 - **Merged and live 2026-11-01** (PR #5); YVA Time **0.4.0 published** the same day (installed apps update themselves). Owner checklist: `YVALAW OS/SETUP-AFTER-BUILD.md` (6 SQL scripts, Gmail, phone notifications, one-time data, publish the app).
 - Step 0 screenshots (60-day retention, full size in the app, upload warnings, log file, My screenshots) · 1 foundation (safe saving, permissions, change history, notifications bell/email/phone push, installable "YVA OS" app) · 2 per-person bill/pay rates from a date · 3 live earnings in My workspace · 4 Monday weekly close (one invoice per client, flags, approve, send) · 5 client payments · 6 Friday payroll (DOP rate, payslips, bank/PayPal, bonuses that don't come back) · 7 My workspace redesign in Spanish/English (time off, client instructions, documents, announcements) · 8 phone pass · 9 CRM (website leads → pipeline, follow-ups, won → client + project, client contacts and health, careers → Candidates).
