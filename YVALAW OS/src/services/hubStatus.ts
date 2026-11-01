@@ -2,7 +2,7 @@
 // gold dot on hubs where something needs action. Cheap queries only, each one allowed to fail
 // (RLS hides tables from roles that can't see them), cached for a minute.
 import { supabase } from '../lib/supabase'
-import { loadSnapshot, countPendingStaffRequests } from './storage'
+import { countPendingStaffRequests } from './storage'
 import { addDays, localParts, mondayOf, DEFAULT_TZ } from '../utils/moneyRules'
 import { dateShort, usdShort } from '../utils/format'
 
@@ -10,7 +10,8 @@ export type PageStatus = { stat: string; warn?: boolean; badge?: number }
 export type HubStatus = Record<string, PageStatus>
 
 let cache: { at: number; keys: string; value: HubStatus } | null = null
-export function invalidateHubStatus() { cache = null }
+let pending: { keys: string; p: Promise<HubStatus> } | null = null
+export function invalidateHubStatus() { cache = null; pending = null }
 
 const safe = async <T,>(fn: () => Promise<T>): Promise<T | null> => { try { return await fn() } catch { return null } }
 const count = async (q: PromiseLike<{ count: number | null; error: unknown }>) => { const r = await q; if (r.error) throw r.error; return r.count ?? 0 }
@@ -18,18 +19,45 @@ const count = async (q: PromiseLike<{ count: number | null; error: unknown }>) =
 export async function loadHubStatus(keys: string[]): Promise<HubStatus> {
   const k = keys.slice().sort().join(',')
   if (cache && cache.keys === k && Date.now() - cache.at < 60_000) return cache.value
+  // Navigating while the first check is still running reuses it instead of starting another
+  if (pending && pending.keys === k) return pending.p
+  const p = computeHubStatus(keys, k)
+  pending = { keys: k, p }
+  try { return await p } finally { if (pending?.p === p) pending = null }
+}
+
+async function computeHubStatus(keys: string[], k: string): Promise<HubStatus> {
   const has = (key: string) => keys.includes(key)
   const today = localParts(Date.now(), DEFAULT_TZ).date
   const monday = mondayOf(today)
   const out: HubStatus = {}
-  const snap = await safe(() => loadSnapshot())
+  // Only the few columns the status lines need (not the full lists, which carry invoice lines, notes, photos…)
+  const cols = async <T,>(table: string, select: string, filter?: (q: any) => any): Promise<T[] | null> => safe(async () => { // eslint-disable-line @typescript-eslint/no-explicit-any
+    let q = supabase.from(table).select(select)
+    if (filter) q = filter(q)
+    const { data, error } = await q
+    if (error) throw error
+    return (data || []) as T[]
+  })
+  const [clientRows, projectRows, employeeRows, invoiceRows] = await Promise.all([
+    has('clients') ? cols<{ status?: string; contract_end?: string }>('clients', 'status,contract_end') : null,
+    has('projects') ? cols<{ status?: string }>('projects', 'status') : null,
+    has('team') ? cols<{ status?: string }>('employees', 'status') : null,
+    has('invoices') ? cols<{ status?: string; subtotal?: number; amount_paid?: number; due_date?: string }>('invoices', 'status,subtotal,amount_paid,due_date', q => q.in('status', ['sent', 'viewed', 'overdue', 'partial'])) : null,
+  ])
+  const snap = {
+    clients: (clientRows || []).map(c => ({ status: c.status, contractEnd: c.contract_end })),
+    projects: projectRows || [],
+    employees: employeeRows || [],
+    invoices: (invoiceRows || []).map(i => ({ status: i.status, subtotal: i.subtotal, amountPaid: i.amount_paid, dueDate: i.due_date })),
+  }
 
   await Promise.all([
     has('leads') && safe(async () => {
       const due = await count(supabase.from('leads').select('id', { count: 'exact', head: true }).lte('next_follow_up', today).not('stage', 'in', '(won,lost)'))
       out.leads = due ? { stat: `${due} follow-up${due === 1 ? '' : 's'} due`, warn: true, badge: due } : { stat: 'No follow-ups due' }
     }),
-    has('clients') && snap && (async () => {
+    has('clients') && clientRows && (async () => {
       const active = snap.clients.filter(c => String(c.status || 'active').toLowerCase() === 'active').length
       const ending = snap.clients.filter(c => c.contractEnd && c.contractEnd >= today && c.contractEnd <= addDays(today, 60)).length
       out.clients = { stat: `${active} active${ending ? ` · ${ending} contract${ending === 1 ? '' : 's'} ending` : ''}`, warn: ending > 0 }
@@ -50,7 +78,7 @@ export async function loadHubStatus(keys: string[]): Promise<HubStatus> {
         : st === 'approved' ? { stat: `Prepares Monday ${dateShort(addDays(monday, 7))}, 12:05 am` }
         : { stat: 'Prepares Monday 12:05 am' }
     }),
-    has('invoices') && snap && (async () => {
+    has('invoices') && invoiceRows && (async () => {
       const open = snap.invoices.filter(i => ['sent', 'viewed', 'overdue', 'partial'].includes(String(i.status || '').toLowerCase()))
       const overdue = open.filter(i => String(i.status).toLowerCase() === 'overdue' || (i.dueDate && i.dueDate < today)).length
       const total = open.reduce((s, i) => s + (Number(i.subtotal) || 0) - (Number(i.amountPaid) || 0), 0)
@@ -67,7 +95,7 @@ export async function loadHubStatus(keys: string[]): Promise<HubStatus> {
       out.expenses = { stat: `${usdShort(total)} this month` }
     }),
     has('reports') && (async () => { out.reports = { stat: 'Revenue, AR aging, forecast' } })(),
-    has('projects') && snap && (async () => {
+    has('projects') && projectRows && (async () => {
       const active = snap.projects.filter(p => !['completed', 'cancelled', 'archived', 'closed'].includes(String(p.status || '').toLowerCase())).length
       out.projects = { stat: `${active} active` }
     })(),
@@ -83,7 +111,7 @@ export async function loadHubStatus(keys: string[]): Promise<HubStatus> {
       const n = await count(supabase.from('time_off_requests').select('id', { count: 'exact', head: true }).eq('status', 'approved').lte('start_date', sunday).gte('end_date', monday))
       out.calendar = { stat: n ? `${n} time off this week` : 'No time off this week' }
     }),
-    has('team') && snap && (async () => {
+    has('team') && employeeRows && (async () => {
       const n = snap.employees.filter(e => !['inactive', 'terminated'].includes(String(e.status || '').toLowerCase())).length
       out.team = { stat: `${n} people` }
     })(),

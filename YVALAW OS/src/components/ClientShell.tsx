@@ -1,13 +1,13 @@
 // Client portal shell (redesign 2026-11, designs/Client Portal.dc.html): header with the page name and the
 // client's name, avatar menu (Settings, Sign out), floating navy dock with six items (bottom dock on phones),
 // and the gold staff-preview banner. Preview keeps ?preview=<clientId> on every link (portalNav).
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { signOutAndForgetDevice } from '../services/notifications'
 import { loadPortalClient } from '../services/portalStorage'
 import { useRole } from '../context/RoleContext'
 import { Ic, P } from './Icon'
-import { useIsMobile } from './ui'
+import { PageLoading, useIsMobile } from './ui'
 import { initials } from '../utils/format'
 
 type Props = { children: ReactNode; previewClientId?: string }
@@ -104,7 +104,7 @@ export default function ClientShell({ children, previewClientId }: Props) {
       </header>
 
       <main className="por-main" id="portal-main">
-        {children}
+        <Suspense fallback={<PageLoading />}>{children}</Suspense>
       </main>
 
       <nav className={`dock por-dock${mobile ? ' por-dock--phone' : ''}`} aria-label="Portal">

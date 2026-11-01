@@ -237,6 +237,19 @@ export function Skel({ w = '100%', h = 14, r }: { w?: number | string; h?: numbe
   return <span className="skel" style={{ display: 'block', width: w, height: h, borderRadius: r }} aria-hidden />
 }
 
+/** Shown for the moment a screen's code is still downloading (React.lazy) */
+export function PageLoading() {
+  return (
+    <div className="page" aria-busy="true" aria-label="Loading">
+      <Skel w={220} h={26} r={6} />
+      <span className="page-loading__gap" />
+      <Skel h={84} r={12} />
+      <span className="page-loading__gap" />
+      <Skel h={260} r={12} />
+    </div>
+  )
+}
+
 /* ── Overlays (rendered in a portal so page layout never clips them) ── */
 
 function Portal({ children }: { children: ReactNode }) {

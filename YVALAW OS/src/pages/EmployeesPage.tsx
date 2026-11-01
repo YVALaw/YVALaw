@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { uploadFile } from '../services/fileStorage'
 import type { Attachment, Client, Employee, Invoice, Project } from '../data/types'
 import { loadSnapshot, saveEmployees, loadEmployeeCounter, saveEmployeeCounter } from '../services/storage'
 import { formatMoney } from '../utils/money'
@@ -86,12 +87,11 @@ export default function EmployeesPage() {
   function handleFileUpload(file: File) {
     const MAX = 5 * 1024 * 1024
     if (file.size > MAX) { alert('File too large (max 5 MB). For videos, paste a link in Resume URL instead.'); return }
-    const reader = new FileReader()
-    reader.onload = ev => {
-      const att: Attachment = { id: uid(), name: file.name, mimeType: file.type, size: file.size, dataUrl: ev.target?.result as string, uploadedAt: Date.now() }
+    // Uploaded to Storage; the record keeps only the link (files inside records slow every list)
+    void uploadFile(file, 'employees/uploads').then(({ storageUrl, storagePath }) => {
+      const att: Attachment = { id: uid(), name: file.name, mimeType: file.type, size: file.size, dataUrl: '', storageUrl, storagePath, uploadedAt: Date.now() }
       setAttachments(prev => [...prev, att])
-    }
-    reader.readAsDataURL(file)
+    }).catch(e => alert(`Could not upload ${file.name}: ${(e as Error).message}`))
   }
 
   async function saveForm() {

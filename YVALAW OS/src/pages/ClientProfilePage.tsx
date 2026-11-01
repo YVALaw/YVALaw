@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { uploadPhoto } from '../utils/photo'
 import ClientContacts from '../components/ClientContacts'
 import HistoryList from '../components/HistoryList'
 import type { ActivityLogEntry, Client, ClientDocument, Invoice, Project, StaffRequest, Tag } from '../data/types'
@@ -102,9 +103,10 @@ export default function ClientProfilePage() {
   function handlePhotoUpload(file: File) {
     if (!file.type.startsWith('image/')) { setMsg({ ok: false, text: 'Please select an image file.' }); return }
     if (file.size > 5 * 1024 * 1024) { setMsg({ ok: false, text: 'Image too large (max 5 MB).' }); return }
-    const reader = new FileReader()
-    reader.onload = ev => { void persistUpdate({ ...clientNN, photoUrl: ev.target?.result as string }).then(() => setMsg({ ok: true, text: 'Photo updated.' })).catch(() => {}) }
-    reader.readAsDataURL(file)
+    // Stored as a small file in Storage; the record keeps only the link (utils/photo.ts)
+    void uploadPhoto(file, `photos/clients/${clientNN.id}`)
+      .then(url => persistUpdate({ ...clientNN, photoUrl: url }).then(() => setMsg({ ok: true, text: 'Photo updated.' })))
+      .catch(e => setMsg({ ok: false, text: `Could not upload the photo: ${(e as Error).message}` }))
   }
   async function handleDelete() {
     const prev = clients

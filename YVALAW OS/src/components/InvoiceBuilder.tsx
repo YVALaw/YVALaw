@@ -1,3 +1,4 @@
+import { clearReadCache } from '../lib/readCache'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { loadRatesForInvoicing, rateClient, rateEmployee, rateProject, type PlacementRate } from '../services/rates'
 import { localParts, resolveRates } from '../utils/moneyRules'
@@ -113,6 +114,8 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
   const [settings,  setSettings]  = useState<AppSettings>({ usdToDop: 0, companyName: '', companyEmail: '', emailSignature: '' })
 
   useEffect(() => {
+    // Numbering and rates must come from the database as it is now, not a kept copy (lib/readCache.ts)
+    clearReadCache()
     void loadSnapshot().then(snap => {
       setEmployees(snap.employees)
       setClients(snap.clients)

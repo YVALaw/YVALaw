@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { uploadPhoto } from '../utils/photo'
 import EmployeePayRates from '../components/EmployeePayRates'
 import EmployeePayoutMethod from '../components/EmployeePayoutMethod'
 import EmployeeDocuments from '../components/EmployeeDocuments'
@@ -139,14 +140,12 @@ export default function EmployeeProfilePage() {
   function handlePhotoUpload(file: File) {
     if (!file.type.startsWith('image/')) { alert('Please select an image file.'); return }
     if (file.size > 5 * 1024 * 1024) { alert('Image too large (max 5 MB).'); return }
-    const reader = new FileReader()
-    reader.onload = ev => {
-      const url = ev.target?.result as string
-      const prev = photoUrl
+    // Stored as a small file in Storage; the record keeps only the link (utils/photo.ts)
+    const prev = photoUrl
+    void uploadPhoto(file, `photos/employees/${empNN.id}`).then(url => {
       setPhotoUrl(url)
-      void persistUpdate({ ...empNN, photoUrl: url, attachments }, 'Photo updated.').then(ok => { if (!ok) setPhotoUrl(prev) })
-    }
-    reader.readAsDataURL(file)
+      return persistUpdate({ ...empNN, photoUrl: url, attachments }, 'Photo updated.').then(ok => { if (!ok) setPhotoUrl(prev) })
+    }).catch(e => alert(`Could not upload the photo: ${(e as Error).message}`))
   }
 
   function handleFileUpload(file: File) {

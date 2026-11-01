@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { cachedRead, clearReadCache, LIST_MS } from '../lib/readCache'
 import { fetchAllPages } from '../lib/pages'
 import type {
   ActivityLogEntry, AppSettings, Candidate, CommEntryType, DataSnapshot,
@@ -59,6 +60,9 @@ function remember(table: string, items: object[], scope?: (row: Row) => boolean)
 }
 
 async function fetchAll<T>(table: string): Promise<T[]> {
+  return cachedRead(`all:${table}`, () => fetchAllNow<T>(table))
+}
+async function fetchAllNow<T>(table: string): Promise<T[]> {
   const { data, error } = await fetchAllPages<Record<string, unknown>>((from, to) => supabase.from(table).select('*').order('created_at').order('id').range(from, to))
   if (error) { console.error('fetchAll(%s)', table, error); return [] }
   const items = (data || []).map(row => toCamel<T>(row as Record<string, unknown>))
@@ -150,6 +154,9 @@ export async function saveProjects(projects: Project[]): Promise<void> {
 // ─── Invoices ─────────────────────────────────────────────────────────────────
 
 export async function loadInvoices(): Promise<Invoice[]> {
+  return cachedRead('all:invoices', loadInvoicesNow)
+}
+async function loadInvoicesNow(): Promise<Invoice[]> {
   const { data, error } = await fetchAllPages<Record<string, unknown>>((from, to) => supabase
     .from('invoices')
     .select('*')
@@ -245,10 +252,13 @@ export async function saveInvoiceTemplates(templates: InvoiceTemplate[]): Promis
 
 // ─── Counters ─────────────────────────────────────────────────────────────────
 
+/** The live invoice counter — always read from the database (used when a new invoice number is taken) */
 export async function loadInvoiceCounter(): Promise<number> {
   const { data } = await supabase.from('counters').select('value').eq('key', 'invoice').single()
   return (data as { value: number } | null)?.value ?? 1
 }
+/** The counter for display in the snapshot only (kept a minute, so pages don't wait on it) */
+const loadInvoiceCounterForDisplay = () => cachedRead('counter:invoice:display', loadInvoiceCounter, LIST_MS)
 export async function saveInvoiceCounter(n: number): Promise<void> {
   const { error } = await supabase.from('counters').update({ value: n }).eq('key', 'invoice')
   if (error) throw new Error(`saveInvoiceCounter failed: ${error.message}`)
@@ -279,6 +289,9 @@ const DEFAULT_SETTINGS: AppSettings = {
 }
 
 export async function loadSettings(): Promise<AppSettings> {
+  return cachedRead('settings', loadSettingsNow).then(s => ({ ...s }))
+}
+async function loadSettingsNow(): Promise<AppSettings> {
   const { data, error } = await supabase.from('settings').select('*').eq('id', 1).single()
   if (error || !data) return DEFAULT_SETTINGS
   const row = data as Record<string, unknown>
@@ -348,26 +361,29 @@ export async function saveSettings(s: AppSettings): Promise<void> {
 }
 
 // ─── Snapshot cache ───────────────────────────────────────────────────────────
+// The lists themselves are shared and kept a minute by lib/readCache.ts (cleared by any write). The old
+// separate 2-minute snapshot copy is gone: it was only cleared by some saves, so payments or server
+// actions could leave it stale.
 
-let _snapCache: { data: DataSnapshot; at: number } | null = null
-const SNAP_TTL = 120_000 // 2 minutes
+export function invalidateSnapshotCache() { clearReadCache() }
 
-export function invalidateSnapshotCache() { _snapCache = null }
+/** Main lists read in the background after sign-in and on each keep-warm pass, so pages open from memory even before
+ *  they were first visited (lib/readCache.ts). A failure here is ignored — the page loads it again. */
+export async function warmUpLists(): Promise<void> {
+  await Promise.allSettled([loadSnapshot(), loadSettings(), loadCandidates(), loadEstimates(), loadActivityLog(), loadStaffRequests(), import('./tagStorage').then(m => m.loadTags())])
+}
 
 // ─── Snapshot (loads all core data in parallel) ───────────────────────────────
 
 export async function loadSnapshot(): Promise<DataSnapshot> {
-  if (_snapCache && Date.now() - _snapCache.at < SNAP_TTL) return _snapCache.data
   const [employees, projects, clients, invoices, invoiceCounter] = await Promise.all([
     loadEmployees(),
     loadProjects(),
     loadClients(),
     loadInvoices(),
-    loadInvoiceCounter(),
+    loadInvoiceCounterForDisplay(),
   ])
-  const data = { employees, projects, clients, invoices, invoiceCounter }
-  _snapCache = { data, at: Date.now() }
-  return data
+  return { employees, projects, clients, invoices, invoiceCounter }
 }
 
 /** @deprecated — use loadSnapshot() */
@@ -469,6 +485,9 @@ export async function removeClientDocument(id: string): Promise<void> {
 // ─── Staff Requests ───────────────────────────────────────────────────────────
 
 export async function loadStaffRequests(): Promise<StaffRequest[]> {
+  return cachedRead('staff_requests', loadStaffRequestsNow)
+}
+async function loadStaffRequestsNow(): Promise<StaffRequest[]> {
   const { data, error } = await supabase
     .from('staff_requests')
     .select('*')
