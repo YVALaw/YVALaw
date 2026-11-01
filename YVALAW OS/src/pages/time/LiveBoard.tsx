@@ -1,4 +1,7 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { useRole } from '../../context/RoleContext'
+import { can } from '../../lib/roles'
 import type { Employee, Project } from '../../data/types'
 import { loadEmployees, loadProjects } from '../../services/storage'
 import { activityColor, blocksActivity, loadTrackerBlocks, type TrackerBlock } from '../../services/trackerStorage'
@@ -8,6 +11,9 @@ const LIVE_WINDOW_MS = 3 * 60_000     // the app uploads about once a minute whi
 
 function startOfToday(): number { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime() }
 function hm(seconds: number): string { return `${Math.floor(seconds / 3600)}h ${String(Math.floor((seconds % 3600) / 60)).padStart(2, '0')}m` }
+function dayInput(ms: number): string {
+  const d = new Date(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 function clock(ms: number): string { return new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) }
 
 type Row = { employee: Employee; seconds: number; activity: number | null; latest: TrackerBlock | null; tracking: boolean }
@@ -19,6 +25,8 @@ export default function LiveBoard() {
   const [blocks,    setBlocks]    = useState<TrackerBlock[]>([])
   const [loadedAt,  setLoadedAt]  = useState(0)
   const [filter,    setFilter]    = useState<'all' | 'client' | 'yva'>('all')
+  const { role } = useRole()
+  const showShots = can.viewScreenshots(role)
 
   useEffect(() => {
     void loadEmployees().then(setEmployees)
@@ -96,6 +104,11 @@ export default function LiveBoard() {
                     <span className={`badge ${employee.worksFor === 'yva' ? 'badge-yellow' : 'badge-blue'}`} style={{ marginLeft: 8, fontSize: 10 }}>
                       {employee.worksFor === 'yva' ? 'YVA team' : 'Client team'}
                     </span>
+                    {showShots && employee.worksFor !== 'yva' && seconds > 0 && (
+                      <div><Link to={`/time?tab=screens&employee=${employee.id}&day=${dayInput(Date.now())}`} style={{ fontSize: 12, fontWeight: 600, color: 'var(--gold)' }}>
+                        View screenshots
+                      </Link></div>
+                    )}
                   </td>
                   <td>
                     {tracking

@@ -90,7 +90,7 @@ export default function SignupPage() {
             onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
           />
           <div style={{ fontSize: 26, fontWeight: 900, color: 'var(--text)', letterSpacing: '-.02em' }}>
-            YVA LawOS
+            YVA OS
           </div>
           <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 5 }}>
             Create your account

@@ -70,9 +70,10 @@ exports.handler = async function handler(event) {
     const e = rows?.[0]
     if (!e) return json(404, { error: 'No employee profile is linked to this login' })
 
+    // Supervisor + instructions (Step 7) when those columns exist; older databases fall back
     const projectRows = await supabaseGet(
-      `projects?employee_ids=cs.${enc(JSON.stringify([e.id]))}&select=id,name,client_id,status&order=name`,
-    )
+      `projects?employee_ids=cs.${enc(JSON.stringify([e.id]))}&select=id,name,client_id,status,supervisor_name,supervisor_email,supervisor_phone,employee_instructions&order=name`,
+    ).catch(() => supabaseGet(`projects?employee_ids=cs.${enc(JSON.stringify([e.id]))}&select=id,name,client_id,status&order=name`))
     const clientIds = [...new Set(projectRows.map(p => p.client_id).filter(Boolean))]
     const clientRows = clientIds.length
       ? await supabaseGet(`clients?id=in.(${clientIds.map(enc).join(',')})&select=id,name`)
@@ -102,6 +103,9 @@ exports.handler = async function handler(event) {
         name:       p.name,
         clientName: clientName[String(p.client_id)] ?? null,
         status:     p.status ?? null,
+        supervisor: p.supervisor_name || p.supervisor_email || p.supervisor_phone
+          ? { name: p.supervisor_name ?? null, email: p.supervisor_email ?? null, phone: p.supervisor_phone ?? null } : null,
+        instructions: p.employee_instructions ?? null,
       })),
     })
   } catch (err) {

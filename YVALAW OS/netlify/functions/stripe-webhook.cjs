@@ -283,6 +283,18 @@ exports.handler = async function handler(event) {
       }))
     }
 
+    // Client payments record (Step 5). external_ref makes Stripe retries count once; a missing
+    // table (migration not run yet) or a duplicate is ignored. The invoice is still marked paid below.
+    if (amountPaid > 0 && obj?.id) {
+      const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY
+      await fetch(`${url}/rest/v1/client_payments?on_conflict=external_ref`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${key}`, apikey: key, 'Content-Type': 'application/json', Prefer: 'resolution=ignore-duplicates,return=minimal' },
+        body: JSON.stringify({ invoice_id: invoiceId, client_id: clientId || null, amount: amountPaid, method: 'card', source: 'stripe',
+          external_ref: obj.id, reference: obj.id, paid_on: new Date().toISOString().slice(0, 10), created_by: null }),
+      }).catch(err => console.warn('stripe-webhook: client_payments insert skipped', err?.message))
+    }
+
     const ok = await supabasePatch('invoices', `id=eq.${invoiceId}`, {
       status:      'paid',
       amount_paid: totalPaid,

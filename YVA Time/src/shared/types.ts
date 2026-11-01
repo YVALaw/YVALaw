@@ -43,6 +43,7 @@ export type Snapshot = {
   idleReview: IdleReview | null
   lastShot: LastShot | null
   online: boolean
+  uploadProblem: string | null        // screenshots waiting to upload: the last error (online but failing)
   lastSavedAt: number | null          // last successful upload
   pending: { blocks: number; screenshots: number }
   workTypes: string[]
@@ -69,5 +70,7 @@ export type YvaApi = {
   deleteScreenshot(): Promise<void>
   openWorkspace(): Promise<void>
   openAddTime(): Promise<void>
+  openLastShot(screen: number): Promise<void>
+  openLogFile(): Promise<void>
   installUpdate(): Promise<void>
 }

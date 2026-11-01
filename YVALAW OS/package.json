@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "TZ=America/Santo_Domingo node --experimental-strip-types --no-warnings --test tests/*.test.ts"
   },
   "dependencies": {
     "@stripe/stripe-js": "^9.1.0",

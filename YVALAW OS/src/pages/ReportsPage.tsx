@@ -9,6 +9,7 @@ import {
 } from '../services/reportsService'
 import { formatMoney, fmtHoursHM } from '../utils/money'
 import { loadSettings, loadGeneralExpenses, loadCandidates } from '../services/storage'
+import { loadPayments } from '../services/payments'
 import type { AppSettings, Candidate, DataSnapshot, Expense, Invoice } from '../data/types'
 import { useRole } from '../context/RoleContext'
 import { can } from '../lib/roles'
@@ -17,7 +18,7 @@ import {
   IconX, IconBriefcase, IconUsers, IconBuilding, IconInbox,
   IconFileText, IconAlert, IconCheck, IconTrendUp, IconTrendDown,
   IconDollar, IconClock, IconBarChart, IconPieChart, IconTarget,
-  IconCalendar, IconZap, IconFlag, IconShield, IconAward,
+  IconCalendar, IconZap, IconFlag, IconShield, IconAward, IconWallet,
 } from '../components/Icon'
 
 function downloadCSV(filename: string, rows: string[][]): void {
@@ -171,10 +172,16 @@ function PipelineBar({ stages, counts }: { stages: string[]; counts: Record<stri
 export default function ReportsPage() {
   const { role } = useRole()
   const navigate = useNavigate()
+  // Payments received in the date range (client_payments, Step 5); null until loaded / table missing
+  const [collected, setCollected] = useState<number | null>(null)
   const [kpiDrill, setKpiDrill] = useState<string | null>(null)
   const [preset, setPreset] = useState<Preset>('month')
   const [from, setFrom] = useState<string>(getCurrentMonthRange().from)
   const [to, setTo]     = useState<string>(getCurrentMonthRange().to)
+  useEffect(() => {
+    if (!can.viewOwnerStats(role)) return
+    void loadPayments({ from: from || undefined, to: to || undefined }).then(r => setCollected(r.error ? null : r.rows.reduce((x, p) => x + p.amount, 0)))
+  }, [from, to, role])
 
   // Invoice history filters
   const [hClient,  setHClient]  = useState('')
@@ -745,6 +752,9 @@ export default function ReportsPage() {
           <div className="kpi-grid">
             {can.viewOwnerStats(role) && (
               <KpiCard icon={<IconDollar size={20} />} value={formatMoney(computed.totalBilled)} label="Total Billed" color="var(--text)" onClick={() => setKpiDrill('billed')} />
+            )}
+            {can.viewOwnerStats(role) && collected !== null && (
+              <KpiCard icon={<IconWallet size={20} />} value={formatMoney(collected)} label="Collected (payments received)" color="#059669" />
             )}
             <KpiCard icon={<IconClock size={20} />} value={fmtHoursHM(computed.totalHours)} label="Total Hours" color="#2563eb" onClick={() => setKpiDrill('hours')} />
             {can.viewOwnerStats(role) && (

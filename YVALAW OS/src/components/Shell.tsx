@@ -1,8 +1,9 @@
 import { ReactNode, useEffect, useRef, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { loadSnapshot, loadCandidates, countPendingStaffRequests } from '../services/storage'
-import { useRole } from '../context/RoleContext'
+import { usePermission, useRole } from '../context/RoleContext'
 import { can, ROLE_LABELS } from '../lib/roles'
+import NotificationBell from './NotificationBell'
 
 type Props = { children: ReactNode }
 
@@ -124,6 +125,10 @@ const navSections = [
         icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
       },
       {
+        to: '/leads', label: 'Leads', end: false,
+        icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>,
+      },
+      {
         to: '/estimates', label: 'Estimates', end: false,
         icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
       },
@@ -139,6 +144,14 @@ const navSections = [
       {
         to: '/invoice', label: 'Invoices', end: false,
         icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>,
+      },
+      {
+        to: '/weekly-close', label: 'Weekly close', end: false,
+        icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 16 11 18 15 14"/></svg>,
+      },
+      {
+        to: '/payroll', label: 'Payroll', end: false,
+        icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg>,
       },
       {
         to: '/expenses', label: 'Expenses', end: false,
@@ -171,6 +184,14 @@ const navSections = [
         icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>,
       },
       {
+        to: '/approvals', label: 'Approvals', end: false,
+        icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>,
+      },
+      {
+        to: '/announcements', label: 'Announcements', end: false,
+        icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>,
+      },
+      {
         to: '/candidates', label: 'Candidates', end: false,
         icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>,
       },
@@ -200,12 +221,13 @@ function PageTitle({ pathname }: { pathname: string }) {
       if (match || (item.to === '/' && pathname === '/')) return <span>{item.label}</span>
     }
   }
-  return <span>YVA LawOS</span>
+  return <span>YVA OS</span>
 }
 
 export default function Shell({ children }: Props) {
   const location = useLocation()
   const { role, email } = useRole()
+  const allowed = usePermission()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const linkedEmployeeId = sessionStorage.getItem('linkedEmployeeId')
   const [pendingRequests, setPendingRequests] = useState(0)
@@ -221,9 +243,14 @@ export default function Shell({ children }: Props) {
   }
 
   // Routes that are not yet built show a "coming soon" placeholder
-  const builtRoutes = ['/', '/invoice', '/clients', '/employees', '/candidates', '/projects', '/expenses', '/settings', '/estimates', '/time', '/calendar', '/requests']
+  const builtRoutes = ['/', '/leads', '/weekly-close', '/payroll', '/approvals', '/announcements', '/invoice', '/clients', '/employees', '/candidates', '/projects', '/expenses', '/settings', '/estimates', '/time', '/calendar', '/requests']
 
   function isVisible(to: string) {
+    if (to === '/weekly-close') return allowed('weekly_close.manage')
+    if (to === '/leads')        return role === 'ceo' || role === 'admin' || role === 'lead_gen' || allowed('leads.view_all') || allowed('leads.manage')
+    if (to === '/payroll')      return allowed('payroll.view') || allowed('payroll.manage')
+    if (to === '/approvals')    return allowed('timeoff.approve') || can.approveTime(role)
+    if (to === '/announcements') return allowed('announcements.manage')
     if (to === '/invoice')    return can.viewInvoices(role)
     if (to === '/clients')    return can.viewClients(role)
     if (to === '/employees')  return can.viewEmployees(role)
@@ -242,8 +269,8 @@ export default function Shell({ children }: Props) {
         <div className="sidebar-brand">
           <img src={`${import.meta.env.BASE_URL}yva-logo.png`} alt="YVA" className="sidebar-brand-logo" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
           <div>
-            <div className="sidebar-brand-name">YVA LawOS</div>
-            <div className="sidebar-brand-sub">Law Operations</div>
+            <div className="sidebar-brand-name">YVA OS</div>
+            <div className="sidebar-brand-sub">YVA Staffing</div>
           </div>
         </div>
 
@@ -320,13 +347,36 @@ export default function Shell({ children }: Props) {
         </div>
         <div className="topbar-actions">
           <GlobalSearch />
-          <div className="topbar-badge">Live</div>
+          <NotificationBell />
         </div>
       </header>
 
       <main className="main-content" id="main-content">
         {children}
       </main>
+
+      {/* Phones: bottom tabs for the main sections; "More" opens the full menu */}
+      <nav className="staff-tabs" aria-label="Main">
+        {[
+          { to: '/', label: 'Home', end: true, show: true, d: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z' },
+          allowed('weekly_close.manage')
+            ? { to: '/weekly-close', label: 'Week', end: false, show: true, d: 'M3 4h18v18H3zM16 2v4M8 2v4M3 10h18M9 16l2 2 4-4' }
+            : { to: '/invoice', label: 'Invoices', end: false, show: can.viewInvoices(role), d: 'M1 4h22v16H1zM1 10h22' },
+          { to: '/time', label: 'Time', end: false, show: true, d: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM12 6v6l4 2' },
+          (allowed('payroll.view') || allowed('payroll.manage'))
+            ? { to: '/payroll', label: 'Payroll', end: false, show: true, d: 'M2 6h20v12H2zM12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z' }
+            : { to: '/employees', label: 'Team', end: false, show: can.viewEmployees(role), d: 'M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM20 21a8 8 0 1 0-16 0' },
+        ].filter(x => x.show).map(x => (
+          <NavLink key={x.to} to={x.to} end={x.end} className={({ isActive }) => `staff-tab${isActive ? ' active' : ''}`}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={x.d} /></svg>
+            <span>{x.label}</span>
+          </NavLink>
+        ))}
+        <button className="staff-tab" onClick={() => setSidebarOpen(true)}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
+          <span>More</span>
+        </button>
+      </nav>
     </div>
   )
 }

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { loadRatesForInvoicing, rateClient, rateEmployee, rateProject, type PlacementRate } from '../services/rates'
+import { localParts, resolveRates } from '../utils/moneyRules'
 import type { AppSettings, Client, Employee, Invoice, InvoiceItem, InvoiceTemplate, Project } from '../data/types'
 import {
   loadInvoiceCounter, loadInvoices, loadSettings,
@@ -110,7 +112,9 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
     })
     void loadInvoiceTemplates().then(setTemplates)
     void loadSettings().then(setSettings)
+    void loadRatesForInvoicing().then(setPlacementRates)   // without rates.manage: bill rates + positions only
   }, [])
+  const [placementRates, setPlacementRates] = useState<PlacementRate[]>([])
 
   const [clientId,     setClientId]     = useState('')
   const [projectId,    setProjectId]    = useState(initialProjectId || '')
@@ -197,8 +201,23 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
     return Math.max(project.nextInvoiceSeq ?? 1, 1)
   }
 
+  /** Bill rate (client) and pay rate (employee) for this person on the selected project — two chains that never cross */
+  function ratesFor(emp: Employee | undefined) {
+    return resolveRates({
+      employee: emp ? rateEmployee(emp) : null,
+      project: selectedProject ? rateProject(selectedProject) : null,
+      client: selectedClient ? rateClient(selectedClient) : null,
+      rates: placementRates,
+      day: billingStart || localParts(Date.now()).date,
+    })
+  }
+
+  /** The row's employee, with the pay rate that applies on this project (placement → dated → base) */
   function rowEmployee(row: BuilderRow) {
-    return employees.find(e => e.id === row.employeeId) || employees.find(e => e.name === row.employeeName)
+    const emp = employees.find(e => e.id === row.employeeId) || employees.find(e => e.name === row.employeeName)
+    if (!emp) return emp
+    const pay = ratesFor(emp).pay.rate
+    return pay ? { ...emp, payRate: pay } : emp
   }
 
   function effectiveShift(row: BuilderRow) {
@@ -283,14 +302,14 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
 
   function handleEmpSelect(rowId: string, name: string) {
     const emp = employees.find(e => e.name === name)
-    // Use the project billing rate for client invoices; fall back to employee pay rate if no project rate set
-    const billingRate = selectedProject?.rate != null && selectedProject.rate !== ''
-      ? String(selectedProject.rate)
-      : emp?.payRate != null ? String(emp.payRate) : ''
+    // Client bill rate: placement → project → client default. Never the employee's pay rate
+    // (that would invoice the client at cost); empty = type one in.
+    const r = ratesFor(emp)
     updateRow(rowId, {
       employeeId: emp?.id,
       employeeName: name,
-      rate: billingRate,
+      rate: r.bill.rate ? String(r.bill.rate) : '',
+      position: r.position,
       shiftStart: emp?.defaultShiftStart || '',
       shiftEnd: emp?.defaultShiftEnd || '',
     })
@@ -322,9 +341,8 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
         if (!row) {
           const emp = employees.find(e => e.id === employeeId)
           row = {
-            ...emptyRow(), employeeId, employeeName: emp?.name ?? g.name, position: emp?.role ?? '',
-            rate: selectedProject?.rate != null && selectedProject.rate !== '' ? String(selectedProject.rate)
-              : emp?.payRate != null ? String(emp.payRate) : '',
+            ...emptyRow(), employeeId, employeeName: emp?.name ?? g.name, position: ratesFor(emp).position,
+            rate: ratesFor(emp).bill.rate ? String(ratesFor(emp).bill.rate) : '',
             shiftStart: emp?.defaultShiftStart || '', shiftEnd: emp?.defaultShiftEnd || '',
           }
           next.push(row)

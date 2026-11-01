@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react'
+import { signOutAndForgetDevice } from '../services/notifications'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useRole } from '../context/RoleContext'
@@ -36,7 +37,7 @@ export default function ClientShell({ children, previewClientId }: Props) {
   const isPreview = Boolean(previewClientId)
 
   async function handleSignOut() {
-    await supabase.auth.signOut()
+    await signOutAndForgetDevice()
     navigate('/login')
   }
 

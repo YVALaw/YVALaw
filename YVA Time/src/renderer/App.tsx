@@ -74,7 +74,7 @@ function Consent() {
         <li><b>Screenshots</b> of your screen(s) at a random moment about every 10 minutes — <b>only while the timer is running</b>. Nothing is taken when stopped or on break.</li>
         <li>You'll see each screenshot here and can <b>delete it within 2 minutes</b>. That 10-minute block is then removed from your time.</li>
         <li><b>Activity %</b>: how much of each 10 minutes had keyboard or mouse use. Only <i>whether</i> you used them — never what you typed or clicked.</li>
-        <li>Screenshots and activity are seen only by YVA admins — never by clients. Screenshots are deleted after 90 days.</li>
+        <li>Screenshots and activity are seen only by YVA admins — never by clients. Screenshots are deleted after 60 days.</li>
         <li>If you stop using your keyboard and mouse for 5 minutes, YVA Time asks whether to keep that time.</li>
       </ul>
       <button className="btn primary wide" onClick={() => void window.yva.acceptConsent()}>I understand — continue</button>
@@ -117,6 +117,7 @@ function TrackerScreen({ s }: { s: Snapshot }) {
           <div className="menu" onMouseLeave={() => setMenu(false)}>
             <button onClick={() => { setMenu(false); void window.yva.openWorkspace() }}>Open My workspace</button>
             {p.manualTimeAllowed && <button onClick={() => { setMenu(false); void window.yva.openAddTime() }}>Add missing time</button>}
+            <button onClick={() => { setMenu(false); void window.yva.openLogFile() }}>Show log file (for YVA support)</button>
             <button onClick={() => { setMenu(false); void window.yva.signOut() }}>Sign out</button>
           </div>
         )}
@@ -167,6 +168,11 @@ function TrackerScreen({ s }: { s: Snapshot }) {
       {!isYva && <ScreenshotCard s={s} />}
 
       {s.message && <div className="message">{s.message}</div>}
+      {s.online && s.uploadProblem && (
+        <div className="message" title={s.uploadProblem}>
+          {s.pending.screenshots} screenshot{s.pending.screenshots === 1 ? '' : 's'} waiting to upload — {s.uploadProblem}. YVA Time keeps trying; if this stays, send YVA the log file (⋯ menu).
+        </div>
+      )}
       <footer className="footer">
         {!s.online
           ? `Offline — saving on this computer (${s.pending.blocks + s.pending.screenshots} waiting)`
@@ -184,10 +190,18 @@ function ScreenshotCard({ s }: { s: Snapshot }) {
   const left = Math.max(0, Math.ceil((shot.deletableUntil - Date.now()) / 1000))
   return (
     <div className="shot">
-      <img src={shot.preview} alt="Latest screenshot" />
+      <button className="shot-open" title="Open full size" onClick={() => void window.yva.openLastShot(0)}>
+        <img src={shot.preview} alt="Latest screenshot — click to open full size" />
+      </button>
       <div className="grow">
         <div className="shot-title">Screenshot · {time(shot.takenAt)}</div>
-        <div className="muted small">{shot.screens > 1 ? `${shot.screens} screens` : '1 screen'}</div>
+        <div className="muted small">
+          {shot.screens > 1
+            ? <>Open screen {Array.from({ length: shot.screens }, (_, i) => (
+                <button key={i} className="link-btn" onClick={() => void window.yva.openLastShot(i)}>{i + 1}</button>
+              ))}</>
+            : 'Click to open full size'}
+        </div>
         {left > 0 && (
           <button className="btn danger small-btn" onClick={() => void window.yva.deleteScreenshot()}>
             Delete ({Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')})

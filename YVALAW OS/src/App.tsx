@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { signOutAndForgetDevice } from './services/notifications'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
@@ -22,6 +23,11 @@ import CandidatesPage from './pages/CandidatesPage'
 import CandidateProfilePage from './pages/CandidateProfilePage'
 import GeneralExpensesPage from './pages/GeneralExpensesPage'
 import EstimatesPage from './pages/EstimatesPage'
+import WeeklyClosePage from './pages/WeeklyClosePage'
+import PayrollPage from './pages/PayrollPage'
+import ApprovalsPage from './pages/ApprovalsPage'
+import LeadsPage from './pages/LeadsPage'
+import AnnouncementsPage from './pages/AnnouncementsPage'
 import TimeTrackingPage from './pages/TimeTrackingPage'
 import CalendarPage from './pages/CalendarPage'
 import PortalDashboard from './pages/portal/PortalDashboard'
@@ -47,7 +53,7 @@ function LoadingScreen() {
   return (
     <div className="loading-screen">
       <div className="loading-spinner" />
-      <div className="loading-text">Loading YVA LawOS…</div>
+      <div className="loading-text">Loading YVA OS…</div>
     </div>
   )
 }
@@ -66,8 +72,8 @@ function PendingAccess() {
   return (
     <div className="loading-screen">
       <div className="loading-text">Your account is waiting for approval.</div>
-      <div className="loading-text">A YVA admin needs to give you access before you can use YVA LawOS.</div>
-      <button className="btn-ghost" onClick={() => void supabase.auth.signOut()}>Sign out</button>
+      <div className="loading-text">A YVA admin needs to give you access before you can use YVA OS.</div>
+      <button className="btn-ghost" onClick={() => void signOutAndForgetDevice()}>Sign out</button>
     </div>
   )
 }
@@ -206,6 +212,11 @@ function AuthenticatedRouter() {
         <Route path="/settings"      element={<SettingsPage />} />
         <Route path="/estimates"     element={<EstimatesPage />} />
         <Route path="/time"          element={<TimeTrackingPage />} />
+        <Route path="/weekly-close"  element={<WeeklyClosePage />} />
+        <Route path="/payroll"       element={<PayrollPage />} />
+        <Route path="/approvals"     element={<ApprovalsPage />} />
+        <Route path="/leads"         element={<LeadsPage />} />
+        <Route path="/announcements" element={<AnnouncementsPage />} />
         <Route path="/calendar"      element={<CalendarPage />} />
         <Route path="/requests"      element={<RequestsPage />} />
         <Route path="*"              element={<Navigate to="/" replace />} />
@@ -249,7 +260,7 @@ async function maybeFireReminder() {
     return s === 'sent' || s === 'viewed' || s === 'overdue' || s === 'partial'
   })
   if (unpaid.length > 0) {
-    new Notification('YVA LawOS — Invoice Reminder', {
+    new Notification('YVA OS — Invoice Reminder', {
       body: `${unpaid.length} unpaid invoice${unpaid.length > 1 ? 's' : ''} waiting. Check the Invoices pipeline.`,
       icon: `${window.location.origin}${import.meta.env.BASE_URL}yva-logo.png`,
     })

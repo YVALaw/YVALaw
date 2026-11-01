@@ -6,9 +6,25 @@
 [functions."run-autopay"]
   schedule = "0 13 * * *"
 
-# YVA Time: screenshots are kept 90 days
+# YVA Time: screenshots are kept 60 days
 [functions."purge-old-screenshots"]
   schedule = "@daily"
+
+# YVA OS: email + phone push for new notifications (bell)
+[functions."notifications-dispatch"]
+  schedule = "*/5 * * * *"
+
+# YVA OS weekly close: Monday 12:05 am Dominican time (04:05 UTC) — prepares last week's invoices
+[functions."week-close-scheduled"]
+  schedule = "5 4 * * 1"
+
+# YVA OS payroll: Wednesday 9:07 am Dominican time — prepares Friday's payroll + reminder
+[functions."payroll-reminder"]
+  schedule = "7 13 * * 3"
+
+# YVA OS CRM: lead follow-ups due today, 8:17 am Dominican time
+[functions."crm-followups"]
+  schedule = "17 12 * * *"
 
 # Marketing-site blog: publishes scheduled posts (see the function for setup)
 [functions."publish-scheduled-posts"]

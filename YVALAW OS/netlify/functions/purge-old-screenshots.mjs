@@ -1,14 +1,14 @@
 /**
  * purge-old-screenshots — Netlify scheduled function (daily, see netlify.toml)
  *
- * YVA Time screenshots are kept for 90 days (employees are told this in the app's
+ * YVA Time screenshots are kept for 60 days (employees are told this in the app's
  * notice). Deletes older screenshot files from the private `screenshots` bucket and
  * their tracker_screenshots rows. Hours (tracker_blocks) are not touched.
  *
  * Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
  */
 
-const KEEP_DAYS = 90
+const KEEP_DAYS = 60
 const BATCH = 100
 const MAX_BATCHES = 50          // up to 5,000 per run; the rest goes the next day
 

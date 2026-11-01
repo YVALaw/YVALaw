@@ -3,8 +3,9 @@ import { useLocation } from 'react-router-dom'
 import {
   IconMail, IconAlert, IconEye, IconPrinter, IconLink, IconCopy,
   IconEdit, IconStatus, IconTrash, IconX, IconCheck, IconChevronDown,
-  IconChevronRight, IconPause, IconPlay, IconPlus,
+  IconChevronRight, IconPause, IconPlay, IconPlus, IconDollar,
 } from '../components/Icon'
+import RecordPaymentModal from '../components/RecordPaymentModal'
 import type { AppSettings, Client, Invoice, Project, RecurringInvoice, RecurringFrequency } from '../data/types'
 import {
   loadInvoices, saveInvoices,
@@ -17,6 +18,7 @@ import { formatMoney } from '../utils/money'
 import { buildInvoiceHTML as buildInvoiceHTMLUtil, printInvoice as printInvoiceUtil } from '../utils/invoiceHtml'
 import InvoiceBuilder from '../components/InvoiceBuilder'
 import { sendEmail } from '../services/gmail'
+import { applyInvoiceTemplate, DEFAULT_INVOICE_EMAIL, DEFAULT_REMINDER_EMAIL } from '../services/invoiceEmail'
 
 type InvoiceStatus = 'draft' | 'sent' | 'viewed' | 'paid' | 'overdue' | 'partial'
 
@@ -80,21 +82,6 @@ function shareInvoice(inv: Invoice, dopRate: number) {
   )
 }
 
-const DEFAULT_INVOICE_EMAIL = `Hi {clientName},\n\nPlease find attached invoice {invoiceNumber} for {amount}.\n\nBilling period: {period}\n{dueDate}\nPlease don't hesitate to reach out with any questions.\n\n{companyName}`
-const DEFAULT_REMINDER_EMAIL = `Hi {clientName},\n\nThis is a friendly reminder that invoice {invoiceNumber} for {amount} is past due.\n\nOriginal due date: {dueDate}\n\nPlease let us know when we can expect payment or if you have any questions.\n\n{companyName}`
-
-function applyInvoiceTemplate(template: string, inv: Invoice, settings: AppSettings): string {
-  const period = `${inv.billingStart || inv.date || '—'} – ${inv.billingEnd || ''}`
-  return template
-    .replace(/\{clientName\}/g,    inv.clientName || 'Client')
-    .replace(/\{invoiceNumber\}/g, inv.number || '')
-    .replace(/\{amount\}/g,        formatMoney(Number(inv.subtotal) || 0))
-    .replace(/\{dueDate\}/g,       inv.dueDate ? `Due date: ${inv.dueDate}` : '')
-    .replace(/\{period\}/g,        period)
-    .replace(/\{companyName\}/g,   settings.emailSignature || settings.companyName || 'YVA Staffing')
-}
-
-// ── Email invoice ──────────────────────────────────────────
 function emailInvoice(inv: Invoice, settings: AppSettings) {
   const to      = inv.clientEmail || ''
   const subject = `Invoice ${inv.number} — ${settings.companyName || 'YVA Staffing'}`
@@ -128,6 +115,7 @@ const EMPTY_FORM: QuickForm = {
 export default function InvoicePage() {
   const location = useLocation()
   const [invoices,    setInvoices]    = useState<Invoice[]>([])
+  const [payingInv,   setPayingInv]   = useState<Invoice | null>(null)
   const [clients,     setClients]     = useState<Client[]>([])
   const [allProjects, setAllProjects] = useState<Project[]>([])
   const [settings,    setSettings]    = useState<AppSettings>({ usdToDop: 0 })
@@ -179,8 +167,11 @@ export default function InvoicePage() {
     setTimeout(() => setToast(null), 3500)
   }
 
-  function openBuilder(projectId?: string) { setBuilderProjectId(projectId); setBuilderOpen(true) }
-  function openEditInvoice(inv: Invoice) { setEditingInvoice(inv); setBuilderProjectId(inv.projectId || undefined); setBuilderOpen(true) }
+  // Phones: review / send / record payments only — building and editing invoices stays on the computer (PLAN Step 8)
+  const onPhone = () => window.matchMedia?.('(max-width: 768px)').matches
+  const PHONE_NOTE = 'Building and editing invoices works on a computer. On the phone you can review, send, change status and record payments.'
+  function openBuilder(projectId?: string) { if (onPhone()) { showToast(PHONE_NOTE); return } setBuilderProjectId(projectId); setBuilderOpen(true) }
+  function openEditInvoice(inv: Invoice) { if (onPhone()) { showToast(PHONE_NOTE); return } setEditingInvoice(inv); setBuilderProjectId(inv.projectId || undefined); setBuilderOpen(true) }
   async function closeBuilder(inv?: Invoice) {
     const fresh = await loadInvoices()
     setInvoices(fresh)
@@ -600,6 +591,7 @@ export default function InvoicePage() {
                                   {inv.clientEmail && ['overdue','sent','partial'].includes((inv.status||'').toLowerCase()) && (
                                     <button className="btn-icon-ghost" title="Payment reminder" onClick={() => { reminderEmail(inv, settings); showToast(`Payment reminder sent to ${inv.clientEmail}`); const cId = clients.find(c => c.name === inv.clientName)?.id; if (cId) void logComm(cId, `Payment reminder sent for Invoice ${inv.number}`, 'email') }}><IconAlert size={14} /></button>
                                   )}
+                                  {inv.status && inv.status !== 'draft' && <button className="btn-icon-ghost" title="Payments received" onClick={() => setPayingInv(inv)}><IconDollar size={14} /></button>}
                                   <button className="btn-icon-ghost" title="Preview" onClick={() => setPreviewInv(inv)}><IconEye size={14} /></button>
                                   <button className="btn-icon-ghost" title="PDF" onClick={() => printInvoice(inv, 0, settings)}><IconPrinter size={14} /></button>
                                   <button className="btn-icon-ghost" title="Share portal" onClick={() => shareInvoice(inv, settings.usdToDop)}><IconLink size={14} /></button>
@@ -825,6 +817,8 @@ export default function InvoicePage() {
           </div>
         </div>
       )}
+      {payingInv && <RecordPaymentModal invoice={{ ...payingInv, subtotal: Number(payingInv.subtotal) || 0 }} onClose={() => setPayingInv(null)}
+        onChanged={() => { void loadInvoices().then(setInvoices) }} />}
     </div>
   )
 }

@@ -1,4 +1,3 @@
-import type { AppSettings } from '../data/types'
 import { loadSettings, saveSettings } from './storage'
 import { supabase } from '../lib/supabase'
 
@@ -11,19 +10,32 @@ type GmailUserData = {
 
 type EmailAttachment = { name: string; content: string; mimeType: string }
 
+// null removes a key from Supabase user metadata; undefined is dropped by JSON.stringify
+// and leaves the stored value in place (the old Disconnect did nothing).
+type GmailUserDataPatch = { [K in keyof GmailUserData]?: GmailUserData[K] | null }
+
 export type SendEmailResult = {
-  mode: 'gmail' | 'mailto'
+  // failed: Gmail could not send and the user chose not to open the mail app
+  mode: 'gmail' | 'mailto' | 'failed'
   attached: boolean
   fallbackReason?: string
 }
 
+/** The saved Google sign-in is unusable; only connecting Gmail again fixes it */
+export class GmailReconnectError extends Error {}
+const RECONNECT_HINT = 'Reconnect Gmail in Settings → Integrations.'
+const errorMessage = (err: unknown, fallback = 'Unknown error') => (err instanceof Error ? err.message : fallback)
+
 async function getGmailUserData(): Promise<GmailUserData> {
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user }, error } = await supabase.auth.getUser()
+  // Reading a failed lookup as "not connected" turned a network blip into a silent switch to the mail app
+  if (error) throw new Error(`Could not load your Gmail connection: ${error.message}`)
   return (user?.user_metadata || {}) as GmailUserData
 }
 
-async function saveGmailUserData(data: GmailUserData): Promise<void> {
-  await supabase.auth.updateUser({ data: data as Record<string, unknown> })
+async function saveGmailUserData(data: GmailUserDataPatch): Promise<void> {
+  const { error } = await supabase.auth.updateUser({ data })
+  if (error) throw new Error(`Could not save your Gmail connection: ${error.message}`)
 }
 
 const AUTH_ENDPOINT  = 'https://accounts.google.com/o/oauth2/v2/auth'
@@ -115,42 +127,40 @@ export async function exchangeCode(code: string, clientId: string): Promise<stri
   return ui.email as string
 }
 
-async function refreshToken(settings: AppSettings & GmailUserData): Promise<string> {
-  if (!settings.gmailRefreshToken || !settings.gmailClientId) {
-    throw new Error('Gmail not connected — no refresh token.')
+async function refreshAccessToken(userData: GmailUserData): Promise<string> {
+  if (!userData.gmailRefreshToken) throw new GmailReconnectError(`No Gmail refresh token is saved for your account. ${RECONNECT_HINT}`)
+  const { gmailClientId } = await loadSettings()
+  if (!gmailClientId) throw new GmailReconnectError('The Google OAuth Client ID is missing. Add it in Settings → Integrations and reconnect Gmail.')
+  let res: Response
+  try {
+    res = await fetch(NETLIFY_GMAIL_OAUTH_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'refresh', clientId: gmailClientId, refreshToken: userData.gmailRefreshToken }),
+    })
+  } catch {
+    throw new Error('Could not reach the Gmail token service. Check your internet connection and try again.')
   }
-  const res = await fetch(NETLIFY_GMAIL_OAUTH_ENDPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      action: 'refresh',
-      clientId: settings.gmailClientId,
-      refreshToken: settings.gmailRefreshToken,
-    }),
-  })
+  const data = await res.json().catch(() => ({}))
   if (!res.ok) {
-    const error = await res.json().catch(() => ({}))
-    throw new Error(error?.error || 'Token refresh failed — please reconnect Gmail.')
+    const googleError = data?.details?.error
+    if (googleError === 'invalid_grant') throw new GmailReconnectError(`Google says the saved Gmail sign-in has expired or been revoked. ${RECONNECT_HINT}`)
+    if (googleError === 'invalid_client' || googleError === 'unauthorized_client') {
+      throw new Error('Google rejected the OAuth client. Check that GMAIL_CLIENT_SECRET on Netlify belongs to the Client ID in Settings → Integrations.')
+    }
+    throw new Error(`Gmail token refresh failed: ${data?.error || `HTTP ${res.status}`}`)
   }
-  const data = await res.json()
-  void saveGmailUserData({
+  if (!data.access_token) throw new Error('Gmail token refresh returned no access token.')
+  saveGmailUserData({
     gmailAccessToken: data.access_token,
     gmailTokenExpiry: Date.now() + (data.expires_in - 60) * 1000,
-  })
+  }).catch(err => console.warn('Could not store the refreshed Gmail token:', err))
   return data.access_token as string
 }
 
-async function getValidToken(): Promise<string | null> {
-  const userData = await getGmailUserData()
-  if (!userData.gmailAccessToken) return null
-  if (userData.gmailTokenExpiry && Date.now() > userData.gmailTokenExpiry) {
-    try {
-      const settings = await loadSettings()
-      return await refreshToken({ ...settings, ...userData } as AppSettings)
-    } catch {
-      return null
-    }
-  }
+async function getAccessToken(userData: GmailUserData): Promise<string> {
+  if (!userData.gmailAccessToken) throw new GmailReconnectError(`Gmail is not connected. ${RECONNECT_HINT}`)
+  if (userData.gmailTokenExpiry && Date.now() > userData.gmailTokenExpiry) return refreshAccessToken(userData)
   return userData.gmailAccessToken
 }
 
@@ -161,10 +171,10 @@ export async function isGmailConnected(): Promise<boolean> {
 
 export async function disconnectGmail(): Promise<void> {
   await saveGmailUserData({
-    gmailAccessToken: undefined,
-    gmailRefreshToken: undefined,
-    gmailTokenExpiry: undefined,
-    gmailEmail: undefined,
+    gmailAccessToken: null,
+    gmailRefreshToken: null,
+    gmailTokenExpiry: null,
+    gmailEmail: null,
   })
 }
 
@@ -259,25 +269,42 @@ export async function sendGmailMessage(
   attachments: EmailAttachment[] = [],
 ): Promise<void> {
   const userData = await getGmailUserData()
-  if (!userData.gmailEmail) throw new Error('Gmail not connected.')
-  const token = await getValidToken()
-  if (!token) throw new Error('Gmail session expired — please reconnect in Settings.')
+  if (!userData.gmailEmail) throw new GmailReconnectError(`Gmail is not connected. ${RECONNECT_HINT}`)
 
   const raw = attachments.length > 0
     ? buildRawWithAttachments(to, subject, body, userData.gmailEmail, attachments)
     : buildRaw(to, subject, body, userData.gmailEmail)
 
-  const res = await fetch(SEND_ENDPOINT, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ raw }),
-  })
+  const send = async (token: string) => {
+    try {
+      return await fetch(SEND_ENDPOINT, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ raw }),
+      })
+    } catch {
+      throw new Error('Could not reach Gmail. Check your internet connection and try again.')
+    }
+  }
+  let res = await send(await getAccessToken(userData))
+  // The stored expiry is only an estimate (early revocation, a wrong PC clock): a 401 gets one forced refresh
+  if (res.status === 401) res = await send(await refreshAccessToken(userData))
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
-    throw new Error(err?.error?.message || `Gmail API error ${res.status}`)
+    const detail = err?.error?.message || `HTTP ${res.status}`
+    if (res.status === 401) throw new GmailReconnectError(`Google rejected the saved Gmail sign-in (${detail}). ${RECONNECT_HINT}`)
+    if (res.status === 403 && /insufficient/i.test(detail)) throw new GmailReconnectError(`Permission to send email was not granted (${detail}). ${RECONNECT_HINT}`)
+    throw new Error(`Gmail API error ${res.status}: ${detail}`)
   }
 }
 
+function openInMailApp(to: string, subject: string, body: string, attachments: EmailAttachment[]) {
+  for (const file of attachments) downloadAttachment(file)
+  // Percent-encoded: mailto does not decode "+" as a space
+  window.location.href = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+}
+
+/** Gmail if connected; never falls back silently — the user sees why Gmail failed and decides */
 export async function sendEmail(
   to: string,
   subject: string,
@@ -286,21 +313,27 @@ export async function sendEmail(
 ): Promise<SendEmailResult> {
   if (!to) return { mode: 'mailto', attached: false }
   const attachments = attachment ? [attachment] : []
-  let fallbackReason: string | undefined
-  const connected = await isGmailConnected()
-  if (connected) {
-    try {
+  let fallbackReason: string
+  try {
+    if (await isGmailConnected()) {
       await sendGmailMessage(to, subject, body, attachments)
       return { mode: 'gmail', attached: attachments.length > 0 }
-    } catch (err) {
-      console.error('Gmail send failed, falling back to mailto:', err)
-      fallbackReason = err instanceof Error ? err.message : 'Gmail send failed'
     }
-  } else {
-    fallbackReason = 'Gmail is not connected for the current signed-in session'
+    // With no OAuth client set up nobody here sends through Gmail: the mail app is the expected route
+    if (!(await loadSettings()).gmailClientId) {
+      openInMailApp(to, subject, body, attachments)
+      return { mode: 'mailto', attached: false }
+    }
+    fallbackReason = 'Gmail is not connected for the account you are signed in with. Connect it in Settings → Integrations.'
+  } catch (err) {
+    console.error('Gmail send failed:', err)
+    fallbackReason = errorMessage(err, 'Gmail send failed')
   }
-
-  for (const file of attachments) downloadAttachment(file)
-  window.location.href = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+  const useMailApp = window.confirm(
+    `Gmail could not send this email.\n\n${fallbackReason}\n\n` +
+    `Open it in your email app instead?${attachments.length > 0 ? ' The PDF will be downloaded so you can attach it.' : ''}`,
+  )
+  if (!useMailApp) return { mode: 'failed', attached: false, fallbackReason }
+  openInMailApp(to, subject, body, attachments)
   return { mode: 'mailto', attached: false, fallbackReason }
 }

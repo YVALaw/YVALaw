@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { Employee } from '../../data/types'
 import { loadEmployees } from '../../services/storage'
+import { loadHolidays, loadTimeOff } from '../../services/workspace'
 import { LOCAL_TZ, loadTrackerBlocks, type TrackerBlock } from '../../services/trackerStorage'
 import { scheduleWeek, type ScheduleDay } from '../../utils/schedule'
 
@@ -44,6 +45,8 @@ export default function ScheduleReport() {
   const [grace, setGrace] = useState(5)
   const [filter, setFilter] = useState<'all' | 'client' | 'yva'>('all')
   const [loading, setLoading] = useState(false)
+  // Approved time off + company holidays (Step 7): those days are "Time off", never "No time"
+  const [offDays, setOffDays] = useState<Map<string, string>>(new Map())
 
   useEffect(() => { void loadEmployees().then(setEmployees) }, [])
   useEffect(() => {
@@ -51,6 +54,15 @@ export default function ScheduleReport() {
     setLoading(true)
     // A day either side, so overnight shifts at the edges of the week are complete
     void loadTrackerBlocks(week - DAY_MS, addDays(week, 8)).then(b => { if (alive) { setBlocks(b); setLoading(false) } })
+    const iso = (ms: number) => { const d = new Date(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
+    const from = iso(week), to = iso(addDays(week, 6))
+    void Promise.all([loadTimeOff({ status: 'approved', from, to }), loadHolidays(from)]).then(([t, h]) => {
+      if (!alive) return
+      const m = new Map<string, string>()
+      for (const r of t.rows) for (let d = r.start_date; d <= r.end_date; d = iso(addDays(new Date(`${d}T12:00:00`).getTime(), 1))) m.set(`${r.employee_id}|${d}`, r.kind === 'sick' ? 'Sick day' : 'Time off')
+      for (const x of h) if (x.day <= to) m.set(`*|${x.day}`, x.name)
+      setOffDays(m)
+    }).catch(() => {})
     return () => { alive = false }
   }, [week])
 
@@ -61,7 +73,11 @@ export default function ScheduleReport() {
     .filter(e => filter === 'all' || (filter === 'yva' ? e.worksFor === 'yva' : e.worksFor !== 'yva'))
     .map(employee => ({
       employee,
-      days: scheduleWeek(counted.filter(b => b.employeeId === employee.id), employee.defaultShiftStart, employee.defaultShiftEnd, week, now, grace),
+      days: scheduleWeek(counted.filter(b => b.employeeId === employee.id), employee.defaultShiftStart, employee.defaultShiftEnd, week, now, grace)
+        .map(d => {
+          const off = offDays.get(`${employee.id}|${d.day}`) ?? offDays.get(`*|${d.day}`)
+          return off && !d.seconds && ['absent', 'not-started', 'upcoming', 'none'].includes(d.status) ? { ...d, status: 'day-off' as const, offLabel: off } : d
+        }),
     }))
     .sort((a, b) => a.employee.name.localeCompare(b.employee.name))
 
@@ -136,7 +152,7 @@ export default function ScheduleReport() {
                           {d.firstAt !== null && d.lastAt !== null ? (
                             <div>{clock(d.firstAt)} – {clock(d.lastAt)}</div>
                           ) : (
-                            <div className="td-muted">{d.status === 'day-off' ? 'Off' : '—'}</div>
+                            <div className="td-muted">{d.status === 'day-off' ? ((d as ScheduleDay & { offLabel?: string }).offLabel ?? 'Off') : '—'}</div>
                           )}
                           {d.seconds > 0 && <div className="td-muted">{hm(d.seconds)}</div>}
                           {c && <div style={{ color: c.color, fontWeight: 600, marginTop: 2 }}>{c.text}</div>}
@@ -157,7 +173,7 @@ export default function ScheduleReport() {
           </table>
           <div style={{ fontSize: 12, color: 'var(--muted)', padding: '8px 4px' }}>
             First and last tracked moment each day from YVA Time (approved manual time included). Saturday and Sunday show when someone
-            worked them. "No time" can also mean a day off or holiday — check before acting on it.
+            worked them. Approved time off and company holidays show as days off, not "No time".
           </div>
         </div>
       )}

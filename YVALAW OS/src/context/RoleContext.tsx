@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
-import type { AppRole } from '../lib/roles'
+import { isStaff, type AppRole } from '../lib/roles'
+import { hasPermission, type Permission } from '../lib/permissions'
 import { auditPortalActivity } from '../services/portalStorage'
 
 type RoleCtx = {
@@ -11,6 +12,8 @@ type RoleCtx = {
   isClient:           boolean
   clientId:           string | null
   mustChangePassword: boolean
+  /** Permissions granted to this role by the CEO (the CEO has all) — see src/lib/permissions.ts */
+  permissions:        string[]
 }
 
 const ROLE_CACHE_KEY = 'yva_role'
@@ -29,7 +32,7 @@ function clearPortalLoginAuditKeys() {
 
 const Ctx = createContext<RoleCtx>({
   role: 'recruiter', userId: null, email: null, loading: true,
-  isClient: false, clientId: null, mustChangePassword: false,
+  isClient: false, clientId: null, mustChangePassword: false, permissions: [],
 })
 
 export function RoleProvider({ children }: { children: ReactNode }) {
@@ -41,6 +44,17 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   const [clientId,           setClientId]           = useState<string | null>(null)
   const [mustChangePassword, setMustChangePassword] = useState(false)
   const [loading,            setLoading]            = useState(!cached)
+  const [permissions,        setPermissions]        = useState<string[]>([])
+
+  // What the CEO granted this role (Settings → Team Access → Permissions)
+  useEffect(() => {
+    if (!isStaff(role) || role === 'ceo') { setPermissions([]); return }
+    let alive = true
+    void supabase.from('role_permissions').select('permission').eq('role', role).then(({ data }) => {
+      if (alive) setPermissions((data || []).map(r => r.permission as string))
+    })
+    return () => { alive = false }
+  }, [role, userId])
 
   useEffect(() => {
     void (async () => {
@@ -150,10 +164,16 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   }, [])
 
   return (
-    <Ctx.Provider value={{ role, userId, email, loading, isClient, clientId, mustChangePassword }}>
+    <Ctx.Provider value={{ role, userId, email, loading, isClient, clientId, mustChangePassword, permissions }}>
       {children}
     </Ctx.Provider>
   )
 }
 
 export function useRole() { return useContext(Ctx) }
+
+/** const allowed = usePermission(); allowed('payroll.manage') */
+export function usePermission() {
+  const { role, permissions } = useContext(Ctx)
+  return (p: Permission) => hasPermission(role, permissions, p)
+}

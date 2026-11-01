@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import MissingRates from '../components/MissingRates'
 import { useNavigate } from 'react-router-dom'
 import type { Client, Employee, Expense, Invoice, Project, Tag, Task, TaskStatus } from '../data/types'
 import { loadSnapshot, saveProjects, loadTasks, saveTasks, loadExpenses, saveExpenses } from '../services/storage'
@@ -254,6 +255,8 @@ export default function ProjectsPage() {
         </div>
       </div>
 
+      <MissingRates projects={projects} employees={employees} clients={clients} />
+
       {/* CARDS VIEW */}
       {view === 'cards' && (
         <div className="card-grid">
@@ -343,7 +346,7 @@ export default function ProjectsPage() {
                 )}
                 <div className="card-footer project-card-footer">
                   <button className="btn-xs btn-ghost" onClick={ev => { ev.stopPropagation(); navigate('/projects/' + p.id) }}>View Profile</button>
-                  <button className="btn-xs btn-ghost" onClick={ev => { ev.stopPropagation(); openEdit(p) }}>Edit</button>
+                  <button className="btn-xs btn-ghost" onClick={ev => { ev.stopPropagation(); navigate(`/projects/${p.id}?edit=1`) }}>Edit</button>
                   <button className="btn-xs btn-danger" onClick={ev => { ev.stopPropagation(); setConfirmDelete(p.id) }}>Remove</button>
                 </div>
               </div>
@@ -369,7 +372,7 @@ export default function ProjectsPage() {
               </div>
               <div className="kanban-cards" onDragOver={(e) => e.preventDefault()} onDrop={() => { if (dragId.current) { moveStage(dragId.current, key); dragId.current = null } }}>
                 {byStage(key).map((p) => (
-                  <div key={p.id} className="kanban-card" draggable onDragStart={() => { dragId.current = p.id }}>
+                  <div key={p.id} className="kanban-card" style={{ cursor: 'pointer' }} draggable onDragStart={() => { dragId.current = p.id }} onClick={() => navigate('/projects/' + p.id)}>
                     <div className="kanban-card-name">{p.name}</div>
                     {clientName(p.clientId) && <div className="kanban-card-role">{clientName(p.clientId)}</div>}
                     {p.rate && <div className="kanban-card-meta">${p.rate}/hr</div>}
@@ -387,10 +390,10 @@ export default function ProjectsPage() {
                         ))}
                       </div>
                     )}
-                    <div className="kanban-card-actions">
+                    <div className="kanban-card-actions" onClick={e => e.stopPropagation()}>
                       <button className="btn-xs btn-ghost" onClick={() => openTaskBoard(p)}>Tasks</button>
                       <button className="btn-xs btn-ghost" onClick={() => openExpenses(p)}>Expenses</button>
-                      <button className="btn-xs btn-ghost" onClick={() => openEdit(p)}>Edit</button>
+                      <button className="btn-xs btn-ghost" onClick={() => navigate(`/projects/${p.id}?edit=1`)}>Edit</button>
                       <button className="btn-xs btn-danger" onClick={() => setConfirmDelete(p.id)}><IconTrash size={12} /></button>
                     </div>
                   </div>

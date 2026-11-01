@@ -4,6 +4,7 @@ import path from 'node:path'
 import { Controller } from './controller'
 import { PROTOCOL } from './config'
 import { installNow, startUpdates } from './updater'
+import { startLogFile } from './logfile'
 import type { Snapshot, Target } from '../shared/types'
 
 if (process.env.YVA_USER_DATA) app.setPath('userData', process.env.YVA_USER_DATA)
@@ -84,6 +85,8 @@ if (!app.requestSingleInstanceLock()) {
     deleteScreenshot: () => controller.deleteScreenshot(),
     openWorkspace:    () => controller.openWorkspace(),
     openAddTime:      () => controller.openAddTime(),
+    openLastShot:     (screen: number) => controller.openLastShot(Number(screen)),
+    openLogFile:      () => controller.openLogFile(),
     installUpdate:    () => installNow(),       // quits (saving + uploading first, below) and installs
   }
   for (const [name, fn] of Object.entries(handlers)) {
@@ -110,6 +113,7 @@ if (!app.requestSingleInstanceLock()) {
   })
 
   void app.whenReady().then(async () => {
+    startLogFile(app.getVersion())
     if (process.defaultApp && process.argv.length >= 2) {
       app.setAsDefaultProtocolClient(PROTOCOL, process.execPath, [path.resolve(process.argv[1])])
     } else {

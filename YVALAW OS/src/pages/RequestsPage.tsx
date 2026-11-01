@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { OpeningCandidates } from '../components/OpeningCandidates'
 import { loadStaffRequests, updateStaffRequestStatus } from '../services/storage'
 import type { StaffRequest } from '../data/types'
 import { IconClipboard, IconAlert, IconSearch, IconCheck, IconX } from '../components/Icon'
@@ -168,6 +169,8 @@ export default function RequestsPage() {
                     Submitted {fmtDate(req.createdAt)}
                   </div>
                 </div>
+
+                <OpeningCandidates requestId={req.id} />
 
                 {/* Details row */}
                 <div className="request-card-details">
