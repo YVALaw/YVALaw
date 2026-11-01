@@ -1,35 +1,41 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
-import { IconBriefcase, IconClock, IconDollar, IconFileText, IconHome, IconImage, IconInbox, IconMegaphone, IconMoreHorizontal, IconUser } from '../../components/Icon'
+import { Ic, P } from '../../components/Icon'
 import NotificationBell from '../../components/NotificationBell'
-import ScreenshotDay from '../time/ScreenshotDay'
-import MyHours from './MyHours'
-import MyPay from './MyPay'
-import MyPayslips from './MyPayslips'
-import MyAdjustments from './MyAdjustments'
+import { Banner, Segmented, Skel, useIsMobile } from '../../components/ui'
 import { DICT, useMeLang } from './i18n'
-import { Card, MeClient, MeCompany, MeDocuments, MeHome, MeProfile, MeRequests, type MyEmployee, type MyProject } from './MeSections'
+import { fetchEarnings, type Earnings } from './MyPay'
+import {
+  BackToMore, MeClient, MeCompany, MeHome, MeMore, MePay, MeProfile, MeRequests, MeScreenshots, MeTime,
+  type MyEmployee, type MyProject,
+} from './MeSections'
 
-type Section = 'home' | 'time' | 'pay' | 'screenshots' | 'requests' | 'client' | 'documents' | 'company' | 'profile'
-const ICON: Record<Section, (p: { size?: number }) => JSX.Element> = {
-  home: IconHome, time: IconClock, pay: IconDollar, screenshots: IconImage, requests: IconInbox, client: IconBriefcase, documents: IconFileText, company: IconMegaphone, profile: IconUser,
+type Dock = 'home' | 'time' | 'pay' | 'requests' | 'client' | 'more'
+type Section = Dock | 'screenshots' | 'company' | 'documents' | 'profile'
+const DOCK: Dock[] = ['home', 'time', 'pay', 'requests', 'client', 'more']
+const DOCK_ICON: Record<Dock, string> = {
+  home: P.home, time: P.time, pay: P.payroll, requests: P.approvals, client: P.building, more: P.more,
 }
-const PHONE_TABS: Section[] = ['home', 'time', 'pay', 'requests']
+/** Pages reached from More keep "More" lit in the dock */
+const dockOf = (s: Section): Dock => (DOCK.includes(s as Dock) ? s as Dock : 'more')
 
-/** My workspace — the only area an invited employee can open (PLAN.md Step 7: Spanish / English, phone-first) */
-/** staffView: a staff member opened their own workspace from the OS account menu (gold banner + back link) */
+/** My workspace — the only area an invited employee can open (designs/My Workspace.dc.html: Spanish / English,
+ *  phone first). Sections live in ?s= (notification links use it: ?s=requests, ?s=company, ?s=pay, ?s=time).
+ *  staffView: a staff member opened their own workspace from the OS account menu (gold banner + back link). */
 export default function EmployeeWorkspace({ staffView = false }: { staffView?: boolean } = {}) {
   const [lang, setLang] = useMeLang()
   const t = DICT[lang]
+  const mobile = useIsMobile()
   const [params, setParams] = useSearchParams()
   const [employee, setEmployee] = useState<MyEmployee | null>(null)
   const [projects, setProjects] = useState<MyProject[]>([])
   // Stored as a kind (not text) so it follows the language switch; detail = the server's own message
   const [error, setError] = useState<{ kind: 'load' | 'network'; detail?: string } | null>(null)
-  const [moreOpen, setMoreOpen] = useState(false)
-  // The desktop app's "Add missing time" opens /me#manual. Switching to ?s=requests drops the hash and the section
-  // mounts only after the profile loads, so remember the request here and let MeRequests scroll when it's rendered.
+  const [earnings, setEarnings] = useState<Earnings | null>(null)
+  const [earningsError, setEarningsError] = useState<string | null>(null)
+  // The desktop app's "Add missing time" opens /me#manual. Switching to ?s=time drops the hash and the section
+  // mounts only after the profile loads, so remember the request here and let My time scroll when it's rendered.
   const [scrollToManual, setScrollToManual] = useState(() => window.location.hash === '#manual')
 
   useEffect(() => {
@@ -44,71 +50,76 @@ export default function EmployeeWorkspace({ staffView = false }: { staffView?: b
       } catch { setError({ kind: 'network' }) }
     })()
   }, [])
-  useEffect(() => { if (scrollToManual) setParams({ s: 'requests' }, { replace: true }) }, [])   // eslint-disable-line react-hooks/exhaustive-deps
+  // Live earnings (Home status card + My pay): refreshed every minute while the page is visible
+  useEffect(() => {
+    let alive = true
+    const load = () => fetchEarnings().then(d => { if (alive) { setEarnings(d); setEarningsError(null) } }).catch(e => { if (alive) setEarningsError((e as Error).message) })
+    void load()
+    const id = setInterval(() => { if (document.visibilityState === 'visible') void load() }, 60_000)
+    return () => { alive = false; clearInterval(id) }
+  }, [])
+  useEffect(() => { if (scrollToManual) setParams({ s: 'time' }, { replace: true }) }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const isYva = employee?.worksFor === 'yva'
-  const sections: Section[] = ['home', 'time', 'pay', ...(isYva ? [] : ['screenshots' as Section]), 'requests', 'client', 'documents', 'company', 'profile']
+  const sections: Section[] = ['home', 'time', 'pay', 'requests', 'client', 'more', ...(isYva ? [] : ['screenshots' as Section]), 'company', 'documents', 'profile']
   const raw = params.get('s') as Section | null
   const section: Section = raw && sections.includes(raw) ? raw : 'home'
-  const go = (s: string) => { setParams(s === 'home' ? {} : { s }); setMoreOpen(false); window.scrollTo({ top: 0 }) }
-  const projectNames = Object.fromEntries(projects.map(p => [p.id, p.name]))
+  const dock = dockOf(section)
+  const go = (s: string) => { setParams(s === 'home' ? {} : { s }); window.scrollTo({ top: 0 }) }
+  const title = section === 'documents' ? t.nav.more : t.nav[section]
 
   return (
-    <div className="me-shell">
-      {staffView && employee && <div className="banner banner--gold" style={{ borderRadius: 0, justifyContent: 'center' }}>Viewing {employee.name}'s workspace as staff · <a href={`${import.meta.env.BASE_URL}`} style={{ color: 'inherit', textDecoration: 'underline', marginLeft: 6 }}>Back to YVA OS</a></div>}
-      <aside className="me-side">
-        <div className="me-brand"><img src={`${import.meta.env.BASE_URL}icons/icon-192.png`} alt="" /><div><strong>YVA OS</strong><span>{t.workspace}</span></div></div>
-        <nav>{sections.map(s => { const I = ICON[s]; return <button key={s} className={section === s ? 'active' : ''} onClick={() => go(s)}><I size={17} />{t.nav[s]}</button> })}</nav>
-      </aside>
-      <div className="me-main">
-        <header className="me-top">
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <div className="me-hello">{employee ? `${t.hi}, ${employee.name.split(' ')[0]}` : t.workspace}</div>
-            <div className="me-muted">{t.nav[section]}</div>
-          </div>
-          <button className="me-lang-pill" onClick={() => setLang(lang === 'es' ? 'en' : 'es')} aria-label="Language">{lang === 'es' ? 'EN' : 'ES'}</button>
-          <NotificationBell lang={lang} />
-        </header>
-        <main className="me-content">
-          {error && <div className="portal-message portal-message-error">{error.kind === 'network' ? t.networkError : `${t.loadError}${error.detail ? ` (${error.detail})` : ''}`}</div>}
-          {!employee && !error && <div className="loading-text">{t.loading}</div>}
-          {employee && (
-            <>
-              {section === 'home' && <MeHome e={employee} lang={lang} go={go} />}
-              {section === 'time' && (
-                <div className="me-stack">
-                  <Card title={t.time.title} sub={t.time.sub}><MyHours employeeId={employee.id} lang={lang} /></Card>
-                  <Card title={t.time.changes} sub={t.time.changesSub}><MyAdjustments projectNames={projectNames} lang={lang} /></Card>
-                </div>
-              )}
-              {section === 'pay' && (
-                <div className="me-stack">
-                  <Card title={t.pay.title} sub={t.pay.sub}><MyPay lang={lang} /></Card>
-                  <Card title={t.pay.payslips}><MyPayslips employeeName={employee.name} employeeNumber={employee.employeeNumber} lang={lang} /></Card>
-                </div>
-              )}
-              {section === 'screenshots' && !isYva && <Card title={t.shots.title} sub={t.shots.sub}><ScreenshotDay self={{ employeeId: employee.id, projectNames }} lang={lang} /></Card>}
-              {section === 'requests' && <MeRequests e={employee} projects={projects} lang={lang} scrollToManual={scrollToManual} onScrolled={() => setScrollToManual(false)} />}
-              {section === 'client' && <MeClient e={employee} projects={projects} lang={lang} />}
-              {section === 'documents' && <MeDocuments lang={lang} />}
-              {section === 'company' && <MeCompany lang={lang} />}
-              {section === 'profile' && <MeProfile e={employee} lang={lang} setLang={setLang} />}
-            </>
-          )}
-        </main>
-      </div>
-
-      <nav className="me-tabs">
-        {PHONE_TABS.map(s => { const I = ICON[s]; return <button key={s} className={section === s ? 'active' : ''} onClick={() => go(s)}><I size={20} /><span>{t.nav[s]}</span></button> })}
-        <button className={!PHONE_TABS.includes(section) ? 'active' : ''} onClick={() => setMoreOpen(o => !o)}><IconMoreHorizontal size={20} /><span>{t.more}</span></button>
-      </nav>
-      {moreOpen && (
-        <div className="me-sheet-backdrop" onClick={() => setMoreOpen(false)}>
-          <div className="me-sheet" onClick={ev => ev.stopPropagation()}>
-            {sections.filter(s => !PHONE_TABS.includes(s)).map(s => { const I = ICON[s]; return <button key={s} className={section === s ? 'active' : ''} onClick={() => go(s)}><I size={18} />{t.nav[s]}</button> })}
-          </div>
+    <div className="mw-app">
+      {staffView && (
+        <div className="mw-staffbar" role="status">
+          <span>{employee ? t.staff.viewing(employee.name) : t.workspace}</span>
+          <a className="mw-staffbar__btn" href={import.meta.env.BASE_URL}>{t.staff.back}</a>
         </div>
       )}
+      <header className="mw-head">
+        <img className="mw-head__logo" src={`${import.meta.env.BASE_URL}yva-logo.png`} alt="YVA" />
+        <span className="mw-head__title">{title}</span>
+        <div className="mw-lang">
+          <Segmented label={t.language} value={lang} onChange={setLang} options={[{ value: 'en', label: 'EN' }, { value: 'es', label: 'ES' }]} />
+        </div>
+        <NotificationBell lang={lang} />
+      </header>
+
+      <main className="mw-main">
+        {error && <Banner tone="danger">{error.kind === 'network' ? t.networkError : `${t.loadError}${error.detail ? ` (${error.detail})` : ''}`}</Banner>}
+        {!employee && !error && (
+          <div className="mw-stack" aria-label={t.loading} aria-busy="true">
+            <Skel w={240} h={32} />
+            <Skel h={78} r={16} />
+            <div className="mw-stats"><Skel h={88} r={14} /><Skel h={88} r={14} /><Skel h={88} r={14} /></div>
+            <Skel h={140} r={14} />
+          </div>
+        )}
+        {employee && (
+          <>
+            {section === 'home' && <MeHome e={employee} lang={lang} go={go} earnings={earnings} earningsError={earningsError} />}
+            {section === 'time' && <MeTime e={employee} projects={projects} lang={lang} go={go} scrollToManual={scrollToManual} onScrolled={() => setScrollToManual(false)} />}
+            {section === 'pay' && <MePay e={employee} lang={lang} earnings={earnings} earningsError={earningsError} />}
+            {section === 'requests' && <MeRequests e={employee} projects={projects} lang={lang} />}
+            {section === 'client' && <MeClient e={employee} projects={projects} lang={lang} />}
+            {(section === 'more' || section === 'documents') && <MeMore e={employee} lang={lang} go={go} />}
+            {section === 'screenshots' && !isYva && <><BackToMore lang={lang} go={go} /><MeScreenshots e={employee} projects={projects} lang={lang} /></>}
+            {section === 'company' && <><BackToMore lang={lang} go={go} /><MeCompany lang={lang} /></>}
+            {section === 'profile' && <><BackToMore lang={lang} go={go} /><MeProfile e={employee} lang={lang} setLang={setLang} /></>}
+          </>
+        )}
+      </main>
+
+      <nav className={mobile ? 'dock dock--phone mw-dock mw-dock--phone' : 'dock mw-dock'} aria-label={t.dockLabel}>
+        {DOCK.map(k => (
+          <button type="button" key={k} aria-current={dock === k ? 'page' : undefined}
+            className={mobile ? `dock__m mw-dock__m${dock === k ? ' dock__m--on' : ''}` : `dock__item${dock === k ? ' dock__item--on' : ''}`}
+            onClick={() => go(k)}>
+            <Ic d={DOCK_ICON[k]} size={18} />
+            <span className="mw-dock__label">{t.nav[k]}</span>
+          </button>
+        ))}
+      </nav>
     </div>
   )
 }
