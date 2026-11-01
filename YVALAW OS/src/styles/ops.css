@@ -320,3 +320,5 @@
   .ops-statcard__label { font-size: 11.5px; }
   .ops-statcard__note { display: none; }
 }
+.ops-rates__table td:not(:nth-child(7)) { white-space: nowrap; }
+.ops-filters .seg__opt { height: 28px; }
