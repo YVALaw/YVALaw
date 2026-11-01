@@ -159,7 +159,7 @@ Sketch of new data (names indicative):
 ## Build progress
 
 Hans asked (2026-10-31) for all steps to be built in one go and checked together when he's back.
-Nothing below is live until the branch is merged; the YVA Time app version is bumped but **not published**.
+**Merged and live on 2026-11-01** (PR #5); YVA Time 0.4.0 published the same day.
 
 | Step | Status | Notes |
 |---|---|---|
