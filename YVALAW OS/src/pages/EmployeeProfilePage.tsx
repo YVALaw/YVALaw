@@ -11,7 +11,7 @@ import { usePermission, useRole } from '../context/RoleContext'
 import { can } from '../lib/roles'
 import { fmtHoursHM } from '../utils/money'
 import { Ic, P } from '../components/Icon'
-import { Banner, Card, EmptyState, KpiStrip, Menu, Modal, Pill, Skel, Tabs } from '../components/ui'
+import { Banner, Card, EmptyState, KpiStrip, Menu, Modal, Pill, Skel, Tabs, useIsMobile } from '../components/ui'
 import EmployeeStatements from '../components/people/EmployeeStatements'
 import EmployeePayslips from '../components/people/EmployeePayslips'
 import YvaTimeLogin from '../components/people/YvaTimeLogin'
@@ -30,6 +30,7 @@ export default function EmployeeProfilePage() {
   const [params, setParams] = useSearchParams()
   const { role: myRole } = useRole()
   const allowed = usePermission()
+  const mobile = useIsMobile()
   const showPayRates = can.viewPayRates(myRole)
   const canSchedule = allowed('rates.manage')
 
@@ -254,7 +255,18 @@ export default function EmployeeProfilePage() {
             { label: 'Billable', value: fmtHoursHM(billableTracked), note: `${totalTracked > 0 ? Math.round(billableTracked / totalTracked * 100) : 0}% of total` },
             { label: 'Projects', value: Object.keys(byProject).length, note: Object.entries(byProject).sort((a, b) => b[1] - a[1])[0]?.[0] || '—' },
           ]} />
-          <div className="table-card">
+          {mobile ? (
+            <div className="mcards">
+              {empTime.slice(0, 20).map(e => (
+                <div key={e.id} className="mcard">
+                  <div className="mcard__top"><span className="mcard__title">{e.projectName || '—'}</span><span className="num t-strong">{fmtHoursHM(e.hours)}</span></div>
+                  <span className="mcard__meta"><span className="mono">{e.date}</span>{e.description ? ` · ${e.description}` : ''}</span>
+                  <span className="row row--wrap">{e.source === 'tracker' && <span className="tag-mono">YVA Time</span>}{e.billable && <Pill tone="success">Billable</Pill>}</span>
+                </div>
+              ))}
+              {empTime.length > 20 && <button type="button" className="link" onClick={() => navigate('/time')}>Showing 20 of {empTime.length} — view all in Time tracking</button>}
+            </div>
+          ) : <div className="table-card">
             <table className="table ppl-timelog__table">
               <thead><tr><th>Date</th><th>Project</th><th className="t-right">Hours</th><th>Description</th><th>Billable</th></tr></thead>
               <tbody>
@@ -270,7 +282,7 @@ export default function EmployeeProfilePage() {
               </tbody>
             </table>
             {empTime.length > 20 && <div className="pager">Showing 20 of {empTime.length} entries <button type="button" className="link" onClick={() => navigate('/time')}>View all in Time tracking</button></div>}
-          </div>
+          </div>}
         </section>
       )}
     </div>

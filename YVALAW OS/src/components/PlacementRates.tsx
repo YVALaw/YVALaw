@@ -167,7 +167,7 @@ export default function PlacementRates({ project, members, client, onAddPeople }
                         <td className="t-num">{c.bill_rate != null ? money(Number(c.bill_rate)) : '—'}</td>
                         <td className="t-num">{c.pay_rate != null ? money(Number(c.pay_rate)) : '—'}</td>
                         <td className="t-num">{marginOf(num(c.bill_rate), num(c.pay_rate))}</td>
-                        <td>From {c.effective_from}</td>
+                        <td>From {dateMed(c.effective_from)}</td>
                         <td>{upcoming ? <Pill tone="info">Upcoming</Pill> : 'Previous rate'}{c.note ? ` · ${c.note}` : ''}</td>
                         <td className="t-actions"><Menu label="Rate change actions" buttonClass="btn btn--xs btn--icon ops-xs-icon" items={[{ label: 'Delete this change', danger: true, onClick: () => void remove(c) }]} /></td>
                       </tr>

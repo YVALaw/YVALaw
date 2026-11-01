@@ -158,7 +158,7 @@ export default function EmployeeStatements({ emp, invoices, onInvoicesChange, ti
     setSending(true)
     try {
       const r = await emailStatement(emp, empInvoices, dateFrom, dateTo, empTracked)
-      const mode = (r as { mode?: string } | undefined)?.mode
+      const mode = r.mode
       if (mode === 'failed') show(false, 'Not sent — check the Gmail connection in Settings.')
       else show(true, mode === 'mailto' ? 'Opened in your mail app — attach the downloaded statement.' : `Statement sent to ${emp.email}`)
     } catch { show(false, 'Failed to send — check Gmail connection in Settings') }

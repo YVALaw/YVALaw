@@ -124,7 +124,7 @@ export default function EmployeesPage() {
   }).sort((a, b) => a.name.localeCompare(b.name))
 
   const rowMenu = (e: Employee) => (
-    <Menu label={`More actions for ${e.name}`} items={[
+    <Menu label={`More actions for ${e.name}`} buttonClass="btn btn--icon btn--sm btn--ghost" items={[
       { label: 'Open profile', icon: P.user, onClick: () => navigate('/employees/' + e.id) },
       { label: 'Edit', icon: P.edit, onClick: () => openEdit(e) },
       { label: 'Statements', icon: P.file, onClick: () => setStatementsFor(e), hidden: !showPayRates },
