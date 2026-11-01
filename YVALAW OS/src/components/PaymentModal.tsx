@@ -12,7 +12,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { loadStripe } from '@stripe/stripe-js'
+import { loadStripe } from '@stripe/stripe-js/pure'   // 'pure' = no script until loadStripe() is called
 import type { Stripe, StripeCardElement, StripeElements } from '@stripe/stripe-js'
 import { supabase } from '../lib/supabase'
 import type { Invoice } from '../data/types'
@@ -20,7 +20,10 @@ import { savePortalAutoPaySettings } from '../services/portalStorage'
 import { Ic, P } from './Icon'
 
 // Initialise Stripe once at module level — not inside component
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string)
+// Stripe's script is loaded the first time a payment window opens — not when this file loads (the staff app
+// preloads every screen's code in the background, and staff never need Stripe)
+let stripePromise: ReturnType<typeof loadStripe> | null = null
+const getStripe = () => (stripePromise ??= loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string))
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -127,7 +130,7 @@ export default function PaymentModal({ invoice, clientId, clientName, onClose, o
           throw new Error(data.error || 'Failed to initialise payment')
         }
 
-        const stripe = await stripePromise
+        const stripe = await getStripe()
         if (!stripe) throw new Error('Stripe failed to load. Check your publishable key.')
 
         if (cancelled) return
