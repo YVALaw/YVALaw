@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import type { AppSettings } from '../data/types'
-import { loadInvoices, loadSettings, loadUserRoles, saveSettings, type UserRoleRow } from '../services/storage'
+import { loadInvoices, loadSettings, loadUserRoles, saveSettings, settingsHaveBrandingColumns, type UserRoleRow } from '../services/storage'
+import { deleteFile, uploadFile } from '../services/fileStorage'
 import { usePermission, useRole } from '../context/RoleContext'
 import NotificationSettings from '../components/NotificationSettings'
 import AutoEmailSender from '../components/AutoEmailSender'
@@ -53,16 +54,21 @@ const DAYS: [string, string][] = [['', 'Off'], ['1', 'Monday'], ['2', 'Tuesday']
 // Form values are strings while typing (number inputs that re-render a parsed number eat the decimal point)
 type Form = {
   companyName: string; companyEmail: string; companyPhone: string; companyAddress: string; monthlyGoal: string; reminderDay: string
+  companyWebsite: string; invoiceFooter: string
   emailSignature: string; invoiceEmailTemplate: string; statementEmailTemplate: string; reminderEmailTemplate: string
-  usdToDop: string; gmailClientId: string
+  usdToDop: string; gmailClientId: string; crispWebsiteId: string
 }
 const toForm = (s: AppSettings): Form => ({
   companyName: s.companyName ?? '', companyEmail: s.companyEmail ?? '', companyPhone: s.companyPhone ?? '', companyAddress: s.companyAddress ?? '',
   monthlyGoal: s.monthlyGoal != null ? String(s.monthlyGoal) : '', reminderDay: s.reminderDay != null ? String(s.reminderDay) : '',
   emailSignature: s.emailSignature ?? '', invoiceEmailTemplate: s.invoiceEmailTemplate ?? '', statementEmailTemplate: s.statementEmailTemplate ?? '',
   reminderEmailTemplate: s.reminderEmailTemplate ?? '', usdToDop: s.usdToDop ? String(s.usdToDop) : '', gmailClientId: s.gmailClientId ?? '',
+  companyWebsite: s.companyWebsite ?? '', invoiceFooter: s.invoiceFooter ?? '', crispWebsiteId: s.crispWebsiteId ?? '',
 })
-const COMPANY_FIELDS = ['companyName', 'companyEmail', 'companyPhone', 'companyAddress', 'monthlyGoal', 'reminderDay'] as const
+const COMPANY_FIELDS = ['companyName', 'companyWebsite', 'companyEmail', 'companyPhone', 'companyAddress', 'monthlyGoal', 'reminderDay', 'invoiceFooter'] as const
+/** Company logo upload: images only (no SVG — it could carry script), up to 2 MB */
+const LOGO_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
+const LOGO_MAX = 2 * 1024 * 1024
 const EMAIL_FIELDS = ['emailSignature', 'invoiceEmailTemplate', 'statementEmailTemplate', 'reminderEmailTemplate'] as const
 type FormKey = keyof Form
 
@@ -74,6 +80,8 @@ function fromForm(f: Form, keys: readonly FormKey[]): Partial<AppSettings> {
     else if (k === 'reminderDay') out.reminderDay = v === '' ? undefined : Number(v)
     else if (k === 'usdToDop') out.usdToDop = parseFloat(v) || 0
     else if (k === 'invoiceEmailTemplate' || k === 'statementEmailTemplate' || k === 'reminderEmailTemplate') out[k] = v.trim() ? v : undefined
+    else if (k === 'companyWebsite' || k === 'crispWebsiteId') out[k] = v.trim() || undefined
+    else if (k === 'invoiceFooter') out.invoiceFooter = v.trim() ? v : undefined
     else (out as Record<string, unknown>)[k] = v
   }
   return out
@@ -102,6 +110,7 @@ export default function SettingsPage() {
   const [notifPerm, setNotifPerm] = useState<NotificationPermission>(typeof Notification !== 'undefined' ? Notification.permission : 'default')
   const [userRoles, setUserRoles] = useState<(UserRoleRow & { created_at?: string })[] | null>(null)
   const gmail = useGmailStatus()
+  const logoInput = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     void loadSettings().then(s => { setSaved(s); setForm(toForm(s)) })
@@ -153,6 +162,35 @@ export default function SettingsPage() {
       notify('danger', "Couldn't save your changes. Check your connection and try again.")
       return false
     } finally { setSaving(null) }
+  }
+
+  async function pickLogo(file: File | undefined) {
+    if (logoInput.current) logoInput.current.value = ''
+    if (!file || !saved) return
+    if (!LOGO_TYPES.includes(file.type)) { notify('danger', 'Pick a PNG, JPG, WebP or GIF image for the logo.'); return }
+    if (file.size > LOGO_MAX) { notify('danger', `That image is ${(file.size / 1024 / 1024).toFixed(1)} MB — the logo can be up to 2 MB.`); return }
+    setSaving('logo')
+    let up: { storageUrl: string; storagePath: string }
+    try {
+      up = await uploadFile(file, 'company')
+    } catch {
+      setSaving(null)
+      notify('danger', "Couldn't upload the logo. Check your connection and try again.")
+      return
+    }
+    const old = saved.companyLogoPath
+    const ok = await save({ companyLogoUrl: up.storageUrl, companyLogoPath: up.storagePath }, 'logo', 'Logo updated. New invoices and statements use it.')
+    // The replaced file (or this upload, if the setting couldn't be saved) is removed; a failed delete only leaves a stray file
+    const stale = ok ? old : up.storagePath
+    if (stale && stale.startsWith('company/')) void deleteFile(stale).catch(() => {})
+  }
+
+  async function resetLogo() {
+    if (!saved?.companyLogoUrl) return
+    const old = saved.companyLogoPath
+    if (await save({ companyLogoUrl: undefined, companyLogoPath: undefined }, 'logo', 'Back to the default YVA logo.') && old && old.startsWith('company/')) {
+      void deleteFile(old).catch(() => {})
+    }
   }
 
   async function handleFetchRate() {
@@ -250,13 +288,34 @@ export default function SettingsPage() {
           {activeTab === 'company' && (!saved ? loadingCard : (
             <section className="set-card" aria-label="Company">
               <h2 className="set-card__title">Company</h2>
+              {!settingsHaveBrandingColumns() && (
+                <Banner tone="warning">Run <code className="set-code">supabase/migrate-redesign-settings.sql</code> in Supabase to save the logo, website and invoice footer.</Banner>
+              )}
               <div className="set-logo-row">
-                <img className="set-logo" src={`${import.meta.env.BASE_URL}yva-logo.png`} alt="YVA logo" />
-                <span className="set-hint">This logo is used on invoices, payslips, notifications and the installed app.</span>
+                <img className="set-logo" src={saved.companyLogoUrl || `${import.meta.env.BASE_URL}yva-logo.png`} alt="Company logo" />
+                <div className="set-logo-side">
+                  <div className="set-actions">
+                    <button type="button" className="btn btn--sm" disabled={saving === 'logo'} onClick={() => logoInput.current?.click()}>
+                      <Ic d={P.upload} size={14} /> {saving === 'logo' ? 'Uploading…' : 'Change logo'}
+                    </button>
+                    {saved.companyLogoUrl && (
+                      <button type="button" className="btn btn--sm btn--ghost" disabled={saving === 'logo'} onClick={() => void resetLogo()}>Use default</button>
+                    )}
+                  </div>
+                  <span className="set-hint">
+                    {saved.companyLogoUrl ? 'Your logo is used on invoices and earnings statements.' : 'Default YVA logo.'} PNG, JPG, WebP or GIF, up to 2 MB.
+                    The app icon and notifications keep the YVA logo.
+                  </span>
+                </div>
+                <input ref={logoInput} type="file" className="sr-only" accept={LOGO_TYPES.join(',')} aria-label="Upload company logo"
+                  onChange={e => void pickLogo(e.target.files?.[0])} />
               </div>
               <div className="form-grid">
                 <Field label="Company name" hint="Shown on invoice PDF exports">
                   <input className="input" value={form.companyName} onChange={set('companyName')} placeholder="YVA Staffing" />
+                </Field>
+                <Field label="Website" hint="Shown under your contact details on invoices">
+                  <input className="input" inputMode="url" autoComplete="url" value={form.companyWebsite} onChange={set('companyWebsite')} placeholder="yvastaffing.agency" />
                 </Field>
                 <Field label="Email" hint="Pre-filled in email drafts & invoices">
                   <input className="input" type="email" value={form.companyEmail} onChange={set('companyEmail')} placeholder="Contact@yvastaffing.net" />
@@ -274,6 +333,9 @@ export default function SettingsPage() {
                   <select className="select" value={form.reminderDay} onChange={set('reminderDay')}>
                     {DAYS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                   </select>
+                </Field>
+                <Field label="Invoice footer" hint="Printed at the bottom of every invoice (e.g. a thank-you note or payment instructions)" full>
+                  <textarea className="textarea" rows={2} maxLength={500} value={form.invoiceFooter} onChange={set('invoiceFooter')} placeholder="Thank you for choosing YVA Staffing." />
                 </Field>
               </div>
               {saveRow(COMPANY_FIELDS, 'company')}
@@ -329,6 +391,16 @@ export default function SettingsPage() {
               recheck={gmail.recheck}
               onGmailChange={gmail.setStatus}
               notify={notify}
+              crisp={{
+                value: form.crispWebsiteId,
+                saved: saved?.crispWebsiteId ?? '',
+                loading: !saved,
+                ready: !saved || settingsHaveBrandingColumns(),
+                saving: saving === 'crisp',
+                dirty: dirty(['crispWebsiteId']),
+                onChange: v => setForm(f => ({ ...f, crispWebsiteId: v })),
+                save: () => save(fromForm(form, ['crispWebsiteId']), 'crisp', form.crispWebsiteId.trim() ? 'Crisp chat is on in the client portal.' : 'Crisp chat turned off.'),
+              }}
             />
           )}
 

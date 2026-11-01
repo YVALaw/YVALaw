@@ -12,14 +12,14 @@ export type EmployeeFormData = {
   defaultShiftStart: string; defaultShiftEnd: string
   premiumEnabled: boolean; premiumStartTime: string; premiumPercent: string
   role: string; employmentType: string; location: string
-  timezone: string; startYear: string; status: string; notes: string
+  timezone: string; startYear: string; hireDate: string; status: string; notes: string
   worksFor: 'client' | 'yva'; manualTimeAllowed: boolean
   paySchedule: PaySchedule | ''; payAnchor: string
 }
 
 export const EMPTY_EMPLOYEE_FORM: EmployeeFormData = {
   name: '', email: '', phone: '', payRate: '', defaultShiftStart: '', defaultShiftEnd: '', premiumEnabled: false, premiumStartTime: '21:00', premiumPercent: '15', role: '', employmentType: '',
-  location: '', timezone: '', startYear: '', status: 'Active', notes: '', worksFor: 'client', manualTimeAllowed: false, paySchedule: '', payAnchor: '',
+  location: '', timezone: '', startYear: '', hireDate: '', status: 'Active', notes: '', worksFor: 'client', manualTimeAllowed: false, paySchedule: '', payAnchor: '',
 }
 
 export function employeeToForm(e: Employee): EmployeeFormData {
@@ -33,6 +33,7 @@ export function employeeToForm(e: Employee): EmployeeFormData {
     premiumPercent: e.premiumPercent != null ? String(e.premiumPercent) : '15',
     role: e.role ?? '', employmentType: e.employmentType ?? '', location: e.location ?? '', timezone: e.timezone ?? '',
     startYear: e.startYear != null ? String(e.startYear) : '',
+    hireDate: e.hireDate ? String(e.hireDate).slice(0, 10) : '',
     status: e.status ?? 'Active', notes: e.notes ?? '',
     worksFor: e.worksFor === 'yva' ? 'yva' : 'client',
     manualTimeAllowed: e.manualTimeAllowed === true,
@@ -52,7 +53,9 @@ export function formToEmployee(form: EmployeeFormData, opts: { schedule: boolean
     premiumEnabled: form.premiumEnabled || undefined,
     premiumStartTime: form.premiumEnabled ? (form.premiumStartTime || '21:00') : undefined,
     premiumPercent: form.premiumEnabled ? Number(form.premiumPercent || 0) : undefined,
-    startYear: form.startYear ? Number(form.startYear) : undefined,
+    // A hire date sets the hire year too, so everything that reads the year keeps working
+    startYear: form.hireDate ? Number(form.hireDate.slice(0, 4)) : form.startYear ? Number(form.startYear) : undefined,
+    hireDate: form.hireDate || null,
     notes: form.notes || undefined,
     email: form.email || undefined,
     phone: form.phone || undefined,
@@ -87,7 +90,11 @@ export function EmployeeFields({ form, setForm, pay, schedule, withName = true }
           <Field label="Employment type">
             <select className="select" value={form.employmentType} onChange={e => set({ employmentType: e.target.value })}>{TYPE_OPTIONS.map(t => <option key={t} value={t}>{t || '— Not set —'}</option>)}</select>
           </Field>
-          <Field label="Hire year"><input className="input" inputMode="numeric" value={form.startYear} onChange={e => set({ startYear: e.target.value })} placeholder="2025" /></Field>
+          <Field label="Hire date">
+            <input className="input" type="date" value={form.hireDate}
+              onChange={e => set({ hireDate: e.target.value, ...(e.target.value ? { startYear: e.target.value.slice(0, 4) } : {}) })} />
+          </Field>
+          <Field label="Hire year"><input className="input" inputMode="numeric" value={form.startYear} disabled={!!form.hireDate} onChange={e => set({ startYear: e.target.value })} placeholder="2025" /></Field>
         </div>
       </section>
 

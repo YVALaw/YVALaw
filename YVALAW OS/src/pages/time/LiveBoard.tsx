@@ -4,12 +4,13 @@ import { useRole } from '../../context/RoleContext'
 import { can } from '../../lib/roles'
 import type { Employee, Project } from '../../data/types'
 import { loadEmployees, loadProjects } from '../../services/storage'
-import { blocksActivity, loadTrackerBlocks, type TrackerBlock } from '../../services/trackerStorage'
+import { blocksActivity, loadConnectedDevices, loadTrackerBlocks, type TrackerBlock } from '../../services/trackerStorage'
 import { Activity, Chips, EmptyState, Pill, Skel, useIsMobile } from '../../components/ui'
 import { ago, hmClock } from '../../utils/format'
 
 const DAY_MS = 86_400_000
 const LIVE_WINDOW_MS = 3 * 60_000     // the app uploads about once a minute while tracking
+const CONNECTED_WINDOW_MS = DAY_MS   // a computer counts as connected when it checked in within 24 h
 
 function startOfToday(): number { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime() }
 function dayInput(ms: number): string {
@@ -25,6 +26,7 @@ export default function LiveBoard() {
   const [projects,  setProjects]  = useState<Project[]>([])
   const [blocks,    setBlocks]    = useState<TrackerBlock[]>([])
   const [loadedAt,  setLoadedAt]  = useState(0)
+  const [devices,   setDevices]   = useState<{ lastSeenAt: number }[] | null>(null)
   const [filter,    setFilter]    = useState<'all' | 'client' | 'yva'>('all')
   const { role } = useRole()
   const showShots = can.viewScreenshots(role)
@@ -39,8 +41,8 @@ export default function LiveBoard() {
     let alive = true
     const load = async () => {
       const from = startOfToday()
-      const rows = await loadTrackerBlocks(from, from + DAY_MS)
-      if (alive) { setBlocks(rows); setLoadedAt(Date.now()) }
+      const [rows, devs] = await Promise.all([loadTrackerBlocks(from, from + DAY_MS), loadConnectedDevices(Date.now() - CONNECTED_WINDOW_MS)])
+      if (alive) { setBlocks(rows); setDevices(devs); setLoadedAt(Date.now()) }
     }
     void load()
     const id = setInterval(() => void load(), 60_000)
@@ -67,6 +69,7 @@ export default function LiveBoard() {
 
   const trackingNow = rows.filter(r => r.tracking).length
   const totalToday  = rows.reduce((s, r) => s + r.seconds, 0)
+  const onlineNow   = devices ? devices.filter(d => loadedAt - d.lastSeenAt < LIVE_WINDOW_MS).length : 0
 
   const state = (r: Row) => (r.tracking ? `Tracking · ${ago(r.latest!.updatedAt)}` : r.latest ? `Last active ${clock(r.latest.updatedAt)}` : 'Not today')
   const working = (r: Row) => (r.latest ? (r.latest.projectId ? projectName(r.latest.projectId) : r.latest.workType ?? '—') : '—')
@@ -80,7 +83,7 @@ export default function LiveBoard() {
       <div className="ops-stats3">
         <div className="card ops-statcard"><span className="ops-statcard__label">Tracking now</span><span className="ops-statcard__value">{loadedAt ? trackingNow : '—'}</span><span className="ops-statcard__note">updated {loadedAt ? clock(loadedAt) : '—'}</span></div>
         <div className="card ops-statcard"><span className="ops-statcard__label">Hours today</span><span className="ops-statcard__value mono">{hmClock(totalToday)}</span><span className="ops-statcard__note">from YVA Time</span></div>
-        <div className="card ops-statcard"><span className="ops-statcard__label">People with a login</span><span className="ops-statcard__value">{employees.filter(e => e.userId).length}</span><span className="ops-statcard__note">invite from an employee profile</span></div>
+        <div className="card ops-statcard" data-stat="computers"><span className="ops-statcard__label">Computers connected</span><span className="ops-statcard__value">{devices ? devices.length : '—'}</span><span className="ops-statcard__note">{devices ? `${onlineNow} online now` : '—'}</span></div>
       </div>
 
       <Chips small value={filter} onChange={setFilter} options={[{ value: 'all', label: 'Everyone' }, { value: 'client', label: 'Client team' }, { value: 'yva', label: 'YVA team' }]} />

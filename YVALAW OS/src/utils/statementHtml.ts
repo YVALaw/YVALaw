@@ -1,5 +1,6 @@
 import type { Employee, Invoice, TimeEntry } from '../data/types'
 import { escapeHtml as esc } from './html'
+import { companyLogoSrc } from './invoiceHtml'
 import { employeePremiumConfig, payrollFromInvoiceItem } from './payroll'
 
 function getEmployeeInvoiceItems(emp: Employee, inv: Invoice) {
@@ -105,7 +106,7 @@ export function buildStatementHTML(
   <style>
     body{font-family:Arial,sans-serif;max-width:700px;margin:40px auto;color:#111}
     .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:28px;border-bottom:2px solid #f5b533;padding-bottom:16px}
-    .logo{height:48px}
+    .logo{height:48px;max-width:200px;object-fit:contain}
     h2{margin:0;font-size:22px;color:#f5b533}
     .meta{font-size:12px;color:#999;margin-top:4px}
     .kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
@@ -119,7 +120,7 @@ export function buildStatementHTML(
     @media print{body{margin:16px}}
   </style></head><body>
   <div class="header">
-    <img src="${window.location.origin}${import.meta.env.BASE_URL}yva-logo.png" class="logo" onerror="this.style.display='none'" />
+    <img src="${esc(companyLogoSrc())}" class="logo" alt="" onerror="this.style.display='none'" />
     <div style="text-align:right">
       <h2>EARNINGS STATEMENT</h2>
       <div class="meta">${esc(emp.name)}${emp.employeeNumber ? ` · ${esc(emp.employeeNumber)}` : ''}</div>

@@ -175,7 +175,7 @@ export function MePay({ e, lang, earnings, earningsError }: { e: MyEmployee; lan
   return (
     <div className="mw-stack">
       <MyPay data={earnings} error={earningsError} lang={lang} />
-      <MyPayslips employeeName={e.name} employeeNumber={e.employeeNumber} lang={lang} />
+      <MyPayslips employeeName={e.name} employeeNumber={e.employeeNumber} lang={lang} pending={earnings?.pendingAdjustments ?? []} />
     </div>
   )
 }

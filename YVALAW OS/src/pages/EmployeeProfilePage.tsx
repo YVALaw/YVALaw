@@ -11,13 +11,14 @@ import { usePermission, useRole } from '../context/RoleContext'
 import { can } from '../lib/roles'
 import { fmtHoursHM } from '../utils/money'
 import { Ic, P } from '../components/Icon'
-import { Banner, Card, EmptyState, KpiStrip, Menu, Modal, Pill, Skel, Tabs, useIsMobile } from '../components/ui'
+import { Activity, Banner, Card, EmptyState, KpiStrip, Menu, Modal, Pill, Skel, Tabs, useIsMobile } from '../components/ui'
 import EmployeeStatements from '../components/people/EmployeeStatements'
 import EmployeePayslips from '../components/people/EmployeePayslips'
 import YvaTimeLogin from '../components/people/YvaTimeLogin'
 import { AttachmentList } from '../components/people/attachments'
 import { EmployeeFields, employeeToForm, formToEmployee, EMPTY_EMPLOYEE_FORM, type EmployeeFormData } from '../components/people/EmployeeForm'
-import { PersonAvatar, employeeStatusTone, firstName, payScheduleOf, placementOf, projectsOf } from '../components/people/common'
+import { PersonAvatar, employeeStatusTone, firstName, hireDateLabel, payScheduleOf, placementOf, projectsOf, upcomingAnniversary } from '../components/people/common'
+import { useEmployeeWeekStats } from '../components/people/weekStats'
 
 function uid() { return crypto.randomUUID() }
 
@@ -33,6 +34,7 @@ export default function EmployeeProfilePage() {
   const mobile = useIsMobile()
   const showPayRates = can.viewPayRates(myRole)
   const canSchedule = allowed('rates.manage')
+  const canTracker = can.viewTracker(myRole)
 
   const [loaded, setLoaded] = useState(false)
   const [employees, setEmployeesState] = useState<Employee[]>([])
@@ -50,6 +52,7 @@ export default function EmployeeProfilePage() {
   }, [])
 
   const emp = employees.find(e => e.id === id)
+  const week = useEmployeeWeekStats(emp)
   const tabParam = params.get('tab') as Tab | null
   const [tab, setTabState] = useState<Tab>(tabParam && TABS.includes(tabParam) ? tabParam : 'overview')
   function setTab(t: Tab) { setTabState(t); setParams(t === 'overview' ? {} : { tab: t }, { replace: true }) }
@@ -179,7 +182,8 @@ export default function EmployeeProfilePage() {
     { k: 'Position', v: empNN.role },
     { k: 'Status', v: empNN.status || 'Active' },
     { k: 'Employment type', v: empNN.employmentType },
-    { k: 'Start year', v: empNN.startYear ? String(empNN.startYear) : undefined },
+    { k: 'Hire date', v: hireDateLabel(empNN.hireDate) },
+    { k: 'Start year', v: !empNN.hireDate && empNN.startYear ? String(empNN.startYear) : undefined },
     { k: 'Default shift', v: empNN.defaultShiftStart || empNN.defaultShiftEnd ? `${empNN.defaultShiftStart || '—'} to ${empNN.defaultShiftEnd || '—'}` : undefined },
     { k: 'Time zone', v: empNN.timezone },
     { k: 'Location', v: empNN.location },
@@ -201,6 +205,12 @@ export default function EmployeeProfilePage() {
   const monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   const monthEntries = empTime.filter(e => e.date.startsWith(monthKey))
   const monthHours = monthEntries.reduce((s, e) => s + e.hours, 0)
+
+  // On time this week (Time → Schedule rules): needs a shift on the profile and a YVA Time login
+  const hasShift = !!(empNN.defaultShiftStart && empNN.defaultShiftEnd)
+  const onTime = hasShift && empNN.userId ? week.onTime : null
+  const onTimeNote = !hasShift ? 'No shift on profile' : !empNN.userId ? 'No YVA Time login'
+    : week.loading ? 'This week' : !onTime || onTime.days === 0 ? 'No finished shift this week' : `${onTime.onTime} of ${onTime.days} days this week`
 
   const overview = (
     <div className="stack stack--lg">
@@ -241,8 +251,18 @@ export default function EmployeeProfilePage() {
           </Card>
           <div className="card ppl-mini-stats">
             <div className="ppl-mini-stat"><span className="info__label">Hours, {now.toLocaleString('en-US', { month: 'short' })}</span><span className="ppl-mini-stat__v num">{fmtHoursHM(monthHours)}</span></div>
-            <div className="ppl-mini-stat"><span className="info__label">Entries, {now.toLocaleString('en-US', { month: 'short' })}</span><span className="ppl-mini-stat__v num">{monthEntries.length}</span></div>
-            <div className="ppl-mini-stat"><span className="info__label">Projects</span><span className="ppl-mini-stat__v num">{assignedProjects.length}</span></div>
+            {canTracker && (
+              <div className="ppl-mini-stat" data-stat="activity">
+                <span className="info__label">Activity</span>
+                <span className="ppl-mini-stat__v">{week.loading ? <Skel w={44} h={18} /> : <Activity pct={client ? week.activity : null} />}</span>
+                <span className="ppl-mini-stat__note">{!client ? 'Not measured for the YVA team' : week.activity === null && !week.loading ? 'Nothing measured this week' : 'This week'}</span>
+              </div>
+            )}
+            <div className="ppl-mini-stat" data-stat="ontime">
+              <span className="info__label">On time</span>
+              <span className="ppl-mini-stat__v num">{week.loading ? <Skel w={44} h={18} /> : onTime && onTime.days > 0 ? `${Math.round(onTime.onTime / onTime.days * 100)}%` : <span className="soft">—</span>}</span>
+              <span className="ppl-mini-stat__note">{onTimeNote}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -313,6 +333,7 @@ export default function EmployeeProfilePage() {
     </div>
   )
 
+  const anniversary = upcomingAnniversary(empNN)
   const since = empNN.startYear ? `since ${empNN.startYear}` : ''
   const subParts = [empNN.role, placementOf(empNN, projects, clients), since].filter(Boolean)
 
@@ -336,6 +357,7 @@ export default function EmployeeProfilePage() {
               <Pill tone={client ? 'info' : 'gold'}>{client ? 'Client project' : 'YVA team'}</Pill>
               <Pill tone={empNN.userId ? 'success' : 'neutral'}>{empNN.userId ? 'YVA Time login' : 'No YVA Time login'}</Pill>
               <Pill tone={employeeStatusTone(empNN.status)}>{empNN.status || 'Active'}</Pill>
+              {anniversary && <Pill tone="gold" className="ppl-anniv">{anniversary.label}</Pill>}
             </div>
           </div>
         </div>

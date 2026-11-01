@@ -202,6 +202,16 @@
 .por-soon__text { margin: 0; font-size: 14px; color: var(--muted); max-width: 420px; line-height: 1.5; }
 .por-soon__text a { color: var(--gold-text); font-weight: 500; }
 
+/* ── Messages (Crisp live chat) ─────────────────────────────────── */
+.por-chat { padding: 32px 24px; display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+.por-chat__icon { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; background: var(--gold-soft-bg); color: var(--gold-soft-fg); }
+.por-chat__title { margin: 0; font-size: 18px; font-weight: 600; }
+.por-chat__text { margin: 0; font-size: 14px; color: var(--muted); max-width: 460px; line-height: 1.5; }
+.por-chat__note { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+.por-chat__note a { color: var(--gold-text); font-weight: 500; }
+/* The Crisp chatbox only shows on the Messages page (PortalMessages adds .por-crisp-on to <html>) */
+html:not(.por-crisp-on) .crisp-client { display: none !important; }
+
 /* ── Settings ──────────────────────────────────────────────────── */
 .por-form { gap: 12px; }
 .por-form__btn { align-self: flex-start; }

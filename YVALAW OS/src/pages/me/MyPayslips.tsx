@@ -4,6 +4,7 @@ import { openPayslip } from '../../utils/payslipHtml'
 import { Skel } from '../../components/ui'
 import { usd } from '../../utils/format'
 import { DICT, dateLabel, hm, type Lang } from './i18n'
+import { adjAmount, adjWhen, type PendingAdjustment } from './MyPay'
 
 type Line = { id: string; run_id: string; label: string; period_start: string; period_end: string; payday: string; paid_on: string | null; reference: string | null
   regular_seconds: number; premium_seconds: number; pay_rate: number; rates: number[]; premium_percent: number; gross_usd: number; adjustments_usd: number; net_usd: number
@@ -12,7 +13,9 @@ type Adj = { id?: string; run_id: string; type: 'bonus' | 'deduction'; amount: n
 
 /** My workspace → My pay: payslips (own PAID payroll lines, RLS) with a PDF each, and the bonuses / deductions
  *  YVA applied to them (own applied payroll_adjustments, RLS) */
-export default function MyPayslips({ employeeName, employeeNumber, lang = 'en' }: { employeeName: string; employeeNumber?: string | null; lang?: Lang }) {
+export default function MyPayslips({ employeeName, employeeNumber, lang = 'en', pending = [] }: { employeeName: string; employeeNumber?: string | null; lang?: Lang
+  /** own bonuses / deductions waiting for a payday (employee-earnings; RLS only lets employees read applied ones) */
+  pending?: PendingAdjustment[] }) {
   const t = DICT[lang].pay
   const [lines, setLines] = useState<Line[] | null>(null)
   const [adjs, setAdjs] = useState<Adj[]>([])
@@ -47,7 +50,17 @@ export default function MyPayslips({ employeeName, employeeNumber, lang = 'en' }
       </section>
       <section className="card">
         <h2 className="mw-card-title">{t.adjustments}</h2>
-        {adjs.length === 0 && <p className="mw-empty">{t.noAdjustments}</p>}
+        {adjs.length === 0 && pending.length === 0 && <p className="mw-empty">{t.noAdjustments}</p>}
+        {pending.map(a => (
+          <div key={`p-${a.id}`} className="mw-row mw-adj mw-adj--waiting">
+            <div className="mw-row__main">
+              <span className="mw-row__title">{a.reason}</span>
+              <span className="mw-row__meta">{a.type === 'bonus' ? t.bonus : t.deduction} · {adjWhen(a, lang)}{a.total > 1 ? ` · ${t.of(a.sequence, a.total)}` : ''}</span>
+            </div>
+            <span className="pill pill--warning mw-pill">{t.waiting}</span>
+            <span className={`mw-adj__amount num ${a.type === 'bonus' ? 't-success' : 't-danger'}`}>{adjAmount(a)}</span>
+          </div>
+        ))}
         {adjs.map((a, i) => {
           const payday = paydayOf(a.run_id)
           return (

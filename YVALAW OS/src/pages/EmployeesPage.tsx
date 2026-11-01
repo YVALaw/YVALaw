@@ -10,7 +10,7 @@ import { Banner, Drawer, EmptyState, Modal, Menu, PageHeader, Pill, SearchInput,
 import EmployeeStatements from '../components/people/EmployeeStatements'
 import { EMPTY_EMPLOYEE_FORM, EmployeeFields, STATUS_OPTIONS, employeeToForm, formToEmployee, type EmployeeFormData } from '../components/people/EmployeeForm'
 import { AttachmentList } from '../components/people/attachments'
-import { PersonAvatar, employeeStatusTone, payScheduleOf, placementOf, projectsOf } from '../components/people/common'
+import { PersonAvatar, employeeStatusTone, payScheduleOf, placementOf, projectsOf, upcomingAnniversary } from '../components/people/common'
 import { TIME_STATUS, loadTimeActivity, timeStatusOf } from '../components/people/teamStatus'
 
 function uid() { return crypto.randomUUID() }
@@ -133,6 +133,12 @@ export default function EmployeesPage() {
     ]} />
   )
 
+  // Work anniversary within 30 days (needs a hire date): small gold marker, full text on hover
+  const annivMark = (e: Employee) => {
+    const a = upcomingAnniversary(e)
+    return a ? <span className="pill pill--gold ppl-anniv-mark" title={a.label} aria-label={a.label}>{a.years} yr · {a.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span> : null
+  }
+
   const invoiceCount = (e: Employee) => invoices.filter(inv => (inv.items || []).some(it => it.employeeName?.toLowerCase() === e.name.toLowerCase())).length
   const payCell = (e: Employee) => {
     const s = payScheduleOf(e, projects)
@@ -146,7 +152,7 @@ export default function EmployeesPage() {
         <button type="button" key={e.id} className="ppl-mrow" onClick={() => navigate('/employees/' + e.id)}>
           <PersonAvatar name={e.name} photo={e.photoUrl} size="lg" />
           <span className="ppl-mrow__main">
-            <span className="ppl-mrow__title">{e.name}</span>
+            <span className="ppl-mrow__title">{e.name}{annivMark(e)}</span>
             <span className="ppl-mrow__meta">{placementOf(e, projects, clients)}</span>
           </span>
           <span className={`ppl-time__dot ppl-time__dot--${TIME_STATUS[timeStatusOf(e, activity)].tone}${TIME_STATUS[timeStatusOf(e, activity)].live ? ' ppl-time__dot--live' : ''}`} aria-label={TIME_STATUS[timeStatusOf(e, activity)].label} />
@@ -173,7 +179,7 @@ export default function EmployeesPage() {
               <td><Pill tone={isYva(e) ? 'gold' : 'info'}>{isYva(e) ? 'YVA team' : 'Client'}</Pill></td>
               <td><TimeDot e={e} activity={activity} /></td>
               <td className="muted">{payCell(e)}</td>
-              <td className="muted">{e.startYear || '—'}</td>
+              <td className="muted"><span className="ppl-since">{e.startYear || '—'}{annivMark(e)}</span></td>
               <td className="t-actions" onClick={ev => ev.stopPropagation()}>{rowMenu(e)}</td>
             </tr>
           ))}

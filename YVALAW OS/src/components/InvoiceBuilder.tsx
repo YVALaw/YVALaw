@@ -13,6 +13,7 @@ import { Ic, P } from './Icon'
 import { Banner, Field, Menu, Modal } from './ui'
 import { printInvoice } from '../utils/invoiceHtml'
 import { hoursToHM, loadTrackerEntriesForProject } from '../services/trackerStorage'
+import { isItemLine, makeItemLine, qtyText } from '../utils/invoiceLines'
 
 function projectPrefix(name: string): string {
   return name.split(/\s+/).map(w => w[0] || '').join('').toUpperCase().slice(0, 5)
@@ -86,6 +87,11 @@ function rowAmount(row: BuilderRow, dates: string[]): number {
   return rowHours(row, dates) * (parseFloat(row.rate) || 0)
 }
 
+/** A fixed-price line (description × qty × price) — e.g. from an accepted estimate. Never hours or payroll. */
+type ItemRow = { _id: string; description: string; qty: string; price: string }
+const itemRowAmount = (r: ItemRow) => (parseFloat(r.qty.replace(',', '.')) || 0) * (parseFloat(r.price.replace(',', '.')) || 0)
+const emptyItemRow = (): ItemRow => ({ _id: uid(), description: '', qty: '1', price: '' })
+
 function emptyRow(): BuilderRow {
   return { _id: uid(), employeeId: undefined, employeeName: '', position: '', rate: '', hoursManual: '', shiftStart: '', shiftEnd: '', daily: {} }
 }
@@ -143,8 +149,13 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
     if (editInvoice.projectId) setProjectId(editInvoice.projectId)
     const client = clients.find(c => c.name === editInvoice.clientName)
     if (client) setClientId(client.id)
-    if (editInvoice.items && editInvoice.items.length > 0) {
-      setRows(editInvoice.items.map(it => ({
+    const lines = editInvoice.items || []
+    // Item lines (kind 'item') go to their own list so saving keeps them; hours lines fill the grid as before
+    const items = lines.filter(isItemLine)
+    if (items.length > 0) setItemRows(items.map(it => ({ _id: uid(), description: it.description || '', qty: qtyText(it.qty), price: String(Number(it.rate) || 0) })))
+    const hours = lines.filter(it => !isItemLine(it))
+    if (hours.length > 0) {
+      setRows(hours.map(it => ({
         _id: uid(),
         employeeId: it.employeeId,
         employeeName: it.employeeName,
@@ -180,6 +191,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
   const [billingEnd,   setBillingEnd]   = useState('')
   const [notes,        setNotes]        = useState('')
   const [rows,         setRows]         = useState<BuilderRow[]>([emptyRow()])
+  const [itemRows,     setItemRows]     = useState<ItemRow[]>([])
   const [saving,       setSaving]       = useState(false)
   const [saveTemplateModal, setSaveTemplateModal] = useState(false)
   const [templateName, setTemplateName] = useState('')
@@ -295,7 +307,12 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
     }
   }
 
-  const grandTotal = rows.reduce((s, r) => s + rowComp(r, dates).billAmount, 0)
+  const itemsTotal = Math.round(itemRows.reduce((s, r) => s + itemRowAmount(r), 0) * 100) / 100
+  const grandTotal = rows.reduce((s, r) => s + rowComp(r, dates).billAmount, 0) + itemsTotal
+
+  function updateItemRow(id: string, patch: Partial<ItemRow>) {
+    setItemRows(prev => prev.map(r => r._id === id ? { ...r, ...patch } : r))
+  }
 
   function updateRow(id: string, patch: Partial<BuilderRow>) {
     setRows(prev => prev.map(r => r._id === id ? { ...r, ...patch } : r))
@@ -404,6 +421,13 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
   }
 
   function buildItems(): InvoiceItem[] {
+    const itemLines = itemRows
+      .filter(r => r.description.trim() || itemRowAmount(r) !== 0)
+      .map(r => makeItemLine(r.description, parseFloat(r.qty.replace(',', '.')) || 0, parseFloat(r.price.replace(',', '.')) || 0))
+    return [...buildHourItems(), ...itemLines]
+  }
+
+  function buildHourItems(): InvoiceItem[] {
     return rows
         .filter(r => r.employeeName.trim())
         .map(r => {
@@ -527,7 +551,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
   const totalHours = rows.reduce((s, r) => s + rowComp(r, dates).hours, 0)
   const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   const canSave = !saving && grandTotal !== 0 && !!clientId
-  const saveHint = !clientId ? 'Pick a client first' : grandTotal === 0 ? 'Add hours and a rate first' : undefined
+  const saveHint = !clientId ? 'Pick a client first' : grandTotal === 0 ? 'Add hours and a rate (or an item line) first' : undefined
   const canImport = dates.length > 0 && !!projectId
   const isDraftEdit = !editInvoice || (editInvoice.status || 'draft') === 'draft'
 
@@ -678,13 +702,50 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
                 </table>
               )}
             </div>
-            <button type="button" className="fin-builder__add" onClick={addRow}>+ Add employee row</button>
+            <div className="fin-builder__adds">
+              <button type="button" className="fin-builder__add" onClick={addRow}>+ Add employee row</button>
+              {itemRows.length === 0 && <button type="button" className="fin-builder__add" onClick={() => setItemRows([emptyItemRow()])}>+ Add item line</button>}
+            </div>
           </section>
+
+          {itemRows.length > 0 && (
+            <section className="card fin-builder__hours fin-builder__items">
+              <div className="card__head">
+                <div className="fin-builder__hours-title">
+                  <h2 className="card__title">Items</h2>
+                  <span className="card__meta">Fixed-price lines (description × qty × price) — not hours, never in payroll.</span>
+                </div>
+              </div>
+              <div className="fin-grid-wrap">
+                <table className="fin-grid fin-grid--simple fin-grid--items">
+                  <thead>
+                    <tr><th className="fin-grid__desc">Description</th><th className="t-right">Qty</th><th className="t-right">Price</th><th className="t-right">Amount</th><th aria-label="Remove" /></tr>
+                  </thead>
+                  <tbody>
+                    {itemRows.map(r => {
+                      const amt = itemRowAmount(r)
+                      return (
+                        <tr key={r._id}>
+                          <td className="fin-grid__desc"><input className="input input--sm" aria-label="Item description" value={r.description} onChange={e => updateItemRow(r._id, { description: e.target.value })} placeholder="e.g. Onboarding and setup" /></td>
+                          <td className="t-right"><input className="input input--sm fin-grid__rate mono" type="text" inputMode="decimal" aria-label="Item quantity" value={r.qty} onChange={e => updateItemRow(r._id, { qty: e.target.value })} placeholder="1" /></td>
+                          <td className="t-right"><input className="input input--sm fin-grid__rate" type="text" inputMode="decimal" aria-label="Item price" value={r.price} onChange={e => updateItemRow(r._id, { price: e.target.value })} placeholder="0.00" /></td>
+                          <td className="t-right fin-grid__amt">{amt !== 0 ? money(amt) : '—'}</td>
+                          <td><button type="button" className="btn btn--ghost btn--icon btn--sm fin-builder__remove" aria-label={`Remove item ${r.description || 'line'}`} onClick={() => setItemRows(prev => prev.filter(x => x._id !== r._id))}><Ic d={P.trash} size={15} /></button></td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <button type="button" className="fin-builder__add" onClick={() => setItemRows(prev => [...prev, emptyItemRow()])}>+ Add item line</button>
+            </section>
+          )}
         </div>
 
         <aside className="card card--pad fin-builder__summary">
           <h2 className="card__title">Summary</h2>
           <div className="fin-sum-line"><span>Hours</span><span className="mono">{hoursToHM(totalHours)}</span></div>
+          {itemRows.length > 0 && <div className="fin-sum-line"><span>Items</span><span className="num">{money(itemsTotal)}</span></div>}
           <div className="fin-sum-line"><span>Subtotal</span><span className="num">{money(grandTotal)}</span></div>
           <div className="fin-sum-line fin-sum-line--total"><span>Total due</span><span className="num">{money(grandTotal)}</span></div>
           {settings.usdToDop > 0 && <div className="fin-sum-dop">RD${(grandTotal * settings.usdToDop).toLocaleString('en-US', { maximumFractionDigits: 0 })} at RD${settings.usdToDop} (internal only, never on the client's invoice)</div>}

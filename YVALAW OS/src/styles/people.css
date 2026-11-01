@@ -97,9 +97,13 @@
 .ppl-info { grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); }
 .ppl-info__v { font-weight: 500; }
 .ppl-notes { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--row-line); }
-.ppl-mini-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 16px 20px; }
+.ppl-mini-stats { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 10px; padding: 16px 20px; }
 .ppl-mini-stat { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .ppl-mini-stat__v { font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+.ppl-mini-stat__note { font-size: 11.5px; line-height: 1.35; color: var(--soft); }
+.ppl-since { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.ppl-anniv-mark { font-size: 11px; padding: 1px 6px; white-space: nowrap; }
+.ppl-mrow__title .ppl-anniv-mark { margin-left: 6px; vertical-align: 1px; }
 .ppl-timelog__table { min-width: 680px; }
 .ppl-payrates__base { font-size: 13.5px; padding-bottom: 10px; }
 .ppl-payout__body { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }

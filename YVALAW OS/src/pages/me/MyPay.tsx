@@ -13,7 +13,31 @@ export type Earnings = {
              amount: number; approvedAmount: number; pendingAmount: number; payRate: number; missingRate: boolean }[]
   totals: { seconds: number; amount: number; approvedAmount: number }
   paid: { payday: string; netUsd: number; netDop: number | null; paidAt: string | null }[]
+  /** Own bonuses / deductions waiting for a payday (absent from an older function version) */
+  pendingAdjustments?: PendingAdjustment[]
   updatedAt: string
+}
+
+/** payday = the payroll it is attached to (null = next payday); later = a later row of a repeat */
+export type PendingAdjustment = { id: string; type: 'bonus' | 'deduction'; amount: number; reason: string; sequence: number; total: number; payday: string | null; later: boolean }
+
+/** "+ $25.00" / "− $10.00" */
+export const adjAmount = (a: PendingAdjustment) => `${a.type === 'bonus' ? '+' : '−'} ${usd(Math.abs(a.amount))}`
+/** "next payday" / "payday Fri, Nov 6" / "a later payday" */
+export function adjWhen(a: PendingAdjustment, lang: Lang): string {
+  const t = DICT[lang].pay
+  return a.later ? t.laterPayday : a.payday ? `${t.payday} ${dateLabel(a.payday, lang)}` : t.nextPayday
+}
+
+/** "+ $25.00 bonus · next payday" line under a pay period */
+function PendingLine({ a, lang }: { a: PendingAdjustment; lang: Lang }) {
+  const t = DICT[lang].pay
+  return (
+    <span className="mw-period__adj">
+      <span className={`num ${a.type === 'bonus' ? 't-success' : 't-danger'}`}>{adjAmount(a)}</span> {a.type === 'bonus' ? t.bonusLower : t.deductionLower} · {adjWhen(a, lang)}
+      {a.total > 1 ? ` (${t.of(a.sequence, a.total)})` : ''}{a.reason ? <span className="mw-period__adj-reason"> · {a.reason}</span> : null}
+    </span>
+  )
 }
 
 export async function fetchEarnings(): Promise<Earnings> {
@@ -41,9 +65,17 @@ export default function MyPay({ data, error, lang = 'en' }: { data: Earnings | n
   if (error && !data) return <Banner tone="danger">{t.pay.error} {error}</Banner>
   if (!data) return <section className="card mw-period"><Skel w={180} h={13} /><Skel w={220} h={34} /><Skel w={260} h={13} /></section>
   const rate = data.dopRate
+  // Waiting bonuses / deductions for the coming payday go under the period paid that day (attached ones),
+  // or under the soonest-paid period (not attached to a payroll yet = next payday)
+  const upcoming = (data.pendingAdjustments || []).filter(a => !a.later)
+  const soonest = data.periods.length ? [...data.periods].sort((a, b) => a.payday.localeCompare(b.payday))[0].key : null
+  const homeOf = (a: PendingAdjustment) => data.periods.find(p => a.payday && p.payday === a.payday)?.key ?? soonest
   return (
     <>
       {data.periods.length === 0 && <div className="card card-empty">{t.pay.none}</div>}
+      {data.periods.length === 0 && upcoming.length > 0 && (
+        <section className="card mw-period mw-period--adj">{upcoming.map(a => <PendingLine key={a.id} a={a} lang={lang} />)}</section>
+      )}
       {data.periods.map(p => (
         <section key={p.key} className="card mw-period">
           <span className="mw-period__label">{t.pay.thisPeriod} · {dateLabel(p.start, lang, { month: 'short', day: 'numeric' })} – {dateLabel(p.end, lang, { month: 'short', day: 'numeric' })}{data.periods.length > 1 || p.key !== 'yva' ? ` · ${p.label}` : ''}</span>
@@ -57,6 +89,9 @@ export default function MyPay({ data, error, lang = 'en' }: { data: Earnings | n
               {p.approvedAmount > 0 && <span className="pill pill--success mw-pill">{money(p.approvedAmount, rate)} {t.status.approved}</span>}
               {p.pendingAmount > 0 && <span className="pill pill--warning mw-pill">{money(p.pendingAmount, rate)} {t.status.waiting}</span>}
             </div>
+          )}
+          {upcoming.some(a => homeOf(a) === p.key) && (
+            <div className="mw-period__adjs">{upcoming.filter(a => homeOf(a) === p.key).map(a => <PendingLine key={a.id} a={a} lang={lang} />)}</div>
           )}
         </section>
       ))}

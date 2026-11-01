@@ -108,6 +108,12 @@
 .fin-builder__remove { color: var(--muted); }
 .fin-builder__add { border: 0; border-top: 1px solid var(--row-line); background: none; text-align: left; padding: 12px 20px; color: var(--gold-text); font: 500 13.5px var(--font); cursor: pointer; width: 100%; }
 .fin-builder__add:hover { color: var(--gold-text-hover); background: var(--surface-2); }
+/* Fixed-price item lines (estimate → invoice): own card under the hours, add buttons side by side */
+.fin-builder__adds { display: flex; border-top: 1px solid var(--row-line); }
+.fin-builder__adds .fin-builder__add { border-top: 0; width: auto; }
+.fin-grid--items { min-width: 560px; }
+.fin-grid__desc { width: 60%; }
+.fin-grid__desc .input { width: 100%; min-width: 220px; }
 .fin-builder__summary { position: sticky; top: 16px; display: flex; flex-direction: column; gap: 12px; padding: 18px 20px; }
 .fin-sum-line { display: flex; justify-content: space-between; gap: 10px; font-size: 13.5px; color: var(--text-2); }
 .fin-sum-line .mono { font-size: 13px; }

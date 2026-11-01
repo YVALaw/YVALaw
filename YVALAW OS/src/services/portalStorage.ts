@@ -7,6 +7,7 @@
 
 import { supabase } from '../lib/supabase'
 import type { Client, ClientDocument, Employee, Invoice, PaymentAttempt, Project, TimeEntry, WorkingHourPrefs } from '../data/types'
+import { hourLines } from '../utils/invoiceLines'
 
 export type PortalBillingSettings = {
   stripeCustomerId?: string
@@ -161,7 +162,7 @@ export function computeMonthHours(invoices: Invoice[], yearMonth: string): numbe
   return invoices
     .filter(inv => (inv.billingStart ?? inv.date ?? '').startsWith(yearMonth))
     .reduce((sum, inv) => {
-      const itemHours = (inv.items ?? []).reduce((s, item) => s + (Number(item.hoursTotal) || 0), 0)
+      const itemHours = hourLines(inv.items).reduce((s, item) => s + (Number(item.hoursTotal) || 0), 0)
       return sum + itemHours
     }, 0)
 }
@@ -467,4 +468,21 @@ export async function submitStaffRequest(params: {
     notes: [extra, params.notes].filter(Boolean).join('\n') || null,
   })
   if (retryErr) throw new Error(retryErr.message)
+}
+
+// ── Live chat (Crisp) ────────────────────────────────────────────────────────
+
+export type PortalChatConfig = { crispWebsiteId: string | null }
+const CRISP_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * The Crisp website ID for the Messages tab. Portal clients can't read `settings`, so it comes from
+ * public.portal_chat_config() (portal clients + staff only; migrate-redesign-settings.sql).
+ * Function missing / not allowed / no ID → chat off (the "coming soon" card).
+ */
+export async function loadChatConfig(): Promise<PortalChatConfig> {
+  const { data, error } = await supabase.rpc('portal_chat_config')
+  if (error) return { crispWebsiteId: null }
+  const id = (data as { crisp_website_id?: unknown } | null)?.crisp_website_id
+  return { crispWebsiteId: typeof id === 'string' && CRISP_ID.test(id.trim()) ? id.trim() : null }
 }

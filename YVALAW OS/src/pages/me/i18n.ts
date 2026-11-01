@@ -45,6 +45,8 @@ const en = {
     error: 'Could not load your pay.',
     payslips: 'Payslips', payslip: 'Payslip', noSlips: 'No payments yet. Your payslips appear here after YVA pays you.',
     adjustments: 'Bonuses and deductions', noAdjustments: 'No bonuses or deductions yet.', bonus: 'Bonus', deduction: 'Deduction',
+    bonusLower: 'bonus', deductionLower: 'deduction', nextPayday: 'next payday', laterPayday: 'a later payday', payday: 'payday',
+    waiting: 'Waiting', of: (n: number, total: number) => `${n} of ${total}`,
   },
   shots: { sub: 'What YVA sees — your screenshots and activity, by day (kept 60 days).' },
   requests: {
@@ -107,6 +109,8 @@ const es: Dict = {
     error: 'No se pudo cargar tu pago.',
     payslips: 'Volantes de pago', payslip: 'Volante de pago', noSlips: 'Aún no hay pagos. Tus volantes aparecen aquí cuando YVA te paga.',
     adjustments: 'Bonos y descuentos', noAdjustments: 'Aún no hay bonos ni descuentos.', bonus: 'Bono', deduction: 'Descuento',
+    bonusLower: 'bono', deductionLower: 'descuento', nextPayday: 'próximo pago', laterPayday: 'un pago posterior', payday: 'pago del',
+    waiting: 'Pendiente', of: (n: number, total: number) => `${n} de ${total}`,
   },
   shots: { sub: 'Lo que ve YVA — tus capturas y actividad por día (se guardan 60 días).' },
   requests: {

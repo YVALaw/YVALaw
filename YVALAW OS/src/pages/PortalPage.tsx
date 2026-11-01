@@ -3,6 +3,7 @@ import type { Invoice } from '../data/types'
 import { Ic, P } from '../components/Icon'
 import { Pill, useIsMobile } from '../components/ui'
 import { dateMed } from '../utils/format'
+import { isItemLine, lineAmount, qtyText } from '../utils/invoiceLines'
 
 // The share link may still carry dopRate (older links); it is ignored — DOP is never shown to clients.
 type Payload = { inv: Invoice; dopRate?: number }
@@ -95,28 +96,44 @@ export default function PortalPage() {
           <section className="set-iv__items" aria-label="Line items">
             {items.map((it, i) => (
               <div key={i} className="set-iv__item">
-                <div>
-                  <strong>{it.employeeName}</strong>
-                  {it.position && <div className="set-iv__item-meta">{it.position}</div>}
-                  <div className="set-iv__item-meta">{fmtHours(it.hoursTotal)} × ${it.rate}/hr</div>
-                </div>
-                <strong className="num">{fmtMoney(it.hoursTotal * it.rate)}</strong>
+                {isItemLine(it) ? (
+                  <div>
+                    <strong>{it.description || 'Item'}</strong>
+                    <div className="set-iv__item-meta">{qtyText(it.qty)} × {fmtMoney(Number(it.rate) || 0)}</div>
+                  </div>
+                ) : (
+                  <div>
+                    <strong>{it.employeeName}</strong>
+                    {it.position && <div className="set-iv__item-meta">{it.position}</div>}
+                    <div className="set-iv__item-meta">{fmtHours(it.hoursTotal)} × ${it.rate}/hr</div>
+                  </div>
+                )}
+                <strong className="num">{fmtMoney(lineAmount(it))}</strong>
               </div>
             ))}
           </section>
         ) : (
           <table className="set-iv__table">
             <thead>
-              <tr><th>Description</th><th className="t-num">Hours</th><th className="t-num">Rate</th><th className="t-num">Amount</th></tr>
+              <tr><th>Description</th><th className="t-num">{items.every(isItemLine) ? 'Qty' : items.some(isItemLine) ? 'Hours / qty' : 'Hours'}</th><th className="t-num">Rate</th><th className="t-num">Amount</th></tr>
             </thead>
             <tbody>
               {items.map((it, i) => (
-                <tr key={i}>
-                  <td><strong>{it.employeeName}</strong>{it.position && <span className="set-iv__pos">{it.position}</span>}</td>
-                  <td className="t-num">{fmtHours(it.hoursTotal)}</td>
-                  <td className="t-num">${it.rate}/hr</td>
-                  <td className="t-num"><strong>{fmtMoney(it.hoursTotal * it.rate)}</strong></td>
-                </tr>
+                isItemLine(it) ? (
+                  <tr key={i}>
+                    <td><strong>{it.description || 'Item'}</strong></td>
+                    <td className="t-num">{qtyText(it.qty)}</td>
+                    <td className="t-num">{fmtMoney(Number(it.rate) || 0)}</td>
+                    <td className="t-num"><strong>{fmtMoney(lineAmount(it))}</strong></td>
+                  </tr>
+                ) : (
+                  <tr key={i}>
+                    <td><strong>{it.employeeName}</strong>{it.position && <span className="set-iv__pos">{it.position}</span>}</td>
+                    <td className="t-num">{fmtHours(it.hoursTotal)}</td>
+                    <td className="t-num">${it.rate}/hr</td>
+                    <td className="t-num"><strong>{fmtMoney(lineAmount(it))}</strong></td>
+                  </tr>
+                )
               ))}
             </tbody>
           </table>

@@ -278,3 +278,7 @@
   .set-iv__total { background: #fff; color: var(--text); border: 2px solid var(--navy); }
   .set-iv__total-value { color: var(--text); }
 }
+
+/* Company logo (upload / use default) + Crisp card link */
+.set-logo-side { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.set-int__link { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--gold-text); font-weight: 500; }

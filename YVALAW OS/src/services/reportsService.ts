@@ -1,5 +1,6 @@
 import type { DataSnapshot, Invoice, InvoiceItem } from '../data/types'
 import { payrollFromInvoiceItem } from '../utils/payroll'
+import { hourLines } from '../utils/invoiceLines'
 import { supabase } from '../lib/supabase'
 import { loadLeads, type Lead } from './crm'
 import { loadTrackerBlocks, loadManualRequests, type TrackerBlock, type ManualRequest } from './trackerStorage'
@@ -140,8 +141,9 @@ function safeSubtotal(inv: Invoice): number {
   return Number.isFinite(n) ? n : 0
 }
 
+/** The invoice's hours lines only: fixed-price item lines (kind 'item') are not hours and pay nobody */
 function safeItems(inv: Invoice): InvoiceItem[] {
-  return Array.isArray(inv.items) ? inv.items : []
+  return hourLines(inv.items)
 }
 
 function sumHours(items: InvoiceItem[]): number {
@@ -413,12 +415,14 @@ export function expiringContracts<C extends { contractEnd?: string }>(clients: C
     .sort((a, b) => a.daysLeft - b.daysLeft)
 }
 
-/** Employees hitting a milestone year with YVA this year (1, 2, 3, 5, 10, 15, 20) */
-export function anniversaries<E extends { id: string; name: string; startYear?: number | string }>(employees: E[], year = new Date().getFullYear()) {
+/** Employees hitting a milestone year with YVA this year (1, 2, 3, 5, 10, 15, 20). The hire date's year wins
+ *  over the stored hire year when both exist. */
+export function anniversaries<E extends { id: string; name: string; startYear?: number | string; hireDate?: string | null }>(employees: E[], year = new Date().getFullYear()) {
   const milestones = new Set([1, 2, 3, 5, 10, 15, 20])
+  const startOf = (e: E) => (/^\d{4}-/.test(e.hireDate || '') ? Number(e.hireDate!.slice(0, 4)) : Number(e.startYear))
   return employees
-    .filter(e => { const s = Number(e.startYear); return !!s && s < year && milestones.has(year - s) })
-    .map(e => ({ id: e.id, name: e.name, years: year - Number(e.startYear) }))
+    .filter(e => { const s = startOf(e); return !!s && s < year && milestones.has(year - s) })
+    .map(e => ({ id: e.id, name: e.name, years: year - startOf(e) }))
 }
 
 function lastInvoiceDayFor(invoices: Invoice[], clientName: string): string {

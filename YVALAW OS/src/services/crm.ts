@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { loadSettings, loadInvoiceCounter, saveInvoiceCounter, logComm, invalidateSnapshotCache } from './storage'
 import { sendEmail, type SendEmailResult } from './gmail'
 import type { Client as Cli, Estimate, Invoice as Inv, Project } from '../data/types'
+import { itemLinesFromEstimate, itemLinesSubtotal } from '../utils/invoiceLines'
 
 export type LeadStage = 'new' | 'contacted' | 'meeting' | 'proposal' | 'won' | 'lost'
 export const STAGES: { key: LeadStage; label: string }[] = [
@@ -144,22 +145,24 @@ export async function sendClientReminder(c: Cli, invoices: Inv[]): Promise<{ res
   return { result, count: unpaidInvs.length, total: totalOwed }
 }
 
-/** Accepted estimate → a draft invoice (fixed price, the estimate's lines in the notes) for Finance to review and send.
- *  Numbered like Quick Invoice (INV-NNN from the shared counter). */
+/** Accepted estimate → a draft invoice for Finance to review and send. The estimate's lines become real
+ *  invoice item lines (description × qty × price — never hours or payroll, see utils/invoiceLines.ts) and the
+ *  subtotal is their sum. Numbered like Quick Invoice (INV-NNN from the shared counter). */
 export async function createInvoiceFromEstimate(est: Estimate, client?: Cli, project?: Project): Promise<{ id: string; number: string }> {
   const counter = await loadInvoiceCounter()
   const id = crypto.randomUUID(), number = `INV-${String(counter).padStart(3, '0')}`
-  const lines = est.items.filter(i => i.description || i.qty || i.unitPrice).map(i => `• ${i.description || 'Item'} — ${i.qty} × $${(Number(i.unitPrice) || 0).toFixed(2)} = $${((i.qty || 0) * (i.unitPrice || 0)).toFixed(2)}`)
-  const notes = [`From estimate ${est.number}`, ...lines, est.notes].filter(Boolean).join('\n')
+  const items = itemLinesFromEstimate(est.items)
+  const subtotal = items.length ? itemLinesSubtotal(items) : Number(est.total) || 0
+  const notes = [`From estimate ${est.number}`, est.notes].filter(Boolean).join('\n')
   const today = new Date(); const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   const { error } = await supabase.from('invoices').insert({
     id, number, date, client_name: client?.name ?? est.clientName ?? null, client_email: client?.email ?? null, client_address: client?.address ?? null,
     client_id: client?.id ?? est.clientId ?? null, project_id: project?.id ?? est.projectId ?? null, project_name: project?.name ?? est.projectName ?? null,
-    subtotal: Number(est.total) || 0, notes, status: 'draft', items: [], status_history: [{ status: 'draft', changedAt: Date.now() }],
+    subtotal, notes, status: 'draft', items, status_history: [{ status: 'draft', changedAt: Date.now() }],
   })
   if (error) throw new Error(error.message)
   invalidateSnapshotCache()
   await saveInvoiceCounter(counter + 1).catch(() => {})
-  if (client?.id) await logComm(client.id, `Draft invoice ${number} created from estimate ${est.number} ($${(Number(est.total) || 0).toFixed(2)})`, 'system')
+  if (client?.id) await logComm(client.id, `Draft invoice ${number} created from estimate ${est.number} ($${subtotal.toFixed(2)})`, 'system')
   return { id, number }
 }

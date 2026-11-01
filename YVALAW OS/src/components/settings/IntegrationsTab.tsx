@@ -24,6 +24,21 @@ function newestVersion(versions: string[]): string | null {
   }, null)
 }
 
+/** Crisp website IDs are UUIDs (Crisp → Settings → Website Settings → Setup & Integrations) */
+export const CRISP_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export type CrispSetting = {
+  value: string
+  saved: string
+  loading: boolean
+  /** false until migrate-redesign-settings.sql has run */
+  ready: boolean
+  saving: boolean
+  dirty: boolean
+  onChange: (v: string) => void
+  save: () => Promise<boolean>
+}
+
 type Facts = {
   stripeLast?: { at: string; amount: number } | null
   calendlyBooked?: number | null
@@ -32,7 +47,7 @@ type Facts = {
   pushHere?: PushState | null
 }
 
-export default function IntegrationsTab({ clientId, onClientId, saveClientId, gmail, recheck, onGmailChange, notify }: {
+export default function IntegrationsTab({ clientId, onClientId, saveClientId, gmail, recheck, onGmailChange, notify, crisp }: {
   clientId: string
   onClientId: (v: string) => void
   /** Saves the Client ID if it changed; resolves false when the save failed */
@@ -41,6 +56,7 @@ export default function IntegrationsTab({ clientId, onClientId, saveClientId, gm
   recheck: () => Promise<void>
   onGmailChange: (s: GmailStatus) => void
   notify: (tone: 'success' | 'danger', text: string) => void
+  crisp: CrispSetting
 }) {
   const [facts, setFacts] = useState<Facts>({})
   const [busy, setBusy] = useState(false)
@@ -93,6 +109,8 @@ export default function IntegrationsTab({ clientId, onClientId, saveClientId, gm
   const stripeMode = pk.startsWith('pk_live') ? 'Live' : pk.startsWith('pk_test') ? 'Test mode' : pk ? 'Configured' : ''
   const downloadUrl = (import.meta.env.VITE_YVA_TIME_DOWNLOAD_URL as string | undefined) || ''
   const dash = <span className="soft">—</span>
+  const crispOn = !crisp.loading && !!crisp.saved
+  const crispBad = !!crisp.value.trim() && !CRISP_ID_RE.test(crisp.value.trim())
 
   const g = gmail.state
   const gmailPill = g === 'ok' ? <Status tone="ok">Connected</Status>
@@ -208,12 +226,29 @@ export default function IntegrationsTab({ clientId, onClientId, saveClientId, gm
       </section>
 
       {/* ── Crisp ── */}
-      <section className="set-int set-int--soon" aria-label="Crisp chat">
+      <section className={`set-int${crispOn ? '' : ' set-int--soon'}`} aria-label="Crisp chat">
         <div className="set-int__head">
           <span className="set-int__name"><Ic d={P.message} /> Crisp chat</span>
-          <Status tone="soon">Coming soon</Status>
+          {crisp.loading ? <Status tone="off">Checking…</Status> : crispOn ? <Status tone="ok">Connected</Status> : <Status tone="soon">Not set up</Status>}
         </div>
-        <span className="set-int__desc">Messages tab in the client portal. Needs a Crisp account (website ID) before it can be switched on.</span>
+        <span className="set-int__desc">Live chat on the Messages tab of the client portal. Replies come from your Crisp inbox.</span>
+        {crispOn && (
+          <div className="set-int__facts">
+            <Fact k="Website ID" v={<span className="mono">{crisp.saved}</span>} />
+            <Fact k="Shown to" v="Signed-in portal clients" />
+          </div>
+        )}
+        {!crisp.ready && <Banner tone="warning">Run <code className="set-code">supabase/migrate-redesign-settings.sql</code> in Supabase first.</Banner>}
+        <Field label="Crisp website ID" hint={<>In <a href="https://app.crisp.chat" target="_blank" rel="noreferrer">Crisp</a> → Settings → Website settings → Setup &amp; integrations. Leave empty to turn chat off.</>}
+          error={crispBad ? 'A website ID looks like 1a2b3c4d-1234-5678-9abc-1234567890ab.' : undefined}>
+          <input className="input mono" placeholder="1a2b3c4d-1234-5678-9abc-1234567890ab" value={crisp.value} spellCheck={false} autoComplete="off"
+            disabled={crisp.loading} onChange={e => crisp.onChange(e.target.value)} />
+        </Field>
+        <div className="set-actions set-actions--split">
+          <button type="button" className="btn btn--primary btn--sm" disabled={crisp.loading || !crisp.ready || crisp.saving || !crisp.dirty || crispBad}
+            onClick={() => void crisp.save()}>{crisp.saving ? 'Saving…' : 'Save'}</button>
+          <a className="set-int__link" href="https://crisp.chat" target="_blank" rel="noreferrer"><Ic d={P.link} size={12} /> crisp.chat</a>
+        </div>
       </section>
     </div>
   )

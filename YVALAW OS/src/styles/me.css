@@ -106,6 +106,13 @@ a.mw-getapp:hover { border-color: var(--navy); color: var(--text); text-decorati
 .mw-slip__amount { font-size: 15px; font-weight: 600; white-space: nowrap; }
 .mw-adj { min-height: 52px; }
 .mw-adj__amount { font-size: 14px; font-weight: 600; white-space: nowrap; }
+.mw-adj--waiting .mw-pill { flex: none; }
+/* Bonuses / deductions waiting for a payday, under the pay period */
+.mw-period__adjs { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--border); }
+.mw-period__adj { font-size: 13px; color: var(--text-2); overflow-wrap: anywhere; }
+.mw-period__adj .num { font-weight: 600; }
+.mw-period__adj-reason { color: var(--muted); }
+.mw-period--adj { gap: 4px; }
 
 /* Requests */
 .mw-req { flex-wrap: wrap; min-height: 62px; padding-top: 10px; padding-bottom: 10px; }

@@ -31,6 +31,7 @@ export type Employee = {
   location?: string
   timezone?: string
   startYear?: number | string
+  hireDate?: string | null      // yyyy-mm-dd (work anniversary); its year is also written to startYear
   status?: string
   notes?: string
   photoUrl?: string
@@ -94,6 +95,11 @@ export type Expense = {
 }
 
 export type InvoiceItem = {
+  /** 'item' = fixed-price line (description × qty × rate as unit price; hoursTotal 0, no employee) — never hours or
+   *  payroll (see utils/invoiceLines.ts). Missing / 'hours' = a person's hours × hourly rate (every older invoice). */
+  kind?: 'hours' | 'item'
+  description?: string
+  qty?: number
   employeeId?: string
   employeeName: string
   position?: string
@@ -213,6 +219,11 @@ export type AppSettings = {
   companyName?: string
   companyAddress?: string
   companyPhone?: string
+  companyWebsite?: string   // shown in the invoice "From" block
+  invoiceFooter?: string    // printed at the bottom of every invoice
+  companyLogoUrl?: string   // public URL in the attachments bucket; unset = /yva-logo.png
+  companyLogoPath?: string  // storage path of that logo (company/…), to delete it when replaced
+  crispWebsiteId?: string   // Crisp live chat in the client portal (Messages); unset = coming soon
   emailSignature?: string
   reminderDay?: number  // 0=Sun … 6=Sat, undefined=off
   reminderLastFired?: string  // ISO date string YYYY-MM-DD
