@@ -6,6 +6,7 @@ import { supabase } from './lib/supabase'
 import { IconZap } from './components/Icon'
 import Shell from './components/Shell'
 import { lazyPage, preloadPages, rarePage } from './lib/lazyPage'
+import { forgetEverything } from './lib/readCache'
 import ClientShell from './components/ClientShell'
 import LoginPage from './pages/LoginPage'
 import { afterLoginPath, rememberConnectReturn } from './lib/connectApp'
@@ -295,7 +296,7 @@ export default function App() {
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session)
-      if (event === 'SIGNED_OUT') sessionStorage.removeItem('linkedEmployeeId')
+      if (event === 'SIGNED_OUT') { sessionStorage.removeItem('linkedEmployeeId'); forgetEverything() }
       if (event === 'SIGNED_IN' && session) {
         void autoLinkEmployee(session.user.id, session.user.email || '')
       }

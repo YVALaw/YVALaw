@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
-import { cachedRead, LIST_MS } from '../lib/readCache'
+import { cachedRead } from '../lib/readCache'
 import { isStaff, type AppRole } from '../lib/roles'
 import { hasPermission, type Permission } from '../lib/permissions'
 import { auditPortalActivity } from '../services/portalStorage'
@@ -55,7 +55,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     void cachedRead(`perm:${role}`, async () => {
       const { data } = await supabase.from('role_permissions').select('permission').eq('role', role)
       return (data || []).map(r => r.permission as string)
-    }, LIST_MS).then(list => { if (alive) setPermissions(list) })
+    }).then(list => { if (alive) setPermissions(list) })
     return () => { alive = false }
   }, [role, userId, loading])
 

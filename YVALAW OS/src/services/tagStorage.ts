@@ -1,11 +1,11 @@
 import { supabase } from '../lib/supabase'
-import { cachedRead, LIST_MS } from '../lib/readCache'
+import { cachedRead } from '../lib/readCache'
 import type { Tag } from '../data/types'
 
 const FALLBACK_KEY = 'yva_tags'
 
 export async function loadTags(): Promise<Tag[]> {
-  return cachedRead('tags', loadTagsNow, LIST_MS)
+  return cachedRead('tags', loadTagsNow)
 }
 async function loadTagsNow(): Promise<Tag[]> {
   const { data, error } = await supabase.from('tags').select('*').order('label')

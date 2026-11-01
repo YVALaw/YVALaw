@@ -1,4 +1,4 @@
-import { cachedRead, LIST_MS } from '../lib/readCache'
+import { cachedRead } from '../lib/readCache'
 import type { DataSnapshot, Invoice, InvoiceItem } from '../data/types'
 import { payrollFromInvoiceItem } from '../utils/payroll'
 import { hourLines } from '../utils/invoiceLines'
@@ -531,9 +531,9 @@ export type HomeSignalWants = { leads?: boolean; blocks?: { from: number; to: nu
 
 const quiet = async <T,>(fn: () => Promise<T>): Promise<T | null> => { try { return await fn() } catch { return null } }
 
-/** Home's extra signals — kept a minute like the main lists (any write clears them), so coming back to Home is instant */
+/** Home's extra signals (shared by callers; the database reads underneath are kept and kept warm — lib/readCache.ts) */
 export function loadHomeSignals(w: HomeSignalWants): Promise<HomeSignals> {
-  return cachedRead(`home:${JSON.stringify(w)}`, () => loadHomeSignalsNow(w), LIST_MS)
+  return cachedRead(`home:${JSON.stringify(w)}`, () => loadHomeSignalsNow(w))
 }
 async function loadHomeSignalsNow(w: HomeSignalWants): Promise<HomeSignals> {
   const [leads, blocks, timeOff, manual, staffRequests, payroll, rates, weekCloses] = await Promise.all([

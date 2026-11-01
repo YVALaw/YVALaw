@@ -9,6 +9,7 @@ import { usePermission, useRole } from '../context/RoleContext'
 import { ROLE_LABELS, can, type UserRole } from '../lib/roles'
 import { visibleHubs, visibleCreateItems, locate, canSeePage, SETTINGS_PAGE, type Hub, type HubKey } from '../lib/nav'
 import { loadHubStatus, type HubStatus } from '../services/hubStatus'
+import { startKeepWarm } from '../lib/readCache'
 import { signOutAndForgetDevice } from '../services/notifications'
 import { canPromptInstall, isIos, isStandalone, promptInstall } from '../lib/install'
 import NotificationBell from './NotificationBell'
@@ -42,10 +43,10 @@ export default function Shell({ children }: { children: ReactNode }) {
   // Live status lines for the hub pop-ups (refreshed on navigation; cached a minute)
   const pageKeys = useMemo(() => hubs.flatMap(h => h.pages.map(p => p.key)), [hubs])
   // The first check waits a moment so the page's own data loads first (the database answers a few queries at a time)
-  // A moment after the first page has loaded, fetch the main lists in the background (kept a minute) so the next
-  // pages open instantly — see warmUpLists / lib/readCache.ts
+  // A moment after the first page has loaded: read the main lists in the background and keep everything used
+  // recently fresh while the window is open (about every minute and right after saves) — lib/readCache.ts
   useEffect(() => {
-    const t = window.setTimeout(() => void warmUpLists(), 2500)
+    const t = window.setTimeout(() => startKeepWarm(() => warmUpLists()), 2500)
     return () => window.clearTimeout(t)
   }, [])
   const statusFrom = useRef(Date.now() + 1500)

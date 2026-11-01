@@ -75,3 +75,92 @@ test('read-only database functions keep the shared copy; other function calls cl
     assert.deepEqual(await cachedRead('t7', c.load), [2])
   } finally { globalThis.fetch = orig }
 })
+
+// ── kept database responses (writeAwareFetch) ──
+function fakeNet(handler?: (url: string, init?: RequestInit) => Response | Promise<Response>) {
+  const calls: string[] = []
+  const orig = globalThis.fetch
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+    calls.push(`${init?.method || 'GET'} ${url}`)
+    return handler ? handler(url, init) : new Response(JSON.stringify([{ n: calls.length }]), { status: 200, headers: { 'content-type': 'application/json' } })
+  }) as typeof fetch
+  return { calls, restore: () => { globalThis.fetch = orig } }
+}
+const H = { headers: { authorization: 'Bearer a', accept: 'application/json' } }
+const DB = 'https://x.supabase.co/rest/v1/'
+
+test('the same read is answered from memory (one network call)', async () => {
+  clearReadCache(); const net = fakeNet()
+  try {
+    const a = await (await writeAwareFetch(`${DB}employees?select=*`, { method: 'GET', ...H })).json()
+    const b = await (await writeAwareFetch(`${DB}employees?select=*`, { method: 'GET', ...H })).json()
+    assert.equal(net.calls.length, 1); assert.deepEqual(a, b)
+  } finally { net.restore() }
+})
+
+test('a write through the client makes the next read go to the database', async () => {
+  clearReadCache(); const net = fakeNet()
+  try {
+    await writeAwareFetch(`${DB}clients?select=*`, { method: 'GET', ...H })
+    await writeAwareFetch(`${DB}clients?id=eq.1`, { method: 'PATCH', ...H, body: '{}' })
+    await writeAwareFetch(`${DB}clients?select=*`, { method: 'GET', ...H })
+    assert.deepEqual(net.calls.map(c => c.split(' ')[0]), ['GET', 'PATCH', 'GET'])
+  } finally { net.restore() }
+})
+
+test('live reads are never kept: "since a moment ago", notifications, counters', async () => {
+  clearReadCache(); const net = fakeNet()
+  try {
+    const since = new Date(Date.now() - 3 * 60_000).toISOString()
+    for (let i = 0; i < 2; i++) {
+      await writeAwareFetch(`${DB}tracker_blocks?select=employee_id&updated_at=gte.${encodeURIComponent(since)}`, { method: 'GET', ...H })
+      await writeAwareFetch(`${DB}notifications?select=*`, { method: 'GET', ...H })
+      await writeAwareFetch(`${DB}counters?select=value&key=eq.invoice`, { method: 'GET', ...H })
+    }
+    assert.equal(net.calls.length, 6)
+    // a date range in the past IS kept (a week of blocks for approvals)
+    await writeAwareFetch(`${DB}tracker_blocks?block_start=gte.2026-01-05T04:00:00.000Z`, { method: 'GET', ...H })
+    await writeAwareFetch(`${DB}tracker_blocks?block_start=gte.2026-01-05T04:00:00.000Z`, { method: 'GET', ...H })
+    assert.equal(net.calls.length, 7)
+  } finally { net.restore() }
+})
+
+test('a refused read is not kept and the caller gets the real answer', async () => {
+  clearReadCache(); let fail = true
+  const net = fakeNet(() => fail ? new Response('{"message":"denied"}', { status: 403 }) : new Response('[]', { status: 200 }))
+  try {
+    const r = await writeAwareFetch(`${DB}payroll_runs?select=*`, { method: 'GET', ...H })
+    assert.equal(r.status, 403)
+    fail = false
+    const r2 = await writeAwareFetch(`${DB}payroll_runs?select=*`, { method: 'GET', ...H })
+    assert.equal(r2.status, 200)
+  } finally { net.restore() }
+})
+
+test('a read that overlaps a save is not kept (the save may have changed it)', async () => {
+  clearReadCache()
+  let release: (r: Response) => void = () => {}
+  let slowOnce = true
+  const net = fakeNet((url, init) => {
+    if ((init?.method || 'GET') === 'GET' && url.includes('slow') && slowOnce) { slowOnce = false; return new Promise<Response>(res => { release = res }) }
+    return new Response('[]', { status: 200 })
+  })
+  try {
+    const pending = writeAwareFetch(`${DB}invoices?slow=1`, { method: 'GET', ...H })
+    await writeAwareFetch(`${DB}invoices?id=eq.1`, { method: 'PATCH', ...H, body: '{}' })
+    release(new Response('[{"old":true}]', { status: 200 }))
+    await pending
+    await writeAwareFetch(`${DB}invoices?slow=1`, { method: 'GET', ...H }).catch(() => null)
+    assert.equal(net.calls.filter(c => c.includes('slow')).length, 2)
+  } finally { net.restore() }
+})
+
+test('different sign-ins never share kept answers', async () => {
+  clearReadCache(); const net = fakeNet()
+  try {
+    await writeAwareFetch(`${DB}clients?select=*`, { method: 'GET', headers: { authorization: 'Bearer a' } })
+    await writeAwareFetch(`${DB}clients?select=*`, { method: 'GET', headers: { authorization: 'Bearer b' } })
+    assert.equal(net.calls.length, 2)
+  } finally { net.restore() }
+})
