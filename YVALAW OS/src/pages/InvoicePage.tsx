@@ -578,7 +578,7 @@ export default function InvoicePage() {
       <Modal open={!!previewInv} onClose={() => setPreviewInv(null)} size="xl" title={previewInv ? `Invoice ${previewInv.number}` : ''}
         sub={previewInv ? <>{previewInv.clientName} · {formatMoney(amountOf(previewInv))} · <Pill status={statusOf(previewInv)} /></> : undefined}
         footer={previewInv ? <>
-          <button type="button" className="btn" onClick={() => openStatusEdit(previewInv)}>Change status</button>
+          <button type="button" className="btn" onClick={() => { const inv = previewInv; setPreviewInv(null); openStatusEdit(inv) }}>Change status</button>
           {statusOf(previewInv) !== 'draft' && <button type="button" className="btn" onClick={() => { setPayingInv(previewInv); setPreviewInv(null) }}>Payments</button>}
           {!mobile && <button type="button" className="btn" onClick={() => { const inv = previewInv; setPreviewInv(null); openEditInvoice(inv) }}>Edit</button>}
           <button type="button" className="btn btn--primary" onClick={() => printInvoice(previewInv)}><Ic d={P.printer} size={15} /> Print / PDF</button>

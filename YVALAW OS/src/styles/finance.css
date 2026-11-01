@@ -113,7 +113,7 @@
 .fin-sum-line .mono { font-size: 13px; }
 .fin-sum-line--total { font-size: 18px; font-weight: 600; color: var(--text); padding-top: 10px; border-top: 1px solid var(--head-line); }
 .fin-sum-dop { font-size: 12px; color: var(--muted); margin-top: -6px; }
-.fin-billto { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; }
+.fin-billto { display: grid; grid-template-columns: 1fr; gap: 10px; padding: 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; }
 .fin-billto__col { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .fin-billto__name { font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
 .fin-billto__meta { font-size: 11.5px; color: var(--muted); overflow-wrap: anywhere; }
@@ -301,8 +301,9 @@
   .fin-wc-inv__hours { display: none; }
   .fin-wc-inv__detail { padding: 0 16px 14px; }
   .fin-wc-inv__actions .btn { flex: 1; }
-  .fin-flag { flex-wrap: wrap; padding: 12px 16px; }
-  .fin-flag__btn { margin-left: auto; }
+  .fin-flag { flex-wrap: wrap; padding: 12px 16px; row-gap: 6px; }
+  .fin-flag__text { flex: 1 1 100%; order: 2; }
+  .fin-flag__btn { margin-left: auto; order: 1; }
   .fin-pay-row, .fin-card-link { padding-left: 16px; padding-right: 16px; }
   .fin-pr-lines__head { padding: 12px 16px; }
   .fin-selbar { width: 100%; }
@@ -319,3 +320,6 @@
 .fin-inv-table td.muted, .fin-ex-table td.muted { color: var(--muted); }
 .fin-pr-table td.soft { color: var(--soft); }
 .fin-inv-table .t-sub.num, .fin-inv-table td.t-num .t-sub { font-size: 11.5px; color: var(--soft); }
+/* paid payroll lines: greyed check (mockup) */
+.fin-pr-table .check input:disabled + .check__box, .fin-pr-m .check input:disabled + .check__box { cursor: default; }
+.fin-pr-table .check input:disabled:checked + .check__box, .fin-pr-m .check input:disabled:checked + .check__box { background: var(--soft); border-color: var(--soft); }

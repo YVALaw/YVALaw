@@ -273,7 +273,7 @@ export default function PayrollPage() {
                             <td className="t-num fin-strong">{l.status === 'paid' && l.net_dop != null ? dop(l.net_dop) : rate ? dop(l.net_usd * rate) : '—'}</td>
                             <td>{payoutCell(l)}</td>
                             <td>{statusPill(l)}</td>
-                            <td className="t-actions"><button type="button" className="btn btn--xs" onClick={() => payslip(l)}>Payslip</button> {canManage && l.status === 'paid' && lineMenu(l)}</td>
+                            <td className="t-actions"><span className="fin-acts"><button type="button" className="btn btn--xs" onClick={() => payslip(l)}>Payslip</button>{canManage && l.status === 'paid' && lineMenu(l)}</span></td>
                           </tr>
                         )
                       }),
