@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
+import { watchFunctionWrites } from './lib/readCache'
 import './styles.css'
 import './styles/ds.css'
 import './styles/shell.css'
@@ -13,6 +14,9 @@ import './styles/people.css'
 import './styles/settings.css'
 import './styles/portal.css'
 import './styles/me.css'
+
+// Server functions that change data clear the shared reads (lib/readCache.ts)
+watchFunctionWrites()
 
 // Notifications service worker (push + tapping a notification). No page caching.
 if ('serviceWorker' in navigator && import.meta.env.PROD) {

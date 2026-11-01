@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { cachedRead } from '../lib/readCache'
 import { fetchAllPages } from '../lib/pages'
 import type {
   ActivityLogEntry, AppSettings, Candidate, CommEntryType, DataSnapshot,
@@ -59,6 +60,9 @@ function remember(table: string, items: object[], scope?: (row: Row) => boolean)
 }
 
 async function fetchAll<T>(table: string): Promise<T[]> {
+  return cachedRead(`all:${table}`, () => fetchAllNow<T>(table))
+}
+async function fetchAllNow<T>(table: string): Promise<T[]> {
   const { data, error } = await fetchAllPages<Record<string, unknown>>((from, to) => supabase.from(table).select('*').order('created_at').order('id').range(from, to))
   if (error) { console.error('fetchAll(%s)', table, error); return [] }
   const items = (data || []).map(row => toCamel<T>(row as Record<string, unknown>))
@@ -150,6 +154,9 @@ export async function saveProjects(projects: Project[]): Promise<void> {
 // ─── Invoices ─────────────────────────────────────────────────────────────────
 
 export async function loadInvoices(): Promise<Invoice[]> {
+  return cachedRead('all:invoices', loadInvoicesNow)
+}
+async function loadInvoicesNow(): Promise<Invoice[]> {
   const { data, error } = await fetchAllPages<Record<string, unknown>>((from, to) => supabase
     .from('invoices')
     .select('*')
@@ -246,8 +253,10 @@ export async function saveInvoiceTemplates(templates: InvoiceTemplate[]): Promis
 // ─── Counters ─────────────────────────────────────────────────────────────────
 
 export async function loadInvoiceCounter(): Promise<number> {
-  const { data } = await supabase.from('counters').select('value').eq('key', 'invoice').single()
-  return (data as { value: number } | null)?.value ?? 1
+  return cachedRead('counter:invoice', async () => {
+    const { data } = await supabase.from('counters').select('value').eq('key', 'invoice').single()
+    return (data as { value: number } | null)?.value ?? 1
+  })
 }
 export async function saveInvoiceCounter(n: number): Promise<void> {
   const { error } = await supabase.from('counters').update({ value: n }).eq('key', 'invoice')
@@ -255,8 +264,10 @@ export async function saveInvoiceCounter(n: number): Promise<void> {
 }
 
 export async function loadEmployeeCounter(): Promise<number> {
-  const { data } = await supabase.from('counters').select('value').eq('key', 'employee').single()
-  return (data as { value: number } | null)?.value ?? 1
+  return cachedRead('counter:employee', async () => {
+    const { data } = await supabase.from('counters').select('value').eq('key', 'employee').single()
+    return (data as { value: number } | null)?.value ?? 1
+  })
 }
 export async function saveEmployeeCounter(n: number): Promise<void> {
   const { error } = await supabase.from('counters').update({ value: n }).eq('key', 'employee')
@@ -279,6 +290,9 @@ const DEFAULT_SETTINGS: AppSettings = {
 }
 
 export async function loadSettings(): Promise<AppSettings> {
+  return cachedRead('settings', loadSettingsNow).then(s => ({ ...s }))
+}
+async function loadSettingsNow(): Promise<AppSettings> {
   const { data, error } = await supabase.from('settings').select('*').eq('id', 1).single()
   if (error || !data) return DEFAULT_SETTINGS
   const row = data as Record<string, unknown>

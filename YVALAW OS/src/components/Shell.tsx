@@ -1,7 +1,7 @@
 // Staff OS shell (redesign 2026-11, designs/YVA OS.dc.html): header with breadcrumb, bell and account
 // menu; floating navy dock with five hubs, "Jump to…" search and the gold + Create button; hub pop-ups
 // (desktop) / bottom sheets (phone); sibling chips above every hub page. Visibility rules: lib/nav.ts.
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { loadSnapshot, loadCandidates } from '../services/storage'
 import { loadLeads } from '../services/crm'
@@ -13,7 +13,7 @@ import { signOutAndForgetDevice } from '../services/notifications'
 import { canPromptInstall, isIos, isStandalone, promptInstall } from '../lib/install'
 import NotificationBell from './NotificationBell'
 import { Ic, P } from './Icon'
-import { Modal, SearchInput, useIsMobile } from './ui'
+import { Modal, PageLoading, SearchInput, useIsMobile } from './ui'
 import { initials } from '../utils/format'
 
 type Overlay = null | { kind: 'hub'; hub: HubKey; left: number } | { kind: 'search' } | { kind: 'create' } | { kind: 'account' }
@@ -41,7 +41,13 @@ export default function Shell({ children }: { children: ReactNode }) {
   useEffect(() => { setOverlay(null); window.scrollTo(0, 0) }, [location.pathname])
   // Live status lines for the hub pop-ups (refreshed on navigation; cached a minute)
   const pageKeys = useMemo(() => hubs.flatMap(h => h.pages.map(p => p.key)), [hubs])
-  useEffect(() => { void loadHubStatus(pageKeys).then(setStatus) }, [pageKeys, location.pathname])
+  // The first check waits a moment so the page's own data loads first (the database answers a few queries at a time)
+  const statusFrom = useRef(Date.now() + 1500)
+  useEffect(() => {
+    let alive = true
+    const t = window.setTimeout(() => void loadHubStatus(pageKeys).then(s => { if (alive) setStatus(s) }), Math.max(0, statusFrom.current - Date.now()))
+    return () => { alive = false; window.clearTimeout(t) }
+  }, [pageKeys, location.pathname])
 
   // "/" opens search when not typing; Esc closes overlays
   useEffect(() => {
@@ -131,7 +137,7 @@ export default function Shell({ children }: { children: ReactNode }) {
             ))}
           </div>
         )}
-        {children}
+        <Suspense fallback={<PageLoading />}>{children}</Suspense>
       </main>
 
       {overlay && <div className={`scrim os-scrim${overlay.kind === 'search' || (mobile && overlay.kind === 'hub') ? '' : ' scrim--clear'}`} onClick={() => setOverlay(null)} />}

@@ -356,3 +356,6 @@ button.kpi-cell:hover { background: var(--surface-2); }
   .hide-phone { display: none !important; }
 }
 @media (min-width: 760px) { .only-phone { display: none !important; } }
+
+/* PageLoading (screen code still downloading) */
+.page-loading__gap { display: block; height: 16px; }

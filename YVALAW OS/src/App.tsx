@@ -1,53 +1,58 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { Suspense, useEffect, useState, type ReactNode } from 'react'
 import { signOutAndForgetDevice } from './services/notifications'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import { IconZap } from './components/Icon'
 import Shell from './components/Shell'
+import { lazyPage, preloadPages } from './lib/lazyPage'
 import ClientShell from './components/ClientShell'
 import LoginPage from './pages/LoginPage'
-import SignupPage from './pages/SignupPage'
-import PortalPage from './pages/PortalPage'
-import OAuthCallbackPage from './pages/OAuthCallbackPage'
-import ReportsPage from './pages/ReportsPage'
-import HomePage from './pages/HomePage'
-import InvoicePage from './pages/InvoicePage'
-import EmployeesPage from './pages/EmployeesPage'
-import EmployeeProfilePage from './pages/EmployeeProfilePage'
-import ClientsPage from './pages/ClientsPage'
-import ClientProfilePage from './pages/ClientProfilePage'
-import ProjectsPage from './pages/ProjectsPage'
-import ProjectProfilePage from './pages/ProjectProfilePage'
-import SettingsPage from './pages/SettingsPage'
-import CandidatesPage from './pages/CandidatesPage'
-import CandidateProfilePage from './pages/CandidateProfilePage'
-import GeneralExpensesPage from './pages/GeneralExpensesPage'
-import EstimatesPage from './pages/EstimatesPage'
-import WeeklyClosePage from './pages/WeeklyClosePage'
-import PayrollPage from './pages/PayrollPage'
-import ApprovalsPage from './pages/ApprovalsPage'
-import LeadsPage from './pages/LeadsPage'
-import AnnouncementsPage from './pages/AnnouncementsPage'
-import TimeTrackingPage from './pages/TimeTrackingPage'
-import CalendarPage from './pages/CalendarPage'
-import PortalDashboard from './pages/portal/PortalDashboard'
-import PortalBilling from './pages/portal/PortalBilling'
-import PortalProjects from './pages/portal/PortalProjects'
-import PortalTeam from './pages/portal/PortalTeam'
-import PortalDocuments from './pages/portal/PortalDocuments'
-import PortalSettings from './pages/portal/PortalSettings'
-import PortalMessages from './pages/portal/PortalMessages'
-import RequestsPage from './pages/RequestsPage'
-import PortalSetPassword from './pages/portal/PortalSetPassword'
-import EmployeeWorkspace from './pages/me/EmployeeWorkspace'
-import ConnectAppPage from './pages/ConnectAppPage'
 import { afterLoginPath, rememberConnectReturn } from './lib/connectApp'
 import { loadSettings, saveSettings, loadInvoices, loadEmployees, linkEmployeeLogin } from './services/storage'
 import { RoleProvider, useRole } from './context/RoleContext'
 import { ToastProvider } from './context/ToastContext'
 import type { UserRole } from './lib/roles'
 import { can, isStaff } from './lib/roles'
+
+// Each screen is its own download (smaller first load); all of them are fetched in the background
+// once the app is idle, so moving between pages stays instant. lib/lazyPage.ts
+const SignupPage = lazyPage(() => import('./pages/SignupPage'))
+const PortalPage = lazyPage(() => import('./pages/PortalPage'))
+const OAuthCallbackPage = lazyPage(() => import('./pages/OAuthCallbackPage'))
+const ReportsPage = lazyPage(() => import('./pages/ReportsPage'))
+const HomePage = lazyPage(() => import('./pages/HomePage'))
+const InvoicePage = lazyPage(() => import('./pages/InvoicePage'))
+const EmployeesPage = lazyPage(() => import('./pages/EmployeesPage'))
+const EmployeeProfilePage = lazyPage(() => import('./pages/EmployeeProfilePage'))
+const ClientsPage = lazyPage(() => import('./pages/ClientsPage'))
+const ClientProfilePage = lazyPage(() => import('./pages/ClientProfilePage'))
+const ProjectsPage = lazyPage(() => import('./pages/ProjectsPage'))
+const ProjectProfilePage = lazyPage(() => import('./pages/ProjectProfilePage'))
+const SettingsPage = lazyPage(() => import('./pages/SettingsPage'))
+const CandidatesPage = lazyPage(() => import('./pages/CandidatesPage'))
+const CandidateProfilePage = lazyPage(() => import('./pages/CandidateProfilePage'))
+const GeneralExpensesPage = lazyPage(() => import('./pages/GeneralExpensesPage'))
+const EstimatesPage = lazyPage(() => import('./pages/EstimatesPage'))
+const WeeklyClosePage = lazyPage(() => import('./pages/WeeklyClosePage'))
+const PayrollPage = lazyPage(() => import('./pages/PayrollPage'))
+const ApprovalsPage = lazyPage(() => import('./pages/ApprovalsPage'))
+const LeadsPage = lazyPage(() => import('./pages/LeadsPage'))
+const AnnouncementsPage = lazyPage(() => import('./pages/AnnouncementsPage'))
+const TimeTrackingPage = lazyPage(() => import('./pages/TimeTrackingPage'))
+const CalendarPage = lazyPage(() => import('./pages/CalendarPage'))
+const PortalDashboard = lazyPage(() => import('./pages/portal/PortalDashboard'))
+const PortalBilling = lazyPage(() => import('./pages/portal/PortalBilling'))
+const PortalProjects = lazyPage(() => import('./pages/portal/PortalProjects'))
+const PortalTeam = lazyPage(() => import('./pages/portal/PortalTeam'))
+const PortalDocuments = lazyPage(() => import('./pages/portal/PortalDocuments'))
+const PortalSettings = lazyPage(() => import('./pages/portal/PortalSettings'))
+const PortalMessages = lazyPage(() => import('./pages/portal/PortalMessages'))
+const RequestsPage = lazyPage(() => import('./pages/RequestsPage'))
+const PortalSetPassword = lazyPage(() => import('./pages/portal/PortalSetPassword'))
+const EmployeeWorkspace = lazyPage(() => import('./pages/me/EmployeeWorkspace'))
+const ConnectAppPage = lazyPage(() => import('./pages/ConnectAppPage'))
+
 
 // ── Shared loading screen ────────────────────────────────────────────────────
 
@@ -298,10 +303,14 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Once someone is signed in, fetch the other screens' code in the background
+  useEffect(() => { if (session) preloadPages() }, [session])
+
   if (session === undefined) return <LoadingScreen />
 
   return (
     <ToastProvider>
+      <Suspense fallback={<LoadingScreen />}>
       <Routes>
         {/* ── Public: no auth needed ── */}
         {/* Old read-only invoice share view (renamed from /portal to avoid conflict) */}
@@ -323,6 +332,7 @@ export default function App() {
             )
         } />
       </Routes>
+      </Suspense>
     </ToastProvider>
   )
 }

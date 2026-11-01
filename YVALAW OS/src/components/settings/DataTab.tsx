@@ -4,6 +4,7 @@ import { loadCandidates, loadExpenses, loadGeneralExpenses, loadSnapshot } from 
 import { Ic, P } from '../Icon'
 import { Banner, Modal, Skel } from '../ui'
 import { clearAllData, exportBackup, importBackup } from './backup'
+import { scanInlineFiles, slimInlineFiles, type SlimScan } from '../../services/slimRecords'
 
 type Stat = { label: string; count: number }
 
@@ -19,6 +20,20 @@ export default function DataTab({ isCeo, canImportLeads }: { isCeo: boolean; can
   const [clearing, setClearing] = useState(false)
   const [cleared, setCleared] = useState(false)
   const [clearError, setClearError] = useState<string | null>(null)
+  // Photos/files saved inside records (older versions) — slow down every list
+  const [slim, setSlim] = useState<SlimScan | null>(null)
+  const [slimming, setSlimming] = useState<{ done: number; total: number } | null>(null)
+  const [slimResult, setSlimResult] = useState<{ moved: number; failed: string[] } | null>(null)
+
+  useEffect(() => { if (isCeo) void scanInlineFiles().then(setSlim).catch(() => setSlim(null)) }, [isCeo])
+
+  async function doSlim() {
+    setSlimming({ done: 0, total: (slim?.photos ?? 0) + (slim?.files ?? 0) }); setSlimResult(null)
+    try { setSlimResult(await slimInlineFiles((done, total) => setSlimming({ done, total }))) }
+    catch (e) { setSlimResult({ moved: 0, failed: [(e as Error).message] }) }
+    setSlimming(null)
+    setSlim(await scanInlineFiles().catch(() => null))
+  }
 
   useEffect(() => {
     void (async () => {
@@ -113,6 +128,32 @@ export default function DataTab({ isCeo, canImportLeads }: { isCeo: boolean; can
         {exportError && <Banner tone="danger">{exportError}</Banner>}
         {importStatus && <Banner tone={importStatus.startsWith('Import failed') ? 'danger' : 'success'}>{importStatus}</Banner>}
       </section>
+
+      {isCeo && (
+        <section className="set-card set-card--mid" aria-label="Speed">
+          <div className="set-card__titles">
+            <h2 className="set-card__title">Make lists load faster</h2>
+            <span className="set-card__sub">Older versions saved photos and attached files inside employee, client and candidate records. Every list downloads them, even when they're not on screen.</span>
+          </div>
+          <div className="set-data-row">
+            <div className="set-data-row__text">
+              {slim == null ? <Skel w={260} h={14} /> : slim.photos + slim.files === 0
+                ? <span className="set-data-row__title">All photos and files are stored the fast way. Nothing to do.</span>
+                : <>
+                  <span className="set-data-row__title">{[slim.photos && `${slim.photos} photo${slim.photos === 1 ? '' : 's'}`, slim.files && `${slim.files} file${slim.files === 1 ? '' : 's'}`].filter(Boolean).join(' and ')} stored inside records · {(slim.bytes / 1048576).toFixed(1)} MB</span>
+                  <span className="set-data-row__sub">Moves them to file storage and keeps a link. Photos are resized to 320 px (they only show as small pictures); files are moved unchanged.</span>
+                </>}
+            </div>
+            {slim != null && slim.photos + slim.files > 0 && (
+              <button type="button" className="btn btn--sm btn--primary" disabled={!!slimming} onClick={() => void doSlim()}>
+                {slimming ? `Moving ${slimming.done} of ${slimming.total}…` : 'Move to file storage'}
+              </button>
+            )}
+          </div>
+          {slimResult && slimResult.failed.length === 0 && <Banner tone="success">Moved {slimResult.moved} record{slimResult.moved === 1 ? '' : 's'}. Lists load faster now.</Banner>}
+          {slimResult && slimResult.failed.length > 0 && <Banner tone="warning">Moved {slimResult.moved}. These could not be moved and were left as they were: {slimResult.failed.slice(0, 5).join('; ')}{slimResult.failed.length > 5 ? ` and ${slimResult.failed.length - 5} more` : ''}</Banner>}
+        </section>
+      )}
 
       {isCeo && (
         <section className="set-card set-card--mid set-danger" aria-label="Danger zone">

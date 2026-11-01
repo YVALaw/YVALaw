@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { uploadFile } from '../services/fileStorage'
 import type { Attachment, Candidate, CandidateStage, Employee } from '../data/types'
 import { loadCandidates, saveCandidates } from '../services/storage'
 import { useRole } from '../context/RoleContext'
@@ -76,12 +77,11 @@ export default function CandidatesPage() {
   function handleFileUpload(file: File) {
     const MAX = 5 * 1024 * 1024
     if (file.size > MAX) { alert('File too large (max 5 MB). For videos, paste a link in Resume URL instead.'); return }
-    const reader = new FileReader()
-    reader.onload = ev => {
-      const att: Attachment = { id: uid(), name: file.name, mimeType: file.type, size: file.size, dataUrl: ev.target?.result as string, uploadedAt: Date.now() }
+    // Uploaded to Storage; the record keeps only the link (files inside records slow every list)
+    void uploadFile(file, 'candidates/uploads').then(({ storageUrl, storagePath }) => {
+      const att: Attachment = { id: uid(), name: file.name, mimeType: file.type, size: file.size, dataUrl: '', storageUrl, storagePath, uploadedAt: Date.now() }
       setAttachments(prev => [...prev, att])
-    }
-    reader.readAsDataURL(file)
+    }).catch(e => alert(`Could not upload ${file.name}: ${(e as Error).message}`))
   }
 
   function openAdd() { setForm({ ...EMPTY_FORM, appliedAt: new Date().toISOString().slice(0, 10) }); setAttachments([]); setAdding(true) }
