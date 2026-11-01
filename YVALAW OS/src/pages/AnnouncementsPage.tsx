@@ -79,7 +79,7 @@ export default function AnnouncementsPage() {
               <span className="field__label">Who sees it</span>
               <Segmented label="Who sees it" value={form.audience} onChange={v => setForm(f => ({ ...f, audience: v }))} options={(Object.keys(AUD) as Announcement['audience'][]).map(k => ({ value: k, label: AUD[k] }))} />
             </div>
-            <label className="ppl-switch-row"><Switch label="Pin to top" checked={form.pinned} onChange={v => setForm(f => ({ ...f, pinned: v }))} />Pin to top</label>
+            <div className="ppl-switch-row"><Switch label="Pin to top" checked={form.pinned} onChange={v => setForm(f => ({ ...f, pinned: v }))} /><span onClick={() => setForm(f => ({ ...f, pinned: !f.pinned }))}>Pin to top</span></div>
             {editing && <span className="ppl-fine">Editing a {STATUS_PILL[statusOf(editing)].label.toLowerCase()} post{editing.published_at ? ` (${dt(editing.published_at)})` : ''}.</span>}
             <div className="row row--wrap">
               {editing && statusOf(editing) !== 'draft'

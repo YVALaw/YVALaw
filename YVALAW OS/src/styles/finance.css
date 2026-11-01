@@ -13,7 +13,10 @@
 .fin-mcard-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
 .fin-mcard-right .fin-strong { font-size: 15px; }
 .mcard__actions .fin-more { flex: 0 0 44px; width: 44px; }
-.fin-stepper .stepper__label { min-width: 140px; font-size: 13.5px; }
+.fin-stepper .stepper { background: var(--surface); border: 1px solid var(--border); border-radius: 9px; height: 38px; gap: 0; }
+.fin-stepper .stepper__btn { border: 0; width: 38px; height: 36px; background: none; border-radius: 8px; }
+.fin-stepper .stepper__btn:hover { background: var(--surface-2); }
+.fin-stepper .stepper__label { min-width: 130px; font-size: 13.5px; }
 .fin-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .fin-toolbar__count { font-size: 13.5px; font-weight: 500; color: var(--text-2); }
 .fin-project-filter { width: auto; min-width: 160px; }
@@ -277,6 +280,7 @@
 @media (max-width: 759px) {
   .fin-stepper, .fin-stepper .stepper { width: 100%; }
   .fin-stepper .stepper__label { flex: 1; min-width: 0; }
+  .fin-stepper .stepper { height: 46px; }
   .fin-stepper .stepper__btn { width: 44px; height: 44px; }
   .page-actions .search-input { flex: 1 1 100%; }
   .page-actions > .btn--primary { flex: 1; }
@@ -308,3 +312,10 @@
   .fin-pay-sum__cell { padding: 8px 10px; }
   .fin-tg__edit .field, .fin-tg__mins { width: 100%; }
 }
+
+/* ds.css colours every .table td with --text; keep status colours on finance cells */
+.fin-inv-table td.t-danger, .fin-pr-table td.t-danger, .fin-ex-table td.t-danger { color: var(--danger-text); }
+.fin-inv-table td.t-success, .fin-pr-table td.t-success { color: var(--success-text); }
+.fin-inv-table td.muted, .fin-ex-table td.muted { color: var(--muted); }
+.fin-pr-table td.soft { color: var(--soft); }
+.fin-inv-table .t-sub.num, .fin-inv-table td.t-num .t-sub { font-size: 11.5px; color: var(--soft); }

@@ -65,8 +65,7 @@ export default function ConnectAppPage() {
 
   if (code) {
     return (
-      <AuthLayout title="Connected" sub="YVA Time should open now." icon={timeIcon('ok', P.check)} foot="You can close this tab.">
-        <Banner tone="success">Connected. YVA Time should open now.</Banner>
+      <AuthLayout title="Connected" sub="Connected. YVA Time should open now." icon={timeIcon('ok', P.check)} foot="You can close this tab.">
         <Field label="If the app didn't open, copy this code and paste it into YVA Time (it works for 5 minutes):">
           <div className="set-code-box">
             <input className="input" readOnly value={code} onFocus={e => e.target.select()} aria-label="Sign-in code" />

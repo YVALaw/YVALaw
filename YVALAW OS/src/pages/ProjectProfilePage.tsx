@@ -145,7 +145,7 @@ export default function ProjectProfilePage() {
     try { await saveTasks(next); return true } catch (e) { setAllTasks(prev); setFlash({ tone: 'danger', text: `Could not save tasks: ${errText(e)}` }); return false }
   }
   function addTask(status: TaskStatus, d: TaskDraft) {
-    const mentions = mentionsIn(d.description)
+    const mentions = mentionsIn(d.description, employees.map(e => e.name))
     return persistTasks([...allTasks, { id: uid(), projectId: projectNN.id, title: d.title.trim(), description: d.description.trim() || undefined, mentions: mentions.length ? mentions : undefined, assigneeName: d.assigneeName || undefined, dueDate: d.dueDate || undefined, status, createdAt: Date.now() }])
   }
   async function persistExpenses(next: Expense[]): Promise<boolean> {

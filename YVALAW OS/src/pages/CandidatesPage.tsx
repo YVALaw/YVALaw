@@ -217,8 +217,8 @@ export default function CandidatesPage() {
           <button type="button" className="btn btn--ghost btn--danger" onClick={() => setConfirmDelete(cur)}>Remove</button>
           <span className="spacer" />
           <button type="button" className="btn btn--ghost hide-phone" onClick={() => navigate('/candidates/' + cur.id)}>Open full profile</button>
-          {cur.stage !== 'rejected' && <button type="button" className="btn" onClick={() => moveStage(cur.id, 'rejected')}>Reject</button>}
-          {next && <button type="button" className="btn btn--primary" onClick={() => moveStage(cur.id, next.key)}>Move to {next.label}</button>}
+          {cur.stage !== 'rejected' && <button type="button" className="btn" onClick={() => { moveStage(cur.id, 'rejected'); setOpenId(null) }}>Reject</button>}
+          {next && <button type="button" className="btn btn--primary" onClick={() => { moveStage(cur.id, next.key); if (next.key !== 'hired') setOpenId(null) }}>Move to {next.label}</button>}
         </>}>
         {cur && <>
           <div className="info-grid ppl-drawer-info">

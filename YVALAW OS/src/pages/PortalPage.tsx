@@ -96,7 +96,7 @@ export default function PortalPage() {
             {items.map((it, i) => (
               <div key={i} className="set-iv__item">
                 <div>
-                  <div className="t-strong">{it.employeeName}</div>
+                  <strong>{it.employeeName}</strong>
                   {it.position && <div className="set-iv__item-meta">{it.position}</div>}
                   <div className="set-iv__item-meta">{fmtHours(it.hoursTotal)} × ${it.rate}/hr</div>
                 </div>

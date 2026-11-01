@@ -107,10 +107,11 @@ export default function CalendarPage() {
     return () => { cancelled = true }
   }, [])
 
-  // Approved time off + holidays for the visible month
+  // Approved time off + holidays for every day the grid shows (incl. the padding days of the next/previous month)
   useEffect(() => {
     let alive = true
-    const from = toDateKey(new Date(year, month, 1)), to = toDateKey(new Date(year, month + 1, 0))
+    const grid = buildGridDays(year, month)
+    const from = toDateKey(grid[0].date), to = toDateKey(grid[grid.length - 1].date)
     void loadTimeOff({ status: 'approved', from, to }).then(r => { if (alive) setTimeOff(r.rows) }).catch(() => {})
     void loadHolidays(from).then(h => { if (alive) setHolidays(h.filter(x => x.day <= to)) }).catch(() => {})
     return () => { alive = false }

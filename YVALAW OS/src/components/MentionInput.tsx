@@ -28,7 +28,7 @@ export default function MentionInput({ value, onChange, employees, placeholder, 
 
     // Look backwards from the cursor for an @ trigger
     const textBeforeCursor = text.slice(0, cursor)
-    const match = textBeforeCursor.match(/@(\w[\w ]*)$/)
+    const match = textBeforeCursor.match(/@([\p{L}\p{N}_][\p{L}\p{N}_ ]*)$/u)
 
     if (match) {
       triggerPosRef.current = cursor - match[0].length

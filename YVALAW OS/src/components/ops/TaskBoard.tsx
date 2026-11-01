@@ -12,13 +12,28 @@ export const TASK_COLS: { key: TaskStatus; label: string }[] = [
 export type TaskDraft = { title: string; description: string; assigneeName: string; dueDate: string }
 const EMPTY: TaskDraft = { title: '', description: '', assigneeName: '', dueDate: '' }
 
+const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+/** "@Name" pattern: known names first (accents and spaces included), else a Unicode word run */
+function mentionRe(names: string[] = [], flags = 'gu') {
+  const known = [...names].filter(Boolean).sort((a, b) => b.length - a.length).map(esc)
+  return new RegExp(known.length ? `@(${known.join('|')}|[\\p{L}\\p{N}_]+)` : '@([\\p{L}\\p{N}_][\\p{L}\\p{N}_ ]*)', flags)
+}
 /** @Name mentions highlighted in task descriptions */
-export function renderWithMentions(text: string) {
-  return text.split(/(@\w[\w\s]*)/g).map((part, i) => (part.startsWith('@') ? <span key={i} className="ops-mention-tag">{part}</span> : part))
+export function renderWithMentions(text: string, names: string[] = []) {
+  const re = mentionRe(names)
+  const out: (string | JSX.Element)[] = []
+  let last = 0
+  for (const m of text.matchAll(re)) {
+    if (m.index! > last) out.push(text.slice(last, m.index))
+    out.push(<span key={m.index} className="ops-mention-tag">{m[0]}</span>)
+    last = m.index! + m[0].length
+  }
+  if (last < text.length) out.push(text.slice(last))
+  return out
 }
 /** Names mentioned with @ in a description (stored on the task) */
-export function mentionsIn(text: string): string[] {
-  return (text.match(/@(\w[\w ]*)/g) ?? []).map(m => m.slice(1).trim()).filter(Boolean)
+export function mentionsIn(text: string, names: string[] = []): string[] {
+  return [...new Set([...text.matchAll(mentionRe(names))].map(m => m[1].trim()).filter(Boolean))]
 }
 
 /** Three-column task board with drag and drop and inline add (project page tab and the Projects page modal) */
@@ -58,7 +73,7 @@ export default function TaskBoard({ tasks, names, onAdd, onMove, onDelete }: {
                     { label: 'Delete task', danger: true, onClick: () => onDelete(t.id) },
                   ]} />
                 </div>
-                {t.description && <div className="ops-task__desc">{renderWithMentions(t.description)}</div>}
+                {t.description && <div className="ops-task__desc">{renderWithMentions(t.description, names)}</div>}
                 {(t.assigneeName || t.dueDate) && (
                   <div className="ops-task__meta">
                     {t.assigneeName && <span>{t.assigneeName}</span>}
