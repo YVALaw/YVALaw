@@ -449,6 +449,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
             basePayRate:  totals.basePayRate,
             premiumPercent: totals.premiumPercent,
             totalPay:     totals.payrollAmount,
+            billAmount:   totals.billAmount,
             daily:        dates.length > 0 ? { ...r.daily } : undefined,
           }
         })

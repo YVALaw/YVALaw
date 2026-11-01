@@ -282,3 +282,13 @@
 /* Company logo (upload / use default) + Crisp card link */
 .set-logo-side { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .set-int__link { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; color: var(--gold-text); font-weight: 500; }
+
+/* Settings → Data → Import from old CRM (preview / result) */
+.set-import { display: flex; flex-direction: column; gap: 14px; }
+.set-import__table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.set-import__table th { text-align: left; font-weight: 600; color: var(--muted); font-size: 12px; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.set-import__table td { padding: 7px 8px; border-bottom: 1px solid var(--border); }
+.set-import__table .t-num { text-align: right; font-variant-numeric: tabular-nums; }
+.set-import__cap { text-transform: capitalize; }
+.set-import__list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; line-height: 1.45; }
+.set-import__progress { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
