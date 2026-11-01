@@ -1,5 +1,9 @@
 // CRM (PLAN.md Step 9): leads, lead activities / follow-ups, client contacts.
 import { supabase } from '../lib/supabase'
+import { loadSettings, loadInvoiceCounter, saveInvoiceCounter, logComm, invalidateSnapshotCache } from './storage'
+import { sendEmail, type SendEmailResult } from './gmail'
+import type { Client as Cli, Estimate, Invoice as Inv, Project } from '../data/types'
+import { itemLinesFromEstimate, itemLinesSubtotal } from '../utils/invoiceLines'
 
 export type LeadStage = 'new' | 'contacted' | 'meeting' | 'proposal' | 'won' | 'lost'
 export const STAGES: { key: LeadStage; label: string }[] = [
@@ -89,4 +93,76 @@ export async function deleteContact(id: string): Promise<void> {
 export async function loadStaff(): Promise<{ user_id: string; email: string; role: string }[]> {
   const { data } = await supabase.from('user_roles').select('user_id,email,role').in('role', ['ceo', 'admin', 'accounting', 'recruiter', 'lead_gen'])
   return (data || []) as { user_id: string; email: string; role: string }[]
+}
+
+// ─── Clients hub helpers (redesign 2026-11) ───────────────────────────────────
+
+/** Portal billing status shown in the Clients table: AutoPay on / Card saved / AutoPay off / No portal */
+export type PortalStatus = 'autopay' | 'card' | 'off' | 'none'
+export type PortalInfo = { status: PortalStatus; lastLoginAt: string | null }
+export const PORTAL_LABEL: Record<PortalStatus, string> = { autopay: 'AutoPay on', card: 'Card saved', off: 'AutoPay off', none: 'No portal' }
+
+/** One query for every client's portal login (client_users_internal_read). null = could not be read (shown as "—"). */
+export async function loadPortalStatuses(): Promise<Map<string, PortalInfo> | null> {
+  const { data, error } = await supabase.from('client_users').select('client_id,auto_pay_enabled,default_payment_method_id,last_login_at')
+  if (error) return null
+  const out = new Map<string, PortalInfo>()
+  for (const r of (data || []) as { client_id: string; auto_pay_enabled: boolean | null; default_payment_method_id: string | null; last_login_at: string | null }[]) {
+    const prev = out.get(r.client_id)
+    const status: PortalStatus = r.auto_pay_enabled ? 'autopay' : r.default_payment_method_id ? 'card' : 'off'
+    const rank = { autopay: 3, card: 2, off: 1, none: 0 }
+    const last = [prev?.lastLoginAt, r.last_login_at].filter(Boolean).sort().pop() ?? null
+    out.set(r.client_id, { status: !prev || rank[status] > rank[prev.status] ? status : prev.status, lastLoginAt: last })
+  }
+  return out
+}
+
+const UNPAID = new Set(['sent', 'viewed', 'overdue', 'partial'])
+/** Invoices of a client: by client_id (weekly close) or by name (older invoices) — same rule as clientHealth */
+export const invoicesOf = (c: Cli, invoices: Inv[]) => invoices.filter(i => (i.clientId && i.clientId === c.id) || i.clientName === c.name)
+export const isUnpaid = (i: Inv) => UNPAID.has((i.status || '').toLowerCase())
+export const balanceOf = (i: Inv) => (Number(i.subtotal) || 0) - (Number(i.amountPaid) || 0)
+export const revenueOf = (c: Cli, invoices: Inv[]) => invoicesOf(c, invoices).reduce((s, i) => s + (Number(i.subtotal) || 0), 0)
+export const outstandingOf = (c: Cli, invoices: Inv[]) => invoicesOf(c, invoices).filter(isUnpaid).reduce((s, i) => s + balanceOf(i), 0)
+
+/** Payment reminder for every unpaid invoice of a client (Settings → Email reminder template). null = nothing unpaid. */
+export async function sendClientReminder(c: Cli, invoices: Inv[]): Promise<{ result: SendEmailResult; count: number; total: number } | null> {
+  const settings = await loadSettings()
+  const unpaidInvs = invoicesOf(c, invoices).filter(isUnpaid)
+  if (unpaidInvs.length === 0) return null
+  const totalOwed = unpaidInvs.reduce((s, inv) => s + balanceOf(inv), 0)
+  const companyName = settings.companyName || 'YVA Staffing'
+  const invoiceList = unpaidInvs.map(inv => `  • ${inv.number} — $${(Number(inv.subtotal) || 0).toFixed(2)}`).join('\n')
+  const bodyText = settings.reminderEmailTemplate
+    ? settings.reminderEmailTemplate
+        .replace(/\{clientName\}/g, c.name)
+        .replace(/\{invoiceNumber\}/g, unpaidInvs.length === 1 ? unpaidInvs[0].number : `${unpaidInvs.length} invoices`)
+        .replace(/\{amount\}/g, `$${totalOwed.toFixed(2)}`)
+        .replace(/\{dueDate\}/g, unpaidInvs[0]?.dueDate || '')
+        .replace(/\{companyName\}/g, companyName)
+    : `Hi ${c.name},\n\nThis is a friendly reminder that you have ${unpaidInvs.length === 1 ? 'an outstanding invoice' : `${unpaidInvs.length} outstanding invoices`} totaling $${totalOwed.toFixed(2)}:\n\n${invoiceList}\n\nPlease let us know when we can expect payment or if you have any questions.\n\n${settings.emailSignature || companyName}`
+  const result = await sendEmail(c.email || '', `Outstanding Balance Reminder — ${companyName}`, bodyText)
+  return { result, count: unpaidInvs.length, total: totalOwed }
+}
+
+/** Accepted estimate → a draft invoice for Finance to review and send. The estimate's lines become real
+ *  invoice item lines (description × qty × price — never hours or payroll, see utils/invoiceLines.ts) and the
+ *  subtotal is their sum. Numbered like Quick Invoice (INV-NNN from the shared counter). */
+export async function createInvoiceFromEstimate(est: Estimate, client?: Cli, project?: Project): Promise<{ id: string; number: string }> {
+  const counter = await loadInvoiceCounter()
+  const id = crypto.randomUUID(), number = `INV-${String(counter).padStart(3, '0')}`
+  const items = itemLinesFromEstimate(est.items)
+  const subtotal = items.length ? itemLinesSubtotal(items) : Number(est.total) || 0
+  const notes = [`From estimate ${est.number}`, est.notes].filter(Boolean).join('\n')
+  const today = new Date(); const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  const { error } = await supabase.from('invoices').insert({
+    id, number, date, client_name: client?.name ?? est.clientName ?? null, client_email: client?.email ?? null, client_address: client?.address ?? null,
+    client_id: client?.id ?? est.clientId ?? null, project_id: project?.id ?? est.projectId ?? null, project_name: project?.name ?? est.projectName ?? null,
+    subtotal, notes, status: 'draft', items, status_history: [{ status: 'draft', changedAt: Date.now() }],
+  })
+  if (error) throw new Error(error.message)
+  invalidateSnapshotCache()
+  await saveInvoiceCounter(counter + 1).catch(() => {})
+  if (client?.id) await logComm(client.id, `Draft invoice ${number} created from estimate ${est.number} ($${subtotal.toFixed(2)})`, 'system')
+  return { id, number }
 }

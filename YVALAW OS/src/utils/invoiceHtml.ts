@@ -7,6 +7,7 @@
 import type { Invoice } from '../data/types'
 import { escapeHtml as esc } from './html'
 import { formatMoney } from './money'
+import { isItemLine, lineAmount, lineMoney, qtyText } from './invoiceLines'
 
 export interface InvoiceHtmlOptions {
   rate?:           number   // USD→DOP rate; 0 = omit DOP line (always 0 for portal)
@@ -14,8 +15,26 @@ export interface InvoiceHtmlOptions {
   companyAddress?: string
   companyEmail?:   string
   companyPhone?:   string
+  companyWebsite?: string   // From block; falls back to Settings → Company (companyBranding)
+  invoiceFooter?:  string   // bottom of the invoice; falls back to Settings → Company
+  logoUrl?:        string   // falls back to the uploaded logo, then /yva-logo.png
   autoPrint?:      boolean  // inject window.print() onload
 }
+
+/** Settings → Company branding (logo, website, invoice footer). loadSettings() keeps it current, so every printed
+ *  invoice / statement uses it even when the caller only passes name/address/email/phone. Portal clients can't read
+ *  settings, so the portal falls back to the defaults. */
+export type CompanyBranding = { logoUrl?: string; website?: string; invoiceFooter?: string }
+let branding: CompanyBranding = {}
+export function setCompanyBranding(b: CompanyBranding): void { branding = { ...b } }
+export function companyBranding(): CompanyBranding { return branding }
+/** The logo URL for printed documents: uploaded logo, else the built-in /yva-logo.png */
+export function companyLogoSrc(logoUrl?: string): string {
+  const url = (logoUrl ?? branding.logoUrl ?? '').trim()
+  return /^https?:\/\//i.test(url) ? url : `${window.location.origin}${import.meta.env.BASE_URL}yva-logo.png`
+}
+/** "yvastaffing.agency" for display (scheme and trailing slash dropped) */
+export const websiteLabel = (w: string) => w.trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '')
 
 const DEFAULTS = {
   companyName:    'YVA Staffing',
@@ -43,6 +62,12 @@ function fmtHours(h: unknown): string {
   return m % 60 === 0 ? `${m / 60}h` : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`
 }
 
+/** A fixed-price line (kind 'item'): "Description · qty × $price", then the amount — never hours */
+function itemRowHtml(it: NonNullable<Invoice['items']>[number], span: number): string {
+  return '<tr><td colspan="' + span + '"><strong>' + esc(it.description || 'Item') + '</strong> · ' + esc(qtyText(it.qty)) + ' × ' + esc(lineMoney(Number(it.rate) || 0)) + '</td>' +
+    '<td style="text-align:right;white-space:nowrap"><strong>' + esc(lineMoney(lineAmount(it))) + '</strong></td></tr>'
+}
+
 export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): string {
   const rate           = opts.rate           ?? 0
   const companyName    = opts.companyName    || DEFAULTS.companyName
@@ -50,6 +75,9 @@ export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): s
   const companyEmail   = opts.companyEmail   || DEFAULTS.companyEmail
   const companyPhone   = opts.companyPhone   || DEFAULTS.companyPhone
   const autoPrint      = opts.autoPrint      ?? false
+  const website        = websiteLabel(opts.companyWebsite ?? branding.website ?? '')
+  const footerText     = (opts.invoiceFooter ?? branding.invoiceFooter ?? '').trim()
+  const logoSrc        = companyLogoSrc(opts.logoUrl)
 
   const dop = dopLabel(Number(inv.subtotal) || 0, rate)
 
@@ -67,6 +95,8 @@ export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): s
   }
 
   let itemsSection = ''
+  const lines = inv.items || []
+  const firstCol = lines.length && lines.every(isItemLine) ? 'Item' : lines.some(isItemLine) ? 'Description' : 'Team Member'
   if ((inv.items || []).length === 0) {
     itemsSection = `
     <div class="section">
@@ -81,6 +111,7 @@ export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): s
         dayAbbr[dt.getDay()] + '<br>' + (dt.getMonth() + 1) + '/' + dt.getDate() + '</th>'
     }).join('')
     const bodyRows = (inv.items || []).map(it => {
+      if (isItemLine(it)) return itemRowHtml(it, allDates.length + 3)
       const dayCells = allDates.map(d => {
         const h = parseH(it.daily?.[d] || '')
         return '<td style="text-align:center;font-size:11px;color:' + (h > 0 ? '#111' : '#ccc') + '">' +
@@ -97,7 +128,7 @@ export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): s
     itemsSection = `
     <div style="overflow-x:auto;margin-top:16px">
     <table style="font-size:12px;width:100%">
-      <thead><tr><th style="min-width:140px">Team Member</th>${dateHeaders}<th style="text-align:right">Hours</th><th style="text-align:right">Rate</th><th style="text-align:right">Amount</th></tr></thead>
+      <thead><tr><th style="min-width:140px">${firstCol}</th>${dateHeaders}<th style="text-align:right">Hours</th><th style="text-align:right">Rate</th><th style="text-align:right">Amount</th></tr></thead>
       <tbody>${bodyRows}
         <tr class="total-row"><td colspan="${colSpan}">Total Due</td><td style="text-align:right">${formatMoney(Number(inv.subtotal) || 0)}</td></tr>
       </tbody>
@@ -105,7 +136,7 @@ export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): s
     </div>
     ${dop ? `<div class="dop">${dop}</div>` : ''}`
   } else {
-    const bodyRows = (inv.items || []).map(it =>
+    const bodyRows = (inv.items || []).map(it => isItemLine(it) ? itemRowHtml(it, 3) :
       '<tr><td><strong>' + esc(it.employeeName) + '</strong>' +
       (it.position ? '<br><span style="font-size:11px;color:#888">' + esc(it.position) + '</span>' : '') +
       '</td><td style="text-align:right">' + fmtHours(it.hoursTotal) + '</td>' +
@@ -114,7 +145,7 @@ export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): s
     ).join('')
     itemsSection = `
     <table>
-      <thead><tr><th>Team Member</th><th style="text-align:right">Hours</th><th style="text-align:right">Rate</th><th style="text-align:right">Amount</th></tr></thead>
+      <thead><tr><th>${firstCol}</th><th style="text-align:right">Hours</th><th style="text-align:right">Rate</th><th style="text-align:right">Amount</th></tr></thead>
       <tbody>${bodyRows}
         <tr class="total-row"><td colspan="3">Total Due</td><td style="text-align:right">${formatMoney(Number(inv.subtotal) || 0)}</td></tr>
       </tbody>
@@ -127,7 +158,7 @@ export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): s
     <style>
       body { font-family: Arial, sans-serif; max-width: 720px; margin: 40px auto; color: #111; }
       .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; }
-      .logo { height: 52px; }
+      .logo { height: 52px; max-width: 220px; object-fit: contain; }
       .from-info { font-size: 12px; color: #666; line-height: 1.6; margin-top: 8px; }
       .inv-title { font-size: 28px; font-weight: 900; color: #f5b533; }
       .inv-num { font-size: 14px; color: #666; margin-top: 4px; }
@@ -141,18 +172,20 @@ export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): s
       .total-row td { border-top: 2px solid #111; border-bottom: none; padding-top: 14px; }
       .dop { font-size: 12px; color: #999; margin-top: 4px; }
       .notes-box { background: #f9f9f9; border-left: 3px solid #f5b533; padding: 12px 16px; margin-top: 24px; font-size: 13px; color: #444; white-space: pre-wrap; }
+      .footer-text { margin-top: 32px; font-size: 13px; color: #444; white-space: pre-line; text-align: center; }
       .footer { margin-top: 40px; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 16px; }
       @media print { body { margin: 20px; } }
     </style>
     </head><body>
     <div class="header">
       <div>
-        <img src="${window.location.origin}${import.meta.env.BASE_URL}yva-logo.png" class="logo" onerror="this.style.display='none'" />
+        <img src="${esc(logoSrc)}" class="logo" alt="${esc(companyName)}" onerror="this.style.display='none'" />
         <div class="from-info">
           <div><strong>${esc(companyName)}</strong></div>
           <div>${esc(companyAddress)}</div>
           <div>${esc(companyEmail)}</div>
           <div>${esc(companyPhone)}</div>
+          ${website ? `<div class="from-web">${esc(website)}</div>` : ''}
         </div>
       </div>
       <div style="text-align:right">
@@ -177,7 +210,8 @@ export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): s
     </div>
     ${itemsSection}
     ${inv.notes ? `<div class="notes-box">${esc(inv.notes)}</div>` : ''}
-    <div class="footer">${esc(companyName)} · yvastaffing.net</div>
+    ${footerText ? `<div class="footer-text">${esc(footerText)}</div>` : ''}
+    <div class="footer">${esc(companyName)} · ${esc(website || 'yvastaffing.net')}</div>
     ${autoPrint ? '<script>window.onload = function(){ window.print(); }</script>' : ''}
     </body></html>`
 }

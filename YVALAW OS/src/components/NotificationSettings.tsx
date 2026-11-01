@@ -3,6 +3,8 @@ import {
   disablePush, enablePush, loadNotificationPrefs, pushState, PushSetupError, saveNotificationPref, sendNotificationsNow,
   type NotificationPref, type PushSetupErrorCode, type PushState,
 } from '../services/notifications'
+import { Ic, P } from './Icon'
+import BoxToggle from './settings/BoxToggle'
 
 type Kind = { kind: string; label: string; labelEs?: string }
 
@@ -70,51 +72,56 @@ export default function NotificationSettings({ kinds, lang = 'en' }: { kinds: Ki
     setBusy(false)
   }
 
+  const deviceText = state === 'on' ? t.on : state === 'denied' ? t.denied : state === 'unsupported' ? t.unsupported : state === 'needs-install' ? t.install : t.deviceSub
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <div className="settings-row" style={{ alignItems: 'flex-start' }}>
-        <div className="settings-row-info">
-          <div className="settings-row-label">{t.device}</div>
-          <div className="settings-row-sub">
-            {state === 'on' ? t.on : state === 'denied' ? t.denied : state === 'unsupported' ? t.unsupported : state === 'needs-install' ? t.install : t.deviceSub}
-          </div>
+    <div className="set-ns">
+      <div className="set-ns__device">
+        <div className="set-ns__device-text">
+          <span className="set-ns__device-title">{t.device}</span>
+          <span className={`set-ns__device-sub${state === 'on' ? ' set-ns__device-sub--on' : ''}`}>{deviceText}</span>
         </div>
         {state === 'on'
-          ? <button className="btn-ghost btn-sm" disabled={busy} onClick={() => void device(false)}>{t.turnOff}</button>
-          : (state === 'off') && <button className="btn-primary btn-sm" disabled={busy} onClick={() => void device(true)}>{t.turnOn}</button>}
+          ? <button type="button" className="btn btn--sm" disabled={busy} onClick={() => void device(false)}>{t.turnOff}</button>
+          : (state === 'off') && <button type="button" className="btn btn--primary btn--sm" disabled={busy} onClick={() => void device(true)}>{t.turnOn}</button>}
       </div>
 
-      <div>
-        <div className="settings-row-label" style={{ marginBottom: 6 }}>{t.what}</div>
-        <div className="table-wrap">
-          <table className="perm-table">
-            <thead><tr><th></th><th style={{ width: 70 }}>{t.email}</th><th style={{ width: 70 }}>{t.push}</th></tr></thead>
-            <tbody>
-              {kinds.map(k => (
-                <tr key={k.kind}>
-                  <td>{lang === 'es' && k.labelEs ? k.labelEs : k.label}</td>
-                  <td><input type="checkbox" aria-label={`${t.email}: ${k.label}`} checked={pref(k.kind).email} onChange={() => void toggle(k.kind, 'email')} /></td>
-                  <td><input type="checkbox" aria-label={`${t.push}: ${k.label}`} checked={pref(k.kind).push} onChange={() => void toggle(k.kind, 'push')} /></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <div className="stack">
+        <span className="section-label">{t.what}</span>
+        <div className="set-ns__table" role="table" aria-label={t.what}>
+          <div className="set-ns__grid set-ns__grid--head" role="row">
+            <span role="columnheader">{lang === 'es' ? 'Evento' : 'Event'}</span>
+            <span role="columnheader">{t.email}</span>
+            <span role="columnheader">{t.push}</span>
+          </div>
+          {kinds.map(k => {
+            const name = lang === 'es' && k.labelEs ? k.labelEs : k.label
+            return (
+              <div key={k.kind} className="set-ns__grid set-ns__grid--row" role="row">
+                <span role="cell">{name}</span>
+                <BoxToggle small label={`${t.email}: ${k.label}`} checked={pref(k.kind).email} onChange={() => void toggle(k.kind, 'email')} />
+                <BoxToggle small label={`${t.push}: ${k.label}`} checked={pref(k.kind).push} onChange={() => void toggle(k.kind, 'push')} />
+              </div>
+            )
+          })}
         </div>
-        <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6 }}>{t.bell}</div>
+        <span className="set-ns__bell">{t.bell}</span>
       </div>
 
-      <div className="form-group" style={{ margin: 0 }}>
-        <label className="form-label">{t.sendTo}</label>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <input className="form-input" type="email" value={emailTo} onChange={e => setEmailTo(e.target.value)} placeholder="name@example.com" style={{ flex: 1, minWidth: 200, maxWidth: 320 }} />
-          <button className="btn-ghost btn-sm" onClick={() => void saveEmailTo()}>{t.save}</button>
+      <div className="field">
+        <span className="field__label">{t.sendTo}</span>
+        <div className="set-ns__sendto">
+          <input className="input" type="email" aria-label={t.sendTo} value={emailTo} onChange={e => setEmailTo(e.target.value)} placeholder="name@example.com" />
+          <button type="button" className="btn" onClick={() => void saveEmailTo()}>{t.save}</button>
         </div>
-        <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>{t.sendToSub}</div>
+        <span className="field__hint">{t.sendToSub}</span>
       </div>
 
-      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-        <button className="btn-ghost btn-sm" disabled={busy} onClick={() => void test()}>{busy ? t.testing : t.test}</button>
-        {msg && <span style={{ fontSize: 13, color: msg.ok ? '#15803d' : '#dc2626' }}>{msg.text}</span>}
+      <div className="set-ns__foot">
+        <button type="button" className="btn btn--sm" disabled={busy} onClick={() => void test()}>
+          <Ic d={P.send} size={14} /> {busy ? t.testing : t.test}
+        </button>
+        {msg && <span className={`set-msg set-msg--${msg.ok ? 'ok' : 'err'}`} role="status">{msg.text}</span>}
       </div>
     </div>
   )

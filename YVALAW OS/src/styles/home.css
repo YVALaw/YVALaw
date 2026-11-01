@@ -1,0 +1,137 @@
+/* home hub styles (redesign 2026-11). Only classes used by the home screens: Home (/) and Reports (/reports). */
+
+/* ── Header + period ─────────────────────────────────────────── */
+.home-head .page-title { font-size: 32px; }
+.home-period { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.home-period__dates { display: flex; align-items: center; gap: 6px; }
+.home-period__dates .input { width: 150px; }
+
+/* ── Layout ──────────────────────────────────────────────────── */
+.home-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.home-empty { padding: 22px 20px; font-size: 14px; color: var(--muted); text-align: center; border-top: 1px solid var(--row-line); }
+.home-kpi-text { display: block; font-size: 18px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Needs attention ─────────────────────────────────────────── */
+.home-attn__row .list-row__title { overflow-wrap: anywhere; }
+.home-attn__amt { font-size: 13px; color: var(--text-2); font-weight: 500; white-space: nowrap; }
+.home-attn__row .btn { flex-shrink: 0; }
+.home-attn__empty { padding: 28px 20px; border-top: 1px solid var(--row-line); font-size: 14px; color: var(--muted); }
+
+/* ── This week (navy) ────────────────────────────────────────── */
+.home-week { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+.home-week__head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.home-week__range { font-size: 12px; font-weight: 500; color: rgba(255, 255, 255, .5); }
+.home-week__row { border: 0; background: transparent; color: #fff; text-align: left; padding: 0; display: flex; gap: 14px; align-items: flex-start; cursor: pointer; font: inherit; border-radius: 8px; }
+.home-week__row:hover .home-week__title { text-decoration: underline; text-underline-offset: 3px; }
+.home-week__date { width: 40px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; border-radius: 8px; background: rgba(255, 255, 255, .07); padding: 5px 0; }
+.home-week__dow { font-size: 10.5px; color: rgba(255, 255, 255, .5); font-weight: 500; }
+.home-week__day { font-size: 16px; font-weight: 600; color: var(--brand); line-height: 1.25; }
+.home-week__text { display: flex; flex-direction: column; gap: 2px; padding-top: 2px; min-width: 0; }
+.home-week__title { font-size: 14px; font-weight: 500; }
+.home-week__meta { font-size: 12.5px; color: rgba(255, 255, 255, .62); }
+
+/* ── Pipeline bar ────────────────────────────────────────────── */
+.home-pipe { display: flex; flex-direction: column; gap: 12px; }
+.home-pipe__bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; gap: 2px; }
+.home-pipe__seg { min-width: 4px; }
+.home-pipe__seg--empty { flex: 1; background: var(--head-line); }
+.home-pipe__stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(68px, 1fr)); gap: 8px; font-size: 12.5px; color: var(--muted); }
+.home-pipe__stat { display: flex; flex-direction: column; min-width: 0; }
+.home-pipe__n { font-size: 17px; font-weight: 600; color: var(--text); }
+.home .card--pad > .card__head, .home-reports .card--pad > .card__head { padding: 0 0 12px; }
+
+/* ── Tracking now ────────────────────────────────────────────── */
+.home-live { padding: 14px 18px; display: flex; align-items: center; gap: 12px; }
+.home-live .link { font-size: 13px; flex-shrink: 0; min-height: 44px; }
+
+/* ── 6-month chart ───────────────────────────────────────────── */
+.home-chart { height: 150px; display: flex; align-items: flex-end; gap: 28px; position: relative; border-bottom: 1px solid var(--border); }
+.home-chart__goal { position: absolute; left: 0; right: 0; border-top: 1px dashed #ca8a04; pointer-events: none; z-index: 1; }
+.home-chart__goal-tag { position: absolute; right: 0; bottom: 2px; font-size: 10.5px; font-weight: 500; color: var(--gold-text); background: var(--surface); padding-left: 6px; }
+.home-chart__col { flex: 1; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; }
+.home-chart__v { font-size: 11px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+.home-chart__bar { width: 100%; max-width: 120px; background: var(--border-strong); border-radius: 5px 5px 0 0; min-height: 2px; }
+.home-chart__bar--now { background: var(--navy); }
+.home-chart__bar--zero { background: var(--head-line); }
+.home-chart__labels { display: flex; gap: 28px; margin-top: 8px; }
+.home-chart__labels span { flex: 1; text-align: center; font-size: 12px; color: var(--muted); }
+
+/* ── Tables inside cards (Reports) ───────────────────────────── */
+.home-tablewrap { overflow-x: auto; overflow-y: hidden; border-top: 1px solid var(--head-line); }
+.home-tablewrap .table th, .home-tablewrap .table td { padding-left: 20px; }
+.home-t-sm { min-width: 420px; }
+.home-t-md { min-width: 560px; }
+.home-t-lg { min-width: 760px; }
+.home-mlist { display: flex; flex-direction: column; border-top: 1px solid var(--head-line); }
+.home-mlist__row { width: 100%; text-align: left; background: none; border-left: 0; border-right: 0; border-bottom: 0; font: inherit; color: inherit; }
+.home-mlist__row--click { cursor: pointer; width: 100%; text-align: left; background: none; border-left: 0; border-right: 0; border-bottom: 0; font: inherit; color: inherit; }
+.home-mlist__row--click:hover { background: var(--surface-2); }
+.home-mlist__right { font-size: 13.5px; font-weight: 500; white-space: nowrap; flex-shrink: 0; }
+.home-mlist__k { color: var(--soft); }
+.home-mlist .list-row:first-child { border-top: 0; }
+.home .card > .card__head + .list-row, .home-reports .card > .card__head + .list-row { border-top: 1px solid var(--head-line); }
+
+/* ── AR aging, forecast, insights ────────────────────────────── */
+.home-aging { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 12px; padding: 4px 20px 16px; }
+.home-aging__tile { background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+.home-aging__label { font-size: 12.5px; color: var(--muted); }
+.home-aging__value { font-size: 20px; font-weight: 600; letter-spacing: -.01em; }
+.home-aging__count { font-size: 12px; color: var(--muted); }
+.home-tone-gold { color: var(--gold-text); }
+.home-tone-warning { color: var(--warning-text); }
+.home-tone-danger { color: var(--danger-text); }
+.home-tone-dark { color: #7f1d1d; }
+.home-forecast { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; font-size: 12.5px; }
+.home-forecast__value { font-size: 26px; font-weight: 600; letter-spacing: -.02em; color: var(--text); }
+.home-kv { display: flex; flex-direction: column; }
+.home-kv__row { display: flex; justify-content: space-between; gap: 10px; padding: 9px 0; border-top: 1px solid var(--row-line); font-size: 13.5px; }
+.home-strong { font-weight: 500; }
+.home-insights { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; color: var(--text-2); }
+.home-paystat { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+
+/* ── Invoice history filters ─────────────────────────────────── */
+.home-history__actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.home-filters { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 0 20px 14px; }
+.home-filters .search-input { width: 200px; }
+.home-filters .search-input .input { height: 34px; font-size: 13px; }
+.home-filters .select { width: 160px; }
+.home-filters__dates { display: flex; align-items: center; gap: 6px; }
+.home-filters__dates .input { width: 145px; }
+.home-filters__total { margin-left: auto; font-size: 12.5px; color: var(--muted); }
+.home-filters__total strong { color: var(--text); }
+
+/* ── Drill-down modal ────────────────────────────────────────── */
+.home-drill { display: flex; flex-direction: column; margin: 0 -22px; max-height: 62dvh; overflow-y: auto; }
+.home-drill__row { padding-left: 22px; padding-right: 22px; }
+.home-drill__row--click { width: 100%; text-align: left; background: none; border-left: 0; border-right: 0; border-bottom: 0; font: inherit; color: inherit; cursor: pointer; }
+.home-drill__row--click:hover { background: var(--surface-2); }
+.home-drill__label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.home-drill__right { font-size: 13.5px; font-weight: 600; white-space: nowrap; }
+.home-drill .home-empty { border-top: 0; }
+
+/* ── Phone ───────────────────────────────────────────────────── */
+@media (max-width: 759px) {
+  .home-head .page-title { font-size: 24px; }
+  .home-period, .home-period .seg { width: 100%; }
+  .home-period .seg__opt { flex: 1; }
+  .home-period__dates { width: 100%; }
+  .home-period__dates .input { flex: 1; width: auto; min-width: 0; }
+  .home-attn__row { gap: 12px; }
+  .home-attn__amt { font-size: 12.5px; }
+  .home-chart, .home-chart__labels { gap: 10px; }
+  .home-chart__v { font-size: 10px; }
+  .home-filters { padding: 0 16px 14px; }
+  .home-filters .search-input, .home-filters .select { width: 100%; }
+  .home-filters__dates { width: 100%; }
+  .home-filters__dates .input { flex: 1; width: auto; min-width: 0; }
+  .home-filters__total { margin-left: 0; }
+  .home-aging { padding: 4px 16px 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home-drill { margin: 0 -22px; }
+  .home-history__actions { width: 100%; }
+  .home-history__actions .btn { flex: 1; }
+}
+
+/* ds.css declares .kpi-cell__note after the .t-* colour helpers, so the note tone never shows; restore it here */
+.home .kpi-cell__note.t-danger, .home-reports .kpi-cell__note.t-danger { color: var(--danger-text); }
+.home .kpi-cell__note.t-warning, .home-reports .kpi-cell__note.t-warning { color: var(--warning-text); }
+.home .kpi-cell__note.t-success, .home-reports .kpi-cell__note.t-success { color: var(--success-text); }

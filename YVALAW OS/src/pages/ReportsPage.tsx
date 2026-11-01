@@ -1,27 +1,30 @@
-import { useEffect, useMemo, useState } from 'react'
+// Reports view (Finance hub) + the building blocks Home reuses: data hook, period control,
+// KPI drill-down modal, attention list, responsive table, pipeline bar.
+// Redesign 2026-11: same calculations and role views as the old dashboard, new layout (home.css).
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getAllDataSnapshot } from '../services/dataSnapshot'
 import {
-  computeReports,
-  getCurrentMonthRange,
-  getCurrentQuarterRange,
-  type DateRange,
+  computeReports, periodRange, invoicesInRangeBySize, expensesInRange, arAging, revenueForecast,
+  retentionWatch, expiringContracts, anniversaries, filterInvoiceHistory, invoiceHistoryCsvRows, payrollCsvRows,
+  invoiceHours, invoiceDay, invoiceStatus, invoiceBalance, outstandingSummary, todayIso,
+  makeCurrentMonthRange, type DateRange, type Period, type ReportsResult,
 } from '../services/reportsService'
 import { formatMoney, fmtHoursHM } from '../utils/money'
 import { loadSettings, loadGeneralExpenses, loadCandidates } from '../services/storage'
-import { loadPayments } from '../services/payments'
+import { loadPayments, type ClientPayment } from '../services/payments'
 import type { AppSettings, Candidate, DataSnapshot, Expense, Invoice } from '../data/types'
 import { useRole } from '../context/RoleContext'
-import { can } from '../lib/roles'
-import { payrollFromInvoiceItem } from '../utils/payroll'
-import {
-  IconX, IconBriefcase, IconUsers, IconBuilding, IconInbox,
-  IconFileText, IconAlert, IconCheck, IconTrendUp, IconTrendDown,
-  IconDollar, IconClock, IconBarChart, IconPieChart, IconTarget,
-  IconCalendar, IconZap, IconFlag, IconShield, IconAward, IconWallet,
-} from '../components/Icon'
+import { can, type AppRole } from '../lib/roles'
+import { Banner, Card, Dot, KpiStrip, Modal, PageHeader, Pill, SearchInput, Segmented, Skel, useIsMobile, type Kpi } from '../components/ui'
+import { dateShort } from '../utils/format'
 
-function downloadCSV(filename: string, rows: string[][]): void {
+/* ══ Shared helpers ═══════════════════════════════════════════════════ */
+
+const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(' ')
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
+
+export function downloadCSV(filename: string, rows: string[][]): void {
   const escape = (v: string) => `"${String(v ?? '').replace(/"/g, '""')}"`
   const csv = rows.map(r => r.map(escape).join(',')).join('\r\n')
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -31,1372 +34,696 @@ function downloadCSV(filename: string, rows: string[][]): void {
   URL.revokeObjectURL(url)
 }
 
-function isoThisMonth(): { from: string; to: string } {
-  const r = getCurrentMonthRange()
-  return { from: r.from, to: r.to }
-}
-function isoThisYear(): { from: string; to: string } {
-  const y = new Date().getFullYear()
-  return { from: `${y}-01-01`, to: `${y}-12-31` }
+const DEFAULT_SETTINGS: AppSettings = { usdToDop: 0, companyName: 'YVA Staffing', companyEmail: '', emailSignature: '' }
+const EMPTY_STORE: DataSnapshot = { employees: [], clients: [], projects: [], invoices: [], invoiceCounter: 1 }
+
+/** Everything the dashboard numbers come from. `payments` is undefined while loading, null when the
+ *  client_payments table isn't available (Collected is then hidden, as before). CEO only. */
+export function useReportsData(role: AppRole, range: DateRange) {
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS)
+  const [store, setStore] = useState<DataSnapshot>(EMPTY_STORE)
+  const [loaded, setLoaded] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [generalExpenses, setGeneralExpenses] = useState<Expense[]>([])
+  const [candidates, setCandidates] = useState<Candidate[]>([])
+  const [payments, setPayments] = useState<ClientPayment[] | null | undefined>(undefined)
+
+  useEffect(() => {
+    void loadSettings().then(setSettings).catch(() => {})
+    getAllDataSnapshot().then(s => { setStore(s); setLoaded(true) }).catch(e => { setLoadError((e as Error).message || 'Could not load data'); setLoaded(true) })
+    void loadGeneralExpenses().then(setGeneralExpenses).catch(() => {})
+    void loadCandidates().then(setCandidates).catch(() => {})
+  }, [])
+
+  const isOwner = can.viewOwnerStats(role)
+  useEffect(() => {
+    if (!isOwner) return
+    let alive = true
+    setPayments(undefined)
+    void loadPayments({ from: range.from || undefined, to: range.to || undefined })
+      .then(r => { if (alive) setPayments(r.error ? null : r.rows) })
+      .catch(() => { if (alive) setPayments(null) })
+    return () => { alive = false }
+  }, [range.from, range.to, isOwner])
+
+  const collected = payments ? payments.reduce((x, p) => x + p.amount, 0) : payments
+  return { settings, store, loaded, loadError, generalExpenses, candidates, payments, collected }
 }
 
-type Preset = 'month' | 'quarter' | 'custom'
-
-function isoToday(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-}
-function clampToIso(v: string): string { return (v || '').slice(0, 10) }
-
-function getLast6Months(): { label: string; bucket: string }[] {
-  const result = []
-  const now = new Date()
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    const bucket = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-    const label = d.toLocaleString('en-US', { month: 'short' })
-    result.push({ label, bucket })
-  }
-  return result
+/** This month / Quarter / Custom (Custom reveals the from/to inputs) */
+export function usePeriod() {
+  const [period, setPeriod] = useState<Period>('month')
+  const [custom, setCustom] = useState<DateRange>(() => makeCurrentMonthRange())
+  const range = useMemo(() => periodRange(period, custom), [period, custom])
+  // Switching to Custom starts from the range that was showing
+  const choose = (p: Period) => { if (p === 'custom' && period !== 'custom') setCustom(range); setPeriod(p) }
+  return { period, setPeriod: choose, custom, setCustom, range }
 }
 
-function BarChart({ data }: { data: { label: string; value: number }[] }) {
-  const max = Math.max(...data.map(d => d.value), 1)
+export function PeriodControl({ period, onPeriod, custom, onCustom }: { period: Period; onPeriod: (p: Period) => void; custom: DateRange; onCustom: (r: DateRange) => void }) {
   return (
-    <div className="bar-chart-container">
-      <div className="bar-chart">
-        {data.map((d) => (
-          <div key={d.label} className="bar-col">
-            {d.value > 0 && (
-              <div className="bar-value">${d.value >= 1000 ? `${(d.value / 1000).toFixed(1)}k` : d.value}</div>
-            )}
-            <div
-              className={`bar-fill${d.value === 0 ? ' bar-fill-zero' : ''}`}
-              style={{ height: `${(d.value / max) * 100}%` }}
-            />
-          </div>
-        ))}
-      </div>
-      <div className="bar-chart-baseline" />
-      <div style={{ display: 'flex', gap: 0 }}>
-        {data.map((d) => (
-          <div key={d.label} className="bar-label" style={{ flex: 1 }}>{d.label}</div>
-        ))}
-      </div>
+    <div className="home-period">
+      <Segmented label="Period" value={period} onChange={onPeriod} options={[{ value: 'month', label: 'This month' }, { value: 'quarter', label: 'Quarter' }, { value: 'custom', label: 'Custom' }]} />
+      {period === 'custom' && (
+        <div className="home-period__dates">
+          <input className="input input--sm" type="date" aria-label="From" value={custom.from} onChange={e => onCustom({ ...custom, from: e.target.value })} />
+          <span className="muted">–</span>
+          <input className="input input--sm" type="date" aria-label="To" value={custom.to} onChange={e => onCustom({ ...custom, to: e.target.value })} />
+        </div>
+      )}
     </div>
   )
 }
 
-// ── Invoice history filter state ───────────────────────────
-function filterInvoices(
-  invoices: Invoice[],
-  opts: { client: string; project: string; status: string; from: string; to: string },
-): Invoice[] {
-  return invoices.filter(inv => {
-    if (opts.client && !(inv.clientName || '').toLowerCase().includes(opts.client.toLowerCase())) return false
-    if (opts.project && inv.projectName !== opts.project) return false
-    if (opts.status && (inv.status || 'draft') !== opts.status) return false
-    const d = inv.date || inv.billingEnd || inv.billingStart || ''
-    if (opts.from && d < opts.from) return false
-    if (opts.to   && d > opts.to)   return false
-    return true
-  })
-}
+/* ── Responsive table: table on desktop, list rows on phones ──────── */
 
-function sBadge(s?: string) {
-  switch ((s||'').toLowerCase()) {
-    case 'paid':    return 'badge-green'
-    case 'overdue': return 'badge-red'
-    case 'sent':    return 'badge-blue'
-    case 'viewed':  return 'badge-purple'
-    case 'partial': return 'badge-orange'
-    default:        return 'badge-gray'
-  }
-}
-
-/* ── Reusable KpiCard with icon ── */
-// Numbers are navy; red only when the colour passed in means a problem (overdue, negative)
-const DANGER = new Set(['#dc2626', '#ef4444', 'var(--danger)'])
-function KpiCard({ icon, value, label, color = 'var(--muted)', onClick }: {
-  icon: React.ReactNode
-  value: string | number
-  label: string
-  color?: string
-  onClick?: () => void
+export type RCol<T> = { label: string; cell: (r: T) => ReactNode; num?: boolean; strong?: boolean; phone?: 'title' | 'right' | 'hide' }
+export function RTable<T>({ rows, cols, rowKey, empty, size = 'md', onRow }: {
+  rows: T[]; cols: RCol<T>[]; rowKey: (r: T, i: number) => string; empty?: ReactNode; size?: 'sm' | 'md' | 'lg'; onRow?: (r: T) => void
 }) {
-  return (
-    <div className={`kpi-card${onClick ? ' clickable-card' : ''}`} onClick={onClick}>
-      <div className="kpi-icon-wrap">
-        {icon}
-      </div>
-      <div className="kpi-body">
-        <div className="kpi-label">{label}</div>
-        <div className="kpi-value" style={DANGER.has(color) ? { color: 'var(--danger)' } : undefined}>{value}</div>
-      </div>
-    </div>
-  )
-}
-
-/* ── Pipeline bar ── */
-function PipelineBar({ stages, counts }: { stages: string[]; counts: Record<string, number> }) {
-  const total = Object.values(counts).reduce((a, b) => a + b, 0)
-  const colors = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#22c55e', '#ef4444']
-  return (
-    <div>
-      <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden', marginBottom: 16, background: 'var(--surf3)' }}>
-        {stages.map((stage, i) => {
-          const count = counts[stage] || 0
-          const pct = total > 0 ? (count / total) * 100 : 0
-          return pct > 0 ? (
-            <div key={stage} style={{ width: `${pct}%`, background: colors[i % colors.length], transition: 'width 0.5s' }} />
-          ) : null
+  const mobile = useIsMobile()
+  if (rows.length === 0) return <div className="home-empty">{empty ?? 'Nothing to show.'}</div>
+  if (mobile) {
+    const title = cols.find(c => c.phone === 'title') ?? cols[0]
+    const right = cols.find(c => c.phone === 'right') ?? [...cols].reverse().find(c => c.num && c !== title)
+    const meta = cols.filter(c => c !== title && c !== right && c.phone !== 'hide')
+    return (
+      <div className="home-mlist">
+        {rows.map((r, i) => {
+          const body = <>
+            <span className="list-row__main">
+              <span className="list-row__title">{title.cell(r)}</span>
+              {meta.length > 0 && <span className="list-row__meta">{meta.map((c, j) => <span key={j}>{j > 0 && ' · '}<span className="home-mlist__k">{c.label}</span> {c.cell(r)}</span>)}</span>}
+            </span>
+            {right && <span className="home-mlist__right num">{right.cell(r)}</span>}
+          </>
+          return onRow
+            ? <button key={rowKey(r, i)} type="button" className="list-row home-mlist__row home-mlist__row--click" onClick={() => onRow(r)}>{body}</button>
+            : <div key={rowKey(r, i)} className="list-row home-mlist__row">{body}</div>
         })}
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {stages.map((stage, i) => (
-          <div key={stage} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ width: 10, height: 10, borderRadius: '50%', background: colors[i % colors.length], flexShrink: 0 }} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text2)', textTransform: 'capitalize' }}>{stage}</span>
+    )
+  }
+  return (
+    <div className="home-tablewrap">
+      <table className={`table home-t-${size}`}>
+        <thead><tr>{cols.map(c => <th key={c.label} className={c.num ? 't-right' : undefined}>{c.label}</th>)}</tr></thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={rowKey(r, i)} className={onRow ? 'is-clickable' : undefined} onClick={onRow ? () => onRow(r) : undefined}>
+              {cols.map(c => <td key={c.label} className={cx(c.num && 't-num', c.strong && 't-strong')}>{c.cell(r)}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+/* ── Attention list (Home + the role views here) ──────────────────── */
+
+export type AttnTone = 'danger' | 'warning' | 'info' | 'muted'
+export type AttnItem = { key: string; tone: AttnTone; title: ReactNode; meta?: ReactNode; amount?: string; action?: string; onAction?: () => void; busy?: boolean }
+const TONE_ORDER: Record<AttnTone, number> = { danger: 0, warning: 1, info: 2, muted: 3 }
+export const sortAttention = (items: AttnItem[]) => items.map((it, i) => ({ it, i })).sort((a, b) => TONE_ORDER[a.it.tone] - TONE_ORDER[b.it.tone] || a.i - b.i).map(x => x.it)
+
+export function AttentionList({ items, loading, className }: { items: AttnItem[]; loading?: boolean; className?: string }) {
+  return (
+    <Card title="Needs attention" meta={loading ? undefined : `${items.length} open`} className={cx('home-attn', className)}>
+      {loading
+        ? [0, 1, 2, 3].map(i => <div key={i} className="card__row"><Skel w={8} h={8} r={4} /><div className="list-row__main"><Skel w="60%" /><Skel w="35%" h={11} /></div><Skel w={70} h={34} r={8} /></div>)
+        : items.length === 0
+          ? <div className="home-attn__empty">Nothing waiting. Nice.</div>
+          : items.map(a => (
+            <div key={a.key} className="card__row home-attn__row">
+              <Dot tone={a.tone} />
+              <div className="list-row__main">
+                <span className="list-row__title">{a.title}</span>
+                {a.meta && <span className="list-row__meta">{a.meta}</span>}
+              </div>
+              {a.amount && <span className="home-attn__amt num">{a.amount}</span>}
+              {a.action && a.onAction && <button type="button" className="btn btn--sm" onClick={a.onAction} disabled={a.busy}>{a.busy ? 'Sending…' : a.action}</button>}
             </div>
-            <span style={{ fontSize: 14, fontWeight: 800, color: counts[stage] ? 'var(--text)' : 'var(--soft)' }}>
-              {counts[stage] || 0}
-            </span>
-          </div>
-        ))}
+          ))}
+    </Card>
+  )
+}
+
+/* ── Stage bar (lead pipeline, candidate pipeline) ────────────────── */
+
+export type Stage = { key: string; label: string; n: number; color: string }
+export function StageBar({ stages }: { stages: Stage[] }) {
+  const total = stages.reduce((s, x) => s + x.n, 0)
+  return (
+    <div className="home-pipe">
+      <div className="home-pipe__bar" aria-hidden>
+        {total === 0 ? <span className="home-pipe__seg home-pipe__seg--empty" /> : stages.filter(s => s.n > 0).map(s => <span key={s.key} className="home-pipe__seg" style={{ flex: s.n, background: s.color }} />)}
+      </div>
+      <div className="home-pipe__stats">
+        {stages.map(s => <div key={s.key} className="home-pipe__stat"><span className="home-pipe__n num">{s.n}</span><span>{s.label}</span></div>)}
       </div>
     </div>
   )
 }
+const CANDIDATE_STAGES = ['applied', 'screening', 'interview', 'offer', 'hired', 'rejected'] as const
+const CANDIDATE_COLORS = ['#cbd5e1', '#94a3b8', '#64748b', '#475569', '#facc15', '#fca5a5']
+export function candidateStages(candidates: Candidate[]): Stage[] {
+  return CANDIDATE_STAGES.map((k, i) => ({ key: k, label: k.charAt(0).toUpperCase() + k.slice(1), n: candidates.filter(c => c.stage === k).length, color: CANDIDATE_COLORS[i] }))
+}
+
+/* ── Role cards reused on Home (recruiter / lead gen) ─────────────── */
+
+export function CandidatePipelineCard({ candidates, onOpen }: { candidates: Candidate[]; onOpen?: () => void }) {
+  return <Card pad title="Pipeline by stage" actions={onOpen && <button type="button" className="link" onClick={onOpen}>Candidates →</button>}><StageBar stages={candidateStages(candidates)} /></Card>
+}
+export function HiringProjectsCard({ store, onOpen }: { store: DataSnapshot; onOpen: (id: string) => void }) {
+  const hiring = store.projects.filter(p => (p.status || '').toLowerCase() === 'hiring')
+  return (
+    <Card title="Projects actively hiring" meta={`${hiring.length}`}>
+      {hiring.length === 0 ? <div className="home-empty">No projects in hiring stage.</div> : hiring.map(p => (
+        <button key={p.id} type="button" className="list-row home-mlist__row--click" onClick={() => onOpen(p.id)}>
+          <span className="list-row__main"><span className="list-row__title">{p.name}</span>{p.projectNeeds && <span className="list-row__meta">{p.projectNeeds}</span>}</span>
+        </button>
+      ))}
+    </Card>
+  )
+}
+export function ContractsCard({ store, onOpen }: { store: DataSnapshot; onOpen: (id: string) => void }) {
+  const list = expiringContracts(store.clients, todayIso())
+  return (
+    <Card title="Contracts expiring (60 days)" meta={`${list.length}`}>
+      {list.length === 0 ? <div className="home-empty">No contracts expiring soon.</div> : list.map(c => (
+        <button key={c.id} type="button" className="list-row home-mlist__row--click" onClick={() => onOpen(c.id)}>
+          <span className="list-row__main"><span className="list-row__title">{c.name}</span><span className="list-row__meta">Ends {dateShort(c.contractEnd)}</span></span>
+          <span className={cx('home-mlist__right', c.daysLeft <= 14 ? 't-danger' : 't-warning')}>{c.daysLeft === 0 ? 'Today' : `${c.daysLeft}d left`}</span>
+        </button>
+      ))}
+    </Card>
+  )
+}
+export function RetentionRiskCard({ store, onOpen }: { store: DataSnapshot; onOpen: (id: string) => void }) {
+  const list = retentionWatch(store.clients, store.invoices, todayIso(), { includeNeverInvoiced: true })
+  return (
+    <Card title="Retention risk (60+ days inactive)" meta={`${list.length}`}>
+      {list.length === 0 ? <div className="home-empty">All clients are active.</div> : list.map(r => (
+        <button key={r.client.id} type="button" className="list-row home-mlist__row--click" onClick={() => onOpen(r.client.id)}>
+          <span className="list-row__main"><span className="list-row__title">{r.client.name}</span><span className="list-row__meta">{r.lastDate ? `Last invoice ${dateShort(r.lastDate)} · ${r.days}d ago` : 'Never invoiced'}</span></span>
+        </button>
+      ))}
+    </Card>
+  )
+}
+
+/* ── KPI drill-down modal ─────────────────────────────────────────── */
+
+export type DrillKind = 'billed' | 'collected' | 'hours' | 'payroll' | 'expenses' | 'net' | 'paid' | 'unpaid' | 'topClient' | 'clients' | 'team' | 'outstanding' | 'overdue' | 'drafts'
+export type DrillCtx = { store: DataSnapshot; computed: ReportsResult; range: DateRange; generalExpenses: Expense[]; payments: ClientPayment[] | null | undefined }
+type DItem = { label: string; sub?: string; right?: string; status?: string; nav?: string }
+
+export function buildDrill(kind: DrillKind, ctx: DrillCtx): { title: string; items: DItem[] } {
+  const { store, computed, range } = ctx
+  const today = todayIso()
+  const invoicesInRange = invoicesInRangeBySize(store.invoices, range.from, range.to)
+  const { rows: rangeExpenses, total: totalExpenses } = expensesInRange(ctx.generalExpenses, range.from, range.to)
+  const netAfterExpenses = computed.totalNetEarnings - totalExpenses
+  const navInv = (inv: Invoice) => `/invoice?open=${encodeURIComponent(inv.id)}`
+  const invRow = (inv: Invoice, sub?: string, right = formatMoney(Number(inv.subtotal) || 0)): DItem => ({ label: `${inv.number} — ${inv.clientName || '—'}`, sub: sub ?? (inv.projectName || inv.date || ''), right, status: inv.status || 'draft', nav: navInv(inv) })
+  switch (kind) {
+    case 'billed': return { title: 'Total billed — invoices in range', items: invoicesInRange.map(inv => invRow(inv)) }
+    case 'collected': {
+      const byId = new Map(store.invoices.map(i => [i.id, i]))
+      return { title: 'Collected — payments received', items: [...(ctx.payments || [])].sort((a, b) => b.paidOn.localeCompare(a.paidOn)).map(p => {
+        const inv = byId.get(p.invoiceId)
+        return { label: inv ? `${inv.number} — ${inv.clientName || '—'}` : 'Payment', sub: `${p.paidOn} · ${p.method}${p.reference ? ` · ${p.reference}` : ''}`, right: formatMoney(p.amount), nav: inv ? navInv(inv) : undefined }
+      }) }
+    }
+    case 'hours': return { title: 'Hours — by employee', items: [...computed.employeePerformance].sort((a, b) => b.hours - a.hours).map(e => ({ label: e.name, sub: plural(e.invoiceCount, 'invoice'), right: fmtHoursHM(e.hours) })) }
+    case 'payroll': return { title: 'Est. payroll — by employee', items: [...computed.employeePerformance].filter(e => e.payroll > 0).sort((a, b) => b.payroll - a.payroll).map(e => ({ label: e.name, sub: `${fmtHoursHM(e.hours)} billed`, right: formatMoney(e.payroll) })) }
+    case 'expenses': return { title: 'Business expenses in range', items: [...rangeExpenses].sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(e => ({ label: e.description, sub: `${e.date || ''}${e.category ? ` · ${e.category}` : ''}`, right: formatMoney(Number(e.amount) || 0) })) }
+    case 'net': return { title: 'Net earnings — breakdown', items: [
+      { label: 'Total billed', right: formatMoney(computed.totalBilled) },
+      { label: 'Est. payroll', right: `− ${formatMoney(computed.totalPayroll)}` },
+      { label: 'Business expenses', right: `− ${formatMoney(totalExpenses)}` },
+      { label: 'Net earnings', right: formatMoney(netAfterExpenses), sub: netAfterExpenses >= 0 ? 'Positive' : 'Negative' },
+    ] }
+    case 'paid': return { title: 'Paid invoices in range', items: invoicesInRange.filter(i => invoiceStatus(i) === 'paid').map(inv => invRow(inv, inv.date || '')) }
+    case 'unpaid': return { title: 'Unpaid invoices in range', items: invoicesInRange.filter(i => invoiceStatus(i) !== 'paid').map(inv => invRow(inv, inv.dueDate ? `Due ${inv.dueDate}` : (inv.date || ''))) }
+    case 'topClient': return { title: 'Revenue by client', items: computed.byClient.map(c => ({ label: c.name, sub: plural(c.invoiceCount, 'invoice'), right: formatMoney(c.total) })) }
+    case 'clients': {
+      const byName: Record<string, number> = {}
+      for (const c of computed.byClient) byName[c.name] = c.total
+      return { title: 'All clients', items: store.clients.map(c => ({ label: c.name, sub: c.company || c.email || '', right: byName[c.name] ? formatMoney(byName[c.name]) : '—', nav: `/clients/${c.id}` })) }
+    }
+    case 'team': {
+      const byName = new Map(computed.employeePerformance.map(e => [e.name, e]))
+      return { title: 'Team members', items: store.employees.map(e => { const perf = byName.get(e.name); return { label: e.name, sub: e.role || e.employmentType || '', right: perf ? fmtHoursHM(perf.hours) : '—', nav: `/employees/${e.id}` } }) }
+    }
+    case 'outstanding': return { title: 'Outstanding — open invoices', items: outstandingSummary(store.invoices, today).open.map(inv => invRow(inv, inv.dueDate ? `Due ${inv.dueDate}` : (inv.date || ''), formatMoney(invoiceBalance(inv)))) }
+    case 'overdue': return { title: 'Overdue invoices', items: outstandingSummary(store.invoices, today).overdue.map(inv => invRow(inv, inv.dueDate ? `Due ${inv.dueDate}` : (inv.date || ''), formatMoney(invoiceBalance(inv)))) }
+    case 'drafts': return { title: 'Draft invoices to send', items: store.invoices.filter(i => invoiceStatus(i) === 'draft').sort((a, b) => invoiceDay(b).localeCompare(invoiceDay(a))).map(inv => invRow(inv, `${inv.date || ''}${inv.autoGenerated ? ' · from weekly close' : ''}`)) }
+  }
+}
+
+export function KpiDrillModal({ kind, ctx, onClose }: { kind: DrillKind | null; ctx: DrillCtx; onClose: () => void }) {
+  const navigate = useNavigate()
+  const d = kind ? buildDrill(kind, ctx) : null
+  return (
+    <Modal open={!!d} onClose={onClose} title={d?.title ?? ''} size="wide">
+      {d && (d.items.length === 0
+        ? <div className="home-empty">No data for this period.</div>
+        : <div className="home-drill">
+          {d.items.map((item, i) => {
+            const body = <>
+              <span className="list-row__main"><span className="list-row__title home-drill__label">{item.label}</span>{item.sub && <span className="list-row__meta">{item.sub}</span>}</span>
+              {item.status && <Pill status={item.status} />}
+              {item.right && <span className="home-drill__right num">{item.right}</span>}
+              {item.nav && <span className="soft" aria-hidden>→</span>}
+            </>
+            return item.nav
+              ? <button key={i} type="button" className="list-row home-drill__row home-drill__row--click" onClick={() => { navigate(item.nav!); onClose() }}>{body}</button>
+              : <div key={i} className="list-row home-drill__row">{body}</div>
+          })}
+        </div>)}
+    </Modal>
+  )
+}
+
+/* ══ Reports page ═════════════════════════════════════════════════════ */
 
 export default function ReportsPage() {
   const { role } = useRole()
   const navigate = useNavigate()
-  // Payments received in the date range (client_payments, Step 5); null until loaded / table missing
-  const [collected, setCollected] = useState<number | null>(null)
-  const [kpiDrill, setKpiDrill] = useState<string | null>(null)
-  const [preset, setPreset] = useState<Preset>('month')
-  const [from, setFrom] = useState<string>(getCurrentMonthRange().from)
-  const [to, setTo]     = useState<string>(getCurrentMonthRange().to)
-  useEffect(() => {
-    if (!can.viewOwnerStats(role)) return
-    void loadPayments({ from: from || undefined, to: to || undefined }).then(r => setCollected(r.error ? null : r.rows.reduce((x, p) => x + p.amount, 0)))
-  }, [from, to, role])
-
-  // Invoice history filters
-  const [hClient,  setHClient]  = useState('')
-  const [hProject, setHProject] = useState('')
-  const [hStatus,  setHStatus]  = useState('')
-  const [hFrom,    setHFrom]    = useState('')
-  const [hTo,      setHTo]      = useState('')
-
-  useEffect(() => {
-    if (preset === 'month')   { const r = getCurrentMonthRange();   setFrom(r.from); setTo(r.to) }
-    if (preset === 'quarter') { const r = getCurrentQuarterRange(); setFrom(r.from); setTo(r.to) }
-  }, [preset])
-
-  const range: DateRange = useMemo(
-    () => ({ from: clampToIso(from) || isoToday(), to: clampToIso(to) || isoToday() }),
-    [from, to],
-  )
-
-  const [settings, setSettings] = useState<AppSettings>({ usdToDop: 0, companyName: 'YVA Staffing', companyEmail: '', emailSignature: '' })
-  const [store, setStore] = useState<DataSnapshot>({ employees: [], clients: [], projects: [], invoices: [], invoiceCounter: 1 })
-  const [generalExpenses, setGeneralExpenses] = useState<Expense[]>([])
-  const [candidates, setCandidates] = useState<Candidate[]>([])
-
-  useEffect(() => {
-    void loadSettings().then(setSettings)
-    void getAllDataSnapshot().then(setStore)
-    void loadGeneralExpenses().then(setGeneralExpenses)
-    void loadCandidates().then(setCandidates)
-  }, [])
-
+  const { period, setPeriod, custom, setCustom, range } = usePeriod()
+  const data = useReportsData(role, range)
+  const { store, loaded, loadError } = data
   const computed = useMemo(() => computeReports(store, range), [store, range])
-  const topClient = computed.byClient.length ? computed.byClient[0] : null
 
-  const invoicesInRange = useMemo(() => store.invoices.filter(inv => {
-    const d = inv.date || inv.billingEnd || inv.billingStart || ''
-    if (from && d < from) return false
-    if (to   && d > to)   return false
-    return true
-  }).sort((a, b) => (Number(b.subtotal)||0) - (Number(a.subtotal)||0)), [store.invoices, from, to])
+  const openInvoice = (inv: Invoice) => navigate(`/invoice?open=${encodeURIComponent(inv.id)}`)
+  const common = { store, computed, navigate, openInvoice }
 
-  // Build bar chart data (last 6 months from ALL invoices, not filtered range)
-  const chartData = useMemo(() => {
-    const months = getLast6Months()
-    const totals: Record<string, number> = {}
-    for (const inv of store.invoices) {
-      const d = inv.date || inv.billingEnd || inv.billingStart
-      if (!d) continue
-      const bucket = d.slice(0, 7)
-      totals[bucket] = (totals[bucket] || 0) + (Number(inv.subtotal) || 0)
-    }
-    return months.map(m => ({ label: m.label, value: totals[m.bucket] || 0 }))
-  }, [store])
+  if (role === 'admin') return <AdminReports {...common} candidates={data.candidates} loaded={loaded} loadError={loadError} />
+  if (role === 'accounting') return <AccountingReports {...common} loaded={loaded} loadError={loadError} />
+  if (role === 'recruiter') return <RecruiterReports store={store} candidates={data.candidates} navigate={navigate} />
+  if (role === 'lead_gen') return <LeadGenReports store={store} navigate={navigate} />
+  return <CeoReports {...common} role={role} data={data} range={range} period={period} setPeriod={setPeriod} custom={custom} setCustom={setCustom} />
+}
 
-  // Overdue + unpaid attention items
-  const overdueInvoices = store.invoices.filter(inv => (inv.status || '').toLowerCase() === 'overdue')
-  const draftInvoices   = store.invoices.filter(inv => (inv.status || '').toLowerCase() === 'draft')
+type Nav = ReturnType<typeof useNavigate>
+type Common = { store: DataSnapshot; computed: ReportsResult; navigate: Nav; openInvoice: (inv: Invoice) => void }
 
-  // Employee anniversary alerts — employees hitting a milestone this year (1, 2, 3, 5, 10+ years)
-  const anniversaries = useMemo(() => {
-    const thisYear = new Date().getFullYear()
-    const milestones = new Set([1, 2, 3, 5, 10, 15, 20])
-    return store.employees
-      .filter(emp => {
-        const startYearNum = Number(emp.startYear)
-        if (!startYearNum || startYearNum >= thisYear) return false
-        const years = thisYear - startYearNum
-        return milestones.has(years)
-      })
-      .map(emp => ({ name: emp.name, years: thisYear - Number(emp.startYear) }))
-  }, [store])
+const thisMonth = () => todayIso().slice(0, 7)
+const statusOverdue = (inv: Invoice) => (inv.status || '').toLowerCase() === 'overdue'
+const statusDraft = (inv: Invoice) => (inv.status || '').toLowerCase() === 'draft'
+const sentPendingOf = (invoices: Invoice[]) => invoices.filter(inv => ['sent', 'viewed', 'partial'].includes((inv.status || '').toLowerCase()))
+const paidThisMonthOf = (invoices: Invoice[]) => invoices.filter(inv => (inv.status || '').toLowerCase() === 'paid' && (inv.date || inv.billingEnd || '').startsWith(thisMonth()))
 
-  // Contract renewal warnings (within 60 days)
-  const expiringContracts = useMemo(() => {
-    const today = new Date(); today.setHours(0,0,0,0)
-    const in60 = new Date(today); in60.setDate(in60.getDate() + 60)
-    return store.clients.filter(c => {
-      if (!c.contractEnd) return false
-      const d = new Date(c.contractEnd)
-      return d >= today && d <= in60
-    }).sort((a, b) => new Date(a.contractEnd!).getTime() - new Date(b.contractEnd!).getTime())
-  }, [store])
+/** Overdue / drafts / contracts / anniversaries, as the old role dashboards listed them */
+function basicAttention(store: DataSnapshot, navigate: Nav, withAnniversaries: boolean): AttnItem[] {
+  const overdue = store.invoices.filter(statusOverdue)
+  const drafts = store.invoices.filter(statusDraft)
+  const items: AttnItem[] = []
+  if (overdue.length) items.push({ key: 'overdue', tone: 'danger', title: plural(overdue.length, 'overdue invoice'), meta: 'Update status in Invoices', action: 'Open', onAction: () => navigate('/invoice') })
+  if (drafts.length) items.push({ key: 'drafts', tone: 'warning', title: plural(drafts.length, 'draft invoice'), meta: 'Ready to send to clients', action: 'Review', onAction: () => navigate('/invoice') })
+  for (const c of expiringContracts(store.clients, todayIso())) items.push({ key: `c-${c.id}`, tone: c.daysLeft <= 14 ? 'warning' : 'muted', title: `Contract expiring — ${c.name}`, meta: c.daysLeft === 0 ? 'Expires today' : `${plural(c.daysLeft, 'day')} left (${c.contractEnd})`, action: 'View', onAction: () => navigate(`/clients/${c.id}`) })
+  if (withAnniversaries) for (const a of anniversaries(store.employees)) items.push({ key: `a-${a.id}`, tone: 'muted', title: `${a.name} — ${plural(a.years, 'year')}`, meta: `${plural(a.years, 'year')} with YVA Staffing`, action: 'View', onAction: () => navigate(`/employees/${a.id}`) })
+  return sortAttention(items)
+}
 
-  // ── Admin dashboard ─────────────────────────────────────────────────────────
-  if (role === 'admin') {
-    const activeProjects = store.projects.filter(p => (p.status||'').toLowerCase() === 'active').length
-    const inPipeline = candidates.filter(c => !['hired','rejected'].includes(c.stage))
-    const sentPending = store.invoices.filter(inv => ['sent','viewed','partial'].includes((inv.status||'').toLowerCase()))
-    const thisMonthStr = new Date().toISOString().slice(0, 7)
-    const paidThisMonth = store.invoices.filter(inv =>
-      (inv.status||'').toLowerCase() === 'paid' && (inv.date || inv.billingEnd || '').startsWith(thisMonthStr)
-    )
-    const stageCounts: Record<string, number> = {}
-    for (const c of candidates) stageCounts[c.stage] = (stageCounts[c.stage] || 0) + 1
+function LoadState({ loaded, loadError }: { loaded: boolean; loadError: string | null }) {
+  if (loadError) return <Banner tone="danger">Couldn't load the dashboard data: {loadError}</Banner>
+  if (!loaded) return <div className="kpi-strip">{[0, 1, 2, 3].map(i => <div key={i} className="kpi-cell"><Skel w="50%" h={12} /><Skel w="70%" h={24} /></div>)}</div>
+  return null
+}
 
-    return (
-      <div className="page-wrap">
-        <div className="page-header">
-          <div className="page-header-left">
-            <h1 className="page-title">Dashboard</h1>
-            <p className="page-sub">Operations overview</p>
-          </div>
-        </div>
+/* ── CEO: the full finance view ───────────────────────────────────── */
 
-        <div className="kpi-grid">
-          <KpiCard icon={<IconBriefcase size={20} />} value={activeProjects} label="Active Projects" color="#2563eb" />
-          <KpiCard icon={<IconUsers size={20} />} value={store.employees.length} label="Team Members" color="#7c3aed" />
-          <KpiCard icon={<IconBuilding size={20} />} value={store.clients.length} label="Total Clients" color="var(--text)" />
-          <KpiCard icon={<IconInbox size={20} />} value={inPipeline.length} label="Open Candidates" color="#9333ea" />
-          <KpiCard icon={<IconFileText size={20} />} value={draftInvoices.length} label="Draft Invoices" color={draftInvoices.length > 0 ? '#d97706' : 'var(--muted)'} />
-          <KpiCard icon={<IconAlert size={20} />} value={overdueInvoices.length} label="Overdue" color={overdueInvoices.length > 0 ? '#dc2626' : 'var(--muted)'} />
-          <KpiCard icon={<IconCalendar size={20} />} value={sentPending.length} label="Sent / Pending" color="#2563eb" />
-          <KpiCard icon={<IconCheck size={20} />} value={paidThisMonth.length} label="Paid This Month" color="#059669" />
-        </div>
+function CeoReports({ store, computed, navigate, openInvoice, role, data, range, period, setPeriod, custom, setCustom }: Common & {
+  role: AppRole; data: ReturnType<typeof useReportsData>; range: DateRange; period: Period; setPeriod: (p: Period) => void; custom: DateRange; setCustom: (r: DateRange) => void
+}) {
+  const owner = can.viewOwnerStats(role)
+  const [drill, setDrill] = useState<DrillKind | null>(null)
+  const today = todayIso()
+  const topClient = computed.byClient[0] ?? null
+  const { total: totalExpenses } = expensesInRange(data.generalExpenses, range.from, range.to)
+  const netAfterExpenses = computed.totalNetEarnings - totalExpenses
 
-        <div className="responsive-sidebar-grid">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div className="data-card">
-              <div className="data-card-title">Invoice Status — Open</div>
-              <div className="table-wrap">
-                <table className="data-table">
-                  <thead><tr><th>Invoice #</th><th>Client</th><th>Project</th><th>Due Date</th><th>Status</th></tr></thead>
-                  <tbody>
-                    {store.invoices
-                      .filter(inv => (inv.status||'draft') !== 'paid')
-                      .sort((a,b) => (a.dueDate||a.date||'') < (b.dueDate||b.date||'') ? -1 : 1)
-                      .slice(0, 10)
-                      .map(inv => (
-                        <tr key={inv.id}>
-                          <td className="td-name">{inv.number}</td>
-                          <td>{inv.clientName||'—'}</td>
-                          <td className="td-muted">{inv.projectName||'—'}</td>
-                          <td className="td-muted">{inv.dueDate||inv.date||'—'}</td>
-                          <td><span className={`badge ${sBadge(inv.status)}`}>{inv.status||'draft'}</span></td>
-                        </tr>
-                      ))}
-                    {store.invoices.filter(inv => (inv.status||'draft') !== 'paid').length === 0 && (
-                      <tr><td colSpan={5} className="td-empty">All invoices paid.</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+  const kpis: (Kpi | false)[] = [
+    owner && { label: 'Total billed', value: formatMoney(computed.totalBilled), note: plural(computed.invoiceCount, 'invoice'), onClick: () => setDrill('billed') },
+    owner && data.collected !== null && { label: 'Collected', value: data.collected === undefined ? '…' : formatMoney(data.collected), note: 'payments received', tone: 'success', onClick: () => setDrill('collected') },
+    { label: 'Total hours', value: fmtHoursHM(computed.totalHours), note: plural(computed.employeePerformance.length, 'person', 'people'), onClick: () => setDrill('hours') },
+    owner && { label: 'Est. payroll', value: formatMoney(computed.totalPayroll), onClick: () => setDrill('payroll') },
+    { label: 'Business expenses', value: formatMoney(totalExpenses), onClick: () => setDrill('expenses') },
+    owner && { label: 'Net earnings', value: formatMoney(netAfterExpenses), note: `after ${formatMoney(totalExpenses)} expenses`, tone: netAfterExpenses < 0 ? 'danger' : undefined, onClick: () => setDrill('net') },
+    { label: 'Paid', value: computed.paidCount, onClick: () => setDrill('paid') },
+    { label: 'Unpaid', value: computed.unpaidCount, tone: computed.unpaidCount > 0 ? 'danger' : undefined, note: computed.unpaidCount > 0 ? 'in this period' : undefined, onClick: () => setDrill('unpaid') },
+    { label: 'Top client', value: <span className="home-kpi-text">{topClient?.name || '—'}</span>, note: topClient ? formatMoney(topClient.total) : undefined, onClick: () => setDrill('topClient') },
+    { label: 'Clients', value: store.clients.length, onClick: () => setDrill('clients') },
+    { label: 'Team', value: store.employees.length, onClick: () => setDrill('team') },
+  ]
 
-            <div className="data-card">
-              <div className="data-card-title">Candidate Pipeline</div>
-              <PipelineBar stages={['applied','screening','interview','offer','hired','rejected']} counts={stageCounts} />
-            </div>
-          </div>
-
-          <div className="data-card">
-            <div className="data-card-title">Needs Attention</div>
-            <div className="attention-list">
-              {overdueInvoices.length > 0 && (
-                <div className="attention-item">
-                  <div className="attention-item-dot" />
-                  <div className="attention-item-body">
-                    <div className="attention-item-title">{overdueInvoices.length} Overdue Invoice{overdueInvoices.length > 1 ? 's' : ''}</div>
-                    <div className="attention-item-sub">Update status in Invoices</div>
-                  </div>
-                </div>
-              )}
-              {draftInvoices.length > 0 && (
-                <div className="attention-item">
-                  <div className="attention-item-dot attention-item-dot-warn" />
-                  <div className="attention-item-body">
-                    <div className="attention-item-title">{draftInvoices.length} Draft Invoice{draftInvoices.length > 1 ? 's' : ''}</div>
-                    <div className="attention-item-sub">Ready to send to clients</div>
-                  </div>
-                </div>
-              )}
-              {expiringContracts.map(c => {
-                const daysLeft = Math.ceil((new Date(c.contractEnd!).getTime() - Date.now()) / 86400000)
-                return (
-                  <div key={c.id} className="attention-item">
-                    <div className="attention-item-dot" style={{ background: daysLeft <= 14 ? '#ef4444' : '#f97316' }} />
-                    <div className="attention-item-body">
-                      <div className="attention-item-title">Contract Expiring — {c.name}</div>
-                      <div className="attention-item-sub">{daysLeft === 0 ? 'Expires today' : `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left`}</div>
-                    </div>
-                  </div>
-                )
-              })}
-              {anniversaries.map(a => (
-                <div key={a.name} className="attention-item">
-                  <div className="attention-item-dot" style={{ background: '#a855f7' }} />
-                  <div className="attention-item-body">
-                    <div className="attention-item-title">{a.name} — {a.years} Year{a.years !== 1 ? 's' : ''}</div>
-                    <div className="attention-item-sub">{a.years} year{a.years !== 1 ? 's' : ''} with YVA Staffing</div>
-                  </div>
-                </div>
-              ))}
-              {overdueInvoices.length === 0 && draftInvoices.length === 0 && expiringContracts.length === 0 && anniversaries.length === 0 && (
-                <div style={{ fontSize: 13, color: 'var(--muted)', padding: '12px 0', textAlign: 'center' }}>All clear — nothing needs attention</div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {store.employees.length > 0 && (
-          <div className="data-card">
-            <div className="data-card-title">Team Capacity</div>
-            <div className="table-wrap">
-              <table className="data-table">
-                <thead><tr><th>Employee</th><th>Role</th><th>Status</th><th>Assigned Projects</th><th>Hours This Month</th></tr></thead>
-                <tbody>
-                  {store.employees.map(emp => {
-                    const assigned = store.projects.filter(p => (p.employeeIds || []).includes(emp.id))
-                    const hoursThisMonth = store.invoices
-                      .filter(inv => (inv.date || inv.billingEnd || '').startsWith(thisMonthStr))
-                      .flatMap(inv => inv.items || [])
-                      .filter(it => it.employeeName?.toLowerCase() === emp.name.toLowerCase())
-                      .reduce((s, it) => s + (Number(it.hoursTotal) || 0), 0)
-                    return (
-                      <tr key={emp.id}>
-                        <td className="td-name">{emp.name}</td>
-                        <td className="td-muted">{emp.role || '—'}</td>
-                        <td><span style={{ fontSize: 11, textTransform: 'capitalize', color: (emp.status||'active') === 'active' ? '#059669' : 'var(--muted)' }}>{emp.status || 'active'}</span></td>
-                        <td className="td-muted">{assigned.map(p => p.name).join(', ') || '—'}</td>
-                        <td className="td-muted">{hoursThisMonth > 0 ? fmtHoursHM(hoursThisMonth) : '—'}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  // ── Accounting dashboard ─────────────────────────────────────────────────────
-  if (role === 'accounting') {
-    const thisMonthStr = new Date().toISOString().slice(0, 7)
-    const sentPending = store.invoices.filter(inv => ['sent','viewed','partial'].includes((inv.status||'').toLowerCase()))
-    const paidThisMonth = store.invoices.filter(inv =>
-      (inv.status||'').toLowerCase() === 'paid' && (inv.date || inv.billingEnd || '').startsWith(thisMonthStr)
-    )
-    const outstanding = store.invoices.filter(inv => !['paid','draft'].includes((inv.status||'draft').toLowerCase()))
-
-    return (
-      <div className="page-wrap">
-        <div className="page-header">
-          <div className="page-header-left">
-            <h1 className="page-title">Dashboard</h1>
-            <p className="page-sub">Invoice &amp; billing overview</p>
-          </div>
-        </div>
-
-        <div className="kpi-grid">
-          <KpiCard icon={<IconFileText size={20} />} value={draftInvoices.length} label="Draft (to send)" color={draftInvoices.length > 0 ? '#d97706' : 'var(--muted)'} />
-          <KpiCard icon={<IconAlert size={20} />} value={overdueInvoices.length} label="Overdue" color={overdueInvoices.length > 0 ? '#dc2626' : 'var(--muted)'} />
-          <KpiCard icon={<IconCalendar size={20} />} value={sentPending.length} label="Sent / Pending" color="#2563eb" />
-          <KpiCard icon={<IconCheck size={20} />} value={paidThisMonth.length} label="Paid This Month" color="#059669" />
-        </div>
-
-        <div className="responsive-sidebar-grid">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div className="data-card">
-              <div className="data-card-title">Outstanding Invoices</div>
-              <div className="table-wrap">
-                <table className="data-table">
-                  <thead><tr><th>Invoice #</th><th>Client</th><th>Project</th><th>Date</th><th>Due</th><th>Status</th></tr></thead>
-                  <tbody>
-                    {outstanding
-                      .sort((a,b) => (a.dueDate||a.date||'') < (b.dueDate||b.date||'') ? -1 : 1)
-                      .map(inv => (
-                        <tr key={inv.id}>
-                          <td className="td-name">{inv.number}</td>
-                          <td>{inv.clientName||'—'}</td>
-                          <td className="td-muted">{inv.projectName||'—'}</td>
-                          <td className="td-muted">{inv.date||'—'}</td>
-                          <td className="td-muted">{inv.dueDate||'—'}</td>
-                          <td><span className={`badge ${sBadge(inv.status)}`}>{inv.status||'draft'}</span></td>
-                        </tr>
-                      ))}
-                    {outstanding.length === 0 && (
-                      <tr><td colSpan={6} className="td-empty">No outstanding invoices.</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {draftInvoices.length > 0 && (
-              <div className="data-card">
-                <div className="data-card-title">Drafts to Send</div>
-                <div className="table-wrap">
-                  <table className="data-table">
-                    <thead><tr><th>Invoice #</th><th>Client</th><th>Project</th><th>Date</th></tr></thead>
-                    <tbody>
-                      {draftInvoices.map(inv => (
-                        <tr key={inv.id}>
-                          <td className="td-name">{inv.number}</td>
-                          <td>{inv.clientName||'—'}</td>
-                          <td className="td-muted">{inv.projectName||'—'}</td>
-                          <td className="td-muted">{inv.date||'—'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            <div className="data-card">
-              <div className="data-card-title">Employee Statements This Month</div>
-              <div className="table-wrap">
-                <table className="data-table">
-                  <thead><tr><th>Employee</th><th>Hours This Month</th><th>Invoices</th><th>Payment Status</th></tr></thead>
-                  <tbody>
-                    {(() => {
-                      const rows = store.employees.map(emp => {
-                        const empInvs = store.invoices.filter(inv =>
-                          (inv.date || inv.billingEnd || '').startsWith(thisMonthStr) &&
-                          (inv.items || []).some(it => it.employeeName?.toLowerCase() === emp.name.toLowerCase())
-                        )
-                        if (empInvs.length === 0) return null
-                        const hours = empInvs.flatMap(inv => inv.items || [])
-                          .filter(it => it.employeeName?.toLowerCase() === emp.name.toLowerCase())
-                          .reduce((s, it) => s + (Number(it.hoursTotal) || 0), 0)
-                        const paidCount = empInvs.filter(inv => inv.employeePayments?.[emp.id]?.status === 'paid').length
-                        const pendingCount = empInvs.length - paidCount
-                        return (
-                          <tr key={emp.id}>
-                            <td className="td-name">{emp.name}</td>
-                            <td className="td-muted">{hours > 0 ? fmtHoursHM(hours) : '—'}</td>
-                            <td className="td-muted">{empInvs.length}</td>
-                            <td>
-                              {paidCount > 0 && <span style={{ color: '#059669', fontWeight: 600, fontSize: 12, marginRight: 8 }}>{paidCount} paid</span>}
-                              {pendingCount > 0 && <span style={{ color: '#a16207', fontWeight: 600, fontSize: 12 }}>{pendingCount} pending</span>}
-                            </td>
-                          </tr>
-                        )
-                      }).filter(Boolean)
-                      return rows.length > 0 ? rows : (
-                        <tr><td colSpan={4} className="td-empty">No employee hours logged this month.</td></tr>
-                      )
-                    })()}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <div className="data-card">
-            <div className="data-card-title">Needs Attention</div>
-            <div className="attention-list">
-              {overdueInvoices.length > 0 && (
-                <div className="attention-item">
-                  <div className="attention-item-dot" />
-                  <div className="attention-item-body">
-                    <div className="attention-item-title">{overdueInvoices.length} Overdue Invoice{overdueInvoices.length > 1 ? 's' : ''}</div>
-                    <div className="attention-item-sub">Update status in Invoices</div>
-                  </div>
-                </div>
-              )}
-              {draftInvoices.length > 0 && (
-                <div className="attention-item">
-                  <div className="attention-item-dot attention-item-dot-warn" />
-                  <div className="attention-item-body">
-                    <div className="attention-item-title">{draftInvoices.length} Draft Invoice{draftInvoices.length > 1 ? 's' : ''}</div>
-                    <div className="attention-item-sub">Ready to send to clients</div>
-                  </div>
-                </div>
-              )}
-              {expiringContracts.map(c => {
-                const daysLeft = Math.ceil((new Date(c.contractEnd!).getTime() - Date.now()) / 86400000)
-                return (
-                  <div key={c.id} className="attention-item">
-                    <div className="attention-item-dot" style={{ background: daysLeft <= 14 ? '#ef4444' : '#f97316' }} />
-                    <div className="attention-item-body">
-                      <div className="attention-item-title">Contract Expiring — {c.name}</div>
-                      <div className="attention-item-sub">{daysLeft === 0 ? 'Expires today' : `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left`}</div>
-                    </div>
-                  </div>
-                )
-              })}
-              {overdueInvoices.length === 0 && draftInvoices.length === 0 && expiringContracts.length === 0 && (
-                <div style={{ fontSize: 13, color: 'var(--muted)', padding: '12px 0', textAlign: 'center' }}>All clear</div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // ── Recruiter dashboard ────────────────────────────────────────────────────
-  if (role === 'recruiter') {
-    const now = new Date()
-    const thisMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-    const hiringProjects = store.projects.filter(p => (p.status || '').toLowerCase() === 'hiring')
-    const hiredThisMonth = candidates.filter(c => {
-      if (c.stage !== 'hired') return false
-      const d = new Date(c.updatedAt || 0)
-      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` === thisMonthStr
-    })
-    const inPipeline = candidates.filter(c => !['hired','rejected'].includes(c.stage))
-    const stageCounts: Record<string, number> = {}
-    for (const c of candidates) stageCounts[c.stage] = (stageCounts[c.stage] || 0) + 1
-
-    return (
-      <div className="page-wrap">
-        <div className="page-header">
-          <div className="page-header-left">
-            <h1 className="page-title">Dashboard</h1>
-            <p className="page-sub">Recruiting pipeline overview</p>
-          </div>
-        </div>
-        <div className="kpi-grid">
-          <KpiCard icon={<IconUsers size={20} />} value={candidates.length} label="Total Candidates" color="var(--text)" />
-          <KpiCard icon={<IconInbox size={20} />} value={inPipeline.length} label="In Pipeline" color="#9333ea" />
-          <KpiCard icon={<IconCheck size={20} />} value={hiredThisMonth.length} label="Hired This Month" color="#059669" />
-          <KpiCard icon={<IconZap size={20} />} value={hiringProjects.length} label="Hiring Projects" color="#d97706" />
-        </div>
-        <div className="responsive-two-col" style={{ marginTop: 16 }}>
-          <div className="data-card">
-            <div className="data-card-title">Pipeline by Stage</div>
-            <PipelineBar stages={['applied','screening','interview','offer','hired','rejected']} counts={stageCounts} />
-          </div>
-          <div className="data-card">
-            <div className="data-card-title">Projects Actively Hiring</div>
-            {hiringProjects.length === 0 ? (
-              <div style={{ color: 'var(--muted)', fontSize: 13, padding: '16px 0' }}>No projects in hiring stage.</div>
-            ) : hiringProjects.map(p => (
-              <div key={p.id} style={{ padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{p.name}</div>
-                {p.projectNeeds && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{p.projectNeeds}</div>}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // ── Lead Gen dashboard ──────────────────────────────────────────────────────
-  if (role === 'lead_gen') {
-    const today = new Date(); today.setHours(0,0,0,0)
-    const in60 = new Date(today); in60.setDate(in60.getDate() + 60)
-    const ago60 = new Date(today); ago60.setDate(ago60.getDate() - 60)
-
-    const contractsExpiring = store.clients.filter(c => {
-      if (!c.contractEnd) return false
-      const d = new Date(c.contractEnd)
-      return d >= today && d <= in60
-    }).sort((a, b) => new Date(a.contractEnd!).getTime() - new Date(b.contractEnd!).getTime())
-
-    const retentionRisk = store.clients.filter(c => {
-      const lastInv = store.invoices
-        .filter(i => i.clientName === c.name)
-        .sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0]
-      if (!lastInv?.date) return true
-      return new Date(lastInv.date) < ago60
-    })
-
-    const thisMonthStr = new Date().toISOString().slice(0, 7)
-    const activeClients = new Set(
-      store.invoices
-        .filter(i => (i.date || '').startsWith(thisMonthStr))
-        .map(i => i.clientName)
-    ).size
-
-    return (
-      <div className="page-wrap">
-        <div className="page-header">
-          <div className="page-header-left">
-            <h1 className="page-title">Dashboard</h1>
-            <p className="page-sub">Client pipeline &amp; retention</p>
-          </div>
-        </div>
-        <div className="kpi-grid">
-          <KpiCard icon={<IconBuilding size={20} />} value={store.clients.length} label="Total Clients" color="var(--text)" />
-          <KpiCard icon={<IconCheck size={20} />} value={activeClients} label="Active This Month" color="#059669" />
-          <KpiCard icon={<IconFlag size={20} />} value={contractsExpiring.length} label="Contracts Expiring" color={contractsExpiring.length > 0 ? '#d97706' : 'var(--muted)'} />
-          <KpiCard icon={<IconAlert size={20} />} value={retentionRisk.length} label="Retention Alerts" color={retentionRisk.length > 0 ? '#dc2626' : 'var(--muted)'} />
-        </div>
-        <div className="responsive-two-col" style={{ marginTop: 16 }}>
-          <div className="data-card">
-            <div className="data-card-title">Contracts Expiring (60 days)</div>
-            {contractsExpiring.length === 0 ? (
-              <div style={{ color: 'var(--muted)', fontSize: 13, padding: '16px 0' }}>No contracts expiring soon.</div>
-            ) : contractsExpiring.map(c => {
-              const days = Math.round((new Date(c.contractEnd!).getTime() - today.getTime()) / 86400000)
-              return (
-                <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.05)' }}>
-                  <span style={{ fontSize: 13, fontWeight: 600 }}>{c.name}</span>
-                  <span style={{ fontSize: 12, color: days <= 14 ? '#dc2626' : '#a16207' }}>{days}d left</span>
-                </div>
-              )
-            })}
-          </div>
-          <div className="data-card">
-            <div className="data-card-title">Retention Risk (60+ days inactive)</div>
-            {retentionRisk.length === 0 ? (
-              <div style={{ color: 'var(--muted)', fontSize: 13, padding: '16px 0' }}>All clients are active.</div>
-            ) : retentionRisk.map(c => (
-              <div key={c.id} style={{ padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,.05)', fontSize: 13, color: 'var(--muted)' }}>
-                {c.name}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    )
-  }
+  const aging = useMemo(() => arAging(store.invoices, today), [store.invoices, today])
+  const forecast = useMemo(() => revenueForecast(store.invoices), [store.invoices])
+  const atRisk = useMemo(() => retentionWatch(store.clients, store.invoices, today), [store.clients, store.invoices, today])
+  const activeProjects = store.projects.filter(p => (p.status || '').toLowerCase() === 'active').length
 
   return (
-    <div className="page-wrap">
-      {/* Date range controls */}
-      <div className="page-header">
-        <div className="page-header-left">
-          <h1 className="page-title">Dashboard</h1>
-          <p className="page-sub">Financial overview &amp; insights</p>
-        </div>
-        <div className="page-header-actions">
-          <div className="form-group" style={{ margin: 0 }}>
-            <select className="form-select" style={{ width: 140 }} value={preset} onChange={(e) => setPreset(e.target.value as Preset)}>
-              <option value="month">This month</option>
-              <option value="quarter">This quarter</option>
-              <option value="custom">Custom</option>
-            </select>
-          </div>
-          <input className="form-input" type="date" value={from} onChange={(e) => { setPreset('custom'); setFrom(e.target.value) }} />
-          <input className="form-input" type="date" value={to} onChange={(e) => { setPreset('custom'); setTo(e.target.value) }} />
-        </div>
-      </div>
+    <div className="page home-reports">
+      <PageHeader title="Reports" sub="Revenue, receivables, forecast and invoice history"
+        actions={<PeriodControl period={period} onPeriod={setPeriod} custom={custom} onCustom={setCustom} />} />
+      <LoadState loaded={data.loaded} loadError={data.loadError} />
+      {data.loaded && <KpiStrip items={kpis.filter(Boolean) as Kpi[]} />}
 
-      {/* Monthly revenue goal progress bar */}
-      {settings.monthlyGoal && settings.monthlyGoal > 0 && preset === 'month' && (
-        <div className="data-card" style={{ marginBottom: 0, padding: '14px 20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--muted)' }}>Monthly Goal</div>
-            <div style={{ fontSize: 13, color: 'var(--gold)', fontWeight: 700 }}>
-              {formatMoney(computed.totalBilled)} / {formatMoney(settings.monthlyGoal)}
-              <span style={{ color: 'var(--muted)', fontWeight: 400, marginLeft: 8 }}>
-                ({Math.round(Math.min((computed.totalBilled / settings.monthlyGoal) * 100, 100))}%)
-              </span>
-            </div>
-          </div>
-          <div style={{ background: 'rgba(255,255,255,.07)', borderRadius: 6, height: 8, overflow: 'hidden' }}>
-            <div style={{
-              height: '100%',
-              width: `${Math.min((computed.totalBilled / settings.monthlyGoal) * 100, 100)}%`,
-              background: computed.totalBilled >= settings.monthlyGoal ? '#059669' : 'var(--gold)',
-              borderRadius: 6,
-              transition: 'width .4s ease',
-            }} />
-          </div>
-          {computed.totalBilled >= settings.monthlyGoal && (
-            <div style={{ fontSize: 12, color: '#059669', marginTop: 6 }}>Goal reached!</div>
-          )}
+      {owner && (
+        <div className="grid-auto">
+          <Card title="Revenue by client" meta={`${dateShort(range.from)} – ${dateShort(range.to)}`}>
+            <RTable rows={computed.byClient.slice(0, 8)} rowKey={r => r.name} size="sm" empty="No invoices in range." cols={[
+              { label: 'Client', cell: r => r.name, strong: true },
+              { label: 'Invoices', cell: r => r.invoiceCount, num: true },
+              { label: 'Share', cell: r => `${Math.round(r.share * 100)}%`, num: true },
+              { label: 'Total', cell: r => formatMoney(r.total), num: true, strong: true, phone: 'right' },
+            ]} />
+          </Card>
+          <Card title="Revenue by project" meta={`${dateShort(range.from)} – ${dateShort(range.to)}`}>
+            <RTable rows={computed.byProject.slice(0, 8)} rowKey={r => r.name} size="sm" empty="No invoices in range." cols={[
+              { label: 'Project', cell: r => r.name, strong: true },
+              { label: 'Hours', cell: r => r.hoursBilled.toFixed(1), num: true },
+              { label: 'Total', cell: r => formatMoney(r.total), num: true, strong: true, phone: 'right' },
+            ]} />
+          </Card>
         </div>
       )}
 
-      {/* KPI cards */}
-      {(() => {
-        const rangeExpenses = generalExpenses.filter(e => {
-          if (!e.date) return true
-          if (from && e.date < from) return false
-          if (to   && e.date > to)   return false
-          return true
-        })
-        const totalExpenses = rangeExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0)
-        const netAfterExpenses = computed.totalNetEarnings - totalExpenses
-        return (
-          <div className="kpi-grid">
-            {can.viewOwnerStats(role) && (
-              <KpiCard icon={<IconDollar size={20} />} value={formatMoney(computed.totalBilled)} label="Total Billed" color="var(--text)" onClick={() => setKpiDrill('billed')} />
-            )}
-            {can.viewOwnerStats(role) && collected !== null && (
-              <KpiCard icon={<IconWallet size={20} />} value={formatMoney(collected)} label="Collected (payments received)" color="#059669" />
-            )}
-            <KpiCard icon={<IconClock size={20} />} value={fmtHoursHM(computed.totalHours)} label="Total Hours" color="#2563eb" onClick={() => setKpiDrill('hours')} />
-            {can.viewOwnerStats(role) && (
-              <KpiCard icon={<IconUsers size={20} />} value={formatMoney(computed.totalPayroll)} label="Est. Payroll" color="var(--text)" onClick={() => setKpiDrill('payroll')} />
-            )}
-            <KpiCard icon={<IconPieChart size={20} />} value={formatMoney(totalExpenses)} label="Business Expenses" color="#d97706" onClick={() => setKpiDrill('expenses')} />
-            {can.viewOwnerStats(role) && (
-              <KpiCard icon={<IconTrendUp size={20} />} value={formatMoney(netAfterExpenses)} label="Net Earnings" color={netAfterExpenses >= 0 ? '#059669' : '#dc2626'} onClick={() => setKpiDrill('net')} />
-            )}
-            <KpiCard icon={<IconCheck size={20} />} value={computed.paidCount} label="Paid" color="#059669" onClick={() => setKpiDrill('paid')} />
-            <KpiCard icon={<IconAlert size={20} />} value={computed.unpaidCount} label="Unpaid" color={computed.unpaidCount > 0 ? '#dc2626' : 'var(--text)'} onClick={() => setKpiDrill('unpaid')} />
-            <KpiCard icon={<IconAward size={20} />} value={topClient?.name || '—'} label="Top Client" color="var(--text)" onClick={() => setKpiDrill('topClient')} />
-            <KpiCard icon={<IconBuilding size={20} />} value={store.clients.length} label="Clients" color="#2563eb" onClick={() => setKpiDrill('clients')} />
-            <KpiCard icon={<IconUsers size={20} />} value={store.employees.length} label="Team" color="#7c3aed" onClick={() => setKpiDrill('team')} />
-          </div>
-        )
-      })()}
-
-      {/* Revenue chart + attention */}
-      <div className={can.viewOwnerStats(role) ? 'responsive-sidebar-grid' : 'responsive-metric-grid'}>
-        {can.viewOwnerStats(role) && (
-          <div className="data-card">
-            <div className="data-card-title">Revenue — Last 6 Months</div>
-            <BarChart data={chartData} />
-          </div>
-        )}
-
-        <div className="data-card">
-          <div className="data-card-title">Needs Attention</div>
-          <div className="attention-list">
-            {overdueInvoices.length > 0 && (
-              <div className="attention-item">
-                <div className="attention-item-dot" />
-                <div className="attention-item-body">
-                  <div className="attention-item-title">{overdueInvoices.length} Overdue Invoice{overdueInvoices.length > 1 ? 's' : ''}</div>
-                  <div className="attention-item-sub">Update status in Invoices → Pipeline</div>
-                </div>
-              </div>
-            )}
-            {draftInvoices.length > 0 && (
-              <div className="attention-item">
-                <div className="attention-item-dot attention-item-dot-warn" />
-                <div className="attention-item-body">
-                  <div className="attention-item-title">{draftInvoices.length} Draft Invoice{draftInvoices.length > 1 ? 's' : ''}</div>
-                  <div className="attention-item-sub">Ready to send to clients</div>
-                </div>
-              </div>
-            )}
-            {computed.unpaidCount > 0 && (
-              <div className="attention-item">
-                <div className="attention-item-dot attention-item-dot-warn" />
-                <div className="attention-item-body">
-                  <div className="attention-item-title">{computed.unpaidCount} Unpaid in Range</div>
-                  <div className="attention-item-sub">{formatMoney(computed.totalBilled - (computed.paidCount > 0 ? computed.totalBilled * (computed.paidCount / computed.invoiceCount) : 0))} outstanding</div>
-                </div>
-              </div>
-            )}
-            {expiringContracts.map(c => {
-              const daysLeft = Math.ceil((new Date(c.contractEnd!).getTime() - Date.now()) / 86400000)
-              return (
-                <div key={c.id} className="attention-item">
-                  <div className="attention-item-dot" style={{ background: daysLeft <= 14 ? '#ef4444' : '#f97316' }} />
-                  <div className="attention-item-body">
-                    <div className="attention-item-title">Contract Expiring — {c.name}</div>
-                    <div className="attention-item-sub">{daysLeft === 0 ? 'Expires today' : `${daysLeft} day${daysLeft !== 1 ? 's' : ''} left (${c.contractEnd})`}</div>
-                  </div>
-                </div>
-              )
-            })}
-            {anniversaries.map(a => (
-              <div key={a.name} className="attention-item">
-                <div className="attention-item-dot" style={{ background: '#a855f7' }} />
-                <div className="attention-item-body">
-                  <div className="attention-item-title">{a.name} — {a.years} Year{a.years !== 1 ? 's' : ''} Anniversary</div>
-                  <div className="attention-item-sub">Celebrating {a.years} year{a.years !== 1 ? 's' : ''} with YVA Staffing in {new Date().getFullYear()}</div>
-                </div>
+      {aging.hasAging && (
+        <Card title="Accounts receivable aging" meta={plural(aging.rows.length, 'unpaid invoice')}>
+          <div className="home-aging">
+            {aging.buckets.map(b => (
+              <div key={b.label} className="home-aging__tile">
+                <span className="home-aging__label">{b.label}</span>
+                <span className={`home-aging__value num ${b.invoices.length ? `home-tone-${b.tone}` : 'soft'}`}>{formatMoney(b.total)}</span>
+                <span className="home-aging__count">{plural(b.invoices.length, 'invoice')}</span>
               </div>
             ))}
-            {overdueInvoices.length === 0 && draftInvoices.length === 0 && computed.unpaidCount === 0 && expiringContracts.length === 0 && anniversaries.length === 0 && (
-              <div style={{ fontSize: 13, color: 'var(--muted)', padding: '12px 0', textAlign: 'center' }}>
-                All clear — nothing needs attention
-              </div>
-            )}
           </div>
-        </div>
+          <RTable rows={aging.rows} rowKey={r => r.inv.id} onRow={r => openInvoice(r.inv)} cols={[
+            { label: 'Invoice #', cell: r => <span className="mono">{r.inv.number}</span>, strong: true, phone: 'title' },
+            { label: 'Client', cell: r => r.inv.clientName || '—' },
+            { label: 'Date', cell: r => r.inv.date || '—', phone: 'hide' },
+            { label: 'Due', cell: r => r.inv.dueDate || '—' },
+            { label: 'Age', cell: r => <span className={r.age > 60 ? 't-danger' : r.age > 30 ? 't-warning' : r.age > 0 ? 't-gold' : 'muted'}>{r.age > 0 ? `${r.age}d overdue` : 'Current'}</span> },
+            { label: 'Balance', cell: r => formatMoney(r.balance), num: true, strong: true, phone: 'right' },
+          ]} />
+        </Card>
+      )}
+
+      <div className="grid-auto">
+        <Card pad title="Revenue forecast">
+          <div className="home-forecast">
+            <span className="section-label">3-month average</span>
+            <span className="home-forecast__value num">{formatMoney(forecast.average)}</span>
+            <span className="muted">per month based on the last 3 months</span>
+          </div>
+          <div className="home-kv">
+            {forecast.months.map(m => <div key={m.label} className="home-kv__row"><span className="muted">{m.label}</span><span className="num home-strong">{formatMoney(m.total)}</span></div>)}
+            <div className="home-kv__row"><span className="muted">Active projects</span><span className="num home-strong">{activeProjects}</span></div>
+          </div>
+        </Card>
+        <Card title="Client retention watch" meta={atRisk.length ? <span className="t-warning">{plural(atRisk.length, 'client')} not invoiced in 60+ days</span> : undefined}>
+          <RTable rows={atRisk} rowKey={r => r.client.id} size="sm" empty="All active clients invoiced within 60 days." onRow={r => navigate(`/clients/${r.client.id}`)} cols={[
+            { label: 'Client', cell: r => r.client.name, strong: true },
+            { label: 'Status', cell: r => <Pill status={r.client.status || 'active'} /> },
+            { label: 'Last invoice', cell: r => <span className="t-warning">{r.lastDate}{r.days !== null ? ` (${r.days}d ago)` : ''}</span> },
+          ]} />
+        </Card>
       </div>
 
-      {/* By client + by project */}
-      {can.viewOwnerStats(role) && <div className="responsive-two-col">
-        <div className="data-card">
-          <div className="data-card-title">Revenue by Client</div>
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead><tr><th>Client</th><th>Invoices</th><th>Total</th><th>Share</th></tr></thead>
-              <tbody>
-                {computed.byClient.slice(0, 8).map((r) => (
-                  <tr key={r.name}>
-                    <td className="td-name">{r.name}</td>
-                    <td className="td-muted">{r.invoiceCount}</td>
-                    <td style={{ color: 'var(--gold)', fontWeight: 700 }}>{formatMoney(r.total)}</td>
-                    <td className="td-muted">{Math.round(r.share * 100)}%</td>
-                  </tr>
-                ))}
-                {computed.byClient.length === 0 && (
-                  <tr><td colSpan={4} className="td-empty">No invoices in range.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="data-card">
-          <div className="data-card-title">Revenue by Project</div>
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead><tr><th>Project</th><th>Hrs</th><th>Total</th></tr></thead>
-              <tbody>
-                {computed.byProject.slice(0, 8).map((r) => (
-                  <tr key={r.name}>
-                    <td className="td-name">{r.name}</td>
-                    <td className="td-muted">{r.hoursBilled.toFixed(1)}</td>
-                    <td style={{ color: 'var(--gold)', fontWeight: 700 }}>{formatMoney(r.total)}</td>
-                  </tr>
-                ))}
-                {computed.byProject.length === 0 && (
-                  <tr><td colSpan={3} className="td-empty">No invoices in range.</td></tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>}
-
-      {/* Employee Performance */}
       {computed.employeePerformance.length > 0 && (
-        <div className="data-card">
-          <div className="data-card-title">Employee Performance — In Range</div>
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Employee</th>
-                  <th>Hours</th>
-                  <th>Billed</th>
-                  {can.viewOwnerStats(role) && <th>Payroll Cost</th>}
-                  {can.viewOwnerStats(role) && <th>Margin</th>}
-                  <th>Invoices</th>
-                </tr>
-              </thead>
-              <tbody>
-                {computed.employeePerformance.map((e) => (
-                  <tr key={e.name}>
-                    <td className="td-name">{e.name}</td>
-                    <td className="td-muted">{fmtHoursHM(e.hours)}</td>
-                    <td style={{ color: 'var(--gold)', fontWeight: 700 }}>{formatMoney(e.billed)}</td>
-                    {can.viewOwnerStats(role) && <td style={{ color: '#dc2626' }}>{e.payroll > 0 ? formatMoney(e.payroll) : <span className="td-muted">—</span>}</td>}
-                    {can.viewOwnerStats(role) && (
-                      <td style={{ color: e.margin >= 0 ? '#059669' : '#dc2626', fontWeight: 600 }}>
-                        {e.payroll > 0 ? formatMoney(e.margin) : <span className="td-muted">—</span>}
-                      </td>
-                    )}
-                    <td className="td-muted">{e.invoiceCount}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <Card title="Employee performance" meta="in range">
+          <RTable rows={computed.employeePerformance} rowKey={e => e.name} size="lg" cols={[
+            { label: 'Employee', cell: e => e.name, strong: true },
+            { label: 'Hours', cell: e => fmtHoursHM(e.hours), num: true },
+            { label: 'Billed', cell: e => formatMoney(e.billed), num: true, strong: true, phone: 'right' },
+            ...(owner ? [
+              { label: 'Payroll cost', cell: (e: typeof computed.employeePerformance[0]) => e.payroll > 0 ? formatMoney(e.payroll) : <span className="soft">—</span>, num: true },
+              { label: 'Margin', cell: (e: typeof computed.employeePerformance[0]) => e.payroll > 0 ? <span className={e.margin >= 0 ? 't-success' : 't-danger'}>{formatMoney(e.margin)}</span> : <span className="soft">—</span>, num: true },
+            ] : []),
+            { label: 'Invoices', cell: e => e.invoiceCount, num: true },
+          ]} />
+        </Card>
       )}
 
-      {/* All-time: Client analytics */}
       {computed.allTimeByClient.length > 0 && (
-        <div className="data-card">
-          <div className="data-card-title">Client Analytics — All Time</div>
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr><th>Client</th><th>Projects</th><th>Invoices</th><th>Total Billed</th><th>Last Invoice</th></tr>
-              </thead>
-              <tbody>
-                {computed.allTimeByClient.map((c) => (
-                  <tr key={c.name}>
-                    <td className="td-name">{c.name}</td>
-                    <td className="td-muted">{c.projectCount}</td>
-                    <td className="td-muted">{c.invoiceCount}</td>
-                    <td style={{ color: 'var(--gold)', fontWeight: 700 }}>{formatMoney(c.total)}</td>
-                    <td className="td-muted">{c.lastDate || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <Card title="Client analytics" meta="all time">
+          <RTable rows={computed.allTimeByClient} rowKey={c => c.name} cols={[
+            { label: 'Client', cell: c => c.name, strong: true },
+            { label: 'Projects', cell: c => c.projectCount, num: true },
+            { label: 'Invoices', cell: c => c.invoiceCount, num: true },
+            { label: 'Total billed', cell: c => formatMoney(c.total), num: true, strong: true, phone: 'right' },
+            { label: 'Last invoice', cell: c => c.lastDate || '—' },
+          ]} />
+        </Card>
       )}
 
-      {/* All-time: Project analytics */}
       {computed.allTimeByProject.length > 0 && (
-        <div className="data-card">
-          <div className="data-card-title">Project Analytics — All Time</div>
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr><th>Project</th><th>Client</th><th>Invoices</th><th>Total Billed</th><th>Hours</th><th>Last Invoice</th></tr>
-              </thead>
-              <tbody>
-                {computed.allTimeByProject.map((p) => (
-                  <tr key={p.name}>
-                    <td className="td-name">{p.name}</td>
-                    <td className="td-muted">{p.client || '—'}</td>
-                    <td className="td-muted">{p.invoiceCount}</td>
-                    <td style={{ color: 'var(--gold)', fontWeight: 700 }}>{formatMoney(p.total)}</td>
-                    <td className="td-muted">{fmtHoursHM(p.hours)}</td>
-                    <td className="td-muted">{p.lastDate || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <Card title="Project analytics" meta="all time">
+          <RTable rows={computed.allTimeByProject} rowKey={p => p.name} size="lg" cols={[
+            { label: 'Project', cell: p => p.name, strong: true },
+            { label: 'Client', cell: p => p.client || '—' },
+            { label: 'Invoices', cell: p => p.invoiceCount, num: true },
+            { label: 'Total billed', cell: p => formatMoney(p.total), num: true, strong: true, phone: 'right' },
+            { label: 'Hours', cell: p => fmtHoursHM(p.hours), num: true },
+            { label: 'Last invoice', cell: p => p.lastDate || '—' },
+          ]} />
+        </Card>
       )}
 
-      {/* Insights */}
       {computed.insights.length > 0 && (
-        <div className="data-card">
-          <div className="data-card-title">Insights</div>
-          <ul className="insights-list">
-            {computed.insights.map((t) => <li key={t}>{t}</li>)}
-          </ul>
-        </div>
+        <Card pad title="Insights">
+          <ul className="home-insights">{computed.insights.map(t => <li key={t}>{t}</li>)}</ul>
+        </Card>
       )}
 
-      {/* ── AR Aging ── */}
-      {(() => {
-        const today = new Date(); today.setHours(0,0,0,0)
-        const unpaid = store.invoices.filter(inv => {
-          const s = (inv.status || '').toLowerCase()
-          return s !== 'paid' && s !== 'draft'
-        })
-        const buckets = [
-          { label: '0–30 days',  min: 0,  max: 30,  color: '#a16207', invoices: [] as typeof unpaid },
-          { label: '31–60 days', min: 31, max: 60,  color: '#f97316', invoices: [] as typeof unpaid },
-          { label: '61–90 days', min: 61, max: 90,  color: '#ef4444', invoices: [] as typeof unpaid },
-          { label: '90+ days',   min: 91, max: 9999, color: '#7f1d1d', invoices: [] as typeof unpaid },
-        ]
-        for (const inv of unpaid) {
-          const ref = inv.dueDate || inv.date || inv.billingEnd || ''
-          if (!ref) continue
-          const d = new Date(ref); d.setHours(0,0,0,0)
-          const age = Math.floor((today.getTime() - d.getTime()) / 86400000)
-          const bucket = buckets.find(b => age >= b.min && age <= b.max)
-          if (bucket) bucket.invoices.push(inv)
-        }
-        const hasAging = buckets.some(b => b.invoices.length > 0)
-        if (!hasAging) return null
-        return (
-          <div className="data-card">
-            <div className="data-card-title">Accounts Receivable Aging</div>
-            <div className="responsive-metric-grid" style={{ marginBottom: 16 }}>
-              {buckets.map(b => (
-                <div key={b.label} className="aging-bucket">
-                  <div className="aging-bucket-label">{b.label}</div>
-                  <div className="aging-bucket-value" style={{ color: b.color }}>{formatMoney(b.invoices.reduce((s,i) => s+(Number(i.subtotal)||0),0))}</div>
-                  <div className="aging-bucket-count">{b.invoices.length} invoice{b.invoices.length!==1?'s':''}</div>
-                </div>
-              ))}
-            </div>
-            <div className="table-wrap">
-              <table className="data-table">
-                <thead><tr><th>Invoice #</th><th>Client</th><th>Date</th><th>Due</th><th>Status</th><th style={{textAlign:'right'}}>Balance</th></tr></thead>
-                <tbody>
-                  {unpaid.sort((a,b) => (a.dueDate||a.date||'') < (b.dueDate||b.date||'') ? -1 : 1).map(inv => {
-                    const ref = inv.dueDate || inv.date || ''; const d = new Date(ref); d.setHours(0,0,0,0)
-                    const age = ref ? Math.floor((today.getTime()-d.getTime())/86400000) : 0
-                    const balance = (Number(inv.subtotal)||0) - (Number(inv.amountPaid)||0)
-                    const ageColor = age > 90 ? '#7f1d1d' : age > 60 ? '#ef4444' : age > 30 ? '#f97316' : '#a16207'
-                    return (
-                      <tr key={inv.id}>
-                        <td className="td-name">{inv.number}</td>
-                        <td>{inv.clientName||'—'}</td>
-                        <td className="td-muted">{inv.date||'—'}</td>
-                        <td className="td-muted">{inv.dueDate||'—'}</td>
-                        <td><span style={{fontSize:11,fontWeight:600,color:ageColor}}>{age>0?`${age}d overdue`:'Current'}</span></td>
-                        <td style={{textAlign:'right',color:'var(--gold)',fontWeight:700}}>{formatMoney(balance)}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )
-      })()}
+      <InvoiceHistory store={store} owner={owner} usdToDop={data.settings.usdToDop || 0} openInvoice={openInvoice} />
 
-      {/* ── Revenue Forecasting + Client Retention ── */}
-      {(() => {
-        // Last 3 months average revenue
-        const now = new Date()
-        const monthTotals: number[] = []
-        for (let i = 3; i >= 1; i--) {
-          const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-          const bucket = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`
-          const total = store.invoices
-            .filter(inv => (inv.date || inv.billingEnd || '').startsWith(bucket))
-            .reduce((s,inv) => s+(Number(inv.subtotal)||0), 0)
-          monthTotals.push(total)
-        }
-        const avgRevenue = monthTotals.reduce((s,v)=>s+v,0) / 3
-        const activeProjects = store.projects.filter(p => (p.status||'').toLowerCase() === 'active').length
+      <KpiDrillModal kind={drill} onClose={() => setDrill(null)} ctx={{ store, computed, range, generalExpenses: data.generalExpenses, payments: data.payments }} />
+    </div>
+  )
+}
 
-        // Client retention — not invoiced in 60+ days
-        const todayStr = now.toISOString().slice(0,10)
-        const atRisk = store.clients.filter(c => {
-          if ((c.status||'').toLowerCase() === 'churned') return false
-          const lastInv = store.invoices
-            .filter(inv => inv.clientName === c.name)
-            .map(inv => inv.date || inv.billingEnd || '')
-            .filter(Boolean)
-            .sort()
-            .pop()
-          if (!lastInv) return false
-          const daysSince = Math.floor((new Date(todayStr).getTime() - new Date(lastInv).getTime()) / 86400000)
-          return daysSince >= 60
-        })
+function InvoiceHistory({ store, owner, usdToDop, openInvoice }: { store: DataSnapshot; owner: boolean; usdToDop: number; openInvoice: (inv: Invoice) => void }) {
+  const [hClient, setHClient] = useState('')
+  const [hProject, setHProject] = useState('')
+  const [hStatus, setHStatus] = useState('')
+  const [hFrom, setHFrom] = useState('')
+  const [hTo, setHTo] = useState('')
+  const allProjects = useMemo(() => [...new Set(store.invoices.map(i => i.projectName || '').filter(Boolean))], [store.invoices])
+  const rows = useMemo(() => filterInvoiceHistory(store.invoices, { client: hClient, project: hProject, status: hStatus, from: hFrom, to: hTo }), [store.invoices, hClient, hProject, hStatus, hFrom, hTo])
+  const total = rows.reduce((s, i) => s + (Number(i.subtotal) || 0), 0)
+  const y = new Date().getFullYear()
+  const month = makeCurrentMonthRange()
 
-        return (
-          <div className="responsive-two-col">
-            <div className="data-card">
-              <div className="data-card-title">Revenue Forecast</div>
-              <div style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>3-Month Average</div>
-                <div style={{ fontSize: 28, fontWeight: 800, color: 'var(--gold)' }}>{formatMoney(avgRevenue)}</div>
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4 }}>per month based on last 3 months</div>
-              </div>
-              <div style={{ display: 'flex', gap: 8, flexDirection: 'column' }}>
-                {monthTotals.map((v, i) => {
-                  const d = new Date(now.getFullYear(), now.getMonth() - (3-i), 1)
-                  const label = d.toLocaleString('en-US', { month: 'long', year: 'numeric' })
-                  return (
-                    <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '6px 0', borderBottom: '1px solid var(--border)' }}>
-                      <span style={{ color: 'var(--muted)' }}>{label}</span>
-                      <span style={{ fontWeight: 700 }}>{formatMoney(v)}</span>
-                    </div>
-                  )
-                })}
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '8px 0' }}>
-                  <span style={{ color: 'var(--muted)' }}>Active projects</span>
-                  <span style={{ fontWeight: 700, color: '#2563eb' }}>{activeProjects}</span>
-                </div>
-              </div>
-            </div>
+  return (
+    <Card title="Invoice history" className="home-history" actions={
+      <div className="home-history__actions">
+        <button type="button" className="btn btn--sm" onClick={() => { setHFrom(month.from); setHTo(month.to) }}>This month</button>
+        <button type="button" className="btn btn--sm" onClick={() => { setHFrom(`${y}-01-01`); setHTo(`${y}-12-31`) }}>This year</button>
+        <button type="button" className="btn btn--sm btn--ghost" onClick={() => { setHFrom(''); setHTo(''); setHClient(''); setHProject(''); setHStatus('') }}>Clear</button>
+        <button type="button" className="btn btn--sm" onClick={() => downloadCSV('invoice-history.csv', invoiceHistoryCsvRows(rows))}>Export CSV</button>
+        {owner && <button type="button" className="btn btn--sm" onClick={() => downloadCSV('payroll-export.csv', payrollCsvRows(rows, store.employees, usdToDop))}>Payroll CSV</button>}
+      </div>
+    }>
+      <div className="home-filters">
+        <SearchInput value={hClient} onChange={setHClient} placeholder="Search client…" />
+        <select className="select select--sm" aria-label="Project" value={hProject} onChange={e => setHProject(e.target.value)}>
+          <option value="">All projects</option>
+          {allProjects.map(p => <option key={p} value={p}>{p}</option>)}
+        </select>
+        <select className="select select--sm" aria-label="Status" value={hStatus} onChange={e => setHStatus(e.target.value)}>
+          <option value="">All statuses</option>
+          <option value="draft">Draft</option>
+          <option value="sent">Sent</option>
+          <option value="viewed">Viewed</option>
+          <option value="partial">Partial</option>
+          <option value="paid">Paid</option>
+          <option value="overdue">Overdue</option>
+        </select>
+        <div className="home-filters__dates">
+          <input className="input input--sm" type="date" aria-label="History from" value={hFrom} onChange={e => setHFrom(e.target.value)} />
+          <span className="muted">–</span>
+          <input className="input input--sm" type="date" aria-label="History to" value={hTo} onChange={e => setHTo(e.target.value)} />
+        </div>
+        <span className="home-filters__total">{plural(rows.length, 'invoice')} · <strong className="num">{formatMoney(total)}</strong></span>
+      </div>
+      <RTable rows={rows.slice(0, 200)} rowKey={i => i.id} size="lg" empty="No invoices match the current filters." onRow={openInvoice} cols={[
+        { label: 'Invoice #', cell: i => <span className="mono">{i.number}</span>, strong: true, phone: 'title' },
+        { label: 'Date', cell: i => i.date || '—' },
+        { label: 'Due date', cell: i => i.dueDate || '—', phone: 'hide' },
+        { label: 'Client', cell: i => i.clientName || '—' },
+        { label: 'Project', cell: i => i.projectName || '—', phone: 'hide' },
+        { label: 'Status', cell: i => <Pill status={i.status || 'draft'} /> },
+        { label: 'Hours', cell: i => { const h = invoiceHours(i); return h > 0 ? fmtHoursHM(h) : '—' }, num: true, phone: 'hide' },
+        { label: 'Amount', cell: i => formatMoney(Number(i.subtotal) || 0), num: true, strong: true, phone: 'right' },
+      ]} />
+    </Card>
+  )
+}
 
-            <div className="data-card">
-              <div className="data-card-title">Client Retention Watch</div>
-              {atRisk.length === 0 ? (
-                <div style={{ fontSize: 13, color: 'var(--muted)', padding: '24px 0', textAlign: 'center' }}>
-                  All active clients invoiced within 60 days.
-                </div>
-              ) : (
-                <>
-                  <div style={{ fontSize: 12, color: '#f97316', marginBottom: 12 }}>
-                    {atRisk.length} client{atRisk.length!==1?'s':''} not invoiced in 60+ days
-                  </div>
-                  <div className="table-wrap">
-                    <table className="data-table">
-                      <thead><tr><th>Client</th><th>Status</th><th>Last Invoice</th></tr></thead>
-                      <tbody>
-                        {atRisk.map(c => {
-                          const lastInv = store.invoices
-                            .filter(inv => inv.clientName === c.name)
-                            .map(inv => inv.date || inv.billingEnd || '')
-                            .filter(Boolean).sort().pop() || '—'
-                          const days = lastInv !== '—'
-                            ? Math.floor((new Date(todayStr).getTime()-new Date(lastInv).getTime())/86400000)
-                            : null
-                          return (
-                            <tr key={c.id}>
-                              <td className="td-name">{c.name}</td>
-                              <td><span style={{fontSize:11,textTransform:'capitalize',color:'var(--muted)'}}>{c.status||'active'}</span></td>
-                              <td style={{color:'#f97316',fontSize:12}}>{lastInv}{days!==null?` (${days}d ago)`:''}</td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )
-      })()}
+/* ── Admin ────────────────────────────────────────────────────────── */
 
-      {/* ── Invoice History ── */}
-      {(() => {
-        const allProjects = [...new Set(store.invoices.map(i => i.projectName || '').filter(Boolean))]
-        const histFiltered = filterInvoices(store.invoices, { client: hClient, project: hProject, status: hStatus, from: hFrom, to: hTo })
-        const histTotal    = histFiltered.reduce((s, i) => s + (Number(i.subtotal) || 0), 0)
+function AdminReports({ store, navigate, openInvoice, candidates, loaded, loadError }: Common & { candidates: Candidate[]; loaded: boolean; loadError: string | null }) {
+  const activeProjects = store.projects.filter(p => (p.status || '').toLowerCase() === 'active').length
+  const inPipeline = candidates.filter(c => !['hired', 'rejected'].includes(c.stage))
+  const overdue = store.invoices.filter(statusOverdue)
+  const drafts = store.invoices.filter(statusDraft)
+  const open = store.invoices.filter(inv => (inv.status || 'draft') !== 'paid').sort((a, b) => ((a.dueDate || a.date || '') < (b.dueDate || b.date || '') ? -1 : 1))
+  const month = thisMonth()
+  const kpis: Kpi[] = [
+    { label: 'Active projects', value: activeProjects, onClick: () => navigate('/projects') },
+    { label: 'Team members', value: store.employees.length, onClick: () => navigate('/employees') },
+    { label: 'Total clients', value: store.clients.length, onClick: () => navigate('/clients') },
+    { label: 'Open candidates', value: inPipeline.length, onClick: () => navigate('/candidates') },
+    { label: 'Draft invoices', value: drafts.length, tone: drafts.length ? 'warning' : undefined, note: drafts.length ? 'ready to send' : undefined, onClick: () => navigate('/invoice') },
+    { label: 'Overdue', value: overdue.length, tone: overdue.length ? 'danger' : undefined, note: overdue.length ? 'needs a reminder' : undefined, onClick: () => navigate('/invoice') },
+    { label: 'Sent / pending', value: sentPendingOf(store.invoices).length },
+    { label: 'Paid this month', value: paidThisMonthOf(store.invoices).length },
+  ]
+  return (
+    <div className="page home-reports">
+      <PageHeader title="Reports" sub="Operations overview" />
+      <LoadState loaded={loaded} loadError={loadError} />
+      {loaded && <KpiStrip items={kpis} />}
+      <div className="grid-auto">
+        <div className="home-col">
+          <Card title="Invoice status — open">
+            <RTable rows={open.slice(0, 10)} rowKey={i => i.id} empty="All invoices paid." onRow={openInvoice} cols={[
+              { label: 'Invoice #', cell: i => <span className="mono">{i.number}</span>, strong: true, phone: 'title' },
+              { label: 'Client', cell: i => i.clientName || '—' },
+              { label: 'Project', cell: i => i.projectName || '—', phone: 'hide' },
+              { label: 'Due date', cell: i => i.dueDate || i.date || '—' },
+              { label: 'Status', cell: i => <Pill status={i.status || 'draft'} /> },
+            ]} />
+          </Card>
+          <CandidatePipelineCard candidates={candidates} onOpen={() => navigate('/candidates')} />
+        </div>
+        <AttentionList items={basicAttention(store, navigate, true)} loading={!loaded} />
+      </div>
+      {store.employees.length > 0 && (
+        <Card title="Team capacity">
+          <RTable rows={store.employees} rowKey={e => e.id} size="lg" onRow={e => navigate(`/employees/${e.id}`)} cols={[
+            { label: 'Employee', cell: e => e.name, strong: true },
+            { label: 'Role', cell: e => e.role || '—' },
+            { label: 'Status', cell: e => <Pill status={e.status || 'active'} /> },
+            { label: 'Assigned projects', cell: e => store.projects.filter(p => (p.employeeIds || []).includes(e.id)).map(p => p.name).join(', ') || '—' },
+            { label: 'Hours this month', num: true, phone: 'right', cell: e => {
+              const h = store.invoices.filter(inv => (inv.date || inv.billingEnd || '').startsWith(month)).flatMap(inv => inv.items || [])
+                .filter(it => it.employeeName?.toLowerCase() === e.name.toLowerCase()).reduce((s, it) => s + (Number(it.hoursTotal) || 0), 0)
+              return h > 0 ? fmtHoursHM(h) : '—'
+            } },
+          ]} />
+        </Card>
+      )}
+    </div>
+  )
+}
 
-        function exportHistCSV() {
-          const headers = ['Invoice #', 'Date', 'Due Date', 'Client', 'Project', 'Status', 'Amount (USD)', 'Hours']
-          const rows = histFiltered.map(inv => [
-            inv.number || '',
-            inv.date || '',
-            inv.dueDate || '',
-            inv.clientName || '',
-            inv.projectName || '',
-            inv.status || '',
-            String(Number(inv.subtotal) || 0),
-            String((inv.items || []).reduce((s, it) => s + (Number(it.hoursTotal) || 0), 0)),
-          ])
-          downloadCSV('invoice-history.csv', [headers, ...rows])
-        }
+/* ── Accounting ───────────────────────────────────────────────────── */
 
-        function exportPayrollCSV() {
-          const dopRate = settings.usdToDop || 0
-          const headers = ['Employee', 'Hours', 'Pay Rate (USD)', 'Amount (USD)', 'Amount (DOP)', 'Invoice #', 'Date']
-          const rowsOut: string[][] = []
-          for (const inv of histFiltered) {
-            for (const item of (inv.items || [])) {
-              const emp = store.employees.find(e =>
-                (item.employeeId && e.id === item.employeeId) ||
-                e.name.toLowerCase() === item.employeeName.toLowerCase()
-              )
-              const payroll = payrollFromInvoiceItem(item, emp)
-              const hrs = payroll.totalHours
-              const usd = payroll.totalPay
-              const payRate = Number(emp?.payRate) || 0
-              const dop = dopRate > 0 ? String((usd * dopRate).toFixed(0)) : ''
-              rowsOut.push([item.employeeName, String(hrs), String(payRate), String(usd.toFixed(2)), dop, inv.number || '', inv.date || ''])
-            }
-          }
-          downloadCSV('payroll-export.csv', [headers, ...rowsOut])
-        }
+function AccountingReports({ store, navigate, openInvoice, loaded, loadError }: Common & { loaded: boolean; loadError: string | null }) {
+  const overdue = store.invoices.filter(statusOverdue)
+  const drafts = store.invoices.filter(statusDraft)
+  const outstanding = store.invoices.filter(inv => !['paid', 'draft'].includes((inv.status || 'draft').toLowerCase())).sort((a, b) => ((a.dueDate || a.date || '') < (b.dueDate || b.date || '') ? -1 : 1))
+  const month = thisMonth()
+  const statements = store.employees.map(emp => {
+    const mine = (inv: Invoice) => (inv.items || []).some(it => it.employeeName?.toLowerCase() === emp.name.toLowerCase())
+    const empInvs = store.invoices.filter(inv => (inv.date || inv.billingEnd || '').startsWith(month) && mine(inv))
+    if (empInvs.length === 0) return null
+    const hours = empInvs.flatMap(inv => inv.items || []).filter(it => it.employeeName?.toLowerCase() === emp.name.toLowerCase()).reduce((s, it) => s + (Number(it.hoursTotal) || 0), 0)
+    const paid = empInvs.filter(inv => inv.employeePayments?.[emp.id]?.status === 'paid').length
+    return { emp, hours, count: empInvs.length, paid, pending: empInvs.length - paid }
+  }).filter((x): x is NonNullable<typeof x> => x !== null)
+  const kpis: Kpi[] = [
+    { label: 'Draft (to send)', value: drafts.length, tone: drafts.length ? 'warning' : undefined, note: drafts.length ? 'ready to send' : undefined, onClick: () => navigate('/invoice') },
+    { label: 'Overdue', value: overdue.length, tone: overdue.length ? 'danger' : undefined, note: overdue.length ? 'needs a reminder' : undefined, onClick: () => navigate('/invoice') },
+    { label: 'Sent / pending', value: sentPendingOf(store.invoices).length },
+    { label: 'Paid this month', value: paidThisMonthOf(store.invoices).length },
+  ]
+  const invCols: RCol<Invoice>[] = [
+    { label: 'Invoice #', cell: i => <span className="mono">{i.number}</span>, strong: true, phone: 'title' },
+    { label: 'Client', cell: i => i.clientName || '—' },
+    { label: 'Project', cell: i => i.projectName || '—', phone: 'hide' },
+    { label: 'Date', cell: i => i.date || '—' },
+  ]
+  return (
+    <div className="page home-reports">
+      <PageHeader title="Reports" sub="Invoice & billing overview" />
+      <LoadState loaded={loaded} loadError={loadError} />
+      {loaded && <KpiStrip items={kpis} />}
+      <div className="grid-auto">
+        <div className="home-col">
+          <Card title="Outstanding invoices" meta={`${outstanding.length}`}>
+            <RTable rows={outstanding} rowKey={i => i.id} size="lg" empty="No outstanding invoices." onRow={openInvoice} cols={[...invCols, { label: 'Due', cell: i => i.dueDate || '—' }, { label: 'Status', cell: i => <Pill status={i.status || 'draft'} /> }]} />
+          </Card>
+          {drafts.length > 0 && (
+            <Card title="Drafts to send" meta={`${drafts.length}`}>
+              <RTable rows={drafts} rowKey={i => i.id} onRow={openInvoice} cols={invCols} />
+            </Card>
+          )}
+          <Card title="Employee statements this month">
+            <RTable rows={statements} rowKey={s => s.emp.id} empty="No employee hours logged this month." onRow={s => navigate(`/employees/${s.emp.id}`)} cols={[
+              { label: 'Employee', cell: s => s.emp.name, strong: true },
+              { label: 'Hours this month', cell: s => (s.hours > 0 ? fmtHoursHM(s.hours) : '—'), num: true, phone: 'right' },
+              { label: 'Invoices', cell: s => s.count, num: true },
+              { label: 'Payment status', cell: s => <span className="home-paystat">{s.paid > 0 && <Pill tone="success">{s.paid} paid</Pill>}{s.pending > 0 && <Pill tone="warning">{s.pending} pending</Pill>}</span> },
+            ]} />
+          </Card>
+        </div>
+        <AttentionList items={basicAttention(store, navigate, false)} loading={!loaded} />
+      </div>
+    </div>
+  )
+}
 
-        return (
-          <div className="data-card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-              <div className="data-card-title" style={{ margin: 0 }}>Invoice History</div>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                <button className="btn-ghost btn-sm" onClick={() => { setHFrom(isoThisMonth().from); setHTo(isoThisMonth().to) }}>This Month</button>
-                <button className="btn-ghost btn-sm" onClick={() => { setHFrom(isoThisYear().from); setHTo(isoThisYear().to) }}>This Year</button>
-                <button className="btn-ghost btn-sm" onClick={() => { setHFrom(''); setHTo(''); setHClient(''); setHProject(''); setHStatus('') }}>Clear</button>
-                <button className="btn-ghost btn-sm" onClick={exportHistCSV}>Export CSV</button>
-                {can.viewOwnerStats(role) && <button className="btn-ghost btn-sm" onClick={exportPayrollCSV}>Payroll CSV</button>}
-              </div>
-            </div>
+/* ── Recruiter / Lead gen (also shown on Home for those roles) ────── */
 
-            {/* Filters */}
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12, alignItems: 'center' }}>
-              <input
-                className="form-input" style={{ width: 160, fontSize: 12 }}
-                placeholder="Search client..."
-                value={hClient} onChange={e => setHClient(e.target.value)}
-              />
-              <select
-                className="form-select" style={{ width: 160, fontSize: 12 }}
-                value={hProject} onChange={e => setHProject(e.target.value)}
-              >
-                <option value="">All projects</option>
-                {allProjects.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-              <select
-                className="form-select" style={{ width: 130, fontSize: 12 }}
-                value={hStatus} onChange={e => setHStatus(e.target.value)}
-              >
-                <option value="">All statuses</option>
-                <option value="draft">Draft</option>
-                <option value="sent">Sent</option>
-                <option value="viewed">Viewed</option>
-                <option value="paid">Paid</option>
-                <option value="overdue">Overdue</option>
-              </select>
-              <input className="form-input" type="date" style={{ width: 140, fontSize: 12 }} value={hFrom} onChange={e => setHFrom(e.target.value)} />
-              <span style={{ color: 'var(--muted)', fontSize: 12 }}>–</span>
-              <input className="form-input" type="date" style={{ width: 140, fontSize: 12 }} value={hTo} onChange={e => setHTo(e.target.value)} />
-              <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--muted)' }}>
-                {histFiltered.length} invoice{histFiltered.length !== 1 ? 's' : ''} · <strong style={{ color: 'var(--gold)' }}>{formatMoney(histTotal)}</strong>
-              </span>
-            </div>
+function RecruiterReports({ store, candidates, navigate }: { store: DataSnapshot; candidates: Candidate[]; navigate: Nav }) {
+  const month = thisMonth()
+  const hiring = store.projects.filter(p => (p.status || '').toLowerCase() === 'hiring')
+  const hired = candidates.filter(c => { if (c.stage !== 'hired') return false; const d = new Date(c.updatedAt || 0); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` === month })
+  const inPipeline = candidates.filter(c => !['hired', 'rejected'].includes(c.stage))
+  return (
+    <div className="page home-reports">
+      <PageHeader title="Reports" sub="Recruiting pipeline overview" />
+      <KpiStrip items={[
+        { label: 'Total candidates', value: candidates.length, onClick: () => navigate('/candidates') },
+        { label: 'In pipeline', value: inPipeline.length, onClick: () => navigate('/candidates') },
+        { label: 'Hired this month', value: hired.length, tone: hired.length ? 'success' : undefined },
+        { label: 'Hiring projects', value: hiring.length },
+      ]} />
+      <div className="grid-auto">
+        <CandidatePipelineCard candidates={candidates} onOpen={() => navigate('/candidates')} />
+        <HiringProjectsCard store={store} onOpen={id => navigate(`/projects/${id}`)} />
+      </div>
+    </div>
+  )
+}
 
-            <div className="table-wrap">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Invoice #</th>
-                    <th>Date</th>
-                    <th>Due Date</th>
-                    <th>Client</th>
-                    <th>Project</th>
-                    <th>Status</th>
-                    <th>Hours</th>
-                    <th style={{ textAlign: 'right' }}>Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {histFiltered.slice(0, 200).map(inv => {
-                    const hrs = (inv.items || []).reduce((s, it) => s + (Number(it.hoursTotal) || 0), 0)
-                    const statusBadge2: Record<string, string> = {
-                      paid: '#22c55e', overdue: '#ef4444', sent: '#3b82f6', viewed: '#a855f7',
-                    }
-                    const sc = statusBadge2[(inv.status || '').toLowerCase()] || '#64748b'
-                    return (
-                      <tr key={inv.id}>
-                        <td className="td-name">{inv.number}</td>
-                        <td className="td-muted">{inv.date || '—'}</td>
-                        <td className="td-muted">{inv.dueDate || '—'}</td>
-                        <td>{inv.clientName || '—'}</td>
-                        <td className="td-muted">{inv.projectName || '—'}</td>
-                        <td>
-                          <span style={{ fontSize: 11, fontWeight: 600, color: sc, textTransform: 'capitalize' }}>
-                            {inv.status || 'draft'}
-                          </span>
-                        </td>
-                        <td className="td-muted">{hrs > 0 ? fmtHoursHM(hrs) : '—'}</td>
-                        <td style={{ textAlign: 'right', color: 'var(--gold)', fontWeight: 700 }}>{formatMoney(Number(inv.subtotal) || 0)}</td>
-                      </tr>
-                    )
-                  })}
-                  {histFiltered.length === 0 && (
-                    <tr><td colSpan={8} className="td-empty">No invoices match the current filters.</td></tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )
-      })()}
-
-      {/* KPI Drill-down Modal */}
-      {kpiDrill && (() => {
-        const rangeExpenses = generalExpenses.filter(e => {
-          if (!e.date) return true
-          if (from && e.date < from) return false
-          if (to   && e.date > to)   return false
-          return true
-        })
-        const totalExpenses = rangeExpenses.reduce((s, e) => s + (Number(e.amount) || 0), 0)
-        const netAfterExpenses = computed.totalNetEarnings - totalExpenses
-
-        type DItem = { label: string; sub?: string; right?: string; badge?: string; badgeLabel?: string; nav?: string }
-        let title = ''
-        let items: DItem[] = []
-        let summary: string | null = null
-
-        const navInv = (inv: Invoice) => `/invoice?q=${encodeURIComponent(inv.number || '')}`
-
-        if (kpiDrill === 'billed') {
-          title = 'Total Billed — Invoices in Range'
-          items = invoicesInRange.map(inv => ({
-            label: `${inv.number} — ${inv.clientName || '—'}`,
-            sub: inv.projectName || (inv.date || ''),
-            right: formatMoney(Number(inv.subtotal)||0),
-            badge: sBadge(inv.status), badgeLabel: inv.status || 'draft',
-            nav: navInv(inv),
-          }))
-        } else if (kpiDrill === 'hours') {
-          title = 'Total Hours — By Employee'
-          items = [...computed.employeePerformance]
-            .sort((a, b) => b.hours - a.hours)
-            .map(e => ({ label: e.name, sub: `${e.invoiceCount} invoice${e.invoiceCount !== 1 ? 's' : ''}`, right: fmtHoursHM(e.hours) }))
-        } else if (kpiDrill === 'payroll') {
-          title = 'Est. Payroll — By Employee'
-          items = [...computed.employeePerformance]
-            .filter(e => e.payroll > 0)
-            .sort((a, b) => b.payroll - a.payroll)
-            .map(e => ({ label: e.name, sub: fmtHoursHM(e.hours) + ' billed', right: formatMoney(e.payroll) }))
-        } else if (kpiDrill === 'expenses') {
-          title = 'Business Expenses in Range'
-          items = [...rangeExpenses]
-            .sort((a, b) => (b.date||'').localeCompare(a.date||''))
-            .map(e => ({ label: e.description, sub: `${e.date || ''}${e.category ? ' · ' + e.category : ''}`, right: formatMoney(Number(e.amount)||0) }))
-        } else if (kpiDrill === 'net') {
-          title = 'Net Earnings — Breakdown'
-          items = [
-            { label: 'Total Billed',       right: formatMoney(computed.totalBilled) },
-            { label: 'Est. Payroll',        right: `− ${formatMoney(computed.totalPayroll)}` },
-            { label: 'Business Expenses',   right: `− ${formatMoney(totalExpenses)}` },
-            { label: 'Net Earnings',        right: formatMoney(netAfterExpenses), sub: netAfterExpenses >= 0 ? 'Positive' : 'Negative' },
-          ]
-        } else if (kpiDrill === 'paid') {
-          title = 'Paid Invoices in Range'
-          items = invoicesInRange
-            .filter(i => (i.status||'').toLowerCase() === 'paid')
-            .map(inv => ({ label: `${inv.number} — ${inv.clientName||'—'}`, sub: inv.date||'', right: formatMoney(Number(inv.subtotal)||0), badge: 'badge-green', badgeLabel: 'paid', nav: navInv(inv) }))
-        } else if (kpiDrill === 'unpaid') {
-          title = 'Unpaid Invoices in Range'
-          items = invoicesInRange
-            .filter(i => !['paid'].includes((i.status||'').toLowerCase()))
-            .map(inv => ({ label: `${inv.number} — ${inv.clientName||'—'}`, sub: inv.dueDate ? `Due ${inv.dueDate}` : (inv.date||''), right: formatMoney(Number(inv.subtotal)||0), badge: sBadge(inv.status), badgeLabel: inv.status||'draft', nav: navInv(inv) }))
-        } else if (kpiDrill === 'topClient') {
-          title = 'Revenue by Client'
-          items = computed.byClient.map(c => ({ label: c.name, sub: `${c.invoiceCount} invoice${c.invoiceCount !== 1 ? 's' : ''}`, right: formatMoney(c.total) }))
-        } else if (kpiDrill === 'clients') {
-          title = 'All Clients'
-          const byName: Record<string, number> = {}
-          for (const c of computed.byClient) byName[c.name] = c.total
-          items = store.clients.map(c => ({ label: c.name, sub: c.company || c.email || '', right: byName[c.name] ? formatMoney(byName[c.name]) : '—', nav: `/clients/${c.id}` }))
-        } else if (kpiDrill === 'team') {
-          title = 'Team Members'
-          const byName: Record<string, typeof computed.employeePerformance[0]> = {}
-          for (const e of computed.employeePerformance) byName[e.name] = e
-          items = store.employees.map(e => {
-            const perf = byName[e.name]
-            return { label: e.name, sub: e.role || e.employmentType || '', right: perf ? fmtHoursHM(perf.hours) : '—', nav: `/employees/${e.id}` }
-          })
-        }
-
-        return (
-          <div className="modal-overlay" onClick={() => setKpiDrill(null)}>
-            <div className="modal" style={{ maxWidth: 580 }} onClick={e => e.stopPropagation()}>
-              <div className="modal-header">
-                <h2 className="modal-title">{title}</h2>
-                <button className="modal-close btn-icon" onClick={() => setKpiDrill(null)}><IconX size={14} /></button>
-              </div>
-              {summary && (
-                <div style={{ padding: '8px 20px', fontSize: 13, color: 'var(--muted)', borderBottom: '1px solid var(--border)' }}>{summary}</div>
-              )}
-              <div style={{ maxHeight: '65vh', overflowY: 'auto' }}>
-                {items.length === 0 ? (
-                  <div style={{ padding: '32px 20px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>No data for this period.</div>
-                ) : items.map((item, i) => (
-                  <div
-                    key={i}
-                    style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 20px', borderBottom: '1px solid var(--border)', cursor: item.nav ? 'pointer' : undefined, transition: 'background .15s' }}
-                    onClick={() => { if (item.nav) { navigate(item.nav); setKpiDrill(null) } }}
-                    onMouseEnter={e => { if (item.nav) (e.currentTarget as HTMLElement).style.background = 'var(--surf2)' }}
-                    onMouseLeave={e => { if (item.nav) (e.currentTarget as HTMLElement).style.background = '' }}
-                  >
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.label}</div>
-                      {item.sub && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>{item.sub}</div>}
-                    </div>
-                    {item.badge && <span className={`badge ${item.badge}`} style={{ fontSize: 10, flexShrink: 0 }}>{item.badgeLabel}</span>}
-                    {item.right && <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--gold)', flexShrink: 0 }}>{item.right}</div>}
-                    {item.nav && <span style={{ fontSize: 11, color: 'var(--muted)', flexShrink: 0 }}>→</span>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )
-      })()}
+function LeadGenReports({ store, navigate }: { store: DataSnapshot; navigate: Nav }) {
+  const today = todayIso()
+  const expiring = expiringContracts(store.clients, today)
+  const risk = retentionWatch(store.clients, store.invoices, today, { includeNeverInvoiced: true })
+  const activeClients = new Set(store.invoices.filter(i => (i.date || '').startsWith(thisMonth())).map(i => i.clientName)).size
+  return (
+    <div className="page home-reports">
+      <PageHeader title="Reports" sub="Client pipeline & retention" />
+      <KpiStrip items={[
+        { label: 'Total clients', value: store.clients.length, onClick: () => navigate('/clients') },
+        { label: 'Active this month', value: activeClients },
+        { label: 'Contracts expiring', value: expiring.length, tone: expiring.length ? 'warning' : undefined },
+        { label: 'Retention alerts', value: risk.length, tone: risk.length ? 'danger' : undefined },
+      ]} />
+      <div className="grid-auto">
+        <ContractsCard store={store} onOpen={id => navigate(`/clients/${id}`)} />
+        <RetentionRiskCard store={store} onOpen={id => navigate(`/clients/${id}`)} />
+      </div>
     </div>
   )
 }

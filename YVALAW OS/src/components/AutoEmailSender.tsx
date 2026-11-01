@@ -35,21 +35,23 @@ export default function AutoEmailSender() {
   }
 
   return (
-    <div className="settings-row" style={{ alignItems: 'flex-start' }}>
-      <div className="settings-row-info">
-        <div className="settings-row-label">Automatic emails are sent from</div>
-        <div className="settings-row-sub">
-          {sender?.id
-            ? <>{sender.id === me ? 'Your Gmail' : sender.email ?? 'Another team member'}{sender.id === me && !connected && ' — but your Gmail is not connected (Settings → Integrations)'}</>
-            : 'Nobody yet — weekly-close emails, payslips and notification emails need a connected Gmail account.'}
-          {msg && <div style={{ marginTop: 4, color: msg.startsWith('Saved') ? '#15803d' : '#dc2626' }}>{msg}</div>}
+    <section className="set-card">
+      <div className="set-card__head">
+        <div className="set-card__titles">
+          <h2 className="set-card__title">Automatic emails are sent from</h2>
+          <span className="set-card__sub">
+            {sender === null ? 'Checking…' : sender.id
+              ? <>{sender.id === me ? 'Your Gmail' : sender.email ?? 'Another team member'}{sender.id === me && !connected && ' — but your Gmail is not connected (Settings → Integrations)'}</>
+              : 'Nobody yet — weekly-close emails, payslips and notification emails need a connected Gmail account.'}
+          </span>
         </div>
+        {sender && sender.id !== me && (
+          <button type="button" className="btn btn--sm" disabled={!connected} title={connected ? '' : 'Connect your Gmail first (Integrations tab)'} onClick={() => void useMine()}>
+            Use my Gmail
+          </button>
+        )}
       </div>
-      {sender && sender.id !== me && (
-        <button className="btn-primary btn-sm" disabled={!connected} title={connected ? '' : 'Connect your Gmail first (Integrations tab)'} onClick={() => void useMine()}>
-          Use my Gmail
-        </button>
-      )}
-    </div>
+      {msg && <span className={`set-msg set-msg--${msg.startsWith('Saved') ? 'ok' : 'err'}`} role="status">{msg}</span>}
+    </section>
   )
 }

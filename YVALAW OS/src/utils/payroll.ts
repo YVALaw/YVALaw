@@ -140,6 +140,8 @@ export function computePremiumAdjustedAmount(
 }
 
 export function payrollFromInvoiceItem(item: InvoiceItem, employee?: Employee | null): PayrollBreakdown {
+  // Fixed-price item lines (kind 'item', utils/invoiceLines.ts) are not anybody's hours and never pay anyone
+  if (item.kind === 'item') return { totalHours: 0, regularHours: 0, premiumHours: 0, basePayRate: 0, premiumPercent: 0, premiumMultiplier: 1, totalPay: 0 }
   const totalHours = toNumber(item.hoursTotal)
   const regularHours = toNumber(item.regularHours)
   const premiumHours = toNumber(item.premiumHours)

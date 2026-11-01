@@ -2,15 +2,19 @@ import { useState } from 'react'
 import { usePermission } from '../context/RoleContext'
 import HistoryList from './HistoryList'
 
-/** "Change history" card at the bottom of a profile page (only with the history.view permission) */
-export default function RecordHistory({ table, recordId }: { table: string; recordId: string }) {
+/** Change history of one record (only with the history.view permission).
+ *  Default: a card with Show/Hide at the bottom of a profile page. `inline`: the list right away (a History tab). */
+export default function RecordHistory({ table, recordId, inline = false, limit = 50 }: { table: string; recordId: string; inline?: boolean; limit?: number }) {
   const allowed = usePermission()
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(inline)
   if (!allowed('history.view')) return null
   return (
-    <div className="data-card" style={{ marginTop: 20 }}>
-      <button className="btn-ghost btn-sm" onClick={() => setOpen(o => !o)}>{open ? 'Hide change history' : 'Show change history'}</button>
-      {open && <div style={{ marginTop: 12 }}><HistoryList table={table} recordId={recordId} limit={50} /></div>}
-    </div>
+    <section className={`card ppl-history${inline ? ' ppl-history--inline' : ''}`}>
+      <div className="card__head">
+        <h2 className="card__title">Change history</h2>
+        {!inline && <button type="button" className="btn btn--sm btn--ghost" onClick={() => setOpen(o => !o)}>{open ? 'Hide change history' : 'Show change history'}</button>}
+      </div>
+      {open && <div className="card__body"><HistoryList table={table} recordId={recordId} limit={limit} /></div>}
+    </section>
   )
 }

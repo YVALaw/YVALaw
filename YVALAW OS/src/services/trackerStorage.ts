@@ -214,6 +214,22 @@ export async function loadDevices(employeeId: string): Promise<DesktopDevice[]> 
   }))
 }
 
+/** Computers still connected to YVA Time (all employees; staff read all rows): not signed out, not
+ *  disconnected by YVA, and seen since `seenSinceMs` (the app checks in on every sync, about once a minute). */
+export async function loadConnectedDevices(seenSinceMs: number): Promise<(DesktopDevice & { employeeId: string })[]> {
+  const { data, error } = await fetchAllPages<Record<string, any>>((from, to) => supabase.from('desktop_devices')   // eslint-disable-line @typescript-eslint/no-explicit-any
+    .select('id,employee_id,name,platform,app_version,created_at,last_seen_at,signed_out_at,revoked_at')
+    .is('signed_out_at', null).is('revoked_at', null)
+    .gte('last_seen_at', new Date(seenSinceMs).toISOString())
+    .order('last_seen_at', { ascending: false }).order('id').range(from, to))
+  if (error) { console.error('loadConnectedDevices', error); return [] }
+  const ms = (v: unknown) => (v ? Date.parse(v as string) : null)
+  return (data || []).map(r => ({
+    id: r.id, employeeId: r.employee_id, name: r.name, platform: r.platform, appVersion: r.app_version,
+    createdAt: ms(r.created_at)!, lastSeenAt: ms(r.last_seen_at)!, signedOutAt: ms(r.signed_out_at), revokedAt: ms(r.revoked_at),
+  }))
+}
+
 /** Disconnect a computer (CEO/Admin/Accounting): ends its login; the database refuses its time */
 export async function disconnectDevice(deviceId: string): Promise<void> {
   const { data: { session } } = await supabase.auth.getSession()

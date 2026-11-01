@@ -1,931 +1,385 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import PlacementRates from '../components/PlacementRates'
-import { PAY_SCHEDULES, type PaySchedule } from '../utils/moneyRules'
-import RecordHistory from '../components/RecordHistory'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import type { Client, Contract, ContractStatus, Employee, Expense, Invoice, Project, Task, TaskStatus } from '../data/types'
-import { loadSnapshot, saveProjects, loadTasks, saveTasks, loadExpenses, saveExpenses } from '../services/storage'
-import { formatMoney } from '../utils/money'
+import HistoryList from '../components/HistoryList'
+import { PAY_SCHEDULES } from '../utils/moneyRules'
+import type { Client, Contract, ContractStatus, Employee, Expense, Invoice, Project, Tag, Task, TaskStatus, TimeEntry } from '../data/types'
+import { loadSnapshot, saveProjects, loadTasks, saveTasks, loadExpenses, saveExpenses, loadTimeEntries } from '../services/storage'
+import { loadTags, saveTags } from '../services/tagStorage'
 import { uploadFile, deleteFile } from '../services/fileStorage'
-import MentionInput from '../components/MentionInput'
-import { IconX, IconTrash, IconDollar, IconWallet, IconReceipt, IconUsers } from '../components/Icon'
+import { usePermission, useRole } from '../context/RoleContext'
+import { can } from '../lib/roles'
+import { TagBadge } from '../components/TagBadge'
+import { Avatar, Banner, Card, Drawer, EmptyState, Field, KpiStrip, Menu, Modal, PageHeader, Pill, Skel, Tabs, toneFor, useIsMobile } from '../components/ui'
+import { Ic, P } from '../components/Icon'
+import ProjectFormFields, { formFromProject, projectFields, EMPTY_PROJECT_FORM, type ProjectFormState } from '../components/ops/ProjectForm'
+import TaskBoard, { mentionsIn, type TaskDraft } from '../components/ops/TaskBoard'
+import ProjectExpenses, { type ExpenseDraft } from '../components/ops/ProjectExpenses'
+import { errText, hoursLabel, monthPrefix, monthShort, payShort, projectMonthHours, stageInfo, uid } from '../components/ops/opsUtils'
+import { dateMed, usd } from '../utils/format'
 
-function uid() { return crypto.randomUUID() }
-
-function renderWithMentions(text: string) {
-  return text.split(/(@\w[\w\s]*)/g).map((part, i) =>
-    part.startsWith('@')
-      ? <span key={i} style={{ background: 'rgba(250,204,21,.2)', color: '#a16207', borderRadius: 4, padding: '1px 5px', fontSize: 12, fontWeight: 600 }}>{part}</span>
-      : part
-  )
-}
-
-function stageBadge(s?: string): string {
-  switch ((s || 'planning').toLowerCase()) {
-    case 'active':    return 'badge-green'
-    case 'review':    return 'badge-purple'
-    case 'completed': return 'badge-teal'
-    case 'on-hold':   return 'badge-yellow'
-    default:          return 'badge-blue'
-  }
-}
-
-const STAGES = ['planning','active','hiring','review','completed','on-hold']
-const BILLING_MODELS = ['hourly','fixed','retainer']
-const TASK_COLS: { key: TaskStatus; label: string }[] = [
-  { key: 'todo', label: 'To Do' },
-  { key: 'in-progress', label: 'In Progress' },
-  { key: 'done', label: 'Done' },
-]
-const EXPENSE_CATS = ['', 'Software', 'Hardware', 'Contractor', 'Travel', 'Marketing', 'Other']
-
-type LinkEntry = { label: string; url: string }
+type TabKey = 'rates' | 'overview' | 'tasks' | 'expenses' | 'invoices' | 'contracts' | 'history'
+const TAB_KEYS: TabKey[] = ['rates', 'overview', 'tasks', 'expenses', 'invoices', 'contracts', 'history']
+type Flash = { tone: 'success' | 'danger'; text: string } | null
+const CONTRACT_TONE: Record<ContractStatus, 'neutral' | 'success' | 'partial' | 'danger'> = { draft: 'neutral', active: 'success', expired: 'partial', terminated: 'danger' }
+const EMPTY_CONTRACT = { title: '', status: 'draft' as ContractStatus, startDate: '', endDate: '', value: '', notes: '' }
 
 export default function ProjectProfilePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { role } = useRole()
+  const allowed = usePermission()
+  const mobile = useIsMobile()
+  const [params, setParams] = useSearchParams()
 
-  const [projects,  setProjectsState] = useState<Project[]>([])
-  const [clients,   setClients]       = useState<Client[]>([])
-  const [employees, setEmployees]     = useState<Employee[]>([])
-  const [invoices,  setInvoices]      = useState<Invoice[]>([])
-  const [tasks,     setTasks]         = useState<Task[]>([])
-  const [expenses,  setExpenses]      = useState<Expense[]>([])
+  const [loaded, setLoaded] = useState(false)
+  const [projects, setProjectsState] = useState<Project[]>([])
+  const [clients, setClients] = useState<Client[]>([])
+  const [employees, setEmployees] = useState<Employee[]>([])
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [allTasks, setAllTasks] = useState<Task[]>([])
+  const [allExpenses, setAllExpenses] = useState<Expense[]>([])
+  const [allTags, setAllTags] = useState<Tag[]>([])
+  const [entries, setEntries] = useState<TimeEntry[]>([])
 
   useEffect(() => {
-    loadSnapshot().then(snap => {
-      setProjectsState(snap.projects)
-      setClients(snap.clients)
-      setEmployees(snap.employees)
-      setInvoices(snap.invoices)
+    void loadSnapshot().then(snap => {
+      setProjectsState(snap.projects); setClients(snap.clients); setEmployees(snap.employees); setInvoices(snap.invoices); setLoaded(true)
     })
-    loadTasks().then(all => setTasks(all.filter(t => t.projectId === id)))
-    loadExpenses().then(all => setExpenses(all.filter(e => e.projectId === id)))
+    void loadTasks().then(setAllTasks)
+    void loadExpenses().then(setAllExpenses)
+    void loadTags().then(setAllTags)
+    void loadTimeEntries().then(setEntries).catch(() => setEntries([]))
   }, [id])
 
   const project = projects.find(p => p.id === id)
-
+  const tabParam = params.get('tab') as TabKey | null
+  const [tab, setTab] = useState<TabKey>(tabParam && TAB_KEYS.includes(tabParam) ? tabParam : 'rates')
+  const [flash, setFlash] = useState<Flash>(null)
   const [editing, setEditing] = useState(false)
-  // "Edit" on the Projects page opens this page in edit mode (?edit=1): all settings live here
-  const [params, setParams] = useSearchParams()
-  const [form, setForm] = useState({
-    name: '', rate: '', budget: '', clientId: '', status: 'planning',
-    billingModel: 'hourly', startDate: '', endDate: '', notes: '',
-    description: '', projectNeeds: '',
-    links: [] as LinkEntry[], employeeIds: [] as string[],
-    paySchedule: 'weekly' as PaySchedule, payAnchor: '',
-    supervisorName: '', supervisorEmail: '', supervisorPhone: '', employeeInstructions: '',
-  })
-  const [newLinkLabel, setNewLinkLabel] = useState('')
-  const [newLinkUrl,   setNewLinkUrl]   = useState('')
+  const [form, setForm] = useState<ProjectFormState>(EMPTY_PROJECT_FORM)
+  const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
-
-  // Sync form from project once data loads
-  useEffect(() => {
-    if (project && !editing) {
-      setForm({
-        name:         project.name ?? '',
-        rate:         project.rate != null ? String(project.rate) : '',
-        budget:       project.budget != null ? String(project.budget) : '',
-        clientId:     project.clientId ?? '',
-        status:       project.status ?? 'planning',
-        billingModel: project.billingModel ?? 'hourly',
-        startDate:    project.startDate ?? '',
-        endDate:      project.endDate ?? '',
-        notes:        project.notes ?? '',
-        description:  project.description ?? '',
-        projectNeeds: project.projectNeeds ?? '',
-        links:        (project.links ?? []) as LinkEntry[],
-        employeeIds:  project.employeeIds ?? [],
-        paySchedule:  project.paySchedule ?? 'weekly',
-        payAnchor:    project.payAnchor ?? '',
-        supervisorName: project.supervisorName ?? '', supervisorEmail: project.supervisorEmail ?? '',
-        supervisorPhone: project.supervisorPhone ?? '', employeeInstructions: project.employeeInstructions ?? '',
-      })
-      if (params.get('edit') === '1') { setEditing(true); setParams({}, { replace: true }) }
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project?.id])
-
-  const [taskForm, setTaskForm] = useState({ title: '', assigneeName: '', dueDate: '', description: '' })
-  const [taskAddCol, setTaskAddCol] = useState<TaskStatus | null>(null)
-  const taskDragId = { current: null as string | null }
-
-  const [expForm, setExpForm] = useState({ description: '', amount: '', date: new Date().toISOString().slice(0,10), category: '' })
 
   // Contracts
   const [contractPanelOpen, setContractPanelOpen] = useState(false)
   const [contractEditId, setContractEditId] = useState<string | null>(null)
-  const [contractForm, setContractForm] = useState({
-    title: '', status: 'draft' as ContractStatus,
-    startDate: '', endDate: '', value: '', notes: '',
-  })
+  const [contractForm, setContractForm] = useState(EMPTY_CONTRACT)
   const [contractFile, setContractFile] = useState<File | null>(null)
   const [contractUploading, setContractUploading] = useState(false)
+  const [contractError, setContractError] = useState<string | null>(null)
   const contractFileRef = useRef<HTMLInputElement>(null)
 
+  // "Edit" on the Projects page opens this page in edit mode (?edit=1); ?tab=rates opens Team & rates
+  useEffect(() => {
+    if (!project) return
+    const t = params.get('tab') as TabKey | null
+    if (t && TAB_KEYS.includes(t)) setTab(t)
+    if (params.get('edit') === '1') { setForm(formFromProject(project)); setEditing(true) }
+    if (params.get('edit') || params.get('tab')) setParams({}, { replace: true })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project?.id])
+
+  if (!loaded) {
+    return <div className="page"><Skel w={120} /><Skel w="40%" h={30} /><Skel h={84} r={14} /><Skel h={260} r={14} /></div>
+  }
   if (!project) {
     return (
-      <div className="page-wrap">
-        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--muted)' }}>
-          Project not found.
-          <br /><button className="btn-ghost btn-sm" style={{ marginTop: 12 }} onClick={() => navigate('/projects')}>← Back to Projects</button>
-        </div>
+      <div className="page">
+        <button type="button" className="back-link" onClick={() => navigate('/projects')}><Ic d={P.chevL} size={14} /> Projects</button>
+        <EmptyState action={<button type="button" className="btn" onClick={() => navigate('/projects')}>Back to Projects</button>}>Project not found.</EmptyState>
       </div>
     )
   }
 
   // project is guaranteed non-null here (early return above handles null case)
   const projectNN = project!
-  const clientName = clients.find(c => c.id === projectNN.clientId)?.name || null
+  const client = clients.find(c => c.id === projectNN.clientId) ?? null
   const projectInvoices = invoices.filter(inv => inv.projectId === projectNN.id || inv.projectName === projectNN.name)
-  const totalBilled = projectInvoices.reduce((s, inv) => s + (Number(inv.subtotal)||0), 0)
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
+  const totalBilled = projectInvoices.reduce((s, inv) => s + (Number(inv.subtotal) || 0), 0)
+  const billedMonth = projectInvoices.filter(inv => String(inv.date || '').startsWith(monthPrefix())).reduce((s, inv) => s + (Number(inv.subtotal) || 0), 0)
+  const tasks = allTasks.filter(t => t.projectId === projectNN.id)
+  const expenses = allExpenses.filter(e => e.projectId === projectNN.id)
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0)
-  const assignedEmps = employees.filter(e => (projectNN.employeeIds||[]).includes(e.id))
+  const assignedEmps = (projectNN.employeeIds ?? []).map(eid => employees.find(e => e.id === eid)).filter((e): e is Employee => !!e)
+  const st = stageInfo(projectNN)
+  const canRates = allowed('rates.manage')
+  const canHistory = allowed('history.view')
 
-  function persistProject(updated: Project) {
-    const next = projects.map(p => p.id === updated.id ? updated : p)
+  /** Optimistic update → await → roll back with a message */
+  async function persistProject(updated: Project, ok?: string): Promise<boolean> {
+    const prev = projects
+    const next = projects.map(p => (p.id === updated.id ? updated : p))
     setProjectsState(next)
-    void saveProjects(next)
+    try { await saveProjects(next); if (ok) setFlash({ tone: 'success', text: ok }); return true }
+    catch (e) { setProjectsState(prev); setFlash({ tone: 'danger', text: `Could not save: ${errText(e)}` }); return false }
   }
-
-  function handleSave() {
+  function openEdit() { setForm(formFromProject(projectNN)); setEditing(true) }
+  async function handleSave() {
     if (!form.name.trim()) return
-    const updated: Project = {
-      ...projectNN,
-      name: form.name,
-      rate: form.rate ? Number(form.rate) : undefined,
-      budget: form.budget ? Number(form.budget) : undefined,
-      clientId: form.clientId || null,
-      status: form.status,
-      billingModel: form.billingModel,
-      startDate: form.startDate || undefined,
-      endDate: form.endDate || undefined,
-      description: form.description || undefined,
-      projectNeeds: form.projectNeeds || undefined,
-      notes: form.notes || undefined,
-      links: form.links.length > 0 ? form.links : undefined,
-      employeeIds: form.employeeIds,
-      paySchedule: form.paySchedule,
-      payAnchor: form.paySchedule === 'biweekly' && form.payAnchor ? form.payAnchor : null,
-      supervisorName: form.supervisorName.trim() || null, supervisorEmail: form.supervisorEmail.trim() || null,
-      supervisorPhone: form.supervisorPhone.trim() || null, employeeInstructions: form.employeeInstructions.trim() || null,
-    }
-    persistProject(updated)
-    setEditing(false)
+    setSaving(true)
+    const ok = await persistProject({ ...projectNN, ...projectFields(form) }, 'Project saved.')
+    setSaving(false)
+    if (ok) setEditing(false)
   }
-
-  function handleCancel() {
-    setForm({
-      name: projectNN.name,
-      rate: projectNN.rate != null ? String(projectNN.rate) : '',
-      budget: projectNN.budget != null ? String(projectNN.budget) : '',
-      clientId: projectNN.clientId ?? '',
-      status: projectNN.status ?? 'planning',
-      billingModel: projectNN.billingModel ?? 'hourly',
-      startDate: projectNN.startDate ?? '',
-      endDate: projectNN.endDate ?? '',
-      notes: projectNN.notes ?? '',
-      description: projectNN.description ?? '',
-      projectNeeds: projectNN.projectNeeds ?? '',
-      links: projectNN.links ?? [],
-      employeeIds: projectNN.employeeIds ?? [],
-      paySchedule: projectNN.paySchedule ?? 'weekly',
-      payAnchor: projectNN.payAnchor ?? '',
-      supervisorName: projectNN.supervisorName ?? '', supervisorEmail: projectNN.supervisorEmail ?? '',
-      supervisorPhone: projectNN.supervisorPhone ?? '', employeeInstructions: projectNN.employeeInstructions ?? '',
-    })
-    setEditing(false)
-  }
-
-  function handleDelete() {
+  async function handleDelete() {
+    setConfirmDelete(false)
+    const prev = projects
     const next = projects.filter(p => p.id !== projectNN.id)
     setProjectsState(next)
-    void saveProjects(next)
-    navigate('/projects')
+    try { await saveProjects(next); navigate('/projects') }
+    catch (e) { setProjectsState(prev); setFlash({ tone: 'danger', text: `Could not delete: ${errText(e)}` }) }
+  }
+  async function handleTagCreated(tag: Tag) {
+    const prev = allTags
+    const next = [...allTags, tag]
+    setAllTags(next)
+    try { await saveTags(next) } catch (e) { setAllTags(prev); setFlash({ tone: 'danger', text: `Could not save the tag: ${errText(e)}` }) }
   }
 
-  function addLink() {
-    if (!newLinkLabel.trim() || !newLinkUrl.trim()) return
-    setForm(f => ({ ...f, links: [...f.links, { label: newLinkLabel.trim(), url: newLinkUrl.trim() }] }))
-    setNewLinkLabel(''); setNewLinkUrl('')
+  // Tasks / expenses: the whole lists are kept so a save never treats other projects' rows as removed
+  async function persistTasks(next: Task[]): Promise<boolean> {
+    const prev = allTasks
+    setAllTasks(next)
+    try { await saveTasks(next); return true } catch (e) { setAllTasks(prev); setFlash({ tone: 'danger', text: `Could not save tasks: ${errText(e)}` }); return false }
   }
-  function removeLink(i: number) {
-    setForm(f => ({ ...f, links: f.links.filter((_, idx) => idx !== i) }))
+  function addTask(status: TaskStatus, d: TaskDraft) {
+    const mentions = mentionsIn(d.description, employees.map(e => e.name))
+    return persistTasks([...allTasks, { id: uid(), projectId: projectNN.id, title: d.title.trim(), description: d.description.trim() || undefined, mentions: mentions.length ? mentions : undefined, assigneeName: d.assigneeName || undefined, dueDate: d.dueDate || undefined, status, createdAt: Date.now() }])
   }
-
-  function toggleEmployee(empId: string) {
-    setForm(f => ({
-      ...f,
-      employeeIds: f.employeeIds.includes(empId)
-        ? f.employeeIds.filter(id => id !== empId)
-        : [...f.employeeIds, empId],
-    }))
+  async function persistExpenses(next: Expense[]): Promise<boolean> {
+    const prev = allExpenses
+    setAllExpenses(next)
+    try { await saveExpenses(next); return true } catch (e) { setAllExpenses(prev); setFlash({ tone: 'danger', text: `Could not save expenses: ${errText(e)}` }); return false }
   }
-
-  // Tasks
-  function persistTasks(next: Task[]) {
-    setTasks(next)
-    loadTasks().then(all => {
-      void saveTasks([...all.filter(t => t.projectId !== id), ...next])
-    })
-  }
-  function addTask(status: TaskStatus) {
-    if (!taskForm.title.trim()) return
-    const mentionMatches = taskForm.description.match(/@(\w[\w ]*)/g) ?? []
-    const mentions = mentionMatches.map(m => m.slice(1).trim()).filter(Boolean)
-    const t: Task = {
-      id: uid(), projectId: projectNN.id, title: taskForm.title.trim(),
-      description: taskForm.description.trim() || undefined,
-      mentions: mentions.length > 0 ? mentions : undefined,
-      assigneeName: taskForm.assigneeName || undefined,
-      dueDate: taskForm.dueDate || undefined,
-      status, createdAt: Date.now(),
-    }
-    persistTasks([...tasks, t])
-    setTaskForm({ title: '', assigneeName: '', dueDate: '', description: '' })
-    setTaskAddCol(null)
-  }
-  function moveTask(taskId: string, status: TaskStatus) {
-    persistTasks(tasks.map(t => t.id === taskId ? { ...t, status } : t))
-  }
-  function deleteTask(taskId: string) { persistTasks(tasks.filter(t => t.id !== taskId)) }
-  function colTasks(status: TaskStatus) { return tasks.filter(t => t.status === status) }
-
-  // Expenses
-  function addExpense() {
-    if (!expForm.description.trim() || !expForm.amount) return
-    const entry: Expense = {
-      id: uid(), projectId: projectNN.id,
-      description: expForm.description.trim(),
-      amount: parseFloat(expForm.amount) || 0,
-      date: expForm.date,
-      category: expForm.category || undefined,
-      createdAt: Date.now(),
-    }
-    loadExpenses().then(all => { void saveExpenses([entry, ...all]) })
-    setExpenses([entry, ...expenses])
-    setExpForm({ description: '', amount: '', date: new Date().toISOString().slice(0,10), category: '' })
-  }
-  function deleteExpense(expId: string) {
-    loadExpenses().then(all => { void saveExpenses(all.filter(e => e.id !== expId)) })
-    setExpenses(expenses.filter(e => e.id !== expId))
+  function addExpense(d: ExpenseDraft) {
+    return persistExpenses([{ id: uid(), projectId: projectNN.id, description: d.description.trim(), amount: parseFloat(d.amount) || 0, date: d.date, category: d.category || undefined, recurring: d.recurring || undefined, createdAt: Date.now() }, ...allExpenses])
   }
 
   // Contracts
-  function contractStatusBadge(s: ContractStatus): string {
-    switch (s) {
-      case 'active':     return 'badge-green'
-      case 'expired':    return 'badge-orange'
-      case 'terminated': return 'badge-red'
-      default:           return 'badge-gray'
-    }
+  function openAddContractPanel() { setContractEditId(null); setContractForm(EMPTY_CONTRACT); setContractFile(null); setContractError(null); setContractPanelOpen(true) }
+  function openEditContractPanel(c: Contract) {
+    setContractEditId(c.id)
+    setContractForm({ title: c.title, status: c.status, startDate: c.startDate ?? '', endDate: c.endDate ?? '', value: c.value != null ? String(c.value) : '', notes: c.notes ?? '' })
+    setContractFile(null); setContractError(null); setContractPanelOpen(true)
   }
-
-  function openAddContractPanel() {
-    setContractEditId(null)
-    setContractForm({ title: '', status: 'draft', startDate: '', endDate: '', value: '', notes: '' })
-    setContractFile(null)
-    setContractPanelOpen(true)
-  }
-
-  function openEditContractPanel(contract: Contract) {
-    setContractEditId(contract.id)
-    setContractForm({
-      title:     contract.title,
-      status:    contract.status,
-      startDate: contract.startDate ?? '',
-      endDate:   contract.endDate ?? '',
-      value:     contract.value != null ? String(contract.value) : '',
-      notes:     contract.notes ?? '',
-    })
-    setContractFile(null)
-    setContractPanelOpen(true)
-  }
-
   async function saveContract() {
     if (!contractForm.title.trim()) return
-    setContractUploading(true)
+    setContractUploading(true); setContractError(null)
     try {
-      let fileUrl: string | undefined
-      let filePath: string | undefined
-      let fileName: string | undefined
-
+      let fileUrl: string | undefined, filePath: string | undefined, fileName: string | undefined
       if (contractFile) {
         const result = await uploadFile(contractFile, `contracts/projects/${projectNN.id}`)
-        fileUrl  = result.storageUrl
-        filePath = result.storagePath
-        fileName = contractFile.name
+        fileUrl = result.storageUrl; filePath = result.storagePath; fileName = contractFile.name
       }
-
-      const existingContracts: Contract[] = projectNN.contracts ?? []
-
-      let updatedContracts: Contract[]
-      if (contractEditId) {
-        updatedContracts = existingContracts.map(c => {
-          if (c.id !== contractEditId) return c
-          return {
-            ...c,
-            title:     contractForm.title.trim(),
-            status:    contractForm.status,
-            startDate: contractForm.startDate || undefined,
-            endDate:   contractForm.endDate || undefined,
-            value:     contractForm.value ? Number(contractForm.value) : undefined,
-            notes:     contractForm.notes || undefined,
-            ...(fileUrl ? { fileUrl, filePath, fileName } : {}),
-          }
-        })
-      } else {
-        const newContract: Contract = {
-          id:        crypto.randomUUID(),
-          title:     contractForm.title.trim(),
-          status:    contractForm.status,
-          startDate: contractForm.startDate || undefined,
-          endDate:   contractForm.endDate || undefined,
-          value:     contractForm.value ? Number(contractForm.value) : undefined,
-          notes:     contractForm.notes || undefined,
-          fileUrl,
-          filePath,
-          fileName,
-          createdAt: Date.now(),
-        }
-        updatedContracts = [newContract, ...existingContracts]
+      const fields = {
+        title: contractForm.title.trim(), status: contractForm.status,
+        startDate: contractForm.startDate || undefined, endDate: contractForm.endDate || undefined,
+        value: contractForm.value ? Number(contractForm.value) : undefined, notes: contractForm.notes || undefined,
       }
-
-      persistProject({ ...projectNN, contracts: updatedContracts })
-      setContractPanelOpen(false)
-    } finally {
-      setContractUploading(false)
-    }
+      const existing: Contract[] = projectNN.contracts ?? []
+      const updated: Contract[] = contractEditId
+        ? existing.map(c => (c.id !== contractEditId ? c : { ...c, ...fields, ...(fileUrl ? { fileUrl, filePath, fileName } : {}) }))
+        : [{ id: crypto.randomUUID(), ...fields, fileUrl, filePath, fileName, createdAt: Date.now() }, ...existing]
+      if (await persistProject({ ...projectNN, contracts: updated }, contractEditId ? 'Contract saved.' : 'Contract added.')) setContractPanelOpen(false)
+    } catch (e) {
+      setContractError(errText(e))
+    } finally { setContractUploading(false) }
   }
-
   async function deleteContract(contract: Contract) {
-    if (contract.filePath) {
-      await deleteFile(contract.filePath).catch(() => {/* ignore */})
-    }
-    const updatedContracts = (projectNN.contracts ?? []).filter(c => c.id !== contract.id)
-    persistProject({ ...projectNN, contracts: updatedContracts })
+    if (!window.confirm(`Delete contract "${contract.title}"?`)) return
+    if (contract.filePath) await deleteFile(contract.filePath).catch(() => { /* ignore */ })
+    await persistProject({ ...projectNN, contracts: (projectNN.contracts ?? []).filter(c => c.id !== contract.id) }, 'Contract deleted.')
   }
+
+  const payLabel = PAY_SCHEDULES.find(x => x.value === (projectNN.paySchedule ?? 'weekly'))?.label
+  const sub = [client?.name ?? 'No client', `${assignedEmps.length} ${assignedEmps.length === 1 ? 'person' : 'people'}`, `pay ${payShort(projectNN).toLowerCase()}`].join(' · ')
+
+  const teamList = (
+    <Card title="Team" meta="Bill and pay rates need the “Bill & pay rates” permission" actions={<button type="button" className="btn btn--sm" onClick={openEdit}>Edit team</button>}>
+      {assignedEmps.length === 0 ? <div className="card-empty">No one is assigned yet.</div> : assignedEmps.map(e => (
+        <Link key={e.id} to={`/employees/${e.id}`} className="list-row ops-row-link">
+          <Avatar name={e.name} size="sm" soft />
+          <span className="list-row__main"><span className="list-row__title">{e.name}</span><span className="list-row__meta">{e.role || '—'}</span></span>
+          <Ic d={P.chevR} size={14} />
+        </Link>
+      ))}
+    </Card>
+  )
 
   return (
-    <div className="page-wrap client-profile-page">
-      <button className="btn-ghost btn-sm" style={{ marginBottom: 16 }} onClick={() => navigate('/projects')}>
-        ← Back to Projects
-      </button>
+    <div className="page">
+      <button type="button" className="back-link" onClick={() => navigate('/projects')}><Ic d={P.chevL} size={14} /> Projects</button>
+      <PageHeader keepTitleOnPhone title={<span className="ops-title-row">{projectNN.name}<Pill tone={st.tone}>{st.label}</Pill></span>} sub={sub} actions={<>
+        <button type="button" className="btn" onClick={openEdit}>Edit project</button>
+        {can.viewInvoices(role) && <button type="button" className="btn btn--primary" onClick={() => navigate(`/invoice?create=invoice&project=${encodeURIComponent(projectNN.id)}`)}>New invoice</button>}
+        <Menu label="More project actions" items={[{ label: 'Delete project', danger: true, icon: P.trash, onClick: () => setConfirmDelete(true) }]} />
+      </>} />
 
-      {/* Header */}
-      <div className="profile-header">
-        <div className="profile-header-left">
-          <div className="avatar profile-avatar" style={{ background: '#3b82f6', fontSize: 20, fontWeight: 800 }}>
-            {projectNN.name.split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
-          </div>
-          <div>
-            {editing
-              ? <input className="form-input profile-name-input" value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))} />
-              : <h1 className="profile-name">{projectNN.name}</h1>
-            }
-            <div className="profile-sub">
-              {clientName && <span style={{ color: 'var(--muted)' }}>Client: {clientName}</span>}
+      {flash && <Banner tone={flash.tone} onClose={() => setFlash(null)}>{flash.text}</Banner>}
+
+      <KpiStrip compact items={[
+        { label: 'Total billed', value: usd(totalBilled), note: `${projectInvoices.length} invoice${projectInvoices.length === 1 ? '' : 's'}` },
+        { label: 'Budget', value: projectNN.budget ? usd(projectNN.budget, { cents: false }) : '—', note: projectNN.budget ? `${Math.round((totalBilled / projectNN.budget) * 100)}% used` : 'No budget set', tone: projectNN.budget && totalBilled / projectNN.budget >= 0.9 ? 'danger' : undefined },
+        { label: 'Expenses', value: usd(totalExpenses), note: `${expenses.length} logged`, onClick: () => setTab('expenses') },
+        { label: `Hours, ${monthShort()}`, value: hoursLabel(projectMonthHours(projectNN, entries)), note: 'From the time log' },
+        { label: 'Team size', value: String(assignedEmps.length), onClick: () => setTab('rates') },
+      ]} />
+
+      <Tabs label="Project sections" value={tab} onChange={setTab} tabs={[
+        { value: 'rates', label: canRates ? 'Team & rates' : 'Team', count: assignedEmps.length },
+        { value: 'overview', label: 'Overview' },
+        { value: 'tasks', label: 'Tasks', count: tasks.filter(t => t.status !== 'done').length },
+        { value: 'expenses', label: 'Expenses', count: expenses.length },
+        { value: 'invoices', label: 'Invoices', count: projectInvoices.length },
+        { value: 'contracts', label: 'Contracts', count: (projectNN.contracts ?? []).length },
+        { value: 'history', label: 'History', hidden: !canHistory },
+      ]} />
+
+      {tab === 'rates' && (canRates
+        ? <PlacementRates project={projectNN} members={assignedEmps} client={client} onAddPeople={openEdit} />
+        : teamList)}
+
+      {tab === 'overview' && (
+        <div className="ops-overview">
+          <Card title="Supervisor" pad>
+            {projectNN.supervisorName || projectNN.supervisorEmail || projectNN.supervisorPhone ? (
+              <div className="stack ops-sup">
+                <span className="ops-sup__name">{projectNN.supervisorName || '—'}</span>
+                <span className="ops-sup__contact">
+                  {projectNN.supervisorEmail && <a href={`mailto:${projectNN.supervisorEmail}`} className="link">{projectNN.supervisorEmail}</a>}
+                  {projectNN.supervisorEmail && projectNN.supervisorPhone && ' · '}
+                  {projectNN.supervisorPhone && <a href={`tel:${projectNN.supervisorPhone.replace(/[^\d+]/g, '')}`} className="link">{projectNN.supervisorPhone}</a>}
+                </span>
+                <span className="field__hint">Shown to the team in My workspace → My client</span>
+              </div>
+            ) : <div className="muted">No supervisor yet. <button type="button" className="link" onClick={openEdit}>Add one</button></div>}
+          </Card>
+          <Card title="Instructions for the team" pad>
+            {projectNN.employeeInstructions ? <p className="ops-prose">{projectNN.employeeInstructions}</p> : <div className="muted">Nothing yet. <button type="button" className="link" onClick={openEdit}>Write instructions</button></div>}
+          </Card>
+          <Card title="Details" pad>
+            <div className="info-grid ops-info-2">
+              <div className="info"><span className="info__label">Client</span><span className="info__value">{client ? <Link to={`/clients/${client.id}`} className="link">{client.name}</Link> : '—'}</span></div>
+              <div className="info"><span className="info__label">Stage</span><span className="info__value">{st.label}</span></div>
+              <div className="info"><span className="info__label">Pay schedule</span><span className="info__value">{payLabel}{projectNN.paySchedule === 'biweekly' && projectNN.payAnchor ? ` · from ${dateMed(projectNN.payAnchor)}` : ''}</span></div>
+              <div className="info"><span className="info__label">Default bill rate</span><span className="info__value">{projectNN.rate ? `$${Number(projectNN.rate).toFixed(2)}/hr` : client?.defaultRate ? `$${Number(client.defaultRate).toFixed(2)}/hr (client)` : '—'}</span></div>
+              <div className="info"><span className="info__label">Billing model</span><span className="info__value">{(projectNN.billingModel || 'hourly').replace(/^./, c => c.toUpperCase())}</span></div>
+              <div className="info"><span className="info__label">Billed, {monthShort()}</span><span className="info__value">{usd(billedMonth)}</span></div>
+              <div className="info"><span className="info__label">Started</span><span className="info__value">{dateMed(projectNN.startDate)}</span></div>
+              <div className="info"><span className="info__label">Ends</span><span className="info__value">{dateMed(projectNN.endDate)}</span></div>
             </div>
-          </div>
-        </div>
-        <div className="profile-header-actions">
-          {editing ? (
-            <>
-              <button className="btn-primary btn-sm" onClick={handleSave} disabled={!form.name.trim()}>Save Changes</button>
-              <button className="btn-ghost btn-sm" onClick={handleCancel}>Cancel</button>
-            </>
-          ) : (
-            <>
-              <span className={`badge ${stageBadge(projectNN.status)}`} style={{ fontSize: 13 }}>{projectNN.status || 'Planning'}</span>
-              <button className="btn-ghost btn-sm" onClick={() => setEditing(true)}>Edit Project</button>
-              <button className="btn-danger btn-sm" onClick={() => setConfirmDelete(true)}>Delete</button>
-            </>
+          </Card>
+          {(projectNN.description || projectNN.projectNeeds || projectNN.notes) && (
+            <Card title="About this project" pad>
+              <div className="stack">
+                {projectNN.description && <div className="info"><span className="info__label">Description</span><p className="ops-prose">{projectNN.description}</p></div>}
+                {projectNN.projectNeeds && <div className="info"><span className="info__label">Project needs</span><p className="ops-prose">{projectNN.projectNeeds}</p></div>}
+                {projectNN.notes && <div className="info"><span className="info__label">Notes</span><p className="ops-prose">{projectNN.notes}</p></div>}
+              </div>
+            </Card>
           )}
-        </div>
-      </div>
-
-      {/* KPIs */}
-      {!editing && (
-        <div className="kpi-grid">
-          {[
-            { label: 'Total Billed', value: formatMoney(totalBilled), icon: <IconDollar size={18} />, color: 'var(--gold)' },
-            { label: 'Budget', value: projectNN.budget ? formatMoney(projectNN.budget) : '—', icon: <IconWallet size={18} />, color: 'var(--text)' },
-            { label: 'Expenses', value: totalExpenses > 0 ? formatMoney(totalExpenses) : '$0', icon: <IconReceipt size={18} />, color: '#dc2626' },
-            { label: 'Team Size', value: String(assignedEmps.length), icon: <IconUsers size={18} />, color: '#9333ea' },
-          ].map(({ label, value, icon, color }) => (
-            <div key={label} className="kpi-card-sm">
-              <div className="kpi-icon-wrap">
-                {icon}
-              </div>
-              <div className="kpi-body">
-                <div className="kpi-label">{label}</div>
-                <div className="kpi-value" style={['#dc2626', '#ef4444', 'var(--danger)'].includes(color) ? { color: 'var(--danger)' } : undefined}>{value}</div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="project-profile-grid">
-        {/* Left - details */}
-        <div className="profile-main-stack">
-          <div className="data-card">
-            <div className="data-card-title">Project Details</div>
-            <div className="profile-fields">
-              {editing ? (
-                <>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Client</span>
-                    <select className="form-select form-input-sm" value={form.clientId} onChange={e => setForm(f => ({...f, clientId: e.target.value}))}>
-                      <option value="">— No client —</option>
-                      {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Status</span>
-                    <select className="form-select form-input-sm" value={form.status} onChange={e => setForm(f => ({...f, status: e.target.value}))}>
-                      {STAGES.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
-                    </select>
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Billing Model</span>
-                    <select className="form-select form-input-sm" value={form.billingModel} onChange={e => setForm(f => ({...f, billingModel: e.target.value}))}>
-                      {BILLING_MODELS.map(m => <option key={m}>{m}</option>)}
-                    </select>
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Rate ($/hr)</span>
-                    <input className="form-input form-input-sm" type="number" value={form.rate} onChange={e => setForm(f => ({...f, rate: e.target.value}))} placeholder="8.50" />
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Pay schedule</span>
-                    <select className="form-select form-input-sm" value={form.paySchedule} onChange={e => setForm(f => ({...f, paySchedule: e.target.value as PaySchedule}))}>
-                      {PAY_SCHEDULES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-                    </select>
-                  </div>
-                  {form.paySchedule === 'biweekly' && (
-                    <div className="profile-field">
-                      <span className="profile-field-label">First period starts (Monday)</span>
-                      <input className="form-input form-input-sm" type="date" value={form.payAnchor} onChange={e => setForm(f => ({...f, payAnchor: e.target.value}))} />
-                    </div>
-                  )}
-                  <div className="profile-field">
-                    <span className="profile-field-label">Client supervisor</span>
-                    <input className="form-input form-input-sm" value={form.supervisorName} placeholder="Name" onChange={e => setForm(f => ({...f, supervisorName: e.target.value}))} />
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Supervisor email / phone</span>
-                    <div style={{ display: 'flex', gap: 6 }}>
-                      <input className="form-input form-input-sm" value={form.supervisorEmail} placeholder="email" onChange={e => setForm(f => ({...f, supervisorEmail: e.target.value}))} />
-                      <input className="form-input form-input-sm" value={form.supervisorPhone} placeholder="phone / WhatsApp" onChange={e => setForm(f => ({...f, supervisorPhone: e.target.value}))} />
-                    </div>
-                  </div>
-                  <div className="profile-field" style={{ gridColumn: '1 / -1' }}>
-                    <span className="profile-field-label">Instructions for the team (shown in My workspace → My client)</span>
-                    <textarea className="form-input form-input-sm" rows={3} value={form.employeeInstructions} onChange={e => setForm(f => ({...f, employeeInstructions: e.target.value}))} placeholder="e.g. Answer calls with: Thank you for calling Halavi Law…" />
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Budget ($)</span>
-                    <input className="form-input form-input-sm" type="number" value={form.budget} onChange={e => setForm(f => ({...f, budget: e.target.value}))} placeholder="5000" />
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">Start Date</span>
-                    <input className="form-input form-input-sm" type="date" value={form.startDate} onChange={e => setForm(f => ({...f, startDate: e.target.value}))} />
-                  </div>
-                  <div className="profile-field">
-                    <span className="profile-field-label">End Date</span>
-                    <input className="form-input form-input-sm" type="date" value={form.endDate} onChange={e => setForm(f => ({...f, endDate: e.target.value}))} />
-                  </div>
-                  <div className="profile-field profile-field-tall">
-                    <span className="profile-field-label">Description</span>
-                    <textarea className="form-textarea" rows={3} value={form.description} onChange={e => setForm(f => ({...f, description: e.target.value}))} placeholder="Overview of the project..." />
-                  </div>
-                  <div className="profile-field profile-field-tall">
-                    <span className="profile-field-label">Project Needs</span>
-                    <textarea className="form-textarea" rows={3} value={form.projectNeeds} onChange={e => setForm(f => ({...f, projectNeeds: e.target.value}))} placeholder="Skills, roles, or requirements needed..." />
-                  </div>
-                  <div className="profile-field profile-field-tall">
-                    <span className="profile-field-label">Notes</span>
-                    <textarea className="form-textarea" rows={3} value={form.notes} onChange={e => setForm(f => ({...f, notes: e.target.value}))} />
-                  </div>
-                  {/* Links */}
-                  <div className="profile-field profile-field-tall">
-                    <span className="profile-field-label">Links</span>
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {form.links.map((lk, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <a href={lk.url} target="_blank" rel="noopener noreferrer" style={{ flex: 1, fontSize: 12, color: 'var(--gold)' }}>{lk.label}</a>
-                          <button className="btn-icon btn-danger" style={{ padding: '2px 6px', fontSize: 11 }} onClick={() => removeLink(i)}><IconX size={12} /></button>
-                        </div>
-                      ))}
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <input className="form-input form-input-sm" value={newLinkLabel} onChange={e => setNewLinkLabel(e.target.value)} placeholder="Label" style={{ flex: 1 }} />
-                        <input className="form-input form-input-sm" value={newLinkUrl} onChange={e => setNewLinkUrl(e.target.value)} placeholder="https://..." style={{ flex: 2 }} />
-                        <button className="btn-ghost btn-sm" onClick={addLink} disabled={!newLinkLabel.trim() || !newLinkUrl.trim()}>+</button>
-                      </div>
-                    </div>
-                  </div>
-                  {/* Team assignment */}
-                  <div className="profile-field profile-field-tall">
-                    <span className="profile-field-label">Team</span>
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 200, overflowY: 'auto' }}>
-                      {employees.map(e => (
-                        <label key={e.id} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, cursor: 'pointer' }}>
-                          <input type="checkbox" checked={form.employeeIds.includes(e.id)} onChange={() => toggleEmployee(e.id)} />
-                          {e.name}
-                          {e.role && <span style={{ color: 'var(--muted)', fontSize: 11 }}>{e.role}</span>}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  {[
-                    { label: 'Client',         value: clientName },
-                    { label: 'Status',         value: projectNN.status || 'Planning' },
-                    { label: 'Billing Model',  value: projectNN.billingModel || 'hourly' },
-                    { label: 'Rate',           value: projectNN.rate ? `$${projectNN.rate}/hr` : undefined },
-                    { label: 'Pay schedule',   value: PAY_SCHEDULES.find(x => x.value === (projectNN.paySchedule ?? 'weekly'))?.label },
-                    { label: 'Client supervisor', value: [projectNN.supervisorName, projectNN.supervisorEmail, projectNN.supervisorPhone].filter(Boolean).join(' · ') || undefined },
-                    { label: 'Budget',         value: projectNN.budget ? formatMoney(projectNN.budget) : undefined },
-                    { label: 'Start Date',     value: projectNN.startDate },
-                    { label: 'End Date',       value: projectNN.endDate },
-                  ].map(({ label, value }) => value ? (
-                    <div key={label} className="profile-field">
-                      <span className="profile-field-label">{label}</span>
-                      <span className="profile-field-value">{value}</span>
-                    </div>
-                  ) : null)}
-                  {projectNN.description && (
-                    <div className="profile-field profile-field-tall">
-                      <span className="profile-field-label">Description</span>
-                      <span className="profile-field-value" style={{ whiteSpace: 'pre-wrap' }}>{projectNN.description}</span>
-                    </div>
-                  )}
-                  {projectNN.projectNeeds && (
-                    <div className="profile-field profile-field-tall">
-                      <span className="profile-field-label">Project Needs</span>
-                      <span className="profile-field-value" style={{ whiteSpace: 'pre-wrap' }}>{projectNN.projectNeeds}</span>
-                    </div>
-                  )}
-                  {projectNN.notes && (
-                    <div className="profile-field profile-field-tall">
-                      <span className="profile-field-label">Notes</span>
-                      <span className="profile-field-value" style={{ whiteSpace: 'pre-wrap' }}>{projectNN.notes}</span>
-                    </div>
-                  )}
-                  {(projectNN.links ?? []).length > 0 && (
-                    <div className="profile-field profile-field-tall">
-                      <span className="profile-field-label">Links</span>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {(projectNN.links ?? []).map((lk, i) => (
-                          <a key={i} href={lk.url} target="_blank" rel="noopener noreferrer" className="card-link-pill">{lk.label}</a>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Team */}
-          {assignedEmps.length > 0 && !editing && (
-            <div className="data-card">
-              <div className="data-card-title">Team</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, paddingTop: 4 }}>
-                {assignedEmps.map(e => (
-                  <button key={e.id} className="btn-ghost btn-sm" style={{ justifyContent: 'flex-start', fontSize: 13 }}
-                    onClick={() => navigate('/employees/' + e.id)}>
-                    {e.name}
-                    {e.role && <span style={{ marginLeft: 6, color: 'var(--muted)', fontSize: 11 }}>{e.role}</span>}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {!editing && <PlacementRates project={projectNN} members={assignedEmps} client={clients.find(c => c.id === projectNN.clientId) ?? null} />}
-
-          {/* Invoice history */}
-          {projectInvoices.length > 0 && (
-            <div className="data-card">
-              <div className="data-card-title">Invoices</div>
-              <div className="table-wrap">
-                <table className="data-table">
-                  <thead><tr><th>Invoice</th><th>Date</th><th>Status</th><th>Amount</th></tr></thead>
-                  <tbody>
-                    {projectInvoices.slice(0, 8).map(inv => (
-                      <tr key={inv.id}>
-                        <td className="td-name">{inv.number}</td>
-                        <td className="td-muted">{inv.date || '—'}</td>
-                        <td><span className="badge badge-gray" style={{ fontSize: 11 }}>{inv.status || 'draft'}</span></td>
-                        <td style={{ color: 'var(--gold)', fontWeight: 700 }}>${(Number(inv.subtotal)||0).toFixed(2)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Right - Tasks + Expenses */}
-        <div className="profile-main-stack">
-          {/* Task Board */}
-          <div className="data-card">
-            <div className="data-card-title">Task Board ({tasks.length})</div>
-            <div className="project-task-board">
-              {TASK_COLS.map(({ key, label }) => (
-                <div key={key} style={{ background: 'var(--surf3)', borderRadius: 8, padding: 10 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--muted)', marginBottom: 8 }}>
-                    {label} <span style={{ color: 'var(--gold)' }}>({colTasks(key).length})</span>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minHeight: 40 }}
-                    onDragOver={e => e.preventDefault()}
-                    onDrop={() => { if (taskDragId.current) { moveTask(taskDragId.current, key); taskDragId.current = null } }}>
-                    {colTasks(key).map(t => (
-                      <div key={t.id} draggable
-                        onDragStart={() => { taskDragId.current = t.id }}
-                        style={{ background: 'var(--surf2)', borderRadius: 6, padding: '8px 10px', border: '1px solid var(--border)', cursor: 'grab' }}>
-                        <div style={{ fontSize: 13, fontWeight: 600 }}>{t.title}</div>
-                        {t.description && (
-                          <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 4, lineHeight: 1.4, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                            {renderWithMentions(t.description)}
-                          </div>
-                        )}
-                        {t.assigneeName && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{t.assigneeName}</div>}
-                        {t.dueDate && <div style={{ fontSize: 11, color: '#a16207', marginTop: 2 }}>Due: {t.dueDate}</div>}
-                        <button className="btn-icon btn-danger" style={{ fontSize: 10, padding: '1px 5px', marginTop: 4, opacity: .6 }} onClick={() => deleteTask(t.id)}><IconTrash size={10} /></button>
-                      </div>
-                    ))}
-                  </div>
-                  {taskAddCol === key ? (
-                    <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                      <input className="form-input form-input-sm" placeholder="Task title" value={taskForm.title}
-                        onChange={e => setTaskForm(f => ({...f, title: e.target.value}))}
-                        onKeyDown={e => { if (e.key === 'Enter') addTask(key) }}
-                        autoFocus />
-                      <MentionInput
-                        value={taskForm.description}
-                        onChange={val => setTaskForm(f => ({...f, description: val}))}
-                        employees={employees.map(e => e.name)}
-                        placeholder="Description (type @ to mention someone)"
-                        rows={2}
-                      />
-                      <input className="form-input form-input-sm" placeholder="Assignee" value={taskForm.assigneeName}
-                        onChange={e => setTaskForm(f => ({...f, assigneeName: e.target.value}))} />
-                      <input className="form-input form-input-sm" type="date" value={taskForm.dueDate}
-                        onChange={e => setTaskForm(f => ({...f, dueDate: e.target.value}))} />
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button className="btn-primary btn-sm" onClick={() => addTask(key)} disabled={!taskForm.title.trim()}>Add</button>
-                        <button className="btn-ghost btn-sm" onClick={() => setTaskAddCol(null)}>Cancel</button>
-                      </div>
-                    </div>
-                  ) : (
-                    <button className="btn-ghost btn-sm" style={{ width: '100%', marginTop: 6, fontSize: 12 }} onClick={() => { setTaskAddCol(key); setTaskForm({ title: '', assigneeName: '', dueDate: '', description: '' }) }}>
-                      + Add task
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Expenses */}
-          <div className="data-card">
-            <div className="data-card-title">Expenses — {formatMoney(totalExpenses)} total</div>
-            <div className="project-expense-form">
-              <input className="form-input form-input-sm" placeholder="Description" value={expForm.description}
-                onChange={e => setExpForm(f => ({...f, description: e.target.value}))} />
-              <input className="form-input form-input-sm" type="number" placeholder="Amount" style={{ width: 90 }}
-                value={expForm.amount} onChange={e => setExpForm(f => ({...f, amount: e.target.value}))} />
-              <select className="form-select form-input-sm" style={{ width: 110 }} value={expForm.category}
-                onChange={e => setExpForm(f => ({...f, category: e.target.value}))}>
-                {EXPENSE_CATS.map(c => <option key={c} value={c}>{c || 'Category'}</option>)}
-              </select>
-              <button className="btn-primary btn-sm" onClick={addExpense} disabled={!expForm.description.trim() || !expForm.amount}>Add</button>
-            </div>
-            {expenses.length === 0 ? (
-              <div style={{ color: 'var(--muted)', fontSize: 13, textAlign: 'center', padding: '12px 0' }}>No expenses yet.</div>
-            ) : (
-              <div className="table-wrap">
-                <table className="data-table">
-                  <thead><tr><th>Description</th><th>Category</th><th>Date</th><th>Amount</th><th></th></tr></thead>
-                  <tbody>
-                    {expenses.map(exp => (
-                      <tr key={exp.id}>
-                        <td className="td-name">{exp.description}</td>
-                        <td className="td-muted">{exp.category || '—'}</td>
-                        <td className="td-muted">{exp.date}</td>
-                        <td style={{ color: '#dc2626', fontWeight: 700 }}>{formatMoney(exp.amount)}</td>
-                        <td><button className="btn-icon btn-danger" style={{ fontSize: 11, padding: '2px 5px' }} onClick={() => deleteExpense(exp.id)}><IconTrash size={12} /></button></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          <Card title="Tags and links" pad>
+            {(projectNN.tags ?? []).length === 0 && (projectNN.links ?? []).length === 0 ? <div className="muted">None yet. <button type="button" className="link" onClick={openEdit}>Add tags or links</button></div> : (
+              <div className="ops-pcard__tags">
+                {(projectNN.tags ?? []).map(label => <TagBadge key={label} label={label} color={allTags.find(t => t.label === label)?.color ?? '#3b82f6'} />)}
+                {(projectNN.links ?? []).map((lk, i) => <a key={i} href={lk.url} target="_blank" rel="noopener noreferrer" className="ops-linkpill"><Ic d={P.link} size={12} />{lk.label}</a>)}
               </div>
             )}
-          </div>
+          </Card>
         </div>
-      </div>
+      )}
 
-      {/* Contracts */}
-      <div className="data-card" style={{ marginTop: 16 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <div className="data-card-title" style={{ marginBottom: 0 }}>Contracts</div>
-          <button className="btn-primary btn-sm" onClick={openAddContractPanel}>+ Add Contract</button>
+      {tab === 'tasks' && (
+        <TaskBoard tasks={tasks} names={employees.map(e => e.name)} onAdd={addTask}
+          onMove={(tid, s) => void persistTasks(allTasks.map(t => (t.id === tid ? { ...t, status: s } : t)))}
+          onDelete={tid => void persistTasks(allTasks.filter(t => t.id !== tid))} />
+      )}
+
+      {tab === 'expenses' && (
+        <ProjectExpenses expenses={expenses} budget={projectNN.budget} billed={totalBilled} onAdd={addExpense}
+          onDelete={eid => void persistExpenses(allExpenses.filter(e => e.id !== eid))} />
+      )}
+
+      {tab === 'invoices' && (projectInvoices.length === 0 ? <EmptyState>No invoices for this project yet.</EmptyState> : mobile ? (
+        <div className="mcards">
+          {projectInvoices.map(inv => (
+            <Link key={inv.id} to={`/invoice?open=${inv.id}`} className="mcard ops-row-link">
+              <div className="mcard__top"><span className="mcard__title mono">{inv.number}</span><span className="num">{usd(Number(inv.subtotal) || 0)}</span></div>
+              <div className="row row--between"><span className="mcard__meta">{dateMed(inv.date)}</span><Pill status={inv.status || 'draft'} /></div>
+            </Link>
+          ))}
         </div>
-        {(projectNN.contracts ?? []).length === 0 ? (
-          <div style={{ color: 'var(--muted)', fontSize: 13, textAlign: 'center', padding: '16px 0' }}>
-            No contracts yet.
-          </div>
-        ) : (
-          <div className="table-wrap">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Title</th>
-                  <th>Status</th>
-                  <th>Date Range</th>
-                  <th>Value</th>
-                  <th>Notes</th>
-                  <th>File</th>
-                  <th></th>
+      ) : (
+        <div className="table-card">
+          <table className="table ops-min-640">
+            <thead><tr><th>Invoice</th><th>Date</th><th>Due</th><th>Status</th><th className="t-right">Amount</th></tr></thead>
+            <tbody>
+              {projectInvoices.map(inv => (
+                <tr key={inv.id} className="is-clickable" onClick={() => navigate(`/invoice?open=${inv.id}`)}>
+                  <td className="mono t-strong">{inv.number}</td>
+                  <td className="muted">{dateMed(inv.date)}</td>
+                  <td className="muted">{dateMed(inv.dueDate)}</td>
+                  <td><Pill status={inv.status || 'draft'} /></td>
+                  <td className="t-num">{usd(Number(inv.subtotal) || 0)}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {(projectNN.contracts ?? []).map(c => (
-                  <tr key={c.id}>
-                    <td className="td-name">{c.title}</td>
-                    <td>
-                      <span className={`badge ${contractStatusBadge(c.status)}`} style={{ fontSize: 11 }}>
-                        {c.status}
-                      </span>
-                    </td>
-                    <td className="td-muted" style={{ fontSize: 12 }}>
-                      {c.startDate || c.endDate
-                        ? `${c.startDate || '—'} → ${c.endDate || '—'}`
-                        : '—'}
-                    </td>
-                    <td style={{ color: 'var(--gold)', fontWeight: 700 }}>
-                      {c.value != null ? `$${c.value.toLocaleString()}` : '—'}
-                    </td>
-                    <td className="td-muted" style={{ fontSize: 12, maxWidth: 200, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {c.notes || '—'}
-                    </td>
-                    <td>
-                      {c.fileUrl
-                        ? <a href={c.fileUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'var(--gold)' }}>{c.fileName || 'Download'}</a>
-                        : <span style={{ color: 'var(--muted)', fontSize: 12 }}>—</span>
-                      }
-                    </td>
-                    <td>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <button className="btn-ghost btn-sm" style={{ fontSize: 11, padding: '2px 8px' }} onClick={() => openEditContractPanel(c)}>Edit</button>
-                        <button className="btn-icon btn-danger" style={{ fontSize: 11, padding: '2px 6px' }} onClick={() => { if (window.confirm(`Delete contract "${c.title}"?`)) deleteContract(c) }}><IconTrash size={12} /></button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Contract slide panel */}
-      {contractPanelOpen && (
-        <>
-          <div
-            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.25)', zIndex: 299 }}
-            onClick={() => setContractPanelOpen(false)}
-          />
-          <div style={{
-            position: 'fixed', top: 0, right: 0, width: 460, height: '100%',
-            background: '#fff', zIndex: 300, display: 'flex', flexDirection: 'column',
-            boxShadow: '-4px 0 24px rgba(0,0,0,0.12)',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 20px 14px', borderBottom: '1px solid var(--border)' }}>
-              <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text)' }}>
-                {contractEditId ? 'Edit Contract' : 'Add Contract'}
-              </div>
-              <button className="btn-icon" style={{ fontSize: 18, color: 'var(--muted)' }} onClick={() => setContractPanelOpen(false)}><IconX size={16} /></button>
-            </div>
-            <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Title *</label>
-                <input
-                  className="form-input"
-                  value={contractForm.title}
-                  onChange={e => setContractForm(f => ({ ...f, title: e.target.value }))}
-                  placeholder="e.g. Service Agreement 2026"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Status</label>
-                <select
-                  className="form-select"
-                  value={contractForm.status}
-                  onChange={e => setContractForm(f => ({ ...f, status: e.target.value as ContractStatus }))}
-                >
-                  <option value="draft">Draft</option>
-                  <option value="active">Active</option>
-                  <option value="expired">Expired</option>
-                  <option value="terminated">Terminated</option>
-                </select>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Start Date</label>
-                  <input
-                    className="form-input"
-                    type="date"
-                    value={contractForm.startDate}
-                    onChange={e => setContractForm(f => ({ ...f, startDate: e.target.value }))}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>End Date</label>
-                  <input
-                    className="form-input"
-                    type="date"
-                    value={contractForm.endDate}
-                    onChange={e => setContractForm(f => ({ ...f, endDate: e.target.value }))}
-                  />
-                </div>
-              </div>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Contract Value (USD)</label>
-                <input
-                  className="form-input"
-                  type="number"
-                  value={contractForm.value}
-                  onChange={e => setContractForm(f => ({ ...f, value: e.target.value }))}
-                  placeholder="Optional"
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>Notes</label>
-                <textarea
-                  className="form-textarea"
-                  rows={2}
-                  value={contractForm.notes}
-                  onChange={e => setContractForm(f => ({ ...f, notes: e.target.value }))}
-                  placeholder="Optional notes about this contract..."
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
-                  File Upload (.pdf, .doc, .docx)
-                </label>
-                <input
-                  ref={contractFileRef}
-                  type="file"
-                  accept=".pdf,.doc,.docx"
-                  style={{ display: 'none' }}
-                  onChange={e => setContractFile(e.target.files?.[0] ?? null)}
-                />
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <button className="btn-ghost btn-sm" onClick={() => contractFileRef.current?.click()}>
-                    Choose File
-                  </button>
-                  <span style={{ fontSize: 12, color: 'var(--muted)' }}>
-                    {contractFile ? contractFile.name : 'No file selected'}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div style={{ padding: '14px 20px', borderTop: '1px solid var(--border)', display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button className="btn-ghost" onClick={() => setContractPanelOpen(false)}>Cancel</button>
-              <button
-                className="btn-primary"
-                onClick={saveContract}
-                disabled={!contractForm.title.trim() || contractUploading}
-              >
-                {contractUploading ? 'Saving...' : (contractEditId ? 'Save Changes' : 'Add Contract')}
-              </button>
-            </div>
-          </div>
-        </>
-      )}
-
-      {confirmDelete && (
-        <div className="modal-overlay" onClick={() => setConfirmDelete(false)}>
-          <div className="confirm-dialog" onClick={e => e.stopPropagation()}>
-            <div className="confirm-title">Delete {projectNN.name}?</div>
-            <div className="confirm-body">This cannot be undone.</div>
-            <div className="confirm-actions">
-              <button className="btn-ghost" onClick={() => setConfirmDelete(false)}>Cancel</button>
-              <button className="btn-danger" onClick={handleDelete}>Delete</button>
-            </div>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
+      ))}
+
+      {tab === 'contracts' && (
+        <Card title="Contracts" actions={<button type="button" className="btn btn--sm btn--primary" onClick={openAddContractPanel}>+ Add contract</button>}>
+          {(projectNN.contracts ?? []).length === 0 ? <div className="card-empty">No contracts yet.</div> : (projectNN.contracts ?? []).map(c => (
+            <div key={c.id} className="list-row">
+              <span className="list-row__main">
+                <span className="list-row__title">{c.title} <Pill tone={CONTRACT_TONE[c.status] ?? toneFor(c.status)}>{c.status.replace(/^./, x => x.toUpperCase())}</Pill></span>
+                <span className="list-row__meta">
+                  {[c.startDate || c.endDate ? `${dateMed(c.startDate)} → ${dateMed(c.endDate)}` : '', c.value != null ? usd(c.value, { cents: false }) : '', c.notes || ''].filter(Boolean).join(' · ') || '—'}
+                </span>
+              </span>
+              {c.fileUrl && <a href={c.fileUrl} target="_blank" rel="noopener noreferrer" className="btn btn--xs"><Ic d={P.download} size={13} />{mobile ? 'File' : c.fileName || 'Download'}</a>}
+              <button type="button" className="btn btn--xs" onClick={() => openEditContractPanel(c)}>Edit</button>
+              <Menu label={`Actions for ${c.title}`} buttonClass="btn btn--xs btn--icon ops-xs-icon" items={[{ label: 'Delete contract', danger: true, onClick: () => void deleteContract(c) }]} />
+            </div>
+          ))}
+        </Card>
       )}
-      <RecordHistory table="projects" recordId={projectNN.id} />
+
+      {tab === 'history' && canHistory && (
+        <Card title="Change history" meta="Who changed this project and when" pad><HistoryList table="projects" recordId={projectNN.id} limit={50} /></Card>
+      )}
+
+      <Drawer open={editing} onClose={() => setEditing(false)} title="Edit project" sub={projectNN.name} size="wide"
+        footer={<><span className="spacer" /><button type="button" className="btn" onClick={() => setEditing(false)}>Cancel</button><button type="button" className="btn btn--primary" disabled={!form.name.trim() || saving} onClick={() => void handleSave()}>{saving ? 'Saving…' : 'Save changes'}</button></>}>
+        <ProjectFormFields form={form} setForm={setForm} clients={clients} employees={employees} allTags={allTags} onTagCreated={t => void handleTagCreated(t)} />
+      </Drawer>
+
+      <Drawer open={contractPanelOpen} onClose={() => setContractPanelOpen(false)} title={contractEditId ? 'Edit contract' : 'Add contract'} size="narrow"
+        footer={<><span className="spacer" /><button type="button" className="btn" onClick={() => setContractPanelOpen(false)}>Cancel</button><button type="button" className="btn btn--primary" onClick={() => void saveContract()} disabled={!contractForm.title.trim() || contractUploading}>{contractUploading ? 'Saving…' : contractEditId ? 'Save changes' : 'Add contract'}</button></>}>
+        {contractError && <Banner tone="danger">{contractError}</Banner>}
+        <div className="form-grid form-grid--2">
+          <Field label="Title *" full><input className="input" aria-label="Contract title" value={contractForm.title} onChange={e => setContractForm(f => ({ ...f, title: e.target.value }))} placeholder="e.g. Service Agreement 2026" autoFocus /></Field>
+          <Field label="Status" full>
+            <select className="select" aria-label="Contract status" value={contractForm.status} onChange={e => setContractForm(f => ({ ...f, status: e.target.value as ContractStatus }))}>
+              <option value="draft">Draft</option><option value="active">Active</option><option value="expired">Expired</option><option value="terminated">Terminated</option>
+            </select>
+          </Field>
+          <Field label="Start date"><input className="input" type="date" aria-label="Contract start" value={contractForm.startDate} onChange={e => setContractForm(f => ({ ...f, startDate: e.target.value }))} /></Field>
+          <Field label="End date"><input className="input" type="date" aria-label="Contract end" value={contractForm.endDate} onChange={e => setContractForm(f => ({ ...f, endDate: e.target.value }))} /></Field>
+          <Field label="Contract value (USD)" full><input className="input" type="number" aria-label="Contract value" value={contractForm.value} onChange={e => setContractForm(f => ({ ...f, value: e.target.value }))} placeholder="Optional" /></Field>
+          <Field label="Notes" full><textarea className="textarea" rows={2} aria-label="Contract notes" value={contractForm.notes} onChange={e => setContractForm(f => ({ ...f, notes: e.target.value }))} placeholder="Optional notes about this contract…" /></Field>
+          <Field label="File (.pdf, .doc, .docx)" full>
+            <input ref={contractFileRef} type="file" accept=".pdf,.doc,.docx" className="sr-only" onChange={e => setContractFile(e.target.files?.[0] ?? null)} />
+            <button type="button" className="dropzone" onClick={() => contractFileRef.current?.click()}>{contractFile ? contractFile.name : 'Choose a file'}</button>
+          </Field>
+        </div>
+      </Drawer>
+
+      <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)} title={`Delete ${projectNN.name}?`} sub="This cannot be undone."
+        footer={<><button type="button" className="btn" onClick={() => setConfirmDelete(false)}>Cancel</button><button type="button" className="btn ops-btn-danger" onClick={() => void handleDelete()}>Delete</button></>} />
     </div>
   )
 }

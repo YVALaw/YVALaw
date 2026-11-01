@@ -1,32 +1,45 @@
+// Finance → Weekly close (PLAN.md Step 4; redesign 2026-11 → designs/Weekly Close.dc.html).
+// Review the week, fix time, approve, send. The week-close function prepares/approves; rows are read here (RLS weekly_close.manage).
 import { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import type { AppSettings, Employee, Invoice, Project } from '../data/types'
 import { loadEmployees, loadProjects, loadSettings } from '../services/storage'
 import { usePermission } from '../context/RoleContext'
 import { invoiceHtmlFor, sendInvoiceEmail } from '../services/invoiceEmail'
 import { isGmailConnected } from '../services/gmail'
 import RecordPaymentModal from '../components/RecordPaymentModal'
+import WeekTimeGrid, { type Editing, type GridTarget } from '../components/finance/WeekTimeGrid'
+import { Banner, EmptyState, KpiStrip, PageHeader, Pill, Stepper, type Tone } from '../components/ui'
+import { Ic, P } from '../components/Icon'
 import {
   addAdjustment, callWeekClose, cancelAdjustment, lastFinishedWeek, loadAdjustments, loadWeekBlocks, loadWeekCloses, loadWeekInvoices,
   markInvoiceSent, moveToNextWeek, type Adjustment, type WeekBlock, type WeekClose, type WeekFlag,
 } from '../services/weeklyClose'
 import { addDays, DEFAULT_TZ, localParts } from '../utils/moneyRules'
+import { hmClock, hmText as hm } from '../utils/format'
 
-type Tab = 'summary' | 'invoices' | 'time' | 'flags' | 'payroll'
 const usd = (n: number) => (Number(n) || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
-const hm = (s: number) => { const neg = s < 0; const m = Math.round(Math.abs(s) / 60); return `${neg ? '−' : ''}${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` }
-const dayLabel = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' })
-const rangeLabel = (a: string) => `${new Date(`${a}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${new Date(`${addDays(a, 6)}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+const md = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+const rangeLabel = (a: string) => {
+  const b = addDays(a, 6)
+  return new Date(`${a}T12:00:00`).getMonth() === new Date(`${b}T12:00:00`).getMonth() ? `${md(a)} – ${new Date(`${b}T12:00:00`).getDate()}` : `${md(a)} – ${md(b)}`
+}
 const FLAG_LABEL: Record<string, string> = {
   missing_rate: 'Missing rate', project_no_client: 'No client', client_no_email: 'No email', invoice_locked: 'Already sent', late: 'Late time',
   manual_pending: 'Waiting request', no_time: 'No time', over_50h: 'Over 50 h', low_activity: 'Low activity', outside_shift: 'Outside shift', missing_screenshots: 'Screenshots',
+}
+/** Pill colours per flag kind (mockup: Missing rate red · Late / Over 50h amber · Low activity orange · No time grey · Locked indigo · Outside shift violet) */
+const FLAG_TONE: Record<string, Tone> = {
+  missing_rate: 'danger', project_no_client: 'danger', client_no_email: 'neutral', invoice_locked: 'sent', late: 'warning', manual_pending: 'info',
+  no_time: 'neutral', over_50h: 'warning', low_activity: 'partial', outside_shift: 'viewed', missing_screenshots: 'partial',
 }
 
 /** Finance → Weekly close: review the week, fix time, approve, send (PLAN.md Step 4) */
 export default function WeeklyClosePage() {
   const allowed = usePermission()
+  const navigate = useNavigate()
   const [closes, setCloses] = useState<WeekClose[]>([])
   const [weekStart, setWeekStart] = useState(lastFinishedWeek())
-  const [tab, setTab] = useState<Tab>('summary')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
@@ -37,8 +50,10 @@ export default function WeeklyClosePage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [settings, setSettings] = useState<AppSettings | null>(null)
   const [paying, setPaying] = useState<Invoice | null>(null)
-  const [editing, setEditing] = useState<{ employeeId: string; target: string; day: string; mode: 'edit' | 'move' } | null>(null)
-  const [adjForm, setAdjForm] = useState({ minutes: '', note: '' })
+  const [open, setOpen] = useState<Set<string>>(new Set())
+  const [showTime, setShowTime] = useState(false)
+  const [allPay, setAllPay] = useState(false)
+  const [loaded, setLoaded] = useState(false)
 
   // The week in progress can be previewed (nothing saved); it closes for real on Monday 12:05 am
   const thisWeek = addDays(lastFinishedWeek(), 7)
@@ -47,13 +62,15 @@ export default function WeeklyClosePage() {
   const close = isCurrent ? previewData?.close ?? null : closes.find(c => c.weekStart === weekStart) ?? null
   async function loadAll() {
     const r = await loadWeekCloses()
-    setCloses(r.rows); setError(r.error)
+    setCloses(r.rows); setError(e => r.error ?? e)
     const c = r.rows.find(x => x.weekStart === weekStart)
     const [inv, b, a] = await Promise.all([c ? loadWeekInvoices(c.id) : Promise.resolve([]), loadWeekBlocks(weekStart), loadAdjustments(weekStart)])
-    setInvoices(inv); setBlocks(b); setAdjustments(a)
+    setInvoices(inv); setBlocks(b); setAdjustments(a); setLoaded(true)
   }
   useEffect(() => { void loadEmployees().then(setEmployees); void loadProjects().then(setProjects); void loadSettings().then(setSettings) }, [])
-  useEffect(() => { setPreviewData(null); void loadAll() }, [weekStart])   // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setPreviewData(null); setOpen(new Set()); void loadAll() }, [weekStart])   // eslint-disable-line react-hooks/exhaustive-deps
+  // First draft opens by default (mockup), once per week
+  useEffect(() => { if (invoices[0] && open.size === 0) setOpen(new Set([invoices[0].id])) }, [invoices])   // eslint-disable-line react-hooks/exhaustive-deps
 
   async function run(action: 'prepare' | 'approve') {
     setBusy(action); setMsg(null); setError(null)
@@ -88,7 +105,7 @@ export default function WeeklyClosePage() {
     return 'sent'
   }
   async function sendOne(inv: Invoice) {
-    setBusy(`send-${inv.id}`); setError(null)
+    setBusy(`send-${inv.id}`); setError(null); setMsg(null)
     try {
       const r = await send(inv)
       if (r === 'sent') setMsg(`${inv.number} sent to ${inv.clientEmail}.`)
@@ -107,7 +124,7 @@ export default function WeeklyClosePage() {
       return
     }
     if (!window.confirm(`Email ${drafts.length} invoice${drafts.length === 1 ? '' : 's'} to the clients now?`)) return
-    setBusy('send-all'); setError(null)
+    setBusy('send-all'); setError(null); setMsg(null)
     let ok = 0
     let stopped = false
     for (const inv of drafts) {
@@ -135,7 +152,7 @@ export default function WeeklyClosePage() {
   const empName = (id: string) => employees.find(e => e.id === id)?.name ?? 'Unknown'
   const projName = (id: string | null) => (id ? projects.find(p => p.id === id)?.name ?? 'Project' : '')
   const grid = useMemo(() => {
-    const m = new Map<string, Map<string, { projectId: string | null; workType: string | null; tracked: Record<string, number>; adj: Record<string, number> }>>()
+    const m = new Map<string, Map<string, GridTarget>>()
     const row = (emp: string, projectId: string | null, workType: string | null) => {
       const key = projectId ? `p:${projectId}` : `w:${workType || 'Other'}`
       if (!m.has(emp)) m.set(emp, new Map())
@@ -149,209 +166,235 @@ export default function WeeklyClosePage() {
   }, [blocks, adjustments, weekStart])   // eslint-disable-line react-hooks/exhaustive-deps
   const lateCount = close?.summary.firstPreparedAt ? blocks.filter(b => Date.parse(b.created_at) > Date.parse(close.preparedAt || close.summary.firstPreparedAt!)).length : 0
 
-  async function saveAdjustment() {
-    if (!editing) return
+  async function saveAdjustment(editing: Editing, minutes: string, note: string, target: GridTarget | undefined): Promise<boolean> {
     // Accept "-15", "−15" (the hint's minus sign), "+30" and a comma decimal
-    const mins = Number(adjForm.minutes.trim().replace(/[\u2212\u2013]/g, '-').replace(',', '.'))
-    if (!mins || adjForm.note.trim().length < 2) { setError('Enter minutes (use − to remove time) and a short note — the employee will see it.'); return }
-    const target = grid.get(editing.employeeId)?.get(editing.target)
+    const mins = Number(minutes.trim().replace(/[−–]/g, '-').replace(',', '.'))
+    if (!mins || note.trim().length < 2) { setError('Enter minutes (use − to remove time) and a short note — the employee will see it.'); return false }
     try {
-      const args = { employeeId: editing.employeeId, projectId: target?.projectId ?? null, workType: target?.workType ?? null, day: editing.day, seconds: Math.abs(mins) * 60 * (editing.mode === 'move' ? 1 : Math.sign(mins)), note: adjForm.note }
+      const args = { employeeId: editing.employeeId, projectId: target?.projectId ?? null, workType: target?.workType ?? null, day: editing.day, seconds: Math.abs(mins) * 60 * (editing.mode === 'move' ? 1 : Math.sign(mins)), note }
       if (editing.mode === 'move') await moveToNextWeek({ ...args, weekStart })
       else await addAdjustment(args)
-      setEditing(null); setAdjForm({ minutes: '', note: '' })
-      setMsg('Saved. Press "Prepare again" to update the invoices.')
+      setError(null); setMsg('Saved. Press "Re-prepare" to update the invoices.')
       setAdjustments(await loadAdjustments(weekStart))
-    } catch (e) { setError((e as Error).message) }
+      return true
+    } catch (e) { setError((e as Error).message); return false }
   }
   async function moveLate(f: WeekFlag) {
     if (!f.employeeId || !f.byDay) return
     if (!window.confirm(`Move ${hm(f.seconds || 0)} of ${f.employeeName}'s late time to next week?`)) return
     try {
       for (const [day, sec] of Object.entries(f.byDay)) await moveToNextWeek({ employeeId: f.employeeId, projectId: f.projectId ?? null, workType: f.workType ?? null, day, seconds: sec, note: 'Uploaded after the week closed — moved to next week', weekStart })
-      setMsg('Moved. Press "Prepare again" to update the invoices.'); setAdjustments(await loadAdjustments(weekStart))
+      setMsg('Moved. Press "Re-prepare" to update the invoices.'); setAdjustments(await loadAdjustments(weekStart))
     } catch (e) { setError((e as Error).message) }
   }
 
   // After every hook: permissions arrive asynchronously for non-CEO roles, so an earlier return changes the hook count
   if (!allowed('weekly_close.manage')) {
-    return <div className="page-wrap"><div className="data-card" style={{ color: 'var(--muted)' }}>The weekly close needs the "Run the weekly close" permission (Settings → Team Access → Permissions).</div></div>
+    return <div className="page"><PageHeader title="Weekly close" /><EmptyState>The weekly close needs the "Run the weekly close" permission (Settings → Team Access → Permissions).</EmptyState></div>
   }
 
   const s = close?.summary ?? {}
   const shown = isCurrent ? previewData?.invoices ?? [] : invoices
   const drafts = isCurrent ? [] : invoices.filter(i => (i.status || 'draft') === 'draft')
-  const weekOptions = [...new Set([thisWeek, lastFinishedWeek(), ...closes.map(c => c.weekStart)])].sort().reverse()
+  const canSend = allowed('invoices.send')
+  const latest = lastFinishedWeek()
+
+  // Three-step status: Preparing → Ready to review → Approved
+  const idx = isCurrent ? 0 : !close ? 0 : close.status === 'approved' ? 2 : close.status === 'ready' ? 1 : 0
+  const preparedAt = close?.preparedAt ? new Date(close.preparedAt).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' }) : null
+  const steps = [
+    { label: 'Preparing', sub: isCurrent ? 'Week in progress' : close ? `Prepared ${preparedAt ?? ''}` : 'Mon 12:05 am · not prepared yet' },
+    { label: 'Ready to review', sub: 'Check flags and drafts' },
+    { label: 'Approved', sub: close?.approvedAt ? `Approved ${new Date(close.approvedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : 'Hours locked into time entries' },
+  ]
+  const stepDone = (i: number) => (!isCurrent && close) ? (i < idx || idx === 2) : false
+
+  function flagAction(f: WeekFlag): { label: string; onClick: () => void } | null {
+    switch (f.kind) {
+      case 'late': return f.employeeId && f.byDay ? { label: 'Move to next week', onClick: () => void moveLate(f) } : null
+      case 'missing_rate': return { label: 'Set rate', onClick: () => navigate(f.projectId ? `/projects/${f.projectId}` : '/projects') }
+      case 'project_no_client': return f.projectId ? { label: 'Fix project', onClick: () => navigate(`/projects/${f.projectId}?edit=1`) } : null
+      case 'client_no_email': return f.clientId ? { label: 'Add email', onClick: () => navigate(`/clients/${f.clientId}`) } : null
+      case 'over_50h': case 'manual_pending': return { label: 'Review', onClick: () => navigate('/time?tab=approve') }
+      case 'outside_shift': case 'no_time': return { label: 'Schedule', onClick: () => navigate('/time?tab=schedule') }
+      case 'low_activity': case 'missing_screenshots':
+        return { label: 'Screenshots', onClick: () => navigate(`/time?tab=screens${f.employeeId ? `&employee=${f.employeeId}` : ''}${f.days?.[0] ? `&day=${f.days[0]}` : ''}`) }
+      default: return null
+    }
+  }
+  const flagMeta = (f: WeekFlag) => [f.employeeName && !f.message.includes(f.employeeName) ? f.employeeName : '', f.projectId ? projName(f.projectId) : f.workType || '', f.seconds ? hm(f.seconds) : ''].filter(Boolean).join(' · ')
+
+  const invoiceStatus = (inv: Invoice) => {
+    const st = (inv.status || 'draft').toLowerCase()
+    return st === 'draft' ? <Pill status="draft" /> : st === 'sent' ? <Pill tone="warning">Sent · locked</Pill> : <Pill status={st} />
+  }
+  const payRows = close?.payroll ?? []
+  const payShown = allPay ? payRows : payRows.slice(0, 5)
+  const payRest = payRows.slice(5)
 
   return (
-    <div className="page-wrap">
-      <div className="page-header">
-        <div className="page-header-left">
-          <h1 className="page-title">Weekly close</h1>
-          <p className="page-sub">{rangeLabel(weekStart)} · {isCurrent ? 'Week in progress — preview only' : close ? (close.status === 'approved' ? 'Approved' : 'Ready for review') : 'Not prepared yet'}{close?.preparedAt ? ` · prepared ${new Date(close.preparedAt).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' })}` : ''}</p>
-        </div>
-        <div className="page-header-actions" style={{ flexWrap: 'wrap' }}>
-          <select className="form-select" aria-label="Week" value={weekStart} onChange={e => setWeekStart(e.target.value)} style={{ width: 'auto' }}>
-            {weekOptions.map(w => <option key={w} value={w}>{w === thisWeek ? `This week so far (${rangeLabel(w)})` : rangeLabel(w)}</option>)}
-          </select>
-          <button className="btn-ghost" disabled={!!busy} onClick={() => void run('prepare')}>{busy === 'prepare' ? (isCurrent ? 'Loading…' : 'Preparing…') : isCurrent ? (close ? 'Refresh preview' : 'Preview this week') : close ? 'Prepare again' : 'Prepare this week'}</button>
-          {close && !isCurrent && close.status !== 'approved' && <button className="btn-primary" disabled={!!busy} onClick={() => void run('approve')}>{busy === 'approve' ? 'Approving…' : 'Approve week'}</button>}
-          {close && drafts.length > 0 && allowed('invoices.send') && <button className="btn-primary" disabled={!!busy} onClick={() => void sendAll()}>{busy === 'send-all' ? 'Sending…' : `Send all (${drafts.length})`}</button>}
-        </div>
-      </div>
+    <div className="page">
+      <PageHeader title="Weekly close"
+        sub="Approved hours become one draft invoice per client. Prepares automatically every Monday at 12:05 am."
+        actions={<>
+          <div className="fin-stepper">
+            <Stepper label={isCurrent ? `${md(weekStart)} – today` : rangeLabel(weekStart)} prevLabel="Previous week" nextLabel="Next week"
+              onPrev={() => setWeekStart(addDays(weekStart, -7))} onNext={() => setWeekStart(isCurrent ? weekStart : addDays(weekStart, 7) > latest ? latest : addDays(weekStart, 7))}
+              nextDisabled={isCurrent || weekStart >= latest} />
+          </div>
+          <button type="button" className={`btn${isCurrent ? ' btn--primary' : ''}`} aria-pressed={isCurrent} onClick={() => setWeekStart(isCurrent ? latest : thisWeek)}>This week so far</button>
+        </>} />
 
-      {error && <div className="portal-message portal-message-error" style={{ marginBottom: 12 }}>{error}</div>}
-      {msg && <div className="portal-message" style={{ marginBottom: 12, background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#065f46', borderRadius: 10, padding: '10px 14px' }}>{msg}</div>}
-      {lateCount > 0 && <div className="data-card" style={{ borderLeft: '4px solid #d97706', marginBottom: 12, fontSize: 14 }}>{lateCount} block{lateCount === 1 ? '' : 's'} of time arrived after this week was prepared. <button className="btn-ghost btn-sm" onClick={() => void run('prepare')}>Prepare again</button></div>}
+      {isCurrent && <Banner tone="info">Preview of the week in progress ({md(weekStart)} – today). Computed live, nothing is saved: no invoices are created and nothing can be approved or sent. The week closes automatically on Monday at 12:05 am (Dominican time).</Banner>}
+      {error && <Banner tone="danger" onClose={() => setError(null)}>{error}</Banner>}
+      {msg && <Banner tone="success" onClose={() => setMsg(null)}>{msg}</Banner>}
+      {lateCount > 0 && !isCurrent && <Banner tone="warning" action={<button type="button" className="btn btn--sm" disabled={!!busy} onClick={() => void run('prepare')}>Re-prepare</button>}>
+        {lateCount} block{lateCount === 1 ? '' : 's'} of time arrived after this week was prepared.</Banner>}
 
-      {isCurrent && <div className="data-card" style={{ borderLeft: '4px solid var(--brand)', marginBottom: 12, fontSize: 14 }}>
-        This week isn't over yet, so this is a <strong>preview</strong>: nothing is saved, no invoices are created and nothing can be approved or sent.
-        The week closes automatically on Monday at 12:05 am (Dominican time).</div>}
+      <section className="card fin-wc-status">
+        <ol className="fin-steps">
+          {steps.map((st, i) => {
+            const done = stepDone(i)
+            const current = !done && i === idx
+            return (
+              <li key={st.label} className={`fin-step${done ? ' fin-step--done' : current ? ' fin-step--current' : ''}`}>
+                <span className="fin-step__mark">{done ? <Ic d={P.check} size={14} stroke={3} /> : i + 1}</span>
+                <span className="fin-step__text"><span className="fin-step__label">{st.label}</span><span className="fin-step__sub">{st.sub}</span></span>
+                {i < 2 && <span className="fin-step__line" aria-hidden />}
+              </li>
+            )
+          })}
+        </ol>
+        <div className="fin-wc-status__actions">
+          <button type="button" className="btn" disabled={!!busy} onClick={() => void run('prepare')}>
+            {busy === 'prepare' ? (isCurrent ? 'Loading…' : 'Preparing…') : isCurrent ? (close ? 'Refresh preview' : 'Preview this week') : close ? 'Re-prepare' : 'Prepare this week'}
+          </button>
+          {close && !isCurrent && (close.status === 'approved'
+            ? <span className="btn fin-approved" aria-disabled="true"><Ic d={P.check} size={14} stroke={2.6} /> Week approved</span>
+            : <button type="button" className="btn btn--gold" disabled={!!busy} onClick={() => void run('approve')}>{busy === 'approve' ? 'Approving…' : 'Approve week'}</button>)}
+        </div>
+      </section>
 
       {!close ? (
-        <div className="data-card" style={{ fontSize: 14, color: 'var(--muted)' }}>
-          {isCurrent ? <>Press <strong>Preview this week</strong> to see the invoices, flags and payroll so far.</> : <>This week hasn't been prepared. It happens automatically every Monday at 12:05 am (Dominican time), or press <strong>Prepare this week</strong>.</>}
-        </div>
+        <EmptyState>{!loaded ? 'Loading…' : isCurrent
+          ? <>Press <strong>Preview this week</strong> to see the invoices, flags and payroll so far.</>
+          : <>This week hasn't been prepared. It happens automatically every Monday at 12:05 am (Dominican time), or press <strong>Prepare this week</strong>.</>}</EmptyState>
       ) : (
         <>
-          <div className="filter-tabs" style={{ marginBottom: 14 }}>
-            {(['summary', 'invoices', 'time', 'flags', 'payroll'] as Tab[]).map(t => (
-              <button key={t} className={`filter-tab${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>
-                {t === 'summary' ? 'Summary' : t === 'invoices' ? `Invoices (${shown.length})` : t === 'time' ? 'Time' : t === 'flags' ? `Flags (${close.flags.length})` : 'Payroll preview'}
-              </button>
-            ))}
-          </div>
+          <KpiStrip compact items={[
+            { label: 'Hours', value: hm(s.billableSeconds || 0), note: `${s.people || 0} people tracked` },
+            { label: 'Draft invoices', value: String(isCurrent ? shown.length : drafts.length), note: `${s.invoices || 0} client${s.invoices === 1 ? '' : 's'}` },
+            { label: 'To bill', value: usd(s.total || 0) },
+            { label: 'Payroll preview', value: usd(s.payrollTotal || 0), note: "paid on each project's schedule" },
+            { label: 'Flags', value: <span className={close.flags.length ? 't-warning' : 't-success'}>{close.flags.length}</span>, note: 'flags never block anything' },
+          ]} />
 
-          {tab === 'summary' && (
-            <div className="kpi-grid">
-              <div className="kpi-card clickable-card" onClick={() => setTab('invoices')}><div className="kpi-label">Invoices</div><div className="kpi-value">{usd(s.total || 0)}</div><div className="kpi-label">{s.invoices || 0} client{s.invoices === 1 ? '' : 's'} · {drafts.length} to send</div></div>
-              <div className="kpi-card clickable-card" onClick={() => setTab('time')}><div className="kpi-label">Billable hours</div><div className="kpi-value">{hm(s.billableSeconds || 0)}</div><div className="kpi-label">{s.people || 0} people tracked</div></div>
-              <div className="kpi-card clickable-card" onClick={() => setTab('payroll')}><div className="kpi-label">Payroll for these hours</div><div className="kpi-value">{usd(s.payrollTotal || 0)}</div><div className="kpi-label">paid on each project's schedule</div></div>
-              <div className="kpi-card clickable-card" onClick={() => setTab('flags')}><div className="kpi-label">Things to check</div><div className="kpi-value" style={{ color: close.flags.length ? '#b45309' : undefined }}>{close.flags.length}</div><div className="kpi-label">flags never block anything</div></div>
+          <section className="card fin-wc-drafts">
+            <div className="card__head">
+              <h2 className="card__title">{isCurrent ? 'Invoices so far' : 'Draft invoices'}</h2>
+              {drafts.length > 0 && canSend && <button type="button" className="btn btn--sm" disabled={!!busy} onClick={() => void sendAll()}>{busy === 'send-all' ? 'Sending…' : `Send all ready (${drafts.length})`}</button>}
             </div>
-          )}
-
-          {tab === 'invoices' && (
-            <div className="table-wrap">
-              <table className="data-table">
-                <thead><tr><th>Invoice</th><th>Client</th><th style={{ textAlign: 'right' }}>Hours</th><th style={{ textAlign: 'right' }}>Total</th><th>Status</th><th></th></tr></thead>
-                <tbody>
-                  {shown.map(inv => {
-                    const hours = (inv.items || []).reduce((x, it) => x + (Number(it.hoursTotal) || 0), 0)
-                    return (
-                      <tr key={inv.id}>
-                        <td className="td-name">{inv.number}</td>
-                        <td>{inv.clientName}<div className="td-muted" style={{ fontSize: 12 }}>{inv.projectName}</div></td>
-                        <td style={{ textAlign: 'right' }}>{hm(hours * 3600)}</td>
-                        <td style={{ textAlign: 'right', fontWeight: 700 }}>{usd(Number(inv.subtotal) || 0)}</td>
-                        <td><span className={`badge ${inv.status === 'paid' ? 'badge-green' : inv.status === 'partial' ? 'badge-orange' : inv.status === 'sent' ? 'badge-blue' : 'badge-gray'}`}>{inv.status || 'draft'}</span></td>
-                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                          {!isCurrent && <button className="btn-ghost btn-sm" onClick={() => preview(inv)}>Preview</button>}
-                          {!isCurrent && (inv.status || 'draft') === 'draft' && allowed('invoices.send') && <button className="btn-ghost btn-sm" style={{ marginLeft: 6 }} disabled={!!busy} onClick={() => void sendOne(inv)}>{busy === `send-${inv.id}` ? 'Sending…' : 'Send'}</button>}
-                          {inv.status && inv.status !== 'draft' && <button className="btn-ghost btn-sm" style={{ marginLeft: 6 }} onClick={() => setPaying(inv)}>Payments</button>}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                  {shown.length === 0 && <tr><td colSpan={6} className="td-muted">No billable client time this week.</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {tab === 'time' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ fontSize: 13, color: 'var(--muted)' }}>Tap a day to add or remove minutes, or move time to next week. Employees see every change with your note.</div>
-              {[...grid.entries()].sort((a, b) => empName(a[0]).localeCompare(empName(b[0]))).map(([emp, targets]) => (
-                <div key={emp} className="data-card" style={{ padding: 12 }}>
-                  <div style={{ fontWeight: 700, marginBottom: 8 }}>{empName(emp)}</div>
-                  <div className="table-wrap">
-                    <table className="data-table week-grid">
-                      <thead><tr><th>Working on</th>{days.map(d => <th key={d} style={{ textAlign: 'center' }}>{dayLabel(d)}</th>)}<th style={{ textAlign: 'right' }}>Week</th></tr></thead>
-                      <tbody>
-                        {[...targets.entries()].map(([key, t]) => {
-                          const total = days.reduce((x, d) => x + (t.tracked[d] || 0) + (t.adj[d] || 0), 0)
-                          return (
-                            <tr key={key}>
-                              <td className="td-name">{t.projectId ? projName(t.projectId) : t.workType}</td>
-                              {days.map(d => {
-                                const sec = (t.tracked[d] || 0) + (t.adj[d] || 0)
-                                return (
-                                  <td key={d} style={{ textAlign: 'center' }}>
-                                    <button className="week-cell" onClick={() => { setEditing({ employeeId: emp, target: key, day: d, mode: 'edit' }); setAdjForm({ minutes: '', note: '' }) }}
-                                      title="Adjust this day">
-                                      {sec ? hm(sec) : '—'}{t.adj[d] ? <span className="week-adj">{t.adj[d] > 0 ? '+' : ''}{hm(t.adj[d])}</span> : null}
-                                    </button>
-                                  </td>
-                                )
-                              })}
-                              <td style={{ textAlign: 'right', fontWeight: 700 }}>{hm(total)}</td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                  {editing?.employeeId === emp && (
-                    <div style={{ marginTop: 10, padding: 12, background: 'var(--surf2)', borderRadius: 10, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'flex-end' }}>
-                      <strong style={{ width: '100%' }}>{dayLabel(editing.day)} · {(() => { const t = targets.get(editing.target); return t?.projectId ? projName(t.projectId) : t?.workType })()}</strong>
-                      <select aria-label="Change" className="form-select" style={{ width: 'auto' }} value={editing.mode} onChange={e => setEditing({ ...editing, mode: e.target.value as 'edit' | 'move' })}>
-                        <option value="edit">Add / remove minutes</option>
-                        <option value="move">Move to next week</option>
-                      </select>
-                      <input aria-label="Minutes" className="form-input" style={{ width: 110 }} inputMode="text" placeholder={editing.mode === 'move' ? 'minutes' : '+30 or −15'} value={adjForm.minutes} onChange={e => setAdjForm(f => ({ ...f, minutes: e.target.value }))} />
-                      <input aria-label="Note for the employee" className="form-input" style={{ flex: 1, minWidth: 180 }} placeholder="Note the employee will see" value={adjForm.note} onChange={e => setAdjForm(f => ({ ...f, note: e.target.value }))} />
-                      <button className="btn-primary btn-sm" onClick={() => void saveAdjustment()}>Save</button>
-                      <button className="btn-ghost btn-sm" onClick={() => setEditing(null)}>Cancel</button>
+            {shown.length === 0 && <div className="card-empty">No billable client time this week.</div>}
+            {shown.map(inv => {
+              const items = inv.items || []
+              const hours = items.reduce((x, it) => x + (Number(it.hoursTotal) || 0), 0)
+              const isOpen = open.has(inv.id)
+              const amount = Number(inv.subtotal) || 0
+              return (
+                <div key={inv.id} className={`fin-wc-inv${isOpen ? ' fin-wc-inv--open' : ''}`} data-invoice={inv.number}>
+                  <button type="button" className="fin-wc-inv__row" aria-expanded={isOpen} onClick={() => setOpen(o => { const n = new Set(o); if (n.has(inv.id)) n.delete(inv.id); else n.add(inv.id); return n })}>
+                    <Ic d={isOpen ? P.chevD : P.chevR} size={14} />
+                    <span className="fin-wc-inv__client"><span className="t-strong">{inv.clientName}</span><span className="t-sub">{inv.projectName ? `${inv.projectName} · ` : ''}{items.length} line{items.length === 1 ? '' : 's'}</span></span>
+                    <span className="fin-wc-inv__num mono">{inv.number}</span>
+                    <span className="fin-wc-inv__hours">{hm(hours * 3600)}</span>
+                    <span className="fin-wc-inv__amt num">{amount ? usd(amount) : 'Needs rate'}</span>
+                    <span className="fin-wc-inv__status">{invoiceStatus(inv)}</span>
+                  </button>
+                  {isOpen && (
+                    <div className="fin-wc-inv__detail">
+                      <div className="fin-wc-lines">
+                        <table className="fin-wc-lines__table">
+                          <thead><tr><th>Employee</th><th>Project</th><th>Hours</th><th>Rate</th><th className="t-right">Amount</th></tr></thead>
+                          <tbody>
+                            {items.map((it, i) => {
+                              const premium = /premium/i.test(it.position || '')
+                              return (
+                                <tr key={i}>
+                                  <td>{it.employeeName}</td>
+                                  <td className={premium ? 'fin-premium' : 'muted'}>{it.position || inv.projectName || '—'}</td>
+                                  <td className="mono">{hmClock((Number(it.hoursTotal) || 0) * 3600)}</td>
+                                  <td>{Number(it.rate) ? usd(Number(it.rate)) : <span className="t-danger">— missing</span>}</td>
+                                  <td className="t-right fin-strong">{usd((Number(it.hoursTotal) || 0) * (Number(it.rate) || 0))}</td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      {!isCurrent && (
+                        <div className="fin-wc-inv__actions">
+                          <button type="button" className="btn btn--sm" onClick={() => navigate(`/invoice?edit=${encodeURIComponent(inv.id)}`)}>Open in builder</button>
+                          <button type="button" className="btn btn--sm" onClick={() => preview(inv)}>Preview</button>
+                          {(inv.status || 'draft') === 'draft' && canSend && <button type="button" className="btn btn--sm btn--primary" disabled={!!busy} onClick={() => void sendOne(inv)}>{busy === `send-${inv.id}` ? 'Sending…' : 'Send invoice'}</button>}
+                          {inv.status && inv.status !== 'draft' && <button type="button" className="btn btn--sm" onClick={() => setPaying(inv)}>Payments</button>}
+                        </div>
+                      )}
                     </div>
                   )}
-                  {adjustments.filter(a => a.employee_id === emp && a.status === 'applied' && a.kind !== 'defer_in').map(a => (
-                    <div key={a.id} style={{ fontSize: 12, color: 'var(--muted)', marginTop: 6, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                      <span>{dayLabel(a.day)}: {a.kind === 'defer_out' ? `moved ${hm(-a.seconds_delta)} to next week` : `${a.seconds_delta > 0 ? '+' : ''}${hm(a.seconds_delta)}`} — {a.note}</span>
-                      <button className="notif-link" onClick={() => void cancelAdjustment(a).then(async () => setAdjustments(await loadAdjustments(weekStart))).catch(e => setError(`Could not undo: ${(e as Error).message}`))}>Undo</button>
-                    </div>
-                  ))}
+                </div>
+              )
+            })}
+          </section>
+
+          <div className="fin-wc-grid">
+            <section className="card fin-wc-flags">
+              <div className="card__head"><h2 className="card__title">Flags</h2><span className="card__meta">{close.flags.length} to check</span></div>
+              {close.flags.length === 0 && <div className="card-empty">Nothing to check this week.</div>}
+              {close.flags.map((f, i) => {
+                const act = flagAction(f)
+                const meta = flagMeta(f)
+                return (
+                  <div key={i} className="fin-flag">
+                    <Pill tone={FLAG_TONE[f.kind] ?? 'warning'} className="fin-flag__kind">{FLAG_LABEL[f.kind] ?? f.kind}</Pill>
+                    <span className="fin-flag__text"><span className="fin-flag__title">{f.message}</span>{meta && <span className="fin-flag__meta">{meta}</span>}</span>
+                    {act && <button type="button" className="btn btn--xs fin-flag__btn" onClick={act.onClick}>{act.label}</button>}
+                  </div>
+                )
+              })}
+            </section>
+
+            <section className="card fin-wc-pay">
+              <div className="card__head fin-wc-pay__head"><h2 className="card__title">Payroll preview</h2><span className="card__meta">What these hours add to Friday's payroll</span></div>
+              {payRows.length === 0 && <div className="card-empty">No pay for these hours.</div>}
+              {payShown.map(p => (
+                <div key={p.employeeId} className="fin-pay-row">
+                  <span>{p.employeeName} <span className="muted">· {hm(p.seconds)}{p.premiumSeconds ? ` (${hm(p.premiumSeconds)} night)` : ''}</span>{p.missingRate && <Pill tone="danger" className="fin-pay-row__pill">No pay rate</Pill>}</span>
+                  <span className="fin-strong num">{usd(p.amount)}</span>
                 </div>
               ))}
-              {grid.size === 0 && <div className="data-card td-muted">No tracked time this week.</div>}
-            </div>
-          )}
+              {!allPay && payRest.length > 0 && (
+                <button type="button" className="fin-pay-row fin-pay-row--more" onClick={() => setAllPay(true)}>
+                  <span>+ {payRest.length} more <span className="muted">· {hm(payRest.reduce((x, p) => x + p.seconds, 0))}</span></span>
+                  <span className="fin-strong num">{usd(payRest.reduce((x, p) => x + p.amount, 0))}</span>
+                </button>
+              )}
+              {payRows.length > 0 && <div className="fin-pay-row fin-pay-row--total"><span>Total</span><span className="num">{usd(s.payrollTotal || 0)}</span></div>}
+              <button type="button" className="fin-card-link" onClick={() => navigate('/payroll')}>Open payroll →</button>
+            </section>
+          </div>
 
-          {tab === 'flags' && (
-            <div className="data-card" style={{ padding: 0 }}>
-              {close.flags.length === 0 && <div style={{ padding: 16, color: 'var(--muted)' }}>Nothing to check this week.</div>}
-              {close.flags.map((f, i) => (
-                <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', padding: '10px 14px', borderBottom: '1px solid var(--border)', flexWrap: 'wrap' }}>
-                  <span className={`badge ${['missing_rate', 'invoice_locked', 'project_no_client'].includes(f.kind) ? 'badge-red' : 'badge-orange'}`} style={{ minWidth: 92, justifyContent: 'center' }}>{FLAG_LABEL[f.kind] ?? f.kind}</span>
-                  <span style={{ fontSize: 14, flex: 1, minWidth: 200 }}>{f.message}</span>
-                  {f.kind === 'late' && <button className="btn-ghost btn-sm" onClick={() => void moveLate(f)}>Move to next week</button>}
-                </div>
-              ))}
+          <section className="card fin-wc-time">
+            <div className="card__head">
+              <div className="fin-wc-time__title"><h2 className="card__title">Time by person</h2>
+                <span className="card__meta">Tap a day to add or remove minutes, or move time to next week. Employees see every change with your note.</span></div>
+              <button type="button" className="btn btn--sm" aria-expanded={showTime} onClick={() => setShowTime(v => !v)}>{showTime ? 'Hide time' : `Show time (${grid.size} ${grid.size === 1 ? 'person' : 'people'})`}</button>
             </div>
-          )}
-
-          {tab === 'payroll' && (
-            <div className="table-wrap">
-              <table className="data-table">
-                <thead><tr><th>Person</th><th style={{ textAlign: 'right' }}>Hours</th><th style={{ textAlign: 'right' }}>Night</th><th style={{ textAlign: 'right' }}>Pay (USD)</th></tr></thead>
-                <tbody>
-                  {close.payroll.map(p => (
-                    <tr key={p.employeeId}>
-                      <td className="td-name">{p.employeeName}{p.missingRate && <span className="badge badge-red" style={{ marginLeft: 6 }}>No pay rate</span>}</td>
-                      <td style={{ textAlign: 'right' }}>{hm(p.seconds)}</td>
-                      <td style={{ textAlign: 'right' }} className="td-muted">{p.premiumSeconds ? hm(p.premiumSeconds) : '—'}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 700 }}>{usd(p.amount)}</td>
-                    </tr>
-                  ))}
-                  <tr><td className="td-name">Total</td><td /><td /><td style={{ textAlign: 'right', fontWeight: 800 }}>{usd(s.payrollTotal || 0)}</td></tr>
-                </tbody>
-              </table>
-              <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 8 }}>Preview only — people are paid on their project's schedule in Payroll.</div>
-            </div>
-          )}
+            {showTime && <div className="card__body"><WeekTimeGrid grid={grid} days={days} empName={empName} projName={projName} adjustments={adjustments}
+              onSave={saveAdjustment} onUndo={a => void cancelAdjustment(a).then(async () => setAdjustments(await loadAdjustments(weekStart))).catch(e => setError(`Could not undo: ${(e as Error).message}`))} /></div>}
+          </section>
         </>
       )}
-      {paying && <RecordPaymentModal invoice={{ ...paying, subtotal: Number(paying.subtotal) || 0, clientId: (paying as Invoice & { clientId?: string }).clientId ?? null }}
+      {paying && <RecordPaymentModal invoice={{ ...paying, subtotal: Number(paying.subtotal) || 0, clientId: paying.clientId ?? null }}
         onClose={() => setPaying(null)} onChanged={() => void loadAll()} />}
     </div>
   )

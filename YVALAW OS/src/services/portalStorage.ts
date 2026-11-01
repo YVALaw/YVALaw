@@ -7,6 +7,7 @@
 
 import { supabase } from '../lib/supabase'
 import type { Client, ClientDocument, Employee, Invoice, PaymentAttempt, Project, TimeEntry, WorkingHourPrefs } from '../data/types'
+import { hourLines } from '../utils/invoiceLines'
 
 export type PortalBillingSettings = {
   stripeCustomerId?: string
@@ -161,7 +162,7 @@ export function computeMonthHours(invoices: Invoice[], yearMonth: string): numbe
   return invoices
     .filter(inv => (inv.billingStart ?? inv.date ?? '').startsWith(yearMonth))
     .reduce((sum, inv) => {
-      const itemHours = (inv.items ?? []).reduce((s, item) => s + (Number(item.hoursTotal) || 0), 0)
+      const itemHours = hourLines(inv.items).reduce((s, item) => s + (Number(item.hoursTotal) || 0), 0)
       return sum + itemHours
     }, 0)
 }
@@ -423,25 +424,65 @@ export async function removePortalSavedCard(clientId: string): Promise<void> {
   if (!res.ok) throw new Error(data.error || 'Could not remove saved card.')
 }
 
-/** Submit a staff request from the client portal */
+/** Submit a staff request from the client portal.
+ *  `headcount` / `project_id` / `project_name` need supabase/migrate-redesign-portal.sql; until it has run,
+ *  the request is saved without them and they are written into the notes instead (nothing is lost). */
 export async function submitStaffRequest(params: {
   clientId: string
   clientName: string
   role: string
+  headcount?: number
   hoursPerWeek?: number
   startDate?: string
+  projectId?: string
+  projectName?: string
   notes?: string
 }): Promise<void> {
-  const { error } = await supabase.from('staff_requests').insert({
-    id:            crypto.randomUUID(),
-    client_id:     params.clientId,
-    client_name:   params.clientName,
-    type:          'additional',
-    role:          params.role || null,
+  const base = {
+    id:             crypto.randomUUID(),
+    client_id:      params.clientId,
+    client_name:    params.clientName,
+    type:           'additional',
+    role:           params.role || null,
     hours_per_week: params.hoursPerWeek || null,
-    start_date:    params.startDate || null,
-    notes:         params.notes || null,
-    status:        'pending',
+    start_date:     params.startDate || null,
+    notes:          params.notes || null,
+    status:         'pending',
+  }
+  const { error } = await supabase.from('staff_requests').insert({
+    ...base,
+    headcount:    params.headcount ?? 1,
+    project_id:   params.projectId || null,
+    project_name: params.projectName || null,
   })
-  if (error) throw new Error(error.message)
+  if (!error) return
+  // Database not updated yet (new columns missing): save without them, keep the details in the notes
+  const missingColumn = error.code === 'PGRST204' || error.code === '42703' || /column/i.test(error.message || '')
+  if (!missingColumn) throw new Error(error.message)
+  const extra = [
+    (params.headcount ?? 1) > 1 ? `People needed: ${params.headcount}` : '',
+    params.projectName ? `Project: ${params.projectName}` : '',
+  ].filter(Boolean).join(' · ')
+  const { error: retryErr } = await supabase.from('staff_requests').insert({
+    ...base,
+    notes: [extra, params.notes].filter(Boolean).join('\n') || null,
+  })
+  if (retryErr) throw new Error(retryErr.message)
+}
+
+// ── Live chat (Crisp) ────────────────────────────────────────────────────────
+
+export type PortalChatConfig = { crispWebsiteId: string | null }
+const CRISP_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * The Crisp website ID for the Messages tab. Portal clients can't read `settings`, so it comes from
+ * public.portal_chat_config() (portal clients + staff only; migrate-redesign-settings.sql).
+ * Function missing / not allowed / no ID → chat off (the "coming soon" card).
+ */
+export async function loadChatConfig(): Promise<PortalChatConfig> {
+  const { data, error } = await supabase.rpc('portal_chat_config')
+  if (error) return { crispWebsiteId: null }
+  const id = (data as { crisp_website_id?: unknown } | null)?.crisp_website_id
+  return { crispWebsiteId: typeof id === 'string' && CRISP_ID.test(id.trim()) ? id.trim() : null }
 }

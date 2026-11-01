@@ -6,7 +6,13 @@
  *   { currency, dopRate, today: { seconds, amount },
  *     periods: [{ key, label, schedule, start, end, payday, seconds, premiumSeconds, amount,
  *                 approvedAmount, pendingAmount, payRate, missingRate }],
- *     totals: { seconds, amount, approvedAmount }, paid: [{ payday, netUsd, netDop, paidAt }] }
+ *     totals: { seconds, amount, approvedAmount }, paid: [{ payday, netUsd, netDop, paidAt }],
+ *     pendingAdjustments: [{ id, type, amount, reason, sequence, total, payday, later }] }
+ *
+ * pendingAdjustments = this person's bonuses / deductions still waiting for a payday (payroll_adjustments
+ * status 'pending'; employees can only read applied ones through RLS). payday = the payroll it is attached to
+ * (run_id), else null = the next payday. later = a later row of a repeat (one per repeat group per payday,
+ * as payroll.cjs does), so it is not part of the next payday.
  *
  * Amounts come from YVA Time blocks × the pay rate that applied on each day (placement →
  * dated pay rate → employee pay rate), night premium included, plus time YVA adjusted
@@ -81,6 +87,27 @@ exports.handler = async function handler(event) {
     }
     periods.sort((a, b) => b.seconds - a.seconds || a.label.localeCompare(b.label))
 
+    // Bonuses / deductions waiting for a payday (own rows only; never who created them or anyone else's)
+    const pendingRows = await optional(`payroll_adjustments?employee_id=eq.${employee.id}&status=eq.pending&select=id,type,amount,reason,sequence,total,run_id,group_id,created_at&order=created_at,id`)
+    const runIds = [...new Set(pendingRows.map(a => a.run_id).filter(Boolean))]
+    const runs = runIds.length ? await optional(`payroll_runs?id=in.(${runIds.map(enc).join(',')})&select=id,payday`) : []
+    const paydayOfRun = Object.fromEntries(runs.map(r => [r.id, r.payday]))
+    // A repeat group gives one row per payday: the lowest unattached sequence goes to the next payday unless
+    // another row of the group is already attached to an open payroll
+    const nextOfGroup = {}
+    for (const a of pendingRows) {
+      if (!a.group_id) continue
+      const g = nextOfGroup[a.group_id] ||= { attached: false, next: null }
+      if (a.run_id) g.attached = true
+      else if (!g.next || Number(a.sequence) < Number(g.next.sequence)) g.next = a
+    }
+    const pendingAdjustments = pendingRows.map(a => {
+      const g = a.group_id ? nextOfGroup[a.group_id] : null
+      const later = !a.run_id && !!g && (g.attached || g.next !== a)
+      return { id: a.id, type: a.type === 'deduction' ? 'deduction' : 'bonus', amount: M.round2(Number(a.amount) || 0), reason: a.reason || '',
+        sequence: Number(a.sequence) || 1, total: Number(a.total) || 1, payday: a.run_id ? paydayOfRun[a.run_id] ?? null : null, later }
+    }).sort((x, y) => Number(x.later) - Number(y.later) || (x.payday || '9999').localeCompare(y.payday || '9999') || x.sequence - y.sequence)
+
     // Paid history (payroll, once it exists)
     const paid = await optional(`payroll_lines?employee_id=eq.${employee.id}&status=eq.paid&select=payday,net_usd,net_dop,paid_at,run_id&order=payday.desc&limit=12`)
 
@@ -91,9 +118,12 @@ exports.handler = async function handler(event) {
       // the desktop app uploads about once a minute while tracking
       lastActivityAt: blocks.reduce((m, b) => (b.updated_at && b.updated_at > m ? b.updated_at : m), '') || null,
       trackingNow: blocks.some(b => b.updated_at && now - Date.parse(b.updated_at) < 3 * 60_000),
+      // what they last worked on (project name or YVA work type), for "Last active … on …"
+      lastActivityOn: (() => { const last = blocks.reduce((m, b) => (b.updated_at && (!m || b.updated_at > m.updated_at) ? b : m), null); return last ? (last.project_id ? projectsById[last.project_id]?.name ?? null : last.work_type || null) : null })(),
       periods,
       totals: { seconds: periods.reduce((s, p) => s + p.seconds, 0), amount: M.round2(periods.reduce((s, p) => s + p.amount, 0)), approvedAmount: M.round2(periods.reduce((s, p) => s + p.approvedAmount, 0)) },
       paid: paid.map(p => ({ payday: p.payday, netUsd: Number(p.net_usd), netDop: p.net_dop == null ? null : Number(p.net_dop), paidAt: p.paid_at })),
+      pendingAdjustments,
       updatedAt: new Date(now).toISOString(),
     })
   } catch (e) {

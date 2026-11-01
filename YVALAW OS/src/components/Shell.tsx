@@ -1,382 +1,314 @@
-import { ReactNode, useEffect, useRef, useState } from 'react'
-import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { loadSnapshot, loadCandidates, countPendingStaffRequests } from '../services/storage'
+// Staff OS shell (redesign 2026-11, designs/YVA OS.dc.html): header with breadcrumb, bell and account
+// menu; floating navy dock with five hubs, "Jump to…" search and the gold + Create button; hub pop-ups
+// (desktop) / bottom sheets (phone); sibling chips above every hub page. Visibility rules: lib/nav.ts.
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
+import { loadSnapshot, loadCandidates } from '../services/storage'
+import { loadLeads } from '../services/crm'
 import { usePermission, useRole } from '../context/RoleContext'
-import { can, ROLE_LABELS } from '../lib/roles'
+import { ROLE_LABELS, can, type UserRole } from '../lib/roles'
+import { visibleHubs, visibleCreateItems, locate, canSeePage, SETTINGS_PAGE, type Hub, type HubKey } from '../lib/nav'
+import { loadHubStatus, type HubStatus } from '../services/hubStatus'
+import { signOutAndForgetDevice } from '../services/notifications'
+import { canPromptInstall, isIos, isStandalone, promptInstall } from '../lib/install'
 import NotificationBell from './NotificationBell'
+import { Ic, P } from './Icon'
+import { Modal, SearchInput, useIsMobile } from './ui'
+import { initials } from '../utils/format'
 
-type Props = { children: ReactNode }
+type Overlay = null | { kind: 'hub'; hub: HubKey; left: number } | { kind: 'search' } | { kind: 'create' } | { kind: 'account' }
+type Result = { type: 'Page' | 'Client' | 'Employee' | 'Project' | 'Invoice' | 'Candidate' | 'Lead'; label: string; sub: string; to: string }
 
-type SearchResult = {
-  type: 'Client' | 'Employee' | 'Project' | 'Candidate' | 'Invoice'
-  label: string
-  sub: string
-  route: string
-}
+const TYPE_CLASS: Record<Result['type'], string> = { Page: 'page', Client: 'client', Employee: 'employee', Project: 'project', Invoice: 'invoice', Candidate: 'candidate', Lead: 'lead' }
 
-function GlobalSearch() {
-  const [query, setQuery]     = useState('')
-  const [results, setResults] = useState<SearchResult[]>([])
-  const [open, setOpen]       = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
+export default function Shell({ children }: { children: ReactNode }) {
+  const location = useLocation()
   const navigate = useNavigate()
+  const mobile = useIsMobile()
+  const { role, email } = useRole()
+  const allowed = usePermission()
+  const hubs = useMemo(() => visibleHubs(role, allowed), [role, allowed])
+  const createItems = useMemo(() => visibleCreateItems(role, allowed), [role, allowed])
+  const [overlay, setOverlay] = useState<Overlay>(null)
+  const [status, setStatus] = useState<HubStatus>({})
+  const [previewOpen, setPreviewOpen] = useState(false)
+  const [installOpen, setInstallOpen] = useState(false)
+  const linkedEmployeeId = sessionStorage.getItem('linkedEmployeeId')
+  const { hub: curHub, page: curPage, isProfile } = locate(location.pathname)
+  const isHome = location.pathname === '/'
 
+  // Navigating closes every overlay and scrolls to the top
+  useEffect(() => { setOverlay(null); window.scrollTo(0, 0) }, [location.pathname])
+  // Live status lines for the hub pop-ups (refreshed on navigation; cached a minute)
+  const pageKeys = useMemo(() => hubs.flatMap(h => h.pages.map(p => p.key)), [hubs])
+  useEffect(() => { void loadHubStatus(pageKeys).then(setStatus) }, [pageKeys, location.pathname])
+
+  // "/" opens search when not typing; Esc closes overlays
   useEffect(() => {
-    const q = query.trim().toLowerCase()
-    if (q.length < 2) { setResults([]); setOpen(false); return }
-    void (async () => {
-      const snap = await loadSnapshot()
-      const candidates = await loadCandidates()
-      const found: SearchResult[] = []
+    const onKey = (e: KeyboardEvent) => {
+      const t = (e.target as HTMLElement | null)?.tagName
+      const typing = t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || (e.target as HTMLElement | null)?.isContentEditable
+      if (e.key === 'Escape') setOverlay(null)
+      else if (e.key === '/' && !typing && !e.metaKey && !e.ctrlKey) { e.preventDefault(); setOverlay({ kind: 'search' }) }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
-      for (const c of snap.clients)
-        if (`${c.name} ${c.email || ''} ${c.company || ''}`.toLowerCase().includes(q))
-          found.push({ type: 'Client', label: c.name, sub: c.email || c.company || '', route: '/clients/' + c.id })
-
-      for (const e of snap.employees)
-        if (`${e.name} ${e.email || ''} ${e.role || ''}`.toLowerCase().includes(q))
-          found.push({ type: 'Employee', label: e.name, sub: e.role || e.email || '', route: '/employees/' + e.id })
-
-      for (const p of snap.projects)
-        if (`${p.name}`.toLowerCase().includes(q))
-          found.push({ type: 'Project', label: p.name, sub: p.status || '', route: '/projects/' + p.id })
-
-      for (const cand of candidates)
-        if (`${cand.name} ${cand.role || ''} ${cand.email || ''}`.toLowerCase().includes(q))
-          found.push({ type: 'Candidate', label: cand.name, sub: cand.role || cand.stage, route: '/candidates/' + cand.id })
-
-      for (const inv of snap.invoices)
-        if (`${inv.number} ${inv.clientName || ''} ${inv.projectName || ''}`.toLowerCase().includes(q))
-          found.push({ type: 'Invoice', label: inv.number, sub: `${inv.clientName || ''} · ${inv.status || 'draft'}`, route: '/invoice' })
-
-      setResults(found.slice(0, 8))
-      setOpen(found.length > 0)
-    })()
-  }, [query])
-
-  function pick(r: SearchResult) {
-    navigate(r.route)
-    setQuery('')
-    setOpen(false)
-    inputRef.current?.blur()
+  const hubWarn = (h: Hub) => h.pages.some(p => status[p.key]?.warn)
+  function openHub(key: HubKey, el: HTMLElement) {
+    if (overlay?.kind === 'hub' && overlay.hub === key) return setOverlay(null)
+    const r = el.getBoundingClientRect()
+    setOverlay({ kind: 'hub', hub: key, left: Math.max(12, Math.min(window.innerWidth - 332, r.left + r.width / 2 - 160)) })
   }
+  const go = (to: string) => { setOverlay(null); navigate(to) }
+  const openHubData = overlay?.kind === 'hub' ? hubs.find(h => h.key === overlay.hub) ?? null : null
 
-  const TYPE_COLORS: Record<string, string> = {
-    Client: '#1d4ed8', Employee: '#15803d', Project: '#7e22ce', Invoice: '#a16207', Candidate: '#0f766e',
-  }
-  const TYPE_BG: Record<string, string> = {
-    Client: 'rgba(59,130,246,.1)', Employee: 'rgba(34,197,94,.1)', Project: 'rgba(168,85,247,.1)',
-    Invoice: 'rgba(250,204,21,.15)', Candidate: 'rgba(20,184,166,.1)',
-  }
+  const displayName = email ? email.split('@')[0].replace(/[._-]+/g, ' ') : 'You'
+  const myInitials = initials(displayName)
+  const pageTitle = isHome ? 'Home' : curPage?.label ?? 'YVA OS'
+  const crumbs = isHome ? ['Home'] : curPage ? [curHub?.label ?? 'Account', curPage.label, ...(isProfile ? ['Profile'] : [])] : []
+  const siblings = curHub ? hubs.find(h => h.key === curHub.key)?.pages ?? [] : []
+
+  const accountItems = [
+    linkedEmployeeId && { label: 'My profile', icon: P.user, onClick: () => go(`/employees/${linkedEmployeeId}`) },
+    { label: 'Settings', icon: P.gear, onClick: () => go(SETTINGS_PAGE.to) },
+    (role === 'ceo' || role === 'admin' || role === 'accounting') && { label: 'Preview client portal', icon: P.eye, onClick: () => { setOverlay(null); setPreviewOpen(true) } },
+    linkedEmployeeId && { label: 'Open employee workspace', icon: P.user, onClick: () => go('/me') },
+    !isStandalone() && { label: 'Install YVA OS app', icon: P.phone, onClick: () => { setOverlay(null); if (canPromptInstall()) void promptInstall(); else setInstallOpen(true) } },
+  ].filter(Boolean) as { label: string; icon: string; onClick: () => void }[]
+
+  const homeOn = isHome && overlay?.kind !== 'hub'
+  const hubOn = (h: Hub) => (overlay?.kind === 'hub' ? overlay.hub === h.key : curHub?.key === h.key)
 
   return (
-    <div className="search-wrap">
-      <input
-        ref={inputRef}
-        className="form-input"
-        style={{ width: 220, fontSize: 13, height: 34, padding: '0 12px' }}
-        placeholder="Search…"
-        value={query}
-        onChange={e => setQuery(e.target.value)}
-        onFocus={() => results.length > 0 && setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
-        onKeyDown={e => { if (e.key === 'Escape') { setQuery(''); setOpen(false) } }}
-      />
-      {open && (
-        <div className="search-dropdown">
-          {results.map((r, i) => (
-            <div
-              key={i}
-              onMouseDown={() => pick(r)}
-              className="search-result-item"
-            >
-              <span className="search-result-type" style={{
-                color: TYPE_COLORS[r.type] || '#666',
-                background: TYPE_BG[r.type] || '#f4f6fa',
-              }}>{r.type}</span>
-              <div style={{ flex: 1, overflow: 'hidden' }}>
-                <div className="search-result-label">{r.label}</div>
-                {r.sub && <div className="search-result-sub">{r.sub}</div>}
+    <div className="os-app">
+      <a href="#main-content" className="skip-link">Skip to content</a>
+
+      <header className="os-head">
+        {mobile ? (
+          <span className="os-head__title">{pageTitle}</span>
+        ) : (
+          <>
+            <img className="os-head__logo" src={`${import.meta.env.BASE_URL}yva-logo.png`} alt="YVA OS home" onClick={() => go('/')} />
+            <nav className="os-crumbs" aria-label="Breadcrumb">
+              <button type="button" className="os-crumbs__root" onClick={() => go('/')}>YVA OS</button>
+              {crumbs.map((c, i) => (
+                <span key={i} className="os-crumbs__part">
+                  <span className="os-crumbs__sep">/</span>
+                  {i === 1 && isProfile && curPage ? <button type="button" className="os-crumbs__link" onClick={() => go(curPage.to)}>{c}</button>
+                    : <span className={i === crumbs.length - 1 ? 'os-crumbs__cur' : undefined}>{c}</span>}
+                </span>
+              ))}
+            </nav>
+            <span className="spacer" />
+          </>
+        )}
+        <NotificationBell />
+        <div className="acct">
+          <button type="button" className="acct__btn" aria-label="Account" aria-expanded={overlay?.kind === 'account'} onClick={() => setOverlay(overlay?.kind === 'account' ? null : { kind: 'account' })}>{myInitials}</button>
+          {overlay?.kind === 'account' && (
+            <div className="acct__pop" role="menu">
+              <div className="acct__who">
+                <span className="acct__name">{displayName}</span>
+                {email && <span className="acct__email">{email}</span>}
+                <span className="acct__role">{(ROLE_LABELS[role as UserRole] ?? role).toUpperCase()}</span>
               </div>
+              {accountItems.map(m => (
+                <button type="button" key={m.label} role="menuitem" className="menu__item" onClick={m.onClick}><Ic d={m.icon} />{m.label}</button>
+              ))}
+              <button type="button" role="menuitem" className="menu__item menu__item--danger" onClick={() => void signOutAndForgetDevice()}><Ic d={P.out} />Sign out</button>
             </div>
+          )}
+        </div>
+      </header>
+
+      <main className="os-main" id="main-content">
+        {siblings.length > 1 && (
+          <div className="chips os-siblings">
+            {siblings.map(p => (
+              <button type="button" key={p.key} className={`chip${curPage?.key === p.key ? ' chip--on' : ''}`} onClick={() => go(p.to)} aria-current={curPage?.key === p.key ? 'page' : undefined}>{p.label}</button>
+            ))}
+          </div>
+        )}
+        {children}
+      </main>
+
+      {overlay && <div className={`scrim os-scrim${overlay.kind === 'search' || (mobile && overlay.kind === 'hub') ? '' : ' scrim--clear'}`} onClick={() => setOverlay(null)} />}
+
+      {openHubData && !mobile && overlay?.kind === 'hub' && (
+        <div className="popover hub-pop" style={{ left: overlay.left }} role="menu" aria-label={openHubData.label}>
+          <span className="hub-pop__label">{openHubData.label}</span>
+          {openHubData.pages.map(p => (
+            <button type="button" key={p.key} role="menuitem" className={`hub-pop__row${curPage?.key === p.key ? ' hub-pop__row--on' : ''}`} onClick={() => go(p.to)}>
+              <span className="hub-pop__tile"><Ic d={p.icon} /></span>
+              <span className="hub-pop__text">
+                <span className="hub-pop__title">{p.label}</span>
+                <span className={`hub-pop__stat${status[p.key]?.warn ? ' t-warning' : ''}`}>{status[p.key]?.stat ?? p.desc}</span>
+              </span>
+              {status[p.key]?.badge ? <span className="badge-count">{status[p.key]!.badge}</span> : null}
+            </button>
           ))}
         </div>
       )}
+      {openHubData && mobile && (
+        <div className="sheet hub-sheet" role="menu" aria-label={openHubData.label}>
+          <span className="sheet__grab" />
+          <span className="hub-sheet__label">{openHubData.label}</span>
+          {openHubData.pages.map(p => (
+            <button type="button" key={p.key} role="menuitem" className="hub-sheet__row" onClick={() => go(p.to)}>
+              <span className="hub-pop__tile hub-pop__tile--lg"><Ic d={p.icon} size={18} /></span>
+              <span className="hub-pop__text">
+                <span className="hub-sheet__title">{p.label}</span>
+                <span className={`hub-sheet__stat${status[p.key]?.warn ? ' t-warning' : ''}`}>{status[p.key]?.stat ?? p.desc}</span>
+              </span>
+              {status[p.key]?.badge ? <span className="badge-count">{status[p.key]!.badge}</span> : null}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {overlay?.kind === 'create' && (
+        <div className="popover create-pop" role="menu" aria-label="Create">
+          <span className="create-pop__label">Create</span>
+          {createItems.map(c => (
+            <button type="button" key={c.key} role="menuitem" className="create-pop__item" onClick={() => go(c.to)}>
+              <span className="create-pop__icon"><Ic d={c.icon} size={14} stroke={2} /></span>{c.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {overlay?.kind === 'search' && <SearchPalette role={role} allowed={allowed} hubs={hubs} onGo={go} onClose={() => setOverlay(null)} />}
+      {overlay?.kind === 'search' && mobile && createItems.length > 0 && (
+        <button type="button" className="create-fab" onClick={() => setOverlay({ kind: 'create' })}>+ Create new</button>
+      )}
+
+      {mobile ? (
+        <nav className="dock dock--phone" aria-label="Main">
+          <button type="button" className={`dock__m${homeOn ? ' dock__m--on' : ''}`} onClick={() => go('/')}><Ic d={P.home} size={20} /><span>Home</span></button>
+          {hubs.slice(0, 2).map(h => (
+            <button type="button" key={h.key} className={`dock__m${hubOn(h) ? ' dock__m--on' : ''}`} onClick={e => openHub(h.key, e.currentTarget)}>
+              <Ic d={h.icon} size={20} /><span>{h.short}</span>{hubWarn(h) && <i className="dock__dot" />}
+            </button>
+          ))}
+          <button type="button" className="dock__search-m" aria-label="Search" onClick={() => setOverlay({ kind: 'search' })}><Ic d={P.search} size={21} stroke={2.2} /></button>
+          {hubs.slice(2).map(h => (
+            <button type="button" key={h.key} className={`dock__m${hubOn(h) ? ' dock__m--on' : ''}`} onClick={e => openHub(h.key, e.currentTarget)}>
+              <Ic d={h.icon} size={20} /><span>{h.short}</span>{hubWarn(h) && <i className="dock__dot" />}
+            </button>
+          ))}
+          {Array.from({ length: Math.max(0, 2 - hubs.slice(2).length) }).map((_, i) => <span key={`pad${i}`} />)}
+        </nav>
+      ) : (
+        <nav className="dock" aria-label="Main">
+          <button type="button" className={`dock__item${homeOn ? ' dock__item--on' : ''}`} onClick={() => go('/')} aria-label="Home"><Ic d={P.home} /><span className="dock__label">Home</span></button>
+          {hubs.map(h => (
+            <button type="button" key={h.key} className={`dock__item${hubOn(h) ? ' dock__item--on' : ''}`} onClick={e => openHub(h.key, e.currentTarget)} aria-label={h.label} aria-expanded={overlay?.kind === 'hub' && overlay.hub === h.key}>
+              <Ic d={h.icon} /><span className="dock__label">{h.label}</span>{hubWarn(h) && <i className="dock__dot" />}
+            </button>
+          ))}
+          <span className="dock__sep" />
+          <button type="button" className="dock__search" onClick={() => setOverlay({ kind: 'search' })}><Ic d={P.search} size={15} stroke={2} /><span className="dock__search-text">Jump to…</span><span className="mono">/</span></button>
+          {createItems.length > 0 && <button type="button" className="dock__create" aria-label="Create" aria-expanded={overlay?.kind === 'create'} onClick={() => setOverlay(overlay?.kind === 'create' ? null : { kind: 'create' })}><Ic d={P.plus} size={18} stroke={2.4} /></button>}
+        </nav>
+      )}
+
+      <PreviewPortalPicker open={previewOpen} onClose={() => setPreviewOpen(false)} />
+      <Modal open={installOpen} onClose={() => setInstallOpen(false)} title="Install YVA OS" sub="Open it from your home screen like an app, with notifications."
+        footer={<button type="button" className="btn btn--primary" onClick={() => setInstallOpen(false)}>Got it</button>}>
+        {isIos()
+          ? <p>On iPhone: open this page in <strong>Safari</strong>, tap <strong>Share</strong>, then <strong>Add to Home Screen</strong>. Open YVA OS from the new icon (needs iOS 16.4+ for notifications).</p>
+          : <p>Use your browser menu (<strong>⋮</strong>) → <strong>Install app</strong> or <strong>Add to Home screen</strong>. If you don't see it, the app may already be installed.</p>}
+      </Modal>
     </div>
   )
 }
 
-// ── Nav sections (Flowlu-style grouped sidebar) ──
-const navSections = [
-  {
-    label: null,
-    items: [
-      {
-        to: '/', label: 'Dashboard', end: true,
-        icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>,
-      },
-    ],
-  },
-  {
-    label: 'CRM',
-    items: [
-      {
-        to: '/clients', label: 'Clients', end: false,
-        icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
-      },
-      {
-        to: '/leads', label: 'Leads', end: false,
-        icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>,
-      },
-      {
-        to: '/estimates', label: 'Estimates', end: false,
-        icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>,
-      },
-      {
-        to: '/requests', label: 'Requests', end: false,
-        icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" x2="19" y1="8" y2="14"/><line x1="22" x2="16" y1="11" y2="11"/></svg>,
-      },
-    ],
-  },
-  {
-    label: 'Finance',
-    items: [
-      {
-        to: '/invoice', label: 'Invoices', end: false,
-        icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>,
-      },
-      {
-        to: '/weekly-close', label: 'Weekly close', end: false,
-        icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 16 11 18 15 14"/></svg>,
-      },
-      {
-        to: '/payroll', label: 'Payroll', end: false,
-        icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg>,
-      },
-      {
-        to: '/expenses', label: 'Expenses', end: false,
-        icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
-      },
-    ],
-  },
-  {
-    label: 'Operations',
-    items: [
-      {
-        to: '/projects', label: 'Projects', end: false,
-        icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>,
-      },
-      {
-        to: '/time', label: 'Time Tracking', end: false,
-        icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
-      },
-      {
-        to: '/calendar', label: 'Calendar', end: false,
-        icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
-      },
-    ],
-  },
-  {
-    label: 'HR',
-    items: [
-      {
-        to: '/employees', label: 'Team', end: false,
-        icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>,
-      },
-      {
-        to: '/approvals', label: 'Approvals', end: false,
-        icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>,
-      },
-      {
-        to: '/announcements', label: 'Announcements', end: false,
-        icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg>,
-      },
-      {
-        to: '/candidates', label: 'Candidates', end: false,
-        icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>,
-      },
-    ],
-  },
-  {
-    label: 'System',
-    items: [
-      {
-        to: '/settings', label: 'Settings', end: false,
-        icon: <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>,
-      },
-    ],
-  },
-]
+/* ── Search / jump palette ──────────────────────────────────────────── */
 
-function PageTitle({ pathname }: { pathname: string }) {
-  const profileMatch = pathname.match(/^\/(employees|clients|projects|candidates)\/[^/]+/)
-  if (profileMatch) {
-    const section = profileMatch[1]
-    const label = section === 'employees' ? 'Team' : section.charAt(0).toUpperCase() + section.slice(1)
-    return <span>{label} — Profile</span>
-  }
-  for (const section of navSections) {
-    for (const item of section.items) {
-      const match = item.end ? pathname === item.to : pathname.startsWith(item.to) && item.to !== '/'
-      if (match || (item.to === '/' && pathname === '/')) return <span>{item.label}</span>
-    }
-  }
-  return <span>YVA OS</span>
+function SearchPalette({ role, allowed, hubs, onGo, onClose }: { role: ReturnType<typeof useRole>['role']; allowed: ReturnType<typeof usePermission>; hubs: Hub[]; onGo: (to: string) => void; onClose: () => void }) {
+  const [q, setQ] = useState('')
+  const [records, setRecords] = useState<Result[]>([])
+  const [sel, setSel] = useState(0)
+  const input = useRef<HTMLInputElement>(null)
+  useEffect(() => { setTimeout(() => input.current?.focus(), 20) }, [])
+  useEffect(() => {
+    let alive = true
+    void (async () => {
+      const out: Result[] = []
+      const snap = await loadSnapshot().catch(() => null)
+      if (snap) {
+        if (can.viewClients(role)) for (const c of snap.clients) out.push({ type: 'Client', label: c.name, sub: c.email || c.company || '', to: `/clients/${c.id}` })
+        if (can.viewEmployees(role)) for (const e of snap.employees) out.push({ type: 'Employee', label: e.name, sub: [e.role, e.email].filter(Boolean).join(' · '), to: `/employees/${e.id}` })
+        for (const p of snap.projects) out.push({ type: 'Project', label: p.name, sub: p.status || '', to: `/projects/${p.id}` })
+        if (can.viewInvoices(role)) for (const i of snap.invoices) out.push({ type: 'Invoice', label: i.number, sub: `${i.clientName || ''} · ${i.status || 'draft'}`, to: `/invoice?open=${encodeURIComponent(i.id)}` })
+      }
+      if (can.viewAllCandidates(role) || can.viewHiredOnly(role)) for (const c of await loadCandidates().catch(() => [])) out.push({ type: 'Candidate', label: c.name, sub: [c.role, c.stage].filter(Boolean).join(' · '), to: `/candidates/${c.id}` })
+      if (canSeePage('leads', role, allowed)) {
+        const r = await loadLeads().catch(() => ({ rows: [] }))
+        for (const l of r.rows) out.push({ type: 'Lead', label: l.name, sub: [l.company, l.stage].filter(Boolean).join(' · '), to: `/leads?open=${encodeURIComponent(l.id)}` })
+      }
+      if (alive) setRecords(out)
+    })()
+    return () => { alive = false }
+  }, [role, allowed])
+  const pages: Result[] = useMemo(() => [
+    ...hubs.flatMap(h => h.pages.map(p => ({ type: 'Page' as const, label: p.label, sub: `${h.label} · ${p.desc}`, to: p.to }))),
+    { type: 'Page', label: SETTINGS_PAGE.label, sub: `Account · ${SETTINGS_PAGE.desc}`, to: SETTINGS_PAGE.to },
+  ], [hubs])
+  const ql = q.trim().toLowerCase()
+  const results = (ql ? [...pages, ...records].filter(r => `${r.label} ${r.sub}`.toLowerCase().includes(ql)) : pages.slice(0, 7)).slice(0, 9)
+  useEffect(() => { setSel(0) }, [ql])
+  return (
+    <div className="palette" role="dialog" aria-modal="true" aria-label="Search">
+      <div className="palette__input">
+        <Ic d={P.search} size={18} stroke={2} />
+        <input ref={input} value={q} onChange={e => setQ(e.target.value)} placeholder="Search clients, invoices, people, or jump to a page" aria-label="Search"
+          onKeyDown={e => {
+            if (e.key === 'ArrowDown') { e.preventDefault(); setSel(s => Math.min(results.length - 1, s + 1)) }
+            else if (e.key === 'ArrowUp') { e.preventDefault(); setSel(s => Math.max(0, s - 1)) }
+            else if (e.key === 'Enter' && results[sel]) onGo(results[sel].to)
+            else if (e.key === 'Escape') onClose()
+          }} />
+        <span className="kbd">ESC</span>
+      </div>
+      <div className="palette__list" role="listbox">
+        {results.map((r, i) => (
+          <button type="button" key={`${r.type}${r.to}${i}`} role="option" aria-selected={i === sel} className={`palette__row${i === sel ? ' palette__row--on' : ''}`} onMouseEnter={() => setSel(i)} onClick={() => onGo(r.to)}>
+            <span className={`palette__type palette__type--${TYPE_CLASS[r.type]}`}>{r.type}</span>
+            <span className="palette__text"><span className="palette__label">{r.label}</span>{r.sub && <span className="palette__sub">{r.sub}</span>}</span>
+          </button>
+        ))}
+        {results.length === 0 && <div className="palette__empty">No matches for “{q}”.</div>}
+      </div>
+    </div>
+  )
 }
 
-export default function Shell({ children }: Props) {
-  const location = useLocation()
-  const { role, email } = useRole()
-  const allowed = usePermission()
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const linkedEmployeeId = sessionStorage.getItem('linkedEmployeeId')
-  const [pendingRequests, setPendingRequests] = useState(0)
+/* ── Account → Preview client portal: pick a client ─────────────────── */
 
+function PreviewPortalPicker({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const navigate = useNavigate()
+  const [clients, setClients] = useState<{ id: string; name: string; sub: string }[]>([])
+  const [q, setQ] = useState('')
   useEffect(() => {
-    void countPendingStaffRequests().then(setPendingRequests)
-  }, [location.pathname])
-
-  const prevPath = useRef(location.pathname)
-  if (prevPath.current !== location.pathname) {
-    prevPath.current = location.pathname
-    if (sidebarOpen) setSidebarOpen(false)
-  }
-
-  // Routes that are not yet built show a "coming soon" placeholder
-  const builtRoutes = ['/', '/leads', '/weekly-close', '/payroll', '/approvals', '/announcements', '/invoice', '/clients', '/employees', '/candidates', '/projects', '/expenses', '/settings', '/estimates', '/time', '/calendar', '/requests']
-
-  function isVisible(to: string) {
-    if (to === '/weekly-close') return allowed('weekly_close.manage')
-    if (to === '/leads')        return role === 'ceo' || role === 'admin' || role === 'lead_gen' || allowed('leads.view_all') || allowed('leads.manage')
-    if (to === '/payroll')      return allowed('payroll.view') || allowed('payroll.manage')
-    if (to === '/approvals')    return allowed('timeoff.approve') || can.approveTime(role)
-    if (to === '/announcements') return allowed('announcements.manage')
-    if (to === '/invoice')    return can.viewInvoices(role)
-    if (to === '/clients')    return can.viewClients(role)
-    if (to === '/employees')  return can.viewEmployees(role)
-    if (to === '/candidates') return can.viewAllCandidates(role) || can.viewHiredOnly(role)
-    if (to === '/expenses')   return can.viewExpenses(role)
-    return true
-  }
-
+    if (!open) return
+    void loadSnapshot().then(s => setClients(s.clients.map(c => ({ id: c.id, name: c.name, sub: c.company || c.email || '' })).sort((a, b) => a.name.localeCompare(b.name)))).catch(() => setClients([]))
+  }, [open])
+  const shown = clients.filter(c => `${c.name} ${c.sub}`.toLowerCase().includes(q.trim().toLowerCase())).slice(0, 50)
   return (
-    <div className="shell">
-      <a href="#main-content" className="skip-link">Skip to content</a>
-      {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
-
-      <aside className={`sidebar${sidebarOpen ? ' sidebar-open' : ''}`}>
-        {/* Brand */}
-        <div className="sidebar-brand">
-          <img src={`${import.meta.env.BASE_URL}yva-logo.png`} alt="YVA" className="sidebar-brand-logo" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-          <div>
-            <div className="sidebar-brand-name">YVA OS</div>
-            <div className="sidebar-brand-sub">YVA Staffing</div>
-          </div>
-        </div>
-
-        {/* Grouped nav */}
-        <nav className="sidebar-nav">
-          {navSections.map((section, si) => (
-            <div key={si}>
-              {section.label && (
-                <div className="sidebar-section-label">{section.label}</div>
-              )}
-              {section.items.filter(item => isVisible(item.to)).map(item => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.end}
-                  className={({ isActive }) => `sidebar-nav-item${isActive ? ' active' : ''}`}
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <span className="sidebar-nav-icon">{item.icon}</span>
-                  <span>{item.label}</span>
-                  {item.to === '/requests' && pendingRequests > 0 ? (
-                    <span className="nav-badge nav-badge-red">{pendingRequests}</span>
-                  ) : !builtRoutes.includes(item.to) ? (
-                    <span className="nav-badge nav-badge-soon">SOON</span>
-                  ) : null}
-                </NavLink>
-              ))}
-            </div>
-          ))}
-        </nav>
-
-        {/* My Profile link (only when linked to an employee) */}
-        {linkedEmployeeId && (
-          <NavLink
-            to={`/employees/${linkedEmployeeId}`}
-            className={({ isActive }) => `sidebar-nav-item${isActive ? ' active' : ''}`}
-            style={{ marginTop: 4 }}
-            onClick={() => setSidebarOpen(false)}
-          >
-            <span className="sidebar-nav-icon">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
-            </span>
-            <span>My Profile</span>
-            <span className="nav-badge nav-badge-soon">ME</span>
-          </NavLink>
-        )}
-
-        {/* Footer */}
-        <div className="sidebar-footer">
-          {email && (
-            <div className="sidebar-footer-label" style={{ marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {email}
-            </div>
-          )}
-          <div className="sidebar-footer-label" style={{ color: '#facc15', fontSize: 10, textTransform: 'uppercase', letterSpacing: '.06em' }}>
-            {ROLE_LABELS[role as import('../lib/roles').UserRole] ?? role}
-          </div>
-        </div>
-      </aside>
-
-      {/* Topbar */}
-      <header className="topbar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button className="hamburger btn-icon btn-ghost" onClick={() => setSidebarOpen(o => !o)} aria-label="Toggle menu">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <line x1="3" y1="6"  x2="21" y2="6" />
-              <line x1="3" y1="12" x2="21" y2="12" />
-              <line x1="3" y1="18" x2="21" y2="18" />
-            </svg>
+    <Modal open={open} onClose={onClose} title="Preview client portal" sub="See the portal exactly as this client sees it.">
+      <SearchInput value={q} onChange={setQ} placeholder="Find a client" />
+      <div className="picker-list">
+        {shown.map(c => (
+          <button type="button" key={c.id} className="menu__item picker-list__row" onClick={() => { onClose(); navigate(`/portal/dashboard?preview=${encodeURIComponent(c.id)}`) }}>
+            <span className="avatar-i avatar-i--sm">{initials(c.name)}</span>
+            <span className="picker-list__text"><span>{c.name}</span>{c.sub && <span className="muted">{c.sub}</span>}</span>
           </button>
-          <div className="topbar-title">
-            <PageTitle pathname={location.pathname} />
-          </div>
-        </div>
-        <div className="topbar-actions">
-          <GlobalSearch />
-          <NotificationBell />
-        </div>
-      </header>
-
-      <main className="main-content" id="main-content">
-        {children}
-      </main>
-
-      {/* Phones: bottom tabs for the main sections; "More" opens the full menu */}
-      <nav className="staff-tabs" aria-label="Main">
-        {[
-          { to: '/', label: 'Home', end: true, show: true, d: 'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z' },
-          allowed('weekly_close.manage')
-            ? { to: '/weekly-close', label: 'Week', end: false, show: true, d: 'M3 4h18v18H3zM16 2v4M8 2v4M3 10h18M9 16l2 2 4-4' }
-            : { to: '/invoice', label: 'Invoices', end: false, show: can.viewInvoices(role), d: 'M1 4h22v16H1zM1 10h22' },
-          { to: '/time', label: 'Time', end: false, show: true, d: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM12 6v6l4 2' },
-          (allowed('payroll.view') || allowed('payroll.manage'))
-            ? { to: '/payroll', label: 'Payroll', end: false, show: true, d: 'M2 6h20v12H2zM12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z' }
-            : { to: '/employees', label: 'Team', end: false, show: can.viewEmployees(role), d: 'M12 4a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM20 21a8 8 0 1 0-16 0' },
-        ].filter(x => x.show).map(x => (
-          <NavLink key={x.to} to={x.to} end={x.end} className={({ isActive }) => `staff-tab${isActive ? ' active' : ''}`}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={x.d} /></svg>
-            <span>{x.label}</span>
-          </NavLink>
         ))}
-        <button className="staff-tab" onClick={() => setSidebarOpen(true)}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
-          <span>More</span>
-        </button>
-      </nav>
-    </div>
+        {shown.length === 0 && <p className="muted">No clients found.</p>}
+      </div>
+    </Modal>
   )
 }

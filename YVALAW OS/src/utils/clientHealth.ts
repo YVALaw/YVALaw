@@ -31,3 +31,5 @@ export function clientHealth(client: Client, invoices: Invoice[], activity: Acti
   return { level, label: level === 'risk' ? 'At risk' : level === 'watch' ? 'Watch' : 'Healthy', reasons }
 }
 export const HEALTH_BADGE: Record<Health['level'], string> = { good: 'badge-green', watch: 'badge-orange', risk: 'badge-red' }
+/** Redesign: dot / pill tone per level (ds.css .dot--* / .pill--*) */
+export const HEALTH_TONE: Record<Health['level'], 'success' | 'warning' | 'danger'> = { good: 'success', watch: 'warning', risk: 'danger' }

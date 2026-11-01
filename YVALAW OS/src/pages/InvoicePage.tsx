@@ -1,824 +1,593 @@
+// Finance → Invoices (redesign 2026-11, design_handoff_yva_os_redesign/designs/Invoices.dc.html).
+// List with status tabs + saved views, contextual row actions, bulk status, project grouping,
+// Recurring tab, the invoice builder as a full page (blocked on phones), Quick invoice, Record payment.
 import { useEffect, useMemo, useState } from 'react'
-import { useLocation } from 'react-router-dom'
-import {
-  IconMail, IconAlert, IconEye, IconPrinter, IconLink, IconCopy,
-  IconEdit, IconStatus, IconTrash, IconX, IconCheck, IconChevronDown,
-  IconChevronRight, IconPause, IconPlay, IconPlus, IconDollar,
-} from '../components/Icon'
+import { useSearchParams } from 'react-router-dom'
 import RecordPaymentModal from '../components/RecordPaymentModal'
-import type { AppSettings, Client, Invoice, Project, RecurringInvoice, RecurringFrequency } from '../data/types'
-import {
-  loadInvoices, saveInvoices,
-  loadInvoiceCounter, saveInvoiceCounter,
-  loadSnapshot, loadSettings,
-  loadRecurringInvoices, saveRecurringInvoices,
-  logComm,
-} from '../services/storage'
-import { formatMoney } from '../utils/money'
-import { buildInvoiceHTML as buildInvoiceHTMLUtil, printInvoice as printInvoiceUtil } from '../utils/invoiceHtml'
 import InvoiceBuilder from '../components/InvoiceBuilder'
-import { sendEmail } from '../services/gmail'
-import { applyInvoiceTemplate, DEFAULT_INVOICE_EMAIL, DEFAULT_REMINDER_EMAIL } from '../services/invoiceEmail'
+import RecurringInvoices from '../components/finance/RecurringInvoices'
+import { useSavedViews } from '../components/finance/savedViews'
+import { Banner, Checkbox, EmptyState, Field, Menu, Modal, PageHeader, Pill, SearchInput, Segmented, Skel, Tabs, useIsMobile, type MenuItem } from '../components/ui'
+import { Ic, P } from '../components/Icon'
+import { useRole } from '../context/RoleContext'
+import type { AppSettings, Client, Invoice, Project, RecurringInvoice } from '../data/types'
+import {
+  loadInvoices, saveInvoices, loadInvoiceCounter, saveInvoiceCounter, loadSnapshot, loadSettings,
+  loadRecurringInvoices, saveRecurringInvoices, logComm,
+} from '../services/storage'
+import { loadPayments } from '../services/payments'
+import { formatMoney } from '../utils/money'
+import { buildInvoiceHTML, printInvoice as printInvoiceUtil } from '../utils/invoiceHtml'
+import { sendInvoiceEmail, sendReminderEmail } from '../services/invoiceEmail'
+import { dateShort } from '../utils/format'
+import { localParts } from '../utils/moneyRules'
 
 type InvoiceStatus = 'draft' | 'sent' | 'viewed' | 'paid' | 'overdue' | 'partial'
+type Tab = 'all' | InvoiceStatus | 'recurring'
+type Grouping = 'list' | 'project'
+type Filters = { tab: Tab; q: string; project: string; group: Grouping }
 
 const STATUSES: { key: InvoiceStatus; label: string }[] = [
-  { key: 'draft',   label: 'Draft' },
-  { key: 'sent',    label: 'Sent' },
-  { key: 'viewed',  label: 'Viewed' },
-  { key: 'partial', label: 'Partial' },
-  { key: 'paid',    label: 'Paid' },
-  { key: 'overdue', label: 'Overdue' },
+  { key: 'draft', label: 'Draft' }, { key: 'sent', label: 'Sent' }, { key: 'viewed', label: 'Viewed' },
+  { key: 'partial', label: 'Partial' }, { key: 'overdue', label: 'Overdue' }, { key: 'paid', label: 'Paid' },
 ]
+const UNPAID = ['sent', 'viewed', 'partial', 'overdue']
+const statusOf = (i: Invoice): InvoiceStatus => ((i.status || 'draft').toLowerCase() as InvoiceStatus)
+const amountOf = (i: Invoice) => Number(i.subtotal) || 0
+const balanceOf = (i: Invoice) => (statusOf(i) === 'paid' ? 0 : Math.max(0, Math.round((amountOf(i) - (Number(i.amountPaid) || 0)) * 100) / 100))
+const uid = () => crypto.randomUUID()
+const label = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
-function uid() { return crypto.randomUUID() }
-
-function statusBadge(s?: string): string {
-  switch ((s || '').toLowerCase()) {
-    case 'paid':    return 'badge-green'
-    case 'overdue': return 'badge-red'
-    case 'sent':    return 'badge-blue'
-    case 'viewed':  return 'badge-purple'
-    case 'partial': return 'badge-orange'
-    default:        return 'badge-gray'
-  }
+function periodLabel(inv: Invoice): string {
+  const a = inv.billingStart, b = inv.billingEnd
+  if (!a || !b) return inv.date ? dateShort(inv.date) : '—'
+  const da = new Date(`${a}T12:00:00`), db = new Date(`${b}T12:00:00`)
+  const sameMonth = da.getMonth() === db.getMonth() && da.getFullYear() === db.getFullYear()
+  return `${dateShort(a)} – ${sameMonth ? db.getDate() : dateShort(b)}`
 }
 
-function dopLabel(usd: number, rate: number): string {
-  if (!rate || rate <= 0) return ''
-  return `RD$${(usd * rate).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
-}
-
-// ── Invoice HTML builder / printer — thin wrappers around shared utility ─────
-function buildInvoiceHTML(inv: Invoice, rate: number, settings: AppSettings, autoPrint = false): string {
-  return buildInvoiceHTMLUtil(inv, {
-    rate,
-    companyName:    settings.companyName,
-    companyAddress: settings.companyAddress,
-    companyEmail:   settings.companyEmail,
-    companyPhone:   settings.companyPhone,
-    autoPrint,
-  })
-}
-
-function printInvoice(inv: Invoice, rate: number, settings: AppSettings) {
-  printInvoiceUtil(inv, {
-    rate,
-    companyName:    settings.companyName,
-    companyAddress: settings.companyAddress,
-    companyEmail:   settings.companyEmail,
-    companyPhone:   settings.companyPhone,
-  })
-}
-
-// ── Share portal link ──────────────────────────────────────
-function shareInvoice(inv: Invoice, dopRate: number) {
+function shareInvoice(inv: Invoice, dopRate: number, done: (msg: string) => void) {
   const payload = { inv, dopRate: dopRate > 0 ? dopRate : undefined }
   const b64 = btoa(encodeURIComponent(JSON.stringify(payload)))
   const url = `${window.location.origin}/invoice-view#${b64}`
-  navigator.clipboard.writeText(url).then(
-    () => alert('Portal link copied to clipboard!'),
-    () => prompt('Copy this link:', url),
-  )
+  navigator.clipboard.writeText(url).then(() => done('Portal link copied to clipboard.'), () => prompt('Copy this link:', url))
 }
 
-function emailInvoice(inv: Invoice, settings: AppSettings) {
-  const to      = inv.clientEmail || ''
-  const subject = `Invoice ${inv.number} — ${settings.companyName || 'YVA Staffing'}`
-  const body    = applyInvoiceTemplate(settings.invoiceEmailTemplate || DEFAULT_INVOICE_EMAIL, inv, settings)
-  // Attach invoice HTML (no DOP for client invoices — pass rate 0)
-  const invoiceHtml = buildInvoiceHTML(inv, 0, settings, false)
-  sendEmail(to, subject, body, {
-    name:     `invoice-${inv.number}.html`,
-    content:  invoiceHtml,
-    mimeType: 'text/html',
-  })
-}
-
-// ── Payment reminder email ──────────────────────────────────
-function reminderEmail(inv: Invoice, settings: AppSettings) {
-  const to      = inv.clientEmail || ''
-  const subject = `Payment Reminder — Invoice ${inv.number} — ${settings.companyName || 'YVA Staffing'}`
-  const body    = applyInvoiceTemplate(settings.reminderEmailTemplate || DEFAULT_REMINDER_EMAIL, inv, settings)
-  sendEmail(to, subject, body)
-}
-
-type QuickForm = {
-  clientName: string; date: string; dueDate: string
-  subtotal: string; notes: string; status: InvoiceStatus
-}
-const EMPTY_FORM: QuickForm = {
-  clientName: '', date: new Date().toISOString().slice(0, 10),
-  dueDate: '', subtotal: '', notes: '', status: 'draft',
-}
+type QuickForm = { clientName: string; date: string; dueDate: string; subtotal: string; notes: string }
+const EMPTY_FORM = (): QuickForm => ({ clientName: '', date: new Date().toISOString().slice(0, 10), dueDate: '', subtotal: '', notes: '' })
 
 export default function InvoicePage() {
-  const location = useLocation()
-  const [invoices,    setInvoices]    = useState<Invoice[]>([])
-  const [payingInv,   setPayingInv]   = useState<Invoice | null>(null)
-  const [clients,     setClients]     = useState<Client[]>([])
+  const { userId } = useRole()
+  const mobile = useIsMobile()
+  const [params, setParams] = useSearchParams()
+  const [loading, setLoading] = useState(true)
+  const [invoices, setInvoices] = useState<Invoice[]>([])
+  const [clients, setClients] = useState<Client[]>([])
   const [allProjects, setAllProjects] = useState<Project[]>([])
-  const [settings,    setSettings]    = useState<AppSettings>({ usdToDop: 0 })
+  const [settings, setSettings] = useState<AppSettings>({ usdToDop: 0 })
+  const [recurring, setRecurring] = useState<RecurringInvoice[]>([])
+  const [collected, setCollected] = useState<number | null>(null)
+  const [banner, setBanner] = useState<{ tone: 'success' | 'danger' | 'warning'; text: string } | null>(null)
+
+  // List filters (a saved view is a snapshot of these)
+  const [tab, setTab] = useState<Tab>('all')
+  const [search, setSearch] = useState('')
+  const [projectFilter, setProjectFilter] = useState('')
+  const [grouping, setGrouping] = useState<Grouping>('list')
+  const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulkStatus, setBulkStatus] = useState<InvoiceStatus>('sent')
+  const { views, save: saveView, remove: removeView } = useSavedViews<Filters>('invoices', userId)
+  const [saveViewOpen, setSaveViewOpen] = useState(false)
+  const [viewName, setViewName] = useState('')
+
+  // Builder (full page) + overlays
   const [builderOpen, setBuilderOpen] = useState(false)
   const [builderProjectId, setBuilderProjectId] = useState<string | undefined>()
   const [editingInvoice, setEditingInvoice] = useState<Invoice | undefined>()
-  const [sendConfirmInv, setSendConfirmInv] = useState<Invoice | null>(null)
+  const [payingInv, setPayingInv] = useState<Invoice | null>(null)
+  const [pickPayment, setPickPayment] = useState(false)
+  const [pickQ, setPickQ] = useState('')
   const [quickModal, setQuickModal] = useState(false)
   const [quickProjectId, setQuickProjectId] = useState<string | undefined>()
-  const [statusModal, setStatusModal] = useState(false)
-  const [editId, setEditId] = useState<string | null>(null)
+  const [form, setForm] = useState<QuickForm>(EMPTY_FORM())
+  const [statusFor, setStatusFor] = useState<Invoice | null>(null)
   const [newStatus, setNewStatus] = useState<InvoiceStatus>('draft')
   const [newAmountPaid, setNewAmountPaid] = useState('')
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
-  const [form, setForm] = useState<QuickForm>(EMPTY_FORM)
-  const urlQ = new URLSearchParams(location.search).get('q') || ''
-  const [search, setSearch] = useState(urlQ)
-  const [toast, setToast] = useState<string | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<Invoice | null>(null)
   const [previewInv, setPreviewInv] = useState<Invoice | null>(null)
-  const [expanded, setExpanded] = useState<Set<string>>(new Set())
-  const [activeTab, setActiveTab] = useState<'invoices' | 'recurring'>('invoices')
-  const [recurring, setRecurring] = useState<RecurringInvoice[]>([])
-  const [recurringPanel, setRecurringPanel] = useState(false)
-  const [editingRec, setEditingRec] = useState<RecurringInvoice | null>(null)
-  type RecForm = { clientId: string; clientName: string; projectId: string; projectName: string; amount: string; description: string; frequency: RecurringFrequency; nextDueDate: string; active: boolean }
-  const EMPTY_REC: RecForm = { clientId: '', clientName: '', projectId: '', projectName: '', amount: '', description: '', frequency: 'monthly', nextDueDate: new Date().toISOString().slice(0,10), active: true }
-  const [recForm, setRecForm] = useState<RecForm>(EMPTY_REC)
+  const [busy, setBusy] = useState<string | null>(null)
+
+  const ok = (text: string) => setBanner({ tone: 'success', text })
+  const fail = (text: string) => setBanner({ tone: 'danger', text })
 
   useEffect(() => {
-    loadSnapshot().then(snap => {
-      setInvoices(snap.invoices)
-      setClients(snap.clients)
-      setAllProjects(snap.projects)
-      // If navigated here with ?q=, expand all project groups so the invoice is visible
-      if (urlQ) {
-        const keys = new Set<string>()
-        for (const inv of snap.invoices) keys.add(inv.projectId || inv.projectName || '__unassigned__')
-        setExpanded(keys)
-      }
+    void loadSnapshot().then(snap => {
+      setInvoices(snap.invoices); setClients(snap.clients); setAllProjects(snap.projects); setLoading(false)
     })
-    loadSettings().then(setSettings)
-    loadRecurringInvoices().then(setRecurring)
+    void loadSettings().then(setSettings)
+    void loadRecurringInvoices().then(setRecurring)
+    const today = localParts(Date.now()).date
+    void loadPayments({ from: `${today.slice(0, 8)}01`, to: today }).then(r => setCollected(r.error ? null : r.rows.reduce((s, p) => s + p.amount, 0)))
   }, [])
 
-  function persist(next: Invoice[]) { setInvoices(next); void saveInvoices(next) }
+  // Deep links: ?create=invoice | ?create=payment | ?open=<id> | ?edit=<id> | ?q=<text> (Reports)
+  useEffect(() => {
+    if (loading) return
+    const create = params.get('create'), open = params.get('open'), edit = params.get('edit'), q = params.get('q')
+    if (!create && !open && !edit && !q) return
+    if (create === 'invoice') openBuilder(params.get('project') || undefined)
+    if (create === 'payment') { setPickQ(''); setPickPayment(true) }
+    if (open) { const inv = invoices.find(i => i.id === open); if (inv) setPreviewInv(inv); else fail('That invoice was not found — it may have been deleted.') }
+    if (edit) { const inv = invoices.find(i => i.id === edit); if (inv) openEditInvoice(inv) }
+    if (q) { setSearch(q); setTab('all'); setExpanded(new Set(invoices.map(i => i.projectId || i.projectName || '__unassigned__'))) }
+    setParams({}, { replace: true })
+  }, [loading, params])   // eslint-disable-line react-hooks/exhaustive-deps
 
-  function showToast(msg: string) {
-    setToast(msg)
-    setTimeout(() => setToast(null), 3500)
+  /** Optimistic save: show it, write it, roll back with the reason if the database refused */
+  async function persist(next: Invoice[], okMsg?: string): Promise<boolean> {
+    const prev = invoices
+    setInvoices(next)
+    try { await saveInvoices(next); if (okMsg) ok(okMsg); return true } catch (e) { setInvoices(prev); fail(`Not saved: ${(e as Error).message}`); return false }
   }
+  async function persistRec(next: RecurringInvoice[], okMsg?: string): Promise<boolean> {
+    const prev = recurring
+    setRecurring(next)
+    try { await saveRecurringInvoices(next); if (okMsg) ok(okMsg); return true } catch (e) { setRecurring(prev); fail(`Not saved: ${(e as Error).message}`); return false }
+  }
+  const clientIdOf = (inv: Invoice) => inv.clientId || clients.find(c => c.name === inv.clientName)?.id
+  const htmlOpts = (rate = 0) => ({ rate, companyName: settings.companyName, companyAddress: settings.companyAddress, companyEmail: settings.companyEmail, companyPhone: settings.companyPhone })
+  const printInvoice = (inv: Invoice) => printInvoiceUtil(inv, htmlOpts(0))
 
-  // Phones: review / send / record payments only — building and editing invoices stays on the computer (PLAN Step 8)
-  const onPhone = () => window.matchMedia?.('(max-width: 768px)').matches
-  const PHONE_NOTE = 'Building and editing invoices works on a computer. On the phone you can review, send, change status and record payments.'
-  function openBuilder(projectId?: string) { if (onPhone()) { showToast(PHONE_NOTE); return } setBuilderProjectId(projectId); setBuilderOpen(true) }
-  function openEditInvoice(inv: Invoice) { if (onPhone()) { showToast(PHONE_NOTE); return } setEditingInvoice(inv); setBuilderProjectId(inv.projectId || undefined); setBuilderOpen(true) }
-  async function closeBuilder(inv?: Invoice) {
+  // ── Builder ─────────────────────────────────────────────────────────────
+  function openBuilder(projectId?: string) { setEditingInvoice(undefined); setBuilderProjectId(projectId); setBuilderOpen(true); window.scrollTo?.(0, 0) }
+  function openEditInvoice(inv: Invoice) { setEditingInvoice(inv); setBuilderProjectId(inv.projectId || undefined); setBuilderOpen(true); window.scrollTo?.(0, 0) }
+  async function closeBuilder(inv?: Invoice, send = false) {
     const fresh = await loadInvoices()
     setInvoices(fresh)
-    setBuilderOpen(false)
-    setBuilderProjectId(undefined)
-    setEditingInvoice(undefined)
-    if (inv && inv.status === 'draft') setSendConfirmInv(inv)
+    setBuilderOpen(false); setBuilderProjectId(undefined); setEditingInvoice(undefined)
+    if (!inv) return
+    const saved = fresh.find(i => i.id === inv.id) ?? inv
+    if (send) await sendDraft(saved, fresh)
+    else ok(statusOf(saved) === 'draft' ? `${saved.number} saved as a draft.` : `${saved.number} saved.`)
   }
 
+  // ── Sending ─────────────────────────────────────────────────────────────
+  /** Email a draft and mark it sent (no email on file → mark sent by hand, as before) */
+  async function sendDraft(inv: Invoice, list = invoices) {
+    const cId = clientIdOf(inv)
+    const markSent = () => list.map(i => i.id === inv.id ? { ...i, status: 'sent' as const, statusHistory: [...(i.statusHistory || []), { status: 'sent', changedAt: Date.now() }] } : i)
+    if (!inv.clientEmail) {
+      if (!window.confirm(`${inv.number}: no client email on file. Mark it as sent anyway?`)) return
+      if (await persist(markSent(), `${inv.number} marked as sent.`) && cId) void logComm(cId, `Invoice ${inv.number} marked as sent`, 'system')
+      return
+    }
+    setBusy(`send-${inv.id}`)
+    try {
+      const r = await sendInvoiceEmail(inv, settings)
+      if (r.mode === 'failed') { fail(`${inv.number} was not sent: ${r.fallbackReason}`); return }
+      const msg = r.mode === 'gmail' ? `${inv.number} sent to ${inv.clientEmail}.` : `${inv.number} opened in your email app for ${inv.clientEmail} and marked as sent.`
+      if (await persist(markSent(), msg) && cId) void logComm(cId, `Invoice ${inv.number} emailed (${formatMoney(amountOf(inv))})`, 'email')
+    } finally { setBusy(null) }
+  }
+  async function emailAgain(inv: Invoice) {
+    const r = await sendInvoiceEmail(inv, settings)
+    if (r.mode === 'failed') { fail(`${inv.number} was not sent: ${r.fallbackReason}`); return }
+    ok(`Invoice ${inv.number} emailed to ${inv.clientEmail}.`)
+    const cId = clientIdOf(inv); if (cId) void logComm(cId, `Invoice ${inv.number} emailed (${formatMoney(amountOf(inv))})`, 'email')
+  }
+  async function remind(inv: Invoice) {
+    const r = await sendReminderEmail(inv, settings)
+    if (r.mode === 'failed') { fail(`Reminder for ${inv.number} was not sent: ${r.fallbackReason}`); return }
+    ok(`Payment reminder sent to ${inv.clientEmail}.`)
+    const cId = clientIdOf(inv); if (cId) void logComm(cId, `Payment reminder sent for Invoice ${inv.number}`, 'email')
+  }
+  async function remindAll() {
+    const seen = new Set<string>()
+    for (const inv of invoices.filter(i => ['overdue', 'sent', 'partial'].includes(statusOf(i)) && i.clientEmail)) {
+      if (seen.has(inv.clientEmail!)) continue
+      seen.add(inv.clientEmail!)
+      const r = await sendReminderEmail(inv, settings)
+      if (r.mode === 'failed') { fail(`Stopped after ${seen.size - 1} reminder${seen.size === 2 ? '' : 's'}: ${r.fallbackReason}`); return }
+      const cId = clientIdOf(inv); if (cId) void logComm(cId, `Payment reminder sent for Invoice ${inv.number}`, 'email')
+    }
+    ok(`Reminders sent to ${seen.size} client${seen.size !== 1 ? 's' : ''}.`)
+  }
+
+  // ── Quick invoice ───────────────────────────────────────────────────────
   function openQuickForProject(projectId?: string) {
     const proj = allProjects.find(p => p.id === projectId)
     const client = proj ? clients.find(c => c.id === proj.clientId) : undefined
-    setForm({
-      ...EMPTY_FORM,
-      date: new Date().toISOString().slice(0, 10),
-      clientName: client?.name || '',
-      status: 'draft',
-    })
-    setQuickProjectId(projectId)
-    setQuickModal(true)
+    setForm({ ...EMPTY_FORM(), clientName: client?.name || '' })
+    setQuickProjectId(projectId); setQuickModal(true)
   }
-
   async function saveQuick() {
     if (!form.clientName.trim() || !form.subtotal) return
     const counter = await loadInvoiceCounter()
     const client = clients.find(c => c.name === form.clientName)
     const proj = allProjects.find(p => p.id === quickProjectId)
     const inv: Invoice = {
-      id: uid(),
-      number: `INV-${String(counter).padStart(3, '0')}`,
-      date: form.date,
-      dueDate: form.dueDate || undefined,
-      clientName: form.clientName,
-      clientEmail: client?.email,
-      projectId: proj?.id || null,
-      projectName: proj?.name || undefined,
-      subtotal: parseFloat(form.subtotal) || 0,
-      notes: form.notes || undefined,
-      status: 'sent',
-      items: [],
-      statusHistory: [{ status: 'sent', changedAt: Date.now() }],
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
+      id: uid(), number: `INV-${String(counter).padStart(3, '0')}`, date: form.date, dueDate: form.dueDate || undefined,
+      clientName: form.clientName, clientEmail: client?.email, projectId: proj?.id || null, projectName: proj?.name || undefined,
+      subtotal: parseFloat(form.subtotal) || 0, notes: form.notes || undefined, status: 'sent', items: [],
+      statusHistory: [{ status: 'sent', changedAt: Date.now() }], createdAt: Date.now(), updatedAt: Date.now(),
     }
-    persist([inv, ...invoices])
+    setQuickModal(false); setQuickProjectId(undefined)
+    if (!await persist([inv, ...invoices], `${inv.number} created.`)) return
     void saveInvoiceCounter(counter + 1)
-    setQuickModal(false)
-    setQuickProjectId(undefined)
     if (inv.clientEmail) {
-      emailInvoice(inv, settings)
+      const r = await sendInvoiceEmail(inv, settings)
+      if (r.mode === 'failed') { setBanner({ tone: 'warning', text: `${inv.number} was created but not emailed: ${r.fallbackReason}` }); return }
+      ok(`${inv.number} created and emailed to ${inv.clientEmail}.`)
       if (client?.id) void logComm(client.id, `Invoice ${inv.number} emailed (${formatMoney(inv.subtotal || 0)})`, 'email')
     } else if (client?.id) {
       void logComm(client.id, `Invoice ${inv.number} created (${formatMoney(inv.subtotal || 0)})`, 'system')
     }
   }
 
-  function toggleCollapse(key: string) {
-    setExpanded(prev => {
-      const next = new Set(prev)
-      next.has(key) ? next.delete(key) : next.add(key)
-      return next
-    })
-  }
-
-  function openStatusEdit(inv: Invoice) {
-    setEditId(inv.id)
-    setNewStatus((inv.status as InvoiceStatus) || 'draft')
-    setNewAmountPaid(inv.amountPaid != null ? String(inv.amountPaid) : '')
-    setStatusModal(true)
-  }
-  function saveStatus() {
-    if (!editId) return
+  // ── Status, duplicate, delete, bulk ─────────────────────────────────────
+  function openStatusEdit(inv: Invoice) { setStatusFor(inv); setNewStatus(statusOf(inv)); setNewAmountPaid(inv.amountPaid != null ? String(inv.amountPaid) : '') }
+  async function saveStatus() {
+    const target = statusFor
+    if (!target) return
     const amtPaid = newStatus === 'partial' ? (parseFloat(newAmountPaid) || 0) : undefined
-    const targetInv = invoices.find(i => i.id === editId)
-    persist(invoices.map((inv) => {
-      if (inv.id !== editId) return inv
-      const histEntry = { status: newStatus, changedAt: Date.now() }
-      return {
-        ...inv, status: newStatus, amountPaid: amtPaid, updatedAt: Date.now(),
-        statusHistory: [...(inv.statusHistory || []), histEntry],
-      }
-    }))
-    if (targetInv) {
-      const clientId = clients.find(c => c.name === targetInv.clientName)?.id
-      if (clientId) {
-        void logComm(clientId, `Invoice ${targetInv.number} status changed to ${newStatus}`, 'system')
-      }
-    }
-    setStatusModal(false)
+    setStatusFor(null)
+    const done = await persist(invoices.map(inv => inv.id !== target.id ? inv
+      : { ...inv, status: newStatus, amountPaid: amtPaid, updatedAt: Date.now(), statusHistory: [...(inv.statusHistory || []), { status: newStatus, changedAt: Date.now() }] }),
+    `${target.number} is now ${label(newStatus)}.`)
+    const cId = clientIdOf(target)
+    if (done && cId) void logComm(cId, `Invoice ${target.number} status changed to ${newStatus}`, 'system')
   }
-
-  function duplicateInvoice(inv: Invoice) {
-    void loadInvoiceCounter().then(counter => {
-      const dup: Invoice = {
-        ...inv,
-        id:        uid(),
-        number:    `INV-${String(counter).padStart(3, '0')}`,
-        status:    'draft',
-        amountPaid: undefined,
-        date:      new Date().toISOString().slice(0, 10),
-        createdAt: Date.now(),
-        updatedAt: Date.now(),
-      }
-      persist([dup, ...invoices])
-      void saveInvoiceCounter(counter + 1)
-    })
+  async function applyBulk() {
+    const ids = selected
+    const targets = invoices.filter(i => ids.has(i.id))
+    const done = await persist(invoices.map(inv => !ids.has(inv.id) ? inv
+      : { ...inv, status: bulkStatus, amountPaid: bulkStatus === 'partial' ? inv.amountPaid : undefined, updatedAt: Date.now(), statusHistory: [...(inv.statusHistory || []), { status: bulkStatus, changedAt: Date.now() }] }),
+    `${ids.size} invoice${ids.size === 1 ? '' : 's'} set to ${label(bulkStatus)}.`)
+    if (done) { setSelected(new Set()); for (const t of targets) { const cId = clientIdOf(t); if (cId) void logComm(cId, `Invoice ${t.number} status changed to ${bulkStatus}`, 'system') } }
   }
-  function doDelete(id: string) { persist(invoices.filter((inv) => inv.id !== id)); setConfirmDelete(null) }
+  async function duplicateInvoice(inv: Invoice) {
+    const counter = await loadInvoiceCounter()
+    const dup: Invoice = { ...inv, id: uid(), number: `INV-${String(counter).padStart(3, '0')}`, status: 'draft', amountPaid: undefined,
+      date: new Date().toISOString().slice(0, 10), createdAt: Date.now(), updatedAt: Date.now() }
+    if (await persist([dup, ...invoices], `${inv.number} duplicated as ${dup.number} (draft).`)) void saveInvoiceCounter(counter + 1)
+  }
+  async function doDelete(inv: Invoice) { setConfirmDelete(null); await persist(invoices.filter(i => i.id !== inv.id), `${inv.number} deleted.`) }
 
-  const filtered = invoices.filter((inv) =>
-    `${inv.number} ${inv.clientName} ${inv.projectName}`.toLowerCase().includes(search.toLowerCase()),
-  )
-
+  // ── Filtering ───────────────────────────────────────────────────────────
+  const today = localParts(Date.now()).date
+  const pastDue = (i: Invoice) => !!i.dueDate && i.dueDate < today && UNPAID.includes(statusOf(i))
+  const base = invoices.filter(inv =>
+    `${inv.number} ${inv.clientName} ${inv.projectName}`.toLowerCase().includes(search.toLowerCase()) &&
+    (!projectFilter || (projectFilter === '__none__' ? !inv.projectId && !inv.projectName : inv.projectId === projectFilter || allProjects.find(p => p.id === projectFilter)?.name === inv.projectName)))
+  const shown = tab === 'all' || tab === 'recurring' ? base : base.filter(i => statusOf(i) === tab)
+  const counts = useMemo(() => {
+    const c: Record<string, number> = { all: base.length }
+    for (const s of STATUSES) c[s.key] = base.filter(i => statusOf(i) === s.key).length
+    return c
+  }, [base])
   const groups = useMemo(() => {
-    const map = new Map<string, { label: string; projectId: string | null; invoices: Invoice[] }>()
-    for (const inv of filtered) {
+    const map = new Map<string, { key: string; label: string; projectId: string | null; invoices: Invoice[] }>()
+    for (const inv of shown) {
       const key = inv.projectId || inv.projectName || '__unassigned__'
       if (!map.has(key)) {
         const proj = allProjects.find(p => p.id === inv.projectId || p.name === inv.projectName)
-        map.set(key, { label: proj?.name || inv.projectName || 'Unassigned', projectId: proj?.id || null, invoices: [] })
+        map.set(key, { key, label: proj?.name || inv.projectName || 'Unassigned', projectId: proj?.id || null, invoices: [] })
       }
       map.get(key)!.invoices.push(inv)
     }
-    return Array.from(map.entries())
-      .map(([key, val]) => ({ key, ...val }))
-      .sort((a, b) => {
-        if (a.key === '__unassigned__') return 1
-        if (b.key === '__unassigned__') return -1
-        return a.label.localeCompare(b.label)
-      })
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtered.map(i=>i.id+i.status).join(), allProjects.map(p=>p.id).join()])
+    return [...map.values()].sort((a, b) => a.key === '__unassigned__' ? 1 : b.key === '__unassigned__' ? -1 : a.label.localeCompare(b.label))
+  }, [shown, allProjects])
 
-  const totalBilled = invoices.reduce((s, i) => s + (Number(i.subtotal) || 0), 0)
+  const openTotal = invoices.filter(i => UNPAID.includes(statusOf(i))).reduce((s, i) => s + balanceOf(i), 0)
+  const overdueTotal = invoices.filter(i => statusOf(i) === 'overdue' || pastDue(i)).reduce((s, i) => s + balanceOf(i), 0)
+  const monthName = new Date(`${today}T12:00:00`).toLocaleDateString('en-US', { month: 'long' })
+  const canRemindAll = invoices.some(i => ['overdue', 'sent', 'partial'].includes(statusOf(i)) && i.clientEmail)
+  const filters: Filters = { tab, q: search, project: projectFilter, group: grouping }
+  const activeView = views.find(v => JSON.stringify(v.filters) === JSON.stringify(filters))
+  function applyView(f: Filters) { setTab(f.tab); setSearch(f.q); setProjectFilter(f.project); setGrouping(f.group); setSelected(new Set()) }
 
-  // ── Recurring helpers ────────────────────────────────────────────────────────
-  function persistRec(next: RecurringInvoice[]) { setRecurring(next); void saveRecurringInvoices(next) }
+  // ── Row actions (mockup: Draft Edit/Send · Overdue PDF/Remind/Payment · open PDF/Payment · Paid PDF) ──
+  type Act = { label: string; onClick: () => void; primary?: boolean }
+  function actionsFor(inv: Invoice): Act[] {
+    const s = statusOf(inv)
+    if (s === 'draft') return [{ label: 'Edit', onClick: () => openEditInvoice(inv) }, { label: busy === `send-${inv.id}` ? 'Sending…' : 'Send', primary: true, onClick: () => void sendDraft(inv) }]
+    if (s === 'paid') return [{ label: 'PDF', onClick: () => printInvoice(inv) }]
+    const late = s === 'overdue' || pastDue(inv)
+    return [
+      { label: 'PDF', onClick: () => printInvoice(inv) },
+      ...(late && inv.clientEmail ? [{ label: 'Remind', onClick: () => void remind(inv) }] : []),
+      { label: 'Payment', primary: true, onClick: () => setPayingInv(inv) },
+    ]
+  }
+  function menuFor(inv: Invoice): MenuItem[] {
+    const s = statusOf(inv)
+    return [
+      { label: 'Preview', icon: P.eye, onClick: () => setPreviewInv(inv) },
+      { label: 'Download PDF', icon: P.printer, onClick: () => printInvoice(inv), hidden: s !== 'draft' },
+      { label: 'Email invoice', icon: P.mail, onClick: () => void emailAgain(inv), hidden: !inv.clientEmail || s === 'draft' },
+      { label: 'Payment reminder', icon: P.bell, onClick: () => void remind(inv), hidden: !inv.clientEmail || !['overdue', 'sent', 'partial'].includes(s) },
+      { label: 'Payments received', icon: P.cash, onClick: () => setPayingInv(inv), hidden: s === 'draft' },
+      { label: 'Copy portal link', icon: P.link, onClick: () => shareInvoice(inv, settings.usdToDop, ok) },
+      { label: 'Duplicate', icon: P.copy, onClick: () => void duplicateInvoice(inv) },
+      { label: 'Edit invoice', icon: P.edit, onClick: () => openEditInvoice(inv), hidden: s === 'draft' },
+      { label: 'Change status', icon: P.refresh, onClick: () => openStatusEdit(inv) },
+      'sep',
+      { label: 'Delete', icon: P.trash, danger: true, onClick: () => setConfirmDelete(inv) },
+    ]
+  }
+  const toggleSel = (id: string) => setSelected(s => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  const toggleGroup = (key: string) => setExpanded(s => { const n = new Set(s); if (n.has(key)) n.delete(key); else n.add(key); return n })
 
-  function openRecurringNew() {
-    setEditingRec(null)
-    setRecForm(EMPTY_REC)
-    setRecurringPanel(true)
-  }
-  function openRecurringEdit(r: RecurringInvoice) {
-    setEditingRec(r)
-    setRecForm({
-      clientId: r.clientId || '', clientName: r.clientName || '',
-      projectId: r.projectId || '', projectName: r.projectName || '',
-      amount: String(r.amount), description: r.description || '',
-      frequency: r.frequency, nextDueDate: r.nextDueDate, active: r.active,
-    })
-    setRecurringPanel(true)
-  }
-  function saveRecurring() {
-    const amt = parseFloat(recForm.amount) || 0
-    if (!amt || !recForm.clientName.trim()) return
-    if (editingRec) {
-      persistRec(recurring.map(r => r.id === editingRec.id
-        ? { ...r, clientId: recForm.clientId || undefined, clientName: recForm.clientName, projectId: recForm.projectId || undefined, projectName: recForm.projectName || undefined, amount: amt, description: recForm.description || undefined, frequency: recForm.frequency, nextDueDate: recForm.nextDueDate, active: recForm.active }
-        : r
-      ))
-    } else {
-      const newRec: RecurringInvoice = {
-        id: uid(), clientId: recForm.clientId || undefined, clientName: recForm.clientName,
-        projectId: recForm.projectId || undefined, projectName: recForm.projectName || undefined,
-        amount: amt, description: recForm.description || undefined, frequency: recForm.frequency,
-        nextDueDate: recForm.nextDueDate, active: recForm.active, createdAt: Date.now(),
-      }
-      persistRec([newRec, ...recurring])
-    }
-    setRecurringPanel(false)
-  }
-  function toggleRecActive(r: RecurringInvoice) {
-    persistRec(recurring.map(x => x.id === r.id ? { ...x, active: !x.active } : x))
-  }
-  function deleteRec(id: string) {
-    persistRec(recurring.filter(r => r.id !== id))
+  // ── Builder view ────────────────────────────────────────────────────────
+  if (builderOpen) {
+    return (
+      <div className="page">
+        {mobile ? (
+          <>
+            <button type="button" className="back-link" onClick={() => setBuilderOpen(false)}><Ic d={P.chevL} size={15} /> Invoices</button>
+            <div className="card fin-phone-block">
+              <h2 className="fin-phone-block__title">The invoice builder needs a bigger screen</h2>
+              <p className="fin-phone-block__text">The daily hours grid doesn't fit on a phone. Open YVA OS on a computer or tablet to build invoices. You can still send, record payments and download PDFs from the list.</p>
+              <button type="button" className="btn btn--primary btn--lg btn--block" onClick={() => setBuilderOpen(false)}>Back to invoices</button>
+            </div>
+          </>
+        ) : (
+          <InvoiceBuilder onCreated={(inv, send) => void closeBuilder(inv, send)} onCancel={() => void closeBuilder()} initialProjectId={builderProjectId} editInvoice={editingInvoice} />
+        )}
+      </div>
+    )
   }
 
-  function freqLabel(f: RecurringFrequency) {
-    return f === 'weekly' ? 'Weekly' : f === 'biweekly' ? 'Biweekly' : 'Monthly'
+  // ── Rows ────────────────────────────────────────────────────────────────
+  const statusCell = (inv: Invoice) => (
+    <span className="fin-status">
+      <Pill status={statusOf(inv)} />
+      {statusOf(inv) === 'partial' && inv.amountPaid != null && <span className="fin-status__paid">{formatMoney(inv.amountPaid)} paid</span>}
+    </span>
+  )
+  const row = (inv: Invoice) => {
+    const bal = balanceOf(inv)
+    const late = statusOf(inv) === 'overdue' || pastDue(inv)
+    return (
+      <tr key={inv.id} className={selected.has(inv.id) ? 'fin-row--sel' : undefined}>
+        <td className="fin-col-check"><Checkbox ariaLabel={`Select ${inv.number}`} checked={selected.has(inv.id)} onChange={() => toggleSel(inv.id)} /></td>
+        <td>
+          <button type="button" className="fin-num mono" onClick={() => setPreviewInv(inv)}>{inv.number}</button>
+          {inv.autoGenerated && <span className="fin-tag-wc">Weekly close</span>}
+        </td>
+        <td><span className="t-strong">{inv.clientName || '—'}</span><span className="t-sub">{inv.projectName || 'No project'}</span></td>
+        <td className="muted">{periodLabel(inv)}</td>
+        <td className={late ? 't-danger' : 'muted'}>{inv.dueDate ? dateShort(inv.dueDate) : '—'}</td>
+        <td>{statusCell(inv)}</td>
+        <td className="t-num fin-strong">{formatMoney(amountOf(inv))}
+          {settings.usdToDop > 0 && <span className="t-sub">RD${(amountOf(inv) * settings.usdToDop).toLocaleString('en-US', { maximumFractionDigits: 0 })}</span>}</td>
+        <td className={`t-num ${bal ? '' : 't-success'}`}>{bal ? formatMoney(bal) : 'Paid'}</td>
+        <td className="t-actions">
+          <span className="fin-acts">
+            {actionsFor(inv).map(a => <button key={a.label} type="button" className={`btn btn--xs${a.primary ? ' btn--primary' : ''}`} onClick={a.onClick}>{a.label}</button>)}
+            <Menu items={menuFor(inv)} buttonClass="btn btn--icon btn--xs fin-more" />
+          </span>
+        </td>
+      </tr>
+    )
   }
+  const card = (inv: Invoice) => (
+    <div key={inv.id} className="mcard">
+      <div className="mcard__top">
+        <div className="fin-mcard-main">
+          <span className="mcard__title">{inv.clientName || '—'}</span>
+          <span className="mcard__meta"><span className="mono">{inv.number}</span> · due {inv.dueDate ? dateShort(inv.dueDate) : '—'}{inv.autoGenerated ? ' · Weekly close' : ''}</span>
+        </div>
+        <div className="fin-mcard-right"><span className="fin-strong num">{formatMoney(amountOf(inv))}</span>{statusCell(inv)}</div>
+      </div>
+      <div className="mcard__actions">
+        {actionsFor(inv).slice(-2).map(a => <button key={a.label} type="button" className={`btn${a.primary ? ' btn--primary' : ''}`} onClick={a.onClick}>{a.label}</button>)}
+        <Menu items={menuFor(inv)} buttonClass="btn btn--icon fin-more" />
+      </div>
+    </div>
+  )
+  const tableHead = (
+    <thead><tr>
+      <th className="fin-col-check"><Checkbox ariaLabel="Select all shown" checked={shown.length > 0 && shown.every(i => selected.has(i.id))} onChange={v => setSelected(v ? new Set(shown.map(i => i.id)) : new Set())} /></th>
+      <th>Invoice</th><th>Client</th><th>Period</th><th>Due</th><th>Status</th><th className="t-right">Amount</th><th className="t-right">Balance</th><th />
+    </tr></thead>
+  )
+  const groupHead = (g: typeof groups[number], asRow: boolean) => {
+    const total = g.invoices.reduce((s, i) => s + amountOf(i), 0)
+    const unpaid = g.invoices.filter(i => ['sent', 'overdue', 'partial'].includes(statusOf(i))).length
+    const open = expanded.has(g.key)
+    const inner = (
+      <div className="fin-group">
+        <button type="button" className="fin-group__toggle" aria-expanded={open} onClick={() => toggleGroup(g.key)}>
+          <Ic d={open ? P.chevD : P.chevR} size={14} /><span className="fin-group__name">{g.label}</span>
+          <span className="fin-group__meta">{g.invoices.length} invoice{g.invoices.length !== 1 ? 's' : ''} · {formatMoney(total)}{settings.usdToDop > 0 ? ` · RD$${(total * settings.usdToDop).toLocaleString('en-US', { maximumFractionDigits: 0 })}` : ''}</span>
+          {unpaid > 0 && <Pill tone="danger">{unpaid} unpaid</Pill>}
+        </button>
+        <span className="spacer" />
+        <button type="button" className="btn btn--xs" onClick={() => openQuickForProject(g.projectId || undefined)}>+ Quick</button>
+        <button type="button" className="btn btn--xs" onClick={() => openBuilder(g.projectId || undefined)}>+ Invoice</button>
+      </div>
+    )
+    return asRow ? <tr key={`g-${g.key}`} className="fin-group-row"><td colSpan={9}>{inner}</td></tr> : <div key={`g-${g.key}`} className="card fin-group-card">{inner}</div>
+  }
+
+  const openInvoices = invoices.filter(i => UNPAID.includes(statusOf(i)))
+    .filter(i => `${i.number} ${i.clientName}`.toLowerCase().includes(pickQ.toLowerCase()))
 
   return (
-    <div className="page-wrap">
-      <div className="page-header">
-        <div className="page-header-left">
-          <h1 className="page-title">Invoices</h1>
-          <p className="page-sub">{invoices.length} total · {formatMoney(totalBilled)}{settings.usdToDop > 0 ? ` · RD$${(totalBilled * settings.usdToDop).toLocaleString('en-US', { maximumFractionDigits: 0 })}` : ''}</p>
-        </div>
-        <div className="page-header-actions">
-          <input className="form-input" style={{ width: 190 }} placeholder="Search invoices..." value={search} onChange={(e) => setSearch(e.target.value)} />
-          {invoices.some(i => ['overdue','sent','partial'].includes((i.status||'').toLowerCase()) && i.clientEmail) && (
-            <button className="btn-ghost btn-sm" title="Send reminder to all clients with unpaid invoices" onClick={() => {
-              const seen = new Set<string>()
-              for (const inv of invoices.filter(i => ['overdue','sent','partial'].includes((i.status||'').toLowerCase()) && i.clientEmail)) {
-                if (!seen.has(inv.clientEmail!)) {
-                  seen.add(inv.clientEmail!)
-                  reminderEmail(inv, settings)
-                  const cId = clients.find(c => c.name === inv.clientName)?.id
-                  if (cId) void logComm(cId, `Payment reminder sent for Invoice ${inv.number}`, 'email')
-                }
-              }
-              showToast(`Reminders sent to ${seen.size} client${seen.size !== 1 ? 's' : ''}`)
-            }}><IconMail size={14} /> Remind All</button>
-          )}
-          <button className="btn-ghost btn-sm" onClick={() => openQuickForProject(undefined)}>Quick Invoice</button>
-          <button className="btn-primary" onClick={() => openBuilder()}><IconPlus size={14} /> New Invoice</button>
-        </div>
-      </div>
+    <div className="page">
+      <PageHeader title="Invoices"
+        sub={<>{formatMoney(openTotal)} open · <span className={overdueTotal ? 't-danger' : undefined}>{formatMoney(overdueTotal)} overdue</span>{collected != null ? ` · ${formatMoney(collected)} collected in ${monthName}` : ''}</>}
+        actions={<>
+          <SearchInput value={search} onChange={setSearch} placeholder="Number, client, project" label="Search invoices" width={mobile ? '100%' : 220} />
+          <Menu label="More invoice actions" items={[
+            { label: 'Quick invoice', icon: P.zap, onClick: () => openQuickForProject(undefined) },
+            { label: 'Record payment', icon: P.cash, onClick: () => { setPickQ(''); setPickPayment(true) } },
+            { label: 'Remind all unpaid', icon: P.mail, onClick: () => void remindAll(), hidden: !canRemindAll },
+          ]} />
+          <button type="button" className="btn btn--primary" onClick={() => openBuilder()}>+ New invoice</button>
+        </>} />
 
-      {/* TABS */}
-      <div style={{ display: 'flex', gap: 4, marginBottom: 16, borderBottom: '2px solid var(--border)', paddingBottom: 0 }}>
-        {(['invoices', 'recurring'] as const).map(tab => (
-          <button key={tab} onClick={() => setActiveTab(tab)} style={{
-            padding: '8px 18px', fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer',
-            background: 'none', borderBottom: activeTab === tab ? '2px solid var(--gold)' : '2px solid transparent',
-            color: activeTab === tab ? 'var(--text)' : 'var(--muted)', marginBottom: -2,
-          }}>
-            {tab === 'invoices' ? 'Invoices' : 'Recurring'}
-            {tab === 'recurring' && recurring.filter(r => r.active).length > 0 && (
-              <span style={{ marginLeft: 6, background: 'var(--brand)', color: '#1b1e2b', borderRadius: 999, padding: '1px 7px', fontSize: 11, fontWeight: 800 }}>
-                {recurring.filter(r => r.active).length}
+      <div className="fin-tabs-row">
+        <Tabs<Tab> label="Invoice status" value={tab} onChange={t => { setTab(t); setSelected(new Set()) }} tabs={[
+          { value: 'all', label: 'All', count: counts.all },
+          ...STATUSES.map(s => ({ value: s.key as Tab, label: s.label, count: counts[s.key] })),
+          { value: 'recurring', label: 'Recurring', badge: recurring.filter(r => r.active).length || null },
+        ]} />
+        {tab !== 'recurring' && (
+          <div className="fin-views">
+            {views.map(v => (
+              <span key={v.id} className={`chip chip--sm fin-view${activeView?.id === v.id ? ' chip--on' : ''}`}>
+                <button type="button" className="fin-view__name" onClick={() => applyView(v.filters)}>{v.name}</button>
+                <button type="button" className="fin-view__x" aria-label={`Remove view ${v.name}`} onClick={() => removeView(v.id)}>×</button>
               </span>
-            )}
-          </button>
-        ))}
+            ))}
+            <button type="button" className="link fin-save-view" onClick={() => { setViewName(''); setSaveViewOpen(true) }}>+ Save view</button>
+          </div>
+        )}
       </div>
 
-      {/* ── RECURRING TAB ─────────────────────────────────────────────────────── */}
-      {activeTab === 'recurring' && (
-        <div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 14 }}>
-            <button className="btn-primary" onClick={openRecurringNew}>+ New Recurring</button>
+      {banner && <Banner tone={banner.tone} onClose={() => setBanner(null)}>{banner.text}</Banner>}
+
+      {tab === 'recurring' ? (
+        <RecurringInvoices recurring={recurring} clients={clients} projects={allProjects} persist={persistRec} />
+      ) : (
+        <>
+          <div className="fin-toolbar">
+            <select className="select select--sm fin-project-filter" aria-label="Project" value={projectFilter} onChange={e => setProjectFilter(e.target.value)}>
+              <option value="">All projects</option>
+              {allProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              <option value="__none__">No project</option>
+            </select>
+            <Segmented<Grouping> label="Group invoices" value={grouping} onChange={setGrouping} options={[{ value: 'list', label: 'List' }, { value: 'project', label: 'By project' }]} />
+            {selected.size > 0 && (
+              <div className="fin-bulk" role="region" aria-label="Bulk status">
+                <span className="fin-bulk__count">{selected.size} selected</span>
+                <select className="select select--sm" aria-label="New status" value={bulkStatus} onChange={e => setBulkStatus(e.target.value as InvoiceStatus)}>
+                  {STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </select>
+                <button type="button" className="btn btn--sm btn--primary" onClick={() => void applyBulk()}>Apply to selected</button>
+                <button type="button" className="btn btn--sm btn--ghost" onClick={() => setSelected(new Set())}>Clear</button>
+              </div>
+            )}
           </div>
-          {recurring.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--muted)', fontSize: 14 }}>
-              No recurring invoices yet. Set one up to auto-bill clients on a schedule.
+
+          {loading ? (
+            <div className="table-card fin-skel">{[0, 1, 2, 3, 4].map(i => <div key={i} className="fin-skel__row"><Skel w={110} /><Skel w="30%" /><Skel w={90} /><Skel w={70} /><Skel w={90} /></div>)}</div>
+          ) : shown.length === 0 ? (
+            <EmptyState>{search || projectFilter || tab !== 'all' ? 'No invoices match these filters.' : 'No invoices yet. Click "+ New invoice" to get started.'}</EmptyState>
+          ) : mobile ? (
+            <div className="mcards">
+              {grouping === 'project'
+                ? groups.map(g => [groupHead(g, false), ...(expanded.has(g.key) ? g.invoices.map(card) : [])])
+                : shown.map(card)}
             </div>
           ) : (
-            <div className="table-wrap">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Client</th><th>Project</th><th>Amount</th><th>Frequency</th>
-                    <th>Next Due</th><th>Description</th><th>Status</th><th>Actions</th>
-                  </tr>
-                </thead>
+            <div className="table-card">
+              <table className="table fin-inv-table">
+                {tableHead}
                 <tbody>
-                  {recurring.map(r => (
-                    <tr key={r.id}>
-                      <td style={{ fontWeight: 600 }}>{r.clientName || '—'}</td>
-                      <td>{r.projectName || '—'}</td>
-                      <td>{formatMoney(r.amount)}</td>
-                      <td><span className="badge-gray">{freqLabel(r.frequency)}</span></td>
-                      <td>{r.nextDueDate}</td>
-                      <td style={{ color: 'var(--muted)', fontSize: 12 }}>{r.description || '—'}</td>
-                      <td>
-                        <span className={r.active ? 'badge-green' : 'badge-gray'}>
-                          {r.active ? 'Active' : 'Paused'}
-                        </span>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <div className="icon-action-toolbar">
-                            <button className="btn-icon-ghost" onClick={() => openRecurringEdit(r)} title="Edit"><IconEdit size={14} /></button>
-                            <button className="btn-icon-ghost" onClick={() => toggleRecActive(r)} title={r.active ? 'Pause' : 'Resume'}>
-                              {r.active ? <IconPause size={14} /> : <IconPlay size={14} />}
-                            </button>
-                            <button className="btn-icon-ghost danger" onClick={() => { if (confirm('Delete this recurring invoice?')) deleteRec(r.id) }} title="Delete"><IconTrash size={14} /></button>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                  {grouping === 'project'
+                    ? groups.map(g => [groupHead(g, true), ...(expanded.has(g.key) ? g.invoices.map(row) : [])])
+                    : shown.map(row)}
                 </tbody>
               </table>
             </div>
           )}
-
-          {/* RECURRING PANEL */}
-          {recurringPanel && (
-            <>
-              <div onClick={() => setRecurringPanel(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.25)', zIndex: 290 }} />
-              <div style={{ position: 'fixed', top: 0, right: 0, height: '100vh', width: 440, background: 'var(--surface)', boxShadow: '-4px 0 24px rgba(0,0,0,0.12)', zIndex: 300, display: 'flex', flexDirection: 'column' }}>
-                <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--text)' }}>{editingRec ? 'Edit Recurring' : 'New Recurring Invoice'}</span>
-                  <button className="btn-ghost btn-sm" onClick={() => setRecurringPanel(false)}><IconX size={14} /></button>
-                </div>
-                <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div className="form-group">
-                    <label className="form-label">Client *</label>
-                    <select className="form-input" value={recForm.clientId} onChange={e => {
-                      const c = clients.find(x => x.id === e.target.value)
-                      setRecForm(f => ({ ...f, clientId: e.target.value, clientName: c?.name || '' }))
-                    }}>
-                      <option value="">Select client…</option>
-                      {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Project</label>
-                    <select className="form-input" value={recForm.projectId} onChange={e => {
-                      const p = allProjects.find(x => x.id === e.target.value)
-                      setRecForm(f => ({ ...f, projectId: e.target.value, projectName: p?.name || '' }))
-                    }}>
-                      <option value="">None</option>
-                      {allProjects.filter(p => !recForm.clientId || p.clientId === recForm.clientId).map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Amount (USD) *</label>
-                    <input className="form-input" type="number" min="0" step="0.01" placeholder="0.00"
-                      value={recForm.amount} onChange={e => setRecForm(f => ({ ...f, amount: e.target.value }))} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Frequency</label>
-                    <select className="form-input" value={recForm.frequency} onChange={e => setRecForm(f => ({ ...f, frequency: e.target.value as RecurringFrequency }))}>
-                      <option value="weekly">Weekly</option>
-                      <option value="biweekly">Biweekly</option>
-                      <option value="monthly">Monthly</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Next Due Date</label>
-                    <input className="form-input" type="date" value={recForm.nextDueDate}
-                      onChange={e => setRecForm(f => ({ ...f, nextDueDate: e.target.value }))} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">Description</label>
-                    <textarea className="form-input" rows={2} placeholder="e.g. Monthly retainer"
-                      value={recForm.description} onChange={e => setRecForm(f => ({ ...f, description: e.target.value }))} />
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <input type="checkbox" id="rec-active" checked={recForm.active} onChange={e => setRecForm(f => ({ ...f, active: e.target.checked }))} />
-                    <label htmlFor="rec-active" style={{ fontSize: 13, color: 'var(--text)', cursor: 'pointer' }}>Active (will auto-generate invoices)</label>
-                  </div>
-                </div>
-                <div style={{ padding: '16px 24px', borderTop: '1px solid var(--border)' }}>
-                  <button className="btn-primary" style={{ width: '100%', justifyContent: 'center', padding: '12px', fontSize: 14 }}
-                    onClick={saveRecurring} disabled={!recForm.clientName.trim() || !recForm.amount}>
-                    {editingRec ? 'Save Changes' : 'Create Recurring Invoice'}
-                  </button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+        </>
       )}
 
-      {/* ── INVOICES TAB ──────────────────────────────────────────────────────── */}
-      {activeTab === 'invoices' && (
-      <div>
-      {/* PROJECT-GROUPED INVOICE LIST */}
-      {groups.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--muted)', fontSize: 14 }}>
-          {search ? 'No invoices match your search.' : 'No invoices yet. Click "+ New Invoice" to get started.'}
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {groups.map(({ key, label, projectId: pId, invoices: groupInvs }) => {
-            const groupTotal = groupInvs.reduce((s, i) => s + (Number(i.subtotal)||0), 0)
-            const unpaid = groupInvs.filter(i => ['sent','overdue','partial'].includes((i.status||'').toLowerCase())).length
-            const isOpen = expanded.has(key)
-            return (
-              <div key={key} className="invoice-group">
-                <div className="invoice-group-header" onClick={() => toggleCollapse(key)}>
-                  <span style={{ color: 'var(--muted)', display: 'inline-flex' }}>{isOpen ? <IconChevronDown size={14} /> : <IconChevronRight size={14} />}</span>
-                  <span className="invoice-group-name">{label}</span>
-                  <span className="invoice-group-meta">
-                    {groupInvs.length} invoice{groupInvs.length !== 1 ? 's' : ''} · {formatMoney(groupTotal)}
-                    {settings.usdToDop > 0 ? ` · RD$${(groupTotal * settings.usdToDop).toLocaleString('en-US',{maximumFractionDigits:0})}` : ''}
-                    {unpaid > 0 && <span className="unpaid-dot" style={{ marginLeft: 8 }}>{unpaid} unpaid</span>}
-                  </span>
-                  <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }} onClick={e => e.stopPropagation()}>
-                    <button className="btn-xs btn-ghost" onClick={() => openQuickForProject(pId || undefined)}>+ Quick</button>
-                    <button className="btn-xs btn-ghost" onClick={() => openBuilder(pId || undefined)}>+ Invoice</button>
-                  </div>
-                </div>
-                {isOpen && (
-                  <div className="table-wrap" style={{ margin: '0 0 2px' }}>
-                    <table className="data-table" style={{ fontSize: 13 }}>
-                      <thead>
-                        <tr>
-                          <th>Number</th>
-                          <th>Client</th>
-                          <th>Date</th>
-                          <th>Due</th>
-                          <th>Status</th>
-                          <th style={{ textAlign: 'right' }}>Amount</th>
-                          <th></th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {groupInvs.map(inv => {
-                          const overdue = inv.dueDate && new Date(inv.dueDate) < new Date() && !['paid'].includes((inv.status||'').toLowerCase())
-                          return (
-                            <tr key={inv.id}>
-                              <td className="td-name" style={{ fontWeight: 700, fontSize: 13 }}>{inv.number}</td>
-                              <td className="td-muted">{inv.clientName || '—'}</td>
-                              <td className="td-muted">{inv.date || '—'}</td>
-                              <td className="td-muted" style={{ color: overdue ? '#dc2626' : undefined }}>{inv.dueDate || '—'}</td>
-                              <td><span className={`badge ${statusBadge(inv.status)}`} style={{ fontSize: 10 }}>{inv.status || 'draft'}</span>
-                                {inv.status === 'partial' && inv.amountPaid != null && (
-                                  <span style={{ fontSize: 10, color: '#f97316', marginLeft: 4 }}>({formatMoney(inv.amountPaid)} paid)</span>
-                                )}
-                              </td>
-                              <td style={{ textAlign: 'right', fontWeight: 700 }}>
-                                {formatMoney(Number(inv.subtotal)||0)}
-                                {settings.usdToDop > 0 && <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>{dopLabel(Number(inv.subtotal)||0, settings.usdToDop)}</div>}
-                              </td>
-                              <td>
-                                <div className="icon-action-toolbar">
-                                  {inv.clientEmail && <button className="btn-icon-ghost" title="Email invoice" onClick={() => { emailInvoice(inv, settings); showToast(`Invoice ${inv.number} emailed to ${inv.clientEmail}`); const cId = clients.find(c => c.name === inv.clientName)?.id; if (cId) void logComm(cId, `Invoice ${inv.number} emailed (${formatMoney(Number(inv.subtotal)||0)})`, 'email') }}><IconMail size={14} /></button>}
-                                  {inv.clientEmail && ['overdue','sent','partial'].includes((inv.status||'').toLowerCase()) && (
-                                    <button className="btn-icon-ghost" title="Payment reminder" onClick={() => { reminderEmail(inv, settings); showToast(`Payment reminder sent to ${inv.clientEmail}`); const cId = clients.find(c => c.name === inv.clientName)?.id; if (cId) void logComm(cId, `Payment reminder sent for Invoice ${inv.number}`, 'email') }}><IconAlert size={14} /></button>
-                                  )}
-                                  {inv.status && inv.status !== 'draft' && <button className="btn-icon-ghost" title="Payments received" onClick={() => setPayingInv(inv)}><IconDollar size={14} /></button>}
-                                  <button className="btn-icon-ghost" title="Preview" onClick={() => setPreviewInv(inv)}><IconEye size={14} /></button>
-                                  <button className="btn-icon-ghost" title="PDF" onClick={() => printInvoice(inv, 0, settings)}><IconPrinter size={14} /></button>
-                                  <button className="btn-icon-ghost" title="Share portal" onClick={() => shareInvoice(inv, settings.usdToDop)}><IconLink size={14} /></button>
-                                  <button className="btn-icon-ghost" title="Duplicate" onClick={() => duplicateInvoice(inv)}><IconCopy size={14} /></button>
-                                  <button className="btn-icon-ghost" title="Edit invoice" onClick={() => openEditInvoice(inv)}><IconEdit size={14} /></button>
-                                  <button className="btn-icon-ghost" title="Update status" onClick={() => openStatusEdit(inv)}><IconStatus size={14} /></button>
-                                  <button className="btn-icon-ghost danger" title="Delete" onClick={() => setConfirmDelete(inv.id)}><IconTrash size={14} /></button>
-                                </div>
-                              </td>
-                            </tr>
-                          )
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
+      {/* Save view */}
+      <Modal open={saveViewOpen} onClose={() => setSaveViewOpen(false)} title="Save view" sub="Keeps this tab, search, project filter and grouping on this browser, for you only."
+        footer={<>
+          <button type="button" className="btn" onClick={() => setSaveViewOpen(false)}>Cancel</button>
+          <button type="button" className="btn btn--primary" disabled={!viewName.trim()} onClick={() => { saveView(viewName, filters); setSaveViewOpen(false); ok(`View "${viewName.trim()}" saved.`) }}>Save view</button>
+        </>}>
+        <Field label="Name"><input className="input" aria-label="View name" autoFocus value={viewName} onChange={e => setViewName(e.target.value)} placeholder="e.g. Overdue · Halavi" /></Field>
+      </Modal>
 
-      </div>
-      )}
-      {/* end invoices tab */}
+      {/* Quick invoice */}
+      <Modal open={quickModal} onClose={() => setQuickModal(false)} title="Quick invoice" sub="A fixed amount. It's marked Sent and emailed to the client."
+        footer={<>
+          <button type="button" className="btn" onClick={() => setQuickModal(false)}>Cancel</button>
+          <button type="button" className="btn btn--primary" onClick={() => void saveQuick()} disabled={!form.clientName || !form.subtotal}>Create</button>
+        </>}>
+        <div className="form-grid form-grid--2">
+          <Field label="Client *" full>
+            <select className="select" aria-label="Client" value={form.clientName} onChange={e => setForm({ ...form, clientName: e.target.value })}>
+              <option value="">— Select client —</option>
+              {clients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+            </select>
+          </Field>
+          <Field label="Invoice date"><input className="input" type="date" aria-label="Invoice date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></Field>
+          <Field label="Due date"><input className="input" type="date" aria-label="Due date" value={form.dueDate} onChange={e => setForm({ ...form, dueDate: e.target.value })} /></Field>
+          <Field label="Amount ($) *" full><input className="input" type="number" placeholder="0.00" aria-label="Amount ($)" value={form.subtotal} onChange={e => setForm({ ...form, subtotal: e.target.value })} /></Field>
+          <Field label="Notes" full><textarea className="textarea" rows={2} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} placeholder="Optional message to client…" /></Field>
+        </div>
+      </Modal>
 
-      {/* React Invoice Builder */}
-      {builderOpen && (
-        <div className="modal-overlay" onClick={() => closeBuilder()}>
-          <div className="builder-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="builder-modal-header">
-              <span>{editingInvoice ? `Edit Invoice — ${editingInvoice.number}` : 'New Invoice'}</span>
-              <button className="modal-close btn-icon" onClick={() => closeBuilder()}><IconX size={14} /></button>
-            </div>
-            <div className="builder-modal-body">
-              <InvoiceBuilder onCreated={closeBuilder} onCancel={() => closeBuilder()} initialProjectId={builderProjectId} editInvoice={editingInvoice} />
-            </div>
+      {/* Change status */}
+      <Modal open={!!statusFor} onClose={() => setStatusFor(null)} title="Change status" sub={statusFor ? `${statusFor.number} · ${statusFor.clientName || ''}` : undefined}
+        footer={<>
+          <button type="button" className="btn" onClick={() => setStatusFor(null)}>Cancel</button>
+          <button type="button" className="btn btn--primary" onClick={() => void saveStatus()}>Save</button>
+        </>}>
+        <Field label="Status">
+          <select className="select" aria-label="Status" value={newStatus} onChange={e => setNewStatus(e.target.value as InvoiceStatus)}>
+            {STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+          </select>
+        </Field>
+        {newStatus === 'partial' && (
+          <Field label="Amount paid ($)" hint="How much has been received so far.">
+            <input className="input" type="number" placeholder="0.00" aria-label="Amount paid ($)" value={newAmountPaid} onChange={e => setNewAmountPaid(e.target.value)} />
+          </Field>
+        )}
+        {(statusFor?.statusHistory || []).length > 0 && (
+          <div className="fin-history">
+            <span className="section-label">Status history</span>
+            {[...(statusFor?.statusHistory || [])].reverse().slice(0, 6).map((h, i) => (
+              <div key={i} className="fin-history__row"><Pill status={h.status} /><span className="muted">{new Date(h.changedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span></div>
+            ))}
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
-      {/* Quick Invoice Modal */}
-      {quickModal && (
-        <div className="modal-overlay" onClick={() => setQuickModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2 className="modal-title">Quick Invoice <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 400 }}>· auto-marked Sent + emailed</span></h2>
-              <button className="modal-close btn-icon" onClick={() => setQuickModal(false)}><IconX size={14} /></button>
-            </div>
-            <div className="modal-body">
-              <div className="form-grid-2">
-                <div className="form-group form-group-full">
-                  <label className="form-label">Client *</label>
-                  <select className="form-select" value={form.clientName} onChange={(e) => setForm({ ...form, clientName: e.target.value })}>
-                    <option value="">— Select client —</option>
-                    {clients.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Invoice Date</label>
-                  <input className="form-input" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Due Date</label>
-                  <input className="form-input" type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Amount ($) *</label>
-                  <input className="form-input" type="number" placeholder="0.00" value={form.subtotal} onChange={(e) => setForm({ ...form, subtotal: e.target.value })} />
-                </div>
-                <div className="form-group form-group-full">
-                  <label className="form-label">Notes</label>
-                  <textarea className="form-textarea" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder="Optional message to client..." />
-                </div>
-              </div>
-            </div>
-            <div className="modal-footer">
-              <button className="btn-ghost" onClick={() => setQuickModal(false)}>Cancel</button>
-              <button className="btn-primary" onClick={saveQuick} disabled={!form.clientName || !form.subtotal}>Create</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Delete */}
+      <Modal open={!!confirmDelete} onClose={() => setConfirmDelete(null)} title="Delete invoice?" sub={confirmDelete ? `${confirmDelete.number} · ${confirmDelete.clientName || ''}. This cannot be undone.` : undefined}
+        footer={<>
+          <button type="button" className="btn" onClick={() => setConfirmDelete(null)}>Cancel</button>
+          <button type="button" className="btn btn--danger" onClick={() => confirmDelete && void doDelete(confirmDelete)}>Delete</button>
+        </>} />
 
-      {/* Status update */}
-      {statusModal && (
-        <div className="modal-overlay" onClick={() => setStatusModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2 className="modal-title">Update Status</h2>
-              <button className="modal-close btn-icon" onClick={() => setStatusModal(false)}><IconX size={14} /></button>
-            </div>
-            <div className="modal-body">
-              <div className="form-group">
-                <label className="form-label">Status</label>
-                <select className="form-select" value={newStatus} onChange={(e) => setNewStatus(e.target.value as InvoiceStatus)}>
-                  {STATUSES.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
-                </select>
-              </div>
-              {newStatus === 'partial' && (
-                <div className="form-group" style={{ marginTop: 12 }}>
-                  <label className="form-label">Amount Paid ($)</label>
-                  <input
-                    className="form-input"
-                    type="number"
-                    placeholder="0.00"
-                    value={newAmountPaid}
-                    onChange={e => setNewAmountPaid(e.target.value)}
-                  />
-                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
-                    Enter how much has been received so far.
-                  </div>
-                </div>
-              )}
-              {(() => {
-                const hist = invoices.find(i => i.id === editId)?.statusHistory || []
-                if (hist.length === 0) return null
-                return (
-                  <div style={{ marginTop: 16, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--muted)', marginBottom: 8 }}>Status History</div>
-                    {[...hist].reverse().slice(0, 6).map((h, i) => (
-                      <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 12, marginBottom: 5 }}>
-                        <span className={`badge ${statusBadge(h.status)}`} style={{ fontSize: 10 }}>{h.status}</span>
-                        <span style={{ color: 'var(--muted)' }}>{new Date(h.changedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>
-                      </div>
-                    ))}
-                  </div>
-                )
-              })()}
-            </div>
-            <div className="modal-footer">
-              <button className="btn-ghost" onClick={() => setStatusModal(false)}>Cancel</button>
-              <button className="btn-primary" onClick={saveStatus}>Save</button>
-            </div>
-          </div>
+      {/* Record payment: pick an open invoice (Create menu → Record payment) */}
+      <Modal open={pickPayment} onClose={() => setPickPayment(false)} title="Record payment" sub="Pick the invoice the payment is for.">
+        <SearchInput value={pickQ} onChange={setPickQ} placeholder="Number or client" label="Find invoice" />
+        <div className="fin-pick">
+          {openInvoices.length === 0 && <div className="muted fin-pick__empty">No open invoices{pickQ ? ' match' : ''}.</div>}
+          {openInvoices.map(i => (
+            <button key={i.id} type="button" className="fin-pick__row" onClick={() => { setPickPayment(false); setPayingInv(i) }}>
+              <span className="fin-pick__main"><span className="t-strong">{i.clientName || '—'}</span><span className="mono muted">{i.number}</span></span>
+              <span className="fin-pick__right"><span className="fin-strong num">{formatMoney(balanceOf(i))}</span><Pill status={statusOf(i)} /></span>
+            </button>
+          ))}
         </div>
-      )}
+      </Modal>
 
-      {confirmDelete && (
-        <div className="modal-overlay" onClick={() => setConfirmDelete(null)}>
-          <div className="confirm-dialog" onClick={(e) => e.stopPropagation()}>
-            <div className="confirm-title">Delete invoice?</div>
-            <div className="confirm-body">This cannot be undone.</div>
-            <div className="confirm-actions">
-              <button className="btn-ghost" onClick={() => setConfirmDelete(null)}>Cancel</button>
-              <button className="btn-danger" onClick={() => doDelete(confirmDelete)}>Delete</button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Preview / open */}
+      <Modal open={!!previewInv} onClose={() => setPreviewInv(null)} size="xl" title={previewInv ? `Invoice ${previewInv.number}` : ''}
+        sub={previewInv ? <>{previewInv.clientName} · {formatMoney(amountOf(previewInv))} · <Pill status={statusOf(previewInv)} /></> : undefined}
+        footer={previewInv ? <>
+          <button type="button" className="btn" onClick={() => { const inv = previewInv; setPreviewInv(null); openStatusEdit(inv) }}>Change status</button>
+          {statusOf(previewInv) !== 'draft' && <button type="button" className="btn" onClick={() => { setPayingInv(previewInv); setPreviewInv(null) }}>Payments</button>}
+          {!mobile && <button type="button" className="btn" onClick={() => { const inv = previewInv; setPreviewInv(null); openEditInvoice(inv) }}>Edit</button>}
+          <button type="button" className="btn btn--primary" onClick={() => printInvoice(previewInv)}><Ic d={P.printer} size={15} /> Print / PDF</button>
+        </> : undefined}>
+        {previewInv && <iframe className="fin-preview" srcDoc={buildInvoiceHTML(previewInv, htmlOpts(0))} sandbox="" title="Invoice preview" />}
+      </Modal>
 
-      {/* Send Confirmation Modal */}
-      {sendConfirmInv && (
-        <div className="modal-overlay" onClick={() => setSendConfirmInv(null)}>
-          <div className="modal" style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header">
-              <h2 className="modal-title">Invoice Saved</h2>
-              <button className="modal-close btn-icon" onClick={() => setSendConfirmInv(null)}><IconX size={14} /></button>
-            </div>
-            <div className="modal-body">
-              <p style={{ fontSize: 14, color: 'var(--soft)', marginBottom: 8 }}>
-                <strong>{sendConfirmInv.number}</strong> has been saved as a draft.
-              </p>
-              {sendConfirmInv.clientEmail ? (
-                <p style={{ fontSize: 13, color: 'var(--muted)' }}>
-                  Send to <strong>{sendConfirmInv.clientEmail}</strong> now?
-                </p>
-              ) : (
-                <p style={{ fontSize: 13, color: 'var(--muted)' }}>No client email on file. Mark as sent manually when ready.</p>
-              )}
-            </div>
-            <div className="modal-footer">
-              <button className="btn-ghost" onClick={() => setSendConfirmInv(null)}>Keep as Draft</button>
-              <button className="btn-primary" onClick={() => {
-                const updated = invoices.map(i => i.id === sendConfirmInv.id
-                  ? { ...i, status: 'sent' as const, statusHistory: [...(i.statusHistory||[]), { status: 'sent', changedAt: Date.now() }] }
-                  : i)
-                void saveInvoices(updated)
-                setInvoices(updated)
-                const cId = clients.find(c => c.name === sendConfirmInv.clientName)?.id
-                if (sendConfirmInv.clientEmail) {
-                  emailInvoice(sendConfirmInv, settings)
-                  showToast(`Invoice ${sendConfirmInv.number} sent to ${sendConfirmInv.clientEmail}`)
-                  if (cId) void logComm(cId, `Invoice ${sendConfirmInv.number} emailed (${formatMoney(Number(sendConfirmInv.subtotal)||0)})`, 'email')
-                } else {
-                  showToast(`Invoice ${sendConfirmInv.number} marked as sent`)
-                  if (cId) void logComm(cId, `Invoice ${sendConfirmInv.number} marked as sent`, 'system')
-                }
-                setSendConfirmInv(null)
-              }}>{sendConfirmInv.clientEmail ? 'Send Now' : 'Mark as Sent'}</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Toast notification */}
-      {toast && (
-        <div className="profile-toast">
-          <IconCheck size={14} /> {toast}
-        </div>
-      )}
-
-      {/* Invoice Preview Modal */}
-      {previewInv && (
-        <div className="modal-overlay" onClick={() => setPreviewInv(null)}>
-          <div style={{ background: 'var(--surface)', borderRadius: 12, width: '90vw', maxWidth: 820, maxHeight: '90vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
-            <div className="modal-header" style={{ padding: '14px 20px' }}>
-              <div>
-                <h2 className="modal-title">Preview — {previewInv.number}</h2>
-                <div style={{ fontSize: 12, color: 'var(--muted)' }}>{previewInv.clientName}</div>
-              </div>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <button className="btn-primary btn-sm" onClick={() => printInvoice(previewInv, 0, settings)}><IconPrinter size={14} /> Print / PDF</button>
-                <button className="modal-close btn-icon" onClick={() => setPreviewInv(null)}><IconX size={14} /></button>
-              </div>
-            </div>
-            <iframe
-              srcDoc={buildInvoiceHTML(previewInv, 0, settings, false)}
-              sandbox=""
-              style={{ flex: 1, border: 'none', background: '#fff', minHeight: 500 }}
-              title="Invoice Preview"
-            />
-          </div>
-        </div>
-      )}
-      {payingInv && <RecordPaymentModal invoice={{ ...payingInv, subtotal: Number(payingInv.subtotal) || 0 }} onClose={() => setPayingInv(null)}
-        onChanged={() => { void loadInvoices().then(setInvoices) }} />}
+      {payingInv && <RecordPaymentModal invoice={{ ...payingInv, subtotal: amountOf(payingInv) }} onClose={() => setPayingInv(null)}
+        onChanged={s => { setInvoices(list => list.map(i => i.id === payingInv.id ? { ...i, amountPaid: s.amountPaid, status: s.status } : i)); void loadInvoices().then(setInvoices) }} />}
     </div>
   )
 }

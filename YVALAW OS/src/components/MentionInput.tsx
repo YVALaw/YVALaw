@@ -28,7 +28,7 @@ export default function MentionInput({ value, onChange, employees, placeholder, 
 
     // Look backwards from the cursor for an @ trigger
     const textBeforeCursor = text.slice(0, cursor)
-    const match = textBeforeCursor.match(/@(\w[\w ]*)$/)
+    const match = textBeforeCursor.match(/@([\p{L}\p{N}_][\p{L}\p{N}_ ]*)$/u)
 
     if (match) {
       triggerPosRef.current = cursor - match[0].length
@@ -105,45 +105,26 @@ export default function MentionInput({ value, onChange, employees, placeholder, 
   }, [dropdownOpen])
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div className="ops-combo">
       <textarea
         ref={textareaRef}
-        className="form-input"
+        className="textarea ops-mention"
         rows={rows}
         value={value}
         placeholder={placeholder}
+        aria-label={placeholder ?? 'Description'}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
-        style={{ width: '100%', resize: 'vertical' }}
       />
       {dropdownOpen && filtered.length > 0 && (
-        <div
-          style={{
-            position: 'absolute',
-            top: '100%',
-            left: 0,
-            zIndex: 200,
-            background: '#fff',
-            border: '1px solid #e2e8f0',
-            borderRadius: 8,
-            boxShadow: '0 4px 16px rgba(0,0,0,.12)',
-            minWidth: 180,
-            maxWidth: 280,
-            overflow: 'hidden',
-          }}
-        >
+        <div className="ops-combo__list ops-combo__list--narrow" role="listbox">
           {filtered.map((name, i) => (
             <div
               key={name}
+              role="option"
+              aria-selected={i === activeIndex}
+              className={`ops-combo__opt${i === activeIndex ? ' ops-combo__opt--on' : ''}`}
               onPointerDown={e => { e.preventDefault(); insertMention(name) }}
-              style={{
-                padding: '7px 12px',
-                fontSize: 13,
-                cursor: 'pointer',
-                background: i === activeIndex ? 'rgba(250,204,21,.15)' : 'transparent',
-                color: i === activeIndex ? '#a16207' : '#1e293b',
-                fontWeight: i === activeIndex ? 600 : 400,
-              }}
             >
               @{name}
             </div>

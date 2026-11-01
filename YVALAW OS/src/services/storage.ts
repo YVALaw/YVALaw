@@ -6,6 +6,7 @@ import type {
   Estimate, TimeEntry, RecurringInvoice, StaffRequest, ClientDocument,
   PaymentAttempt,
 } from '../data/types'
+import { setCompanyBranding } from '../utils/invoiceHtml'
 import { LoadTracker, applyPlan, normalizeRow, planSync, toSnakeRow as toSnake, type Row } from '../utils/syncPlan'
 
 export type ClientPortalBillingStatus = {
@@ -264,6 +265,12 @@ export async function saveEmployeeCounter(n: number): Promise<void> {
 
 // ─── Settings ─────────────────────────────────────────────────────────────────
 
+/** True once a loaded settings row had the columns from migrate-redesign-settings.sql */
+let hasBrandingColumns = false
+
+/** False until migrate-redesign-settings.sql has run (logo, website, invoice footer and Crisp can't be saved yet) */
+export const settingsHaveBrandingColumns = () => hasBrandingColumns
+
 const DEFAULT_SETTINGS: AppSettings = {
   usdToDop: 0,
   companyName: 'YVA Staffing',
@@ -275,12 +282,19 @@ export async function loadSettings(): Promise<AppSettings> {
   const { data, error } = await supabase.from('settings').select('*').eq('id', 1).single()
   if (error || !data) return DEFAULT_SETTINGS
   const row = data as Record<string, unknown>
-  return {
+  // Before migrate-redesign-settings.sql runs these columns don't exist; saving them would fail the whole update
+  hasBrandingColumns = 'company_website' in row
+  const settings: AppSettings = {
     usdToDop:               (row.usd_to_dop as number) ?? 0,
     companyName:            (row.company_name as string) ?? 'YVA Staffing',
     companyEmail:           (row.company_email as string) ?? '',
     companyAddress:         (row.company_address as string | undefined),
     companyPhone:           (row.company_phone as string | undefined),
+    companyWebsite:         (row.company_website as string | null) ?? undefined,
+    invoiceFooter:          (row.invoice_footer as string | null) ?? undefined,
+    companyLogoUrl:         (row.company_logo_url as string | null) ?? undefined,
+    companyLogoPath:        (row.company_logo_path as string | null) ?? undefined,
+    crispWebsiteId:         (row.crisp_website_id as string | null) ?? undefined,
     emailSignature:         (row.email_signature as string) ?? '',
     reminderDay:            row.reminder_day != null ? (row.reminder_day as number) : undefined,
     reminderLastFired:      (row.reminder_last_fired as string | undefined),
@@ -296,6 +310,9 @@ export async function loadSettings(): Promise<AppSettings> {
     gmailTokenExpiry:       row.gmail_token_expiry != null ? (row.gmail_token_expiry as number) : undefined,
     gmailEmail:             (row.gmail_email as string | undefined),
   }
+  // Printed invoices / statements pick up the logo, website and footer without every caller passing them
+  setCompanyBranding({ logoUrl: settings.companyLogoUrl, website: settings.companyWebsite, invoiceFooter: settings.invoiceFooter })
+  return settings
 }
 
 export async function saveSettings(s: AppSettings): Promise<void> {
@@ -305,6 +322,13 @@ export async function saveSettings(s: AppSettings): Promise<void> {
     company_email:            s.companyEmail,
     company_address:          s.companyAddress,
     company_phone:            s.companyPhone,
+    ...(hasBrandingColumns ? {
+      company_website:        s.companyWebsite || null,
+      invoice_footer:         s.invoiceFooter || null,
+      company_logo_url:       s.companyLogoUrl || null,
+      company_logo_path:      s.companyLogoPath || null,
+      crisp_website_id:       s.crispWebsiteId || null,
+    } : {}),
     email_signature:          s.emailSignature,
     reminder_day:             s.reminderDay ?? null,
     reminder_last_fired:      s.reminderLastFired ?? null,

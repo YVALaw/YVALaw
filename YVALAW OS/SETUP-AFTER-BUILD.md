@@ -33,6 +33,19 @@ If you ever re-run the YVA Time phase 2 script, run `migrate-step4-weekly-close.
 **Netlify → Forms:** if you have an email notification on the `lead-backup` form, add one for the new
 `application-backup` form too (careers applications when EmailJS is blocked). They also land in YVA OS → Candidates.
 
+## 2b. After the redesign (November) is live — 5 more small scripts
+
+Same way as step 1, in this order (each is safe to run again):
+1. `supabase/migrate-redesign-portal.sql` — "Request more staff" saves how many people and which project
+2. `supabase/migrate-redesign-finance.sql` — receipts on expenses
+3. `supabase/migrate-redesign-people.sql` — scheduled announcements notify the team when they go live
+4. `supabase/migrate-redesign-settings.sql` — Settings → Company: website, invoice footer, your own logo; Crisp chat
+5. `supabase/migrate-redesign-people-extras.sql` — full hire date on employees (anniversaries)
+
+**Crisp chat (client portal → Messages):** make a free account at crisp.chat → Settings → Website settings →
+copy the **Website ID** → YVA OS → Settings → **Integrations** → Crisp → paste → Save. Clients then chat with
+you from the portal; you answer in the Crisp app or website.
+
 ## 3. Connect Gmail (for invoices, payslips and automatic emails)
 
 1. Google Cloud Console → your OAuth client (Web application) → **Authorized redirect URIs** → add

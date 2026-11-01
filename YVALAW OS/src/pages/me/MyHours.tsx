@@ -1,50 +1,65 @@
 import { useEffect, useState } from 'react'
 import { loadTrackerBlocks, type TrackerBlock } from '../../services/trackerStorage'
-import { DICT, type Lang } from './i18n'
+import { Segmented, Skel } from '../../components/ui'
+import { DICT, hm, type Lang } from './i18n'
 
-function mondayOf(ms: number): number {
+export function mondayOf(ms: number): number {
   const d = new Date(ms); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.getTime()
 }
-function addDays(ms: number, n: number): number { const d = new Date(ms); d.setDate(d.getDate() + n); return d.getTime() }
+export function addDays(ms: number, n: number): number { const d = new Date(ms); d.setDate(d.getDate() + n); return d.getTime() }
 function sameDay(a: number, b: number): boolean { return new Date(a).toDateString() === new Date(b).toDateString() }
-const hm = (s: number) => `${Math.floor(s / 3600)}h ${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}m`
+/** A full bar = 10 hours (as in the mockup) */
+const FULL_DAY = 10 * 3600
 
-/** My workspace → My hours: the employee's own YVA Time hours by day (RLS: own rows only) */
+/** My workspace → My time: the employee's own YVA Time hours by day, this or last week (RLS: own rows only).
+ *  Green = approved by YVA, amber = tracked, not approved yet. */
 export default function MyHours({ employeeId, lang = 'en' }: { employeeId: string; lang?: Lang }) {
-  const t = DICT[lang].time
-  const [week, setWeek] = useState(() => mondayOf(Date.now()))
-  const [blocks, setBlocks] = useState<TrackerBlock[]>([])
+  const t = DICT[lang]
+  const thisWeek = mondayOf(Date.now())
+  const [which, setWhich] = useState<'this' | 'last'>('this')
+  const week = which === 'this' ? thisWeek : addDays(thisWeek, -7)
+  const [blocks, setBlocks] = useState<TrackerBlock[] | null>(null)
 
   useEffect(() => {
-    void loadTrackerBlocks(week, addDays(week, 7), employeeId).then(setBlocks)
+    let alive = true
+    setBlocks(null)
+    void loadTrackerBlocks(week, addDays(week, 7), employeeId).then(b => { if (alive) setBlocks(b) })
+    return () => { alive = false }
   }, [week, employeeId])
 
-  const counted = blocks.filter(b => b.status === 'tracked' || b.status === 'approved')
-  const days = Array.from({ length: 7 }, (_, i) => addDays(week, i))
+  const counted = (blocks || []).filter(b => b.status === 'tracked' || b.status === 'approved')
   const sum = (list: TrackerBlock[]) => list.reduce((s, b) => s + b.seconds, 0)
   const total = sum(counted), approved = sum(counted.filter(b => b.status === 'approved'))
-  const thisWeek = mondayOf(Date.now())
+  const days = Array.from({ length: 7 }, (_, i) => addDays(week, i))
 
   return (
     <>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
-        <button className={`filter-tab${week === thisWeek ? ' active' : ''}`} onClick={() => setWeek(thisWeek)}>{t.thisWeek}</button>
-        <button className={`filter-tab${week === addDays(thisWeek, -7) ? ' active' : ''}`} onClick={() => setWeek(addDays(thisWeek, -7))}>{t.lastWeek}</button>
+      <div className="mw-weeks">
+        <Segmented label={t.time.weekToggle} value={which} onChange={setWhich}
+          options={[{ value: 'this', label: t.time.thisWeek }, { value: 'last', label: t.time.lastWeek }]} />
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 6 }}>
+      <section className="card mw-days" aria-label={which === 'this' ? t.time.thisWeek : t.time.lastWeek}>
         {days.map((d, i) => {
-          const s = sum(counted.filter(b => sameDay(b.blockStart, d)))
+          const list = counted.filter(b => sameDay(b.blockStart, d))
+          const ok = sum(list.filter(b => b.status === 'approved')), all = sum(list), wait = all - ok
           return (
-            <div key={d} style={{ border: '1px solid var(--border)', borderRadius: 10, padding: '8px 6px', textAlign: 'center', background: sameDay(d, Date.now()) ? 'var(--surf2)' : undefined }}>
-              <div style={{ fontSize: 11, color: 'var(--muted)' }}>{t.days[i]} {new Date(d).getDate()}</div>
-              <div style={{ fontWeight: 700, fontSize: 13, marginTop: 2 }}>{s ? hm(s) : '—'}</div>
+            <div key={d} className={`mw-day${sameDay(d, Date.now()) ? ' mw-day--today' : ''}`}>
+              <span className="mw-day__name">{t.time.days[i]} <span className="mw-day__date">{new Date(d).getDate()}</span></span>
+              <span className="mw-bar" aria-hidden>
+                {blocks && ok > 0 && <span className="mw-bar__ok" style={{ width: `${Math.min(100, (ok / FULL_DAY) * 100)}%` }} />}
+                {blocks && wait > 0 && <span className="mw-bar__wait" style={{ width: `${Math.min(100 - Math.min(100, (ok / FULL_DAY) * 100), (wait / FULL_DAY) * 100)}%` }} />}
+              </span>
+              <span className="mw-day__hours mono">{blocks === null ? <Skel w={40} h={12} /> : all ? hm(all) : '—'}</span>
+              <span className={`mw-day__status ${wait > 0 ? 't-warning' : 't-success'}`}>{all === 0 ? '' : wait > 0 ? t.status.waiting : t.status.approved}</span>
             </div>
           )
         })}
-      </div>
-      <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 10 }}>
-        {t.weekTotal} <strong style={{ color: 'var(--text)' }}>{hm(total)}</strong> · {t.approvedBy} <strong style={{ color: 'var(--text)' }}>{hm(approved)}</strong>
-      </div>
+        <div className="mw-total">
+          <span>{which === 'this' ? t.time.thisWeek : t.time.lastWeek}</span>
+          <span className="num">{hm(total)}</span>
+        </div>
+        <div className="mw-total__sub">{hm(approved)} {t.time.approvedBy} · {t.time.sub}</div>
+      </section>
     </>
   )
 }

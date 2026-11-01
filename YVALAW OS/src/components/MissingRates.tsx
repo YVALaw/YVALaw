@@ -4,6 +4,7 @@ import type { Client, Employee, Project } from '../data/types'
 import { usePermission } from '../context/RoleContext'
 import { loadPlacementRates, rateClient, rateEmployee, rateProject, type PlacementRate } from '../services/rates'
 import { localParts, resolveRates } from '../utils/moneyRules'
+import { Banner } from './ui'
 
 export type MissingRate = { project: Project; employee: Employee; bill: boolean; pay: boolean }
 
@@ -23,30 +24,53 @@ export function findMissingRates(projects: Project[], employees: Employee[], cli
   return out
 }
 
-/** "Missing rates" warning (Projects page): nobody should be invoiced or paid at $0 */
-export default function MissingRates({ projects, employees, clients }: { projects: Project[]; employees: Employee[]; clients: Client[] }) {
+/** All placement rate rows, or null without rates.manage (the permission arrives after the first render for non-CEO roles) */
+export function usePlacementRateRows(): PlacementRate[] | null {
+  const allowed = usePermission()
+  const canRates = allowed('rates.manage')
+  const [rates, setRates] = useState<PlacementRate[] | null>(null)
+  useEffect(() => { if (canRates) void loadPlacementRates().then(r => setRates(r.rows)); else setRates(null) }, [canRates])
+  return canRates ? rates : null
+}
+
+const what = (m: MissingRate) => (m.bill && m.pay ? 'bill + pay' : m.bill ? 'bill' : 'pay')
+
+/** Red "missing rates" banner (Projects page): nobody should be invoiced or paid at $0.
+ *  Pass `rates` when the page already loaded them; otherwise the banner loads them itself. */
+export default function MissingRates({ projects, employees, clients, rates: given }: { projects: Project[]; employees: Employee[]; clients: Client[]; rates?: PlacementRate[] | null }) {
   const allowed = usePermission()
   const navigate = useNavigate()
-  const [rates, setRates] = useState<PlacementRate[] | null>(null)
+  const [own, setOwn] = useState<PlacementRate[] | null>(null)
   const [open, setOpen] = useState(false)
-  // Permissions load after the first render for non-CEO roles: re-run when the permission arrives
   const canRates = allowed('rates.manage')
-  useEffect(() => { if (canRates) void loadPlacementRates().then(r => setRates(r.rows)) }, [canRates])
-  if (!canRates || rates === null) return null
+  useEffect(() => { if (canRates && given === undefined) void loadPlacementRates().then(r => setOwn(r.rows)) }, [canRates, given])
+  const rates = given === undefined ? own : given
+  if (!canRates || !rates) return null
   const missing = findMissingRates(projects, employees, clients, rates)
   if (missing.length === 0) return null
+  const named = missing.slice(0, 3).map(m => `${m.employee.name} (${m.project.name}, ${what(m)})`)
+  const list = named.length > 1 ? `${named.slice(0, -1).join(', ')}${missing.length > 3 ? ', ' : ' and '}${named[named.length - 1]}` : named[0]
+  const first = missing[0]
   return (
-    <div className="data-card" style={{ borderLeft: '4px solid #dc2626', marginBottom: 16 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <strong>{missing.length} placement{missing.length === 1 ? '' : 's'} without a rate</strong>
-        <span style={{ color: 'var(--muted)', fontSize: 13 }}>They would be invoiced or paid at $0.</span>
-        <button className="btn-ghost btn-sm" style={{ marginLeft: 'auto' }} onClick={() => setOpen(o => !o)}>{open ? 'Hide' : 'Show'}</button>
-      </div>
+    <div className="ops-missing">
+      <Banner tone="danger" action={
+        <div className="ops-missing__actions">
+          {missing.length > 3 && <button type="button" className="btn btn--sm btn--ghost ops-missing__more" onClick={() => setOpen(o => !o)}>{open ? 'Hide list' : 'Show all'}</button>}
+          <button type="button" className="btn btn--sm ops-btn-danger" onClick={() => navigate(`/projects/${first.project.id}?tab=rates`)}>Set rates</button>
+        </div>
+      }>
+        <b>{missing.length} placement{missing.length === 1 ? ' has' : 's have'} no rate.</b>{' '}
+        {list}{missing.length > 3 ? ` and ${missing.length - 3} more` : ''}. Weekly close and payroll would use $0 for {missing.length === 1 ? 'it' : 'them'}.
+      </Banner>
       {open && (
-        <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div className="card ops-missing__list">
           {missing.map(m => (
-            <button key={`${m.project.id}-${m.employee.id}`} className="btn-ghost btn-sm" style={{ justifyContent: 'flex-start' }} onClick={() => navigate(`/projects/${m.project.id}`)}>
-              <strong>{m.employee.name}</strong>&nbsp;on {m.project.name} — no {[m.bill && 'bill rate', m.pay && 'pay rate'].filter(Boolean).join(' or ')}
+            <button key={`${m.project.id}-${m.employee.id}`} type="button" className="list-row ops-row-btn" onClick={() => navigate(`/projects/${m.project.id}?tab=rates`)}>
+              <span className="list-row__main">
+                <span className="list-row__title">{m.employee.name} on {m.project.name}</span>
+                <span className="list-row__meta t-danger">No {[m.bill && 'bill rate', m.pay && 'pay rate'].filter(Boolean).join(' or ')}</span>
+              </span>
+              <span className="link">Set rates →</span>
             </button>
           ))}
         </div>

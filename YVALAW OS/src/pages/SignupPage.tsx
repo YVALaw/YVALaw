@@ -1,18 +1,20 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { IconCheck } from '../components/Icon'
+import { Ic, P } from '../components/Icon'
+import AuthLayout from '../components/settings/AuthLayout'
+import { Banner, Field } from '../components/ui'
 
-function passwordStrength(pw: string): { score: number; label: string; color: string } {
+function passwordStrength(pw: string): { score: number; label: string; tone: 'weak' | 'fair' | 'strong' } {
   let score = 0
   if (pw.length >= 8)  score++
   if (pw.length >= 12) score++
   if (/[A-Z]/.test(pw)) score++
   if (/[0-9]/.test(pw)) score++
   if (/[^A-Za-z0-9]/.test(pw)) score++
-  if (score <= 1) return { score, label: 'Weak',   color: '#dc2626' }
-  if (score <= 3) return { score, label: 'Fair',   color: '#facc15' }
-  return               { score, label: 'Strong', color: '#059669' }
+  if (score <= 1) return { score, label: 'Weak',   tone: 'weak' }
+  if (score <= 3) return { score, label: 'Fair',   tone: 'fair' }
+  return               { score, label: 'Strong', tone: 'strong' }
 }
 
 export default function SignupPage() {
@@ -44,127 +46,49 @@ export default function SignupPage() {
 
   if (success) {
     return (
-      <div style={{
-        minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'var(--bg)', padding: '20px',
-      }}>
-        <div style={{
-          background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: 24, padding: '40px 32px', width: '100%', maxWidth: 400, textAlign: 'center',
-        }}>
-          <div style={{
-            width: 56, height: 56, borderRadius: 16, background: 'rgba(34,197,94,.15)',
-            border: '1px solid rgba(34,197,94,.25)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 20px', fontSize: 24,
-          }}><IconCheck size={14} /></div>
-          <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)', marginBottom: 10 }}>Account created</div>
-          <div style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 28, lineHeight: 1.6 }}>
-            Your account is ready. An administrator will assign your role before you can access all features.
-          </div>
-          <button className="btn-primary" onClick={() => navigate('/login')} style={{ width: '100%', justifyContent: 'center', padding: '12px 20px', fontSize: 14, fontWeight: 800 }}>
-            Go to sign in
-          </button>
-        </div>
-      </div>
+      <AuthLayout
+        center
+        icon={<span className="set-auth__icon set-auth__icon--ok"><Ic d={P.check} size={24} stroke={2.4} /></span>}
+        title="Account created"
+        sub="Your account is waiting for approval. A YVA admin will assign your role before you can use YVA OS."
+      >
+        <button className="btn btn--primary btn--lg btn--block" onClick={() => navigate('/login')}>Go to sign in</button>
+      </AuthLayout>
     )
   }
 
   return (
-    <div style={{
-      minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
-      background: 'var(--bg)', padding: '20px',
-      fontFamily: "'Inter', system-ui, sans-serif",
-    }}>
-      <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 420 }}>
-        <div style={{ textAlign: 'center', marginBottom: 36 }}>
-          <img
-            src={`${import.meta.env.BASE_URL}yva-logo.png`}
-            alt="YVA Staffing"
-            style={{
-              width: 64, height: 64, borderRadius: 16,
-              objectFit: 'contain',
-              margin: '0 auto 16px',
-              display: 'block',
-            }}
-            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-          />
-          <div style={{ fontSize: 26, fontWeight: 900, color: 'var(--text)', letterSpacing: '-.02em' }}>
-            YVA OS
-          </div>
-          <div style={{ fontSize: 13, color: 'var(--muted)', marginTop: 5 }}>
-            Create your account
-          </div>
-        </div>
-
-        <div style={{
-          background: 'var(--surface)', border: '1px solid var(--border)',
-          borderRadius: 24, padding: '36px 32px',
-          boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
-        }}>
-          <div style={{ fontSize: 17, fontWeight: 800, color: 'var(--text)', marginBottom: 24 }}>
-            Set up your account
-          </div>
-
-          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div className="form-group">
-              <label className="form-label">Email address</label>
-              <input
-                className="form-input"
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="you@yvastaffing.net"
-                required
-                autoFocus
-              />
+    <AuthLayout
+      title="Create your account"
+      sub="Use the email address YVA invited. A YVA admin approves new accounts and picks your role."
+      foot={<button type="button" className="link" onClick={() => navigate('/login')}>Already have an account? Sign in</button>}
+    >
+      <form className="set-auth__form" onSubmit={handleSubmit}>
+        <Field label="Email address">
+          <input className="input" type="email" autoComplete="email" value={email}
+            onChange={e => setEmail(e.target.value)} placeholder="you@yvastaffing.net" required autoFocus />
+        </Field>
+        <Field label="Password">
+          <input className="input" type="password" autoComplete="new-password" value={password}
+            onChange={e => setPassword(e.target.value)} placeholder="Min. 8 characters" required aria-describedby="pw-strength" />
+        </Field>
+        {strength && (
+          <div className="set-strength" id="pw-strength" aria-live="polite">
+            <div className="set-strength__bars" aria-hidden>
+              {[1, 2, 3, 4, 5].map(i => (
+                <span key={i} className={`set-strength__bar${i <= strength.score ? ` set-strength__bar--${strength.tone}` : ''}`} />
+              ))}
             </div>
+            <span className={`set-strength__label set-strength__label--${strength.tone}`}>{strength.label} password</span>
+          </div>
+        )}
 
-            <div className="form-group">
-              <label className="form-label">Password</label>
-              <input
-                className="form-input"
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="Min. 8 characters"
-                required
-              />
-              {strength && (
-                <div style={{ marginTop: 8 }}>
-                  <div style={{ display: 'flex', gap: 4, marginBottom: 4 }}>
-                    {[1,2,3,4,5].map(i => (
-                      <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, background: i <= strength.score ? strength.color : 'rgba(255,255,255,.1)', transition: 'background .2s' }} />
-                    ))}
-                  </div>
-                  <div style={{ fontSize: 11, color: strength.color }}>{strength.label} password</div>
-                </div>
-              )}
-            </div>
+        {error && <Banner tone="danger">{error}</Banner>}
 
-            {error && (
-              <div style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.2)', borderRadius: 12, padding: '10px 14px', fontSize: 13, color: '#dc2626' }}>
-                {error}
-              </div>
-            )}
-
-            <button
-              className="btn-primary"
-              type="submit"
-              disabled={loading}
-              style={{ marginTop: 4, width: '100%', justifyContent: 'center', padding: '12px 20px', fontSize: 14, fontWeight: 800 }}
-            >
-              {loading ? 'Creating account…' : 'Create account'}
-            </button>
-          </form>
-        </div>
-
-        <div style={{ textAlign: 'center', marginTop: 16 }}>
-          <button className="btn-ghost btn-sm" onClick={() => navigate('/login')}>
-            Already have an account? Sign in
-          </button>
-        </div>
-      </div>
-    </div>
+        <button className="btn btn--primary btn--lg btn--block" type="submit" disabled={loading}>
+          {loading ? 'Creating account…' : 'Create account'}
+        </button>
+      </form>
+    </AuthLayout>
   )
 }
