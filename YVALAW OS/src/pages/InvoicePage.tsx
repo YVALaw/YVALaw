@@ -323,7 +323,7 @@ export default function InvoicePage() {
   if (builderOpen) {
     return (
       <div className="page">
-        {mobile ? (
+        {mobile && (
           <>
             <button type="button" className="back-link" onClick={() => setBuilderOpen(false)}><Ic d={P.chevL} size={15} /> Invoices</button>
             <div className="card fin-phone-block">
@@ -332,9 +332,11 @@ export default function InvoicePage() {
               <button type="button" className="btn btn--primary btn--lg btn--block" onClick={() => setBuilderOpen(false)}>Back to invoices</button>
             </div>
           </>
-        ) : (
-          <InvoiceBuilder onCreated={(inv, send) => void closeBuilder(inv, send)} onCancel={() => void closeBuilder()} initialProjectId={builderProjectId} editInvoice={editingInvoice} />
         )}
+        {/* Kept mounted (only hidden) on phone widths: resizing a window or turning a tablet must not wipe a half-built invoice */}
+        <div hidden={mobile}>
+          <InvoiceBuilder onCreated={(inv, send) => void closeBuilder(inv, send)} onCancel={() => void closeBuilder()} initialProjectId={builderProjectId} editInvoice={editingInvoice} />
+        </div>
       </div>
     )
   }

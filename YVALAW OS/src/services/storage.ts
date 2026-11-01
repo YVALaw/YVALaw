@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase'
-import { cachedRead } from '../lib/readCache'
+import { cachedRead, clearReadCache, LIST_MS } from '../lib/readCache'
 import { fetchAllPages } from '../lib/pages'
 import type {
   ActivityLogEntry, AppSettings, Candidate, CommEntryType, DataSnapshot,
@@ -60,7 +60,7 @@ function remember(table: string, items: object[], scope?: (row: Row) => boolean)
 }
 
 async function fetchAll<T>(table: string): Promise<T[]> {
-  return cachedRead(`all:${table}`, () => fetchAllNow<T>(table))
+  return cachedRead(`all:${table}`, () => fetchAllNow<T>(table), LIST_MS)
 }
 async function fetchAllNow<T>(table: string): Promise<T[]> {
   const { data, error } = await fetchAllPages<Record<string, unknown>>((from, to) => supabase.from(table).select('*').order('created_at').order('id').range(from, to))
@@ -154,7 +154,7 @@ export async function saveProjects(projects: Project[]): Promise<void> {
 // ─── Invoices ─────────────────────────────────────────────────────────────────
 
 export async function loadInvoices(): Promise<Invoice[]> {
-  return cachedRead('all:invoices', loadInvoicesNow)
+  return cachedRead('all:invoices', loadInvoicesNow, LIST_MS)
 }
 async function loadInvoicesNow(): Promise<Invoice[]> {
   const { data, error } = await fetchAllPages<Record<string, unknown>>((from, to) => supabase
@@ -290,7 +290,7 @@ const DEFAULT_SETTINGS: AppSettings = {
 }
 
 export async function loadSettings(): Promise<AppSettings> {
-  return cachedRead('settings', loadSettingsNow).then(s => ({ ...s }))
+  return cachedRead('settings', loadSettingsNow, LIST_MS).then(s => ({ ...s }))
 }
 async function loadSettingsNow(): Promise<AppSettings> {
   const { data, error } = await supabase.from('settings').select('*').eq('id', 1).single()
@@ -362,16 +362,21 @@ export async function saveSettings(s: AppSettings): Promise<void> {
 }
 
 // ─── Snapshot cache ───────────────────────────────────────────────────────────
+// The lists themselves are shared and kept a minute by lib/readCache.ts (cleared by any write). The old
+// separate 2-minute snapshot copy is gone: it was only cleared by some saves, so payments or server
+// actions could leave it stale.
 
-let _snapCache: { data: DataSnapshot; at: number } | null = null
-const SNAP_TTL = 120_000 // 2 minutes
+export function invalidateSnapshotCache() { clearReadCache() }
 
-export function invalidateSnapshotCache() { _snapCache = null }
+/** After sign-in (once the first page has loaded): fetch the main lists in the background so the next pages open
+ *  instantly. They're kept a minute (lib/readCache.ts); a failure here is ignored — the page loads it again. */
+export async function warmUpLists(): Promise<void> {
+  await Promise.allSettled([loadSnapshot(), loadSettings(), loadCandidates(), loadEstimates()])
+}
 
 // ─── Snapshot (loads all core data in parallel) ───────────────────────────────
 
 export async function loadSnapshot(): Promise<DataSnapshot> {
-  if (_snapCache && Date.now() - _snapCache.at < SNAP_TTL) return _snapCache.data
   const [employees, projects, clients, invoices, invoiceCounter] = await Promise.all([
     loadEmployees(),
     loadProjects(),
@@ -379,9 +384,7 @@ export async function loadSnapshot(): Promise<DataSnapshot> {
     loadInvoices(),
     loadInvoiceCounter(),
   ])
-  const data = { employees, projects, clients, invoices, invoiceCounter }
-  _snapCache = { data, at: Date.now() }
-  return data
+  return { employees, projects, clients, invoices, invoiceCounter }
 }
 
 /** @deprecated — use loadSnapshot() */

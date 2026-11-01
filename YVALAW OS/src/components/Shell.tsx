@@ -3,7 +3,7 @@
 // (desktop) / bottom sheets (phone); sibling chips above every hub page. Visibility rules: lib/nav.ts.
 import { Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { loadSnapshot, loadCandidates } from '../services/storage'
+import { loadSnapshot, loadCandidates, warmUpLists } from '../services/storage'
 import { loadLeads } from '../services/crm'
 import { usePermission, useRole } from '../context/RoleContext'
 import { ROLE_LABELS, can, type UserRole } from '../lib/roles'
@@ -42,6 +42,12 @@ export default function Shell({ children }: { children: ReactNode }) {
   // Live status lines for the hub pop-ups (refreshed on navigation; cached a minute)
   const pageKeys = useMemo(() => hubs.flatMap(h => h.pages.map(p => p.key)), [hubs])
   // The first check waits a moment so the page's own data loads first (the database answers a few queries at a time)
+  // A moment after the first page has loaded, fetch the main lists in the background (kept a minute) so the next
+  // pages open instantly — see warmUpLists / lib/readCache.ts
+  useEffect(() => {
+    const t = window.setTimeout(() => void warmUpLists(), 2500)
+    return () => window.clearTimeout(t)
+  }, [])
   const statusFrom = useRef(Date.now() + 1500)
   useEffect(() => {
     let alive = true

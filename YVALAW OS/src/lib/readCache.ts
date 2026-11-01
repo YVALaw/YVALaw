@@ -1,17 +1,21 @@
-// Shared reads: when several parts of one screen load the same table at the same moment (the page, the
-// dock's status lines, search, a side panel…), they share one request instead of each fetching it.
-// A result is reused for a few seconds only, and ANY write — a Supabase insert/update/delete/RPC or a
+// Shared reads: when several parts of the app load the same table (the page, the dock's status lines,
+// search, a side panel, the next page you open…), they share one request instead of each fetching it.
+// Main lists are reused for a minute (LIST_MS), everything else for a few seconds, and ANY write — a Supabase insert/update/delete/RPC or a
 // POST to a Netlify function — clears everything, so nobody ever sees data older than their own save.
 // A read that started before a write is not kept for later callers (epoch check).
 
-const FRESH_MS = 4000
+/** Default: callers on the same screen share one request */
+export const SHARE_MS = 4000
+/** Main lists (employees, clients, projects, invoices…): kept a minute, so moving between pages is instant.
+ *  Own writes clear them at once; other people's changes show within a minute or on reload. */
+export const LIST_MS = 60_000
 let epoch = 0
 const entries = new Map<string, { at: number; epoch: number; p: Promise<unknown> }>()
 
-/** Run `loader` once for every caller asking for `key` within a few seconds; arrays come back as copies */
-export function cachedRead<T>(key: string, loader: () => Promise<T>): Promise<T> {
+/** Run `loader` once for every caller asking for `key` within `freshMs`; arrays come back as copies */
+export function cachedRead<T>(key: string, loader: () => Promise<T>, freshMs = SHARE_MS): Promise<T> {
   const hit = entries.get(key)
-  if (hit && hit.epoch === epoch && Date.now() - hit.at < FRESH_MS) return hit.p.then(copy) as Promise<T>
+  if (hit && hit.epoch === epoch && Date.now() - hit.at < freshMs) return hit.p.then(copy) as Promise<T>
   const mine = epoch
   const p = loader()
   entries.set(key, { at: Date.now(), epoch: mine, p })
