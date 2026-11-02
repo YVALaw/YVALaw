@@ -584,3 +584,6 @@ input, select, textarea { font-family: inherit; }
 }
 
 /* ── Leads (Step 9) ── */
+.loading-slow { max-width: 420px; text-align: center; font-size: 13.5px; color: var(--text-2, #374151); line-height: 1.5; }
+.loading-slow p { margin: 0 0 12px; }
+.loading-slow__actions { display: flex; gap: 8px; justify-content: center; }

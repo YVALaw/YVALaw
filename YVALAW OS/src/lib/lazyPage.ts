@@ -4,9 +4,27 @@ import { lazy, type ComponentType } from 'react'
 // the background once the first screen is up — after that, opening any page needs no download.
 const loaders: Array<() => Promise<unknown>> = []
 
+/** After a new version goes live, a window that was already open asks for the OLD screen files, which no longer
+ *  exist — the import fails and the screen would stay on "Loading…" forever. Then reload once to get the new
+ *  version (at most once a minute, so a real outage can't cause a reload loop). */
+const RELOAD_KEY = 'yva_reloaded_for_update'
+export function reloadForNewVersion(): boolean {
+  try {
+    const last = Number(sessionStorage.getItem(RELOAD_KEY) || 0)
+    if (Date.now() - last < 60_000) return false
+    sessionStorage.setItem(RELOAD_KEY, String(Date.now()))
+  } catch { /* storage blocked: still reload once */ }
+  window.location.reload()
+  return true
+}
+const isChunkError = (e: unknown) => /dynamically imported module|Importing a module script failed|error loading dynamically imported|Failed to fetch|MIME type|ChunkLoadError/i.test(String((e as Error)?.message ?? e))
+
 export function lazyPage<T extends ComponentType<any>>(load: () => Promise<{ default: T }>) { // eslint-disable-line @typescript-eslint/no-explicit-any
   loaders.push(load)
-  return lazy(load)
+  return lazy(() => load().catch(err => {
+    if (typeof window !== 'undefined' && isChunkError(err) && reloadForNewVersion()) return new Promise<never>(() => {})   // page is reloading
+    throw err
+  }))
 }
 
 let started = false
