@@ -6,7 +6,7 @@ import type { AppSettings, Employee, Invoice, Project } from '../data/types'
 import { loadEmployees, loadProjects, loadSettings } from '../services/storage'
 import { usePermission } from '../context/RoleContext'
 import { invoiceHtmlFor, sendInvoiceEmail, sentToLabel } from '../services/invoiceEmail'
-import { isGmailConnected } from '../services/gmail'
+import { loadEmailStatus } from '../services/email'
 import RecordPaymentModal from '../components/RecordPaymentModal'
 import WeekTimeGrid, { type Editing, type GridTarget } from '../components/finance/WeekTimeGrid'
 import { Banner, EmptyState, KpiStrip, PageHeader, Pill, Stepper, type Tone } from '../components/ui'
@@ -94,7 +94,7 @@ export default function WeeklyClosePage() {
     } catch (e) { setError((e as Error).message) }
     setBusy(null)
   }
-  /** 'sent' only when Gmail delivered it; 'mailto' = handed to the mail app, which we can't confirm */
+  /** 'sent' only when the company mailbox sent it; 'mailto' = handed to the mail app, which we can't confirm */
   const sentTo = new Map<string, string>()   // invoice id → "to (cc …)" of its last send, for the message
   async function send(inv: Invoice): Promise<'sent' | 'mailto' | 'failed'> {
     if (!settings) return 'failed'
@@ -102,7 +102,7 @@ export default function WeeklyClosePage() {
     const r = await sendInvoiceEmail(inv, settings)
     if (r.mode === 'failed') { setError(`${inv.number} was not sent: ${r.fallbackReason}`); return 'failed' }
     sentTo.set(inv.id, sentToLabel(r))
-    if (r.mode !== 'gmail') return 'mailto'
+    if (r.mode !== 'outlook') return 'mailto'
     await markInvoiceSent(inv)
     return 'sent'
   }
@@ -120,9 +120,9 @@ export default function WeeklyClosePage() {
   }
   async function sendAll() {
     const drafts = invoices.filter(i => (i.status || 'draft') === 'draft')
-    const gmailReady = await isGmailConnected().catch(() => false)
-    if (!gmailReady) {
-      setError('"Send all" needs Gmail connected (Settings → Integrations). Without it, send the invoices one at a time with each row\'s Send button.')
+    const email = await loadEmailStatus().catch(() => null)
+    if (!email?.configured) {
+      setError('"Send all" needs Outlook email set up (Settings → Integrations → Email sending). Without it, send the invoices one at a time with each row\'s Send button.')
       return
     }
     if (!window.confirm(`Email ${drafts.length} invoice${drafts.length === 1 ? '' : 's'} to the clients now?`)) return
@@ -133,12 +133,12 @@ export default function WeeklyClosePage() {
       try {
         const r = await send(inv)
         if (r === 'sent') ok++
-        // Gmail dropped mid-run and the user chose the mail app: stop instead of opening one mail window per invoice
+        // sending failed mid-run and the user chose the mail app: stop instead of opening one mail window per invoice
         if (r === 'mailto') { stopped = true; break }
       } catch (e) { setError((e as Error).message) }
     }
     setMsg(stopped
-      ? `${ok} of ${drafts.length} invoices sent through Gmail. Stopped: Gmail isn't sending, so the rest were not sent — reconnect Gmail (Settings → Integrations) or send them one at a time. The invoice opened in your email app is still a draft; use its Send button to mark it sent.`
+      ? `${ok} of ${drafts.length} invoices sent from the company mailbox. Stopped: email isn't sending, so the rest were not sent — check Settings → Integrations → Email sending, or send them one at a time. The invoice opened in your email app is still a draft; use its Send button to mark it sent.`
       : `${ok} of ${drafts.length} invoices sent.`)
     await loadAll(); setBusy(null)
   }

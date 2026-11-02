@@ -1,7 +1,7 @@
 // CRM (PLAN.md Step 9): leads, lead activities / follow-ups, client contacts.
 import { supabase } from '../lib/supabase'
 import { loadSettings, loadInvoiceCounter, saveInvoiceCounter, logComm, invalidateSnapshotCache } from './storage'
-import { sendEmail, type SendEmailResult } from './gmail'
+import { sendEmail, type SendEmailResult } from './email'
 import { clientRecipients } from './emailRecipients'
 import { invoicePdf } from './invoiceEmail'
 import { logAction } from './activityLog'

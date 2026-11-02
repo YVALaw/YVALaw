@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import type { Estimate, EstimateItem, EstimateStatus, Client, Invoice, Project } from '../data/types'
 import { loadEstimates, saveEstimates, loadSnapshot } from '../services/storage'
 import { createInvoiceFromEstimate } from '../services/crm'
-import { sendEmail } from '../services/gmail'
+import { sendEmail } from '../services/email'
 import { useRole } from '../context/RoleContext'
 import { can } from '../lib/roles'
 import { Banner, Drawer, Field, Menu, Modal, PageHeader, Pill, SearchInput, Skel, Tabs, useIsMobile, type Tone } from '../components/ui'
@@ -93,9 +93,9 @@ export default function EstimatesPage() {
         const lines = saved.items.filter(i => i.description || i.unitPrice).map(i => `  • ${i.description || 'Item'} — ${i.qty} × ${usd(i.unitPrice)} = ${usd((i.qty || 0) * (i.unitPrice || 0))}`).join('\n')
         const body = `Hi ${selectedClient.name},\n\nHere is estimate ${saved.number}${saved.projectName ? ` for ${saved.projectName}` : ''}:\n\n${lines}\n\nTotal: ${usd(saved.total)}${saved.expiryDate ? `\nValid until ${dateMed(saved.expiryDate)}.` : ''}${saved.notes ? `\n\n${saved.notes}` : ''}\n\nReply to this email to accept or ask questions.\n\nYVA Staffing`
         const r = await sendEmail(selectedClient.email, `Estimate ${saved.number} — YVA Staffing`, body)
-        if (r.mode === 'gmail') setNotice({ text: `Estimate ${saved.number} saved and emailed to ${selectedClient.email}.` })
+        if (r.mode === 'outlook') setNotice({ text: `Estimate ${saved.number} saved and emailed to ${selectedClient.email}.` })
         else if (r.mode === 'mailto') setNotice({ text: `Estimate ${saved.number} saved and opened in your email app.` })
-        else setError(`Estimate saved, but the email was not sent: ${r.fallbackReason ?? 'Gmail could not send it.'}`)
+        else setError(`Estimate saved, but the email was not sent: ${r.fallbackReason ?? 'the company mailbox could not send it.'}`)
       } else setNotice({ text: `Estimate ${saved.number} saved.` })
     } catch { /* persist already showed the error */ }
     finally { setSaving(false) }

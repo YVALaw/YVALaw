@@ -1,5 +1,5 @@
 /**
- * Notifications: create them (bell), then deliver by email (configured Gmail sender) and
+ * Notifications: create them (bell), then deliver by email (the company Outlook mailbox, _lib/outlook.cjs) and
  * phone/computer push, respecting each person's choices (notification_prefs).
  *
  *   notify(userIds, { kind, title, body, link })      → rows in public.notifications
@@ -8,7 +8,7 @@
  *                                                       5 minutes, and right after creating them)
  */
 const { rest, enc, authAdmin, usersWithPermission, APP_URL } = require('./supa.cjs')
-const { sendMail, senderToken, GmailNotSetUp } = require('./gmail.cjs')
+const { sendMail, emailConfigured, OutlookNotSetUp } = require('./outlook.cjs')
 const { sendPush, vapidKeys } = require('./webpush.cjs')
 
 async function notify(userIds, { kind, title, body = null, link = null }) {
@@ -60,10 +60,12 @@ async function dispatchPending({ limit = 100 } = {}) {
   const pref = (u, kind) => prefs.find(p => p.user_id === u && p.kind === kind)
   const emails = new Map()
 
-  let sender = null, emailProblem = null
+  let emailOn = false, emailProblem = null
   const wantsEmail = claimed.some(n => pref(n.user_id, n.kind)?.email !== false)
   if (wantsEmail) {
-    try { sender = await senderToken() } catch (e) { emailProblem = e.message; if (!(e instanceof GmailNotSetUp)) console.error('notify: gmail sender', e) }
+    const conf = emailConfigured()
+    if (conf.configured) emailOn = true
+    else emailProblem = `Outlook email is not set up: ${conf.missing.join(', ')} missing on Netlify.`
   }
   let keys = null
   if (subs.length) keys = await vapidKeys().catch(e => { console.error('notify: vapid keys', e); return null })
@@ -72,12 +74,16 @@ async function dispatchPending({ limit = 100 } = {}) {
   for (const n of claimed) {
     const p = pref(n.user_id, n.kind)
     const done = {}
-    if (sender && p?.email !== false) {
+    if (emailOn && p?.email !== false) {
       try {
         let to = pref(n.user_id, '*')?.email_to || emails.get(n.user_id)
         if (!to) { to = (await authAdmin(`users/${n.user_id}`)).email; emails.set(n.user_id, to) }
-        if (to) { await sendMail({ to, ...emailFor(n) }, sender); done.emailed_at = new Date().toISOString(); emailed++ }
-      } catch (e) { console.error('notify: email failed', n.id, e.message) }
+        if (to) { await sendMail({ to, ...emailFor(n) }); done.emailed_at = new Date().toISOString(); emailed++ }
+      } catch (e) {
+        console.error('notify: email failed', n.id, e.message)
+        // a setup problem (bad secret, no permission) fails every email the same way: stop trying this run
+        if (e instanceof OutlookNotSetUp) { emailOn = false; emailProblem = e.message }
+      }
     }
     if (keys && p?.push !== false) {
       const mine = subs.filter(s => s.user_id === n.user_id)

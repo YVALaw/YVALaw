@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import type { Employee, Invoice, TimeEntry } from '../../data/types'
 import { loadSettings, loadTimeEntries, saveInvoices } from '../../services/storage'
-import { sendEmail, type SendEmailResult } from '../../services/gmail'
+import { sendEmail, type SendEmailResult } from '../../services/email'
 import { logAction } from '../../services/activityLog'
 import { mergeCc, normalizeEmailList, recipientsLabel } from '../../utils/emailList'
 import { buildStatementHTML } from '../../utils/statementHtml'
@@ -174,9 +174,9 @@ export default function EmployeeStatements({ emp, invoices, onInvoicesChange, ti
     try {
       const r = await emailStatement(emp, empInvoices, dateFrom, dateTo, empTracked)
       const mode = r.mode
-      if (mode === 'failed') show(false, `Not sent: ${r.fallbackReason ?? 'check the Gmail connection in Settings.'}`)
+      if (mode === 'failed') show(false, `Not sent: ${r.fallbackReason ?? 'check Email sending in Settings → Integrations.'}`)
       else show(true, mode === 'mailto' ? `Opened in your mail app for ${recipientsLabel(r.to, r.cc)} — attach the downloaded PDF.` : `Statement sent to ${recipientsLabel(r.to, r.cc)} with the PDF attached.`)
-    } catch { show(false, 'Failed to send — check Gmail connection in Settings') }
+    } catch { show(false, 'Failed to send — check Email sending in Settings → Integrations') }
     finally { setSending(false) }
   }
 

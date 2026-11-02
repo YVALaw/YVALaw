@@ -20,7 +20,6 @@ import { can, isStaff } from './lib/roles'
 // once the app is idle, so moving between pages stays instant. lib/lazyPage.ts
 const SignupPage = rarePage(() => import('./pages/SignupPage'))
 const PortalPage = rarePage(() => import('./pages/PortalPage'))
-const OAuthCallbackPage = rarePage(() => import('./pages/OAuthCallbackPage'))
 const ReportsPage = lazyPage(() => import('./pages/ReportsPage'))
 const HomePage = lazyPage(() => import('./pages/HomePage'))
 const InvoicePage = lazyPage(() => import('./pages/InvoicePage'))
@@ -316,7 +315,8 @@ export default function App() {
         {/* ── Public: no auth needed ── */}
         {/* Old read-only invoice share view (renamed from /portal to avoid conflict) */}
         <Route path="/invoice-view" element={<PortalPage />} />
-        <Route path="/oauth-callback" element={<OAuthCallbackPage />} />
+        {/* Old Gmail sign-in return address (Gmail was replaced by Outlook in 2026-11) */}
+        <Route path="/oauth-callback" element={<Navigate to="/settings?tab=integrations" replace />} />
 
         {/* ── Auth pages: redirect away if already logged in ── */}
         <Route path="/login"          element={session ? <Navigate to={afterLoginPath()} replace /> : <LoginPage />} />
