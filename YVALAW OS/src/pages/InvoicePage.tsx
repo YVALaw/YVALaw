@@ -172,20 +172,20 @@ export default function InvoicePage() {
     try {
       const r = await sendInvoiceEmail(inv, settings, clients)
       if (r.mode === 'failed') { fail(`${inv.number} was not sent: ${r.fallbackReason}`); return }
-      const msg = r.mode === 'gmail' ? `${inv.number} sent to ${sentToLabel(r)} with the PDF attached.` : `${inv.number} opened in your email app for ${sentToLabel(r)} and marked as sent — attach the downloaded PDF.`
+      const msg = r.mode === 'outlook' ? `${inv.number} sent to ${sentToLabel(r)} with the PDF attached.` : `${inv.number} opened in your email app for ${sentToLabel(r)} and marked as sent — attach the downloaded PDF.`
       if (await persist(markSent(), msg) && cId) void logComm(cId, `Invoice ${inv.number} emailed (${formatMoney(amountOf(inv))})`, 'email')
     } finally { setBusy(null) }
   }
   async function emailAgain(inv: Invoice) {
     const r = await sendInvoiceEmail(inv, settings, clients)
     if (r.mode === 'failed') { fail(`${inv.number} was not sent: ${r.fallbackReason}`); return }
-    ok(r.mode === 'gmail' ? `Invoice ${inv.number} emailed to ${sentToLabel(r)}.` : `Invoice ${inv.number} opened in your email app for ${sentToLabel(r)} — attach the downloaded PDF.`)
+    ok(r.mode === 'outlook' ? `Invoice ${inv.number} emailed to ${sentToLabel(r)}.` : `Invoice ${inv.number} opened in your email app for ${sentToLabel(r)} — attach the downloaded PDF.`)
     const cId = clientIdOf(inv); if (cId) void logComm(cId, `Invoice ${inv.number} emailed (${formatMoney(amountOf(inv))})`, 'email')
   }
   async function remind(inv: Invoice) {
     const r = await sendReminderEmail(inv, settings, clients)
     if (r.mode === 'failed') { fail(`Reminder for ${inv.number} was not sent: ${r.fallbackReason}`); return }
-    ok(r.mode === 'gmail' ? `Payment reminder sent to ${sentToLabel(r)}.` : `Reminder for ${inv.number} opened in your email app for ${sentToLabel(r)}.`)
+    ok(r.mode === 'outlook' ? `Payment reminder sent to ${sentToLabel(r)}.` : `Reminder for ${inv.number} opened in your email app for ${sentToLabel(r)}.`)
     const cId = clientIdOf(inv); if (cId) void logComm(cId, `Payment reminder sent for Invoice ${inv.number}`, 'email')
   }
   async function remindAll() {
@@ -225,7 +225,7 @@ export default function InvoicePage() {
     if (inv.clientEmail) {
       const r = await sendInvoiceEmail(inv, settings, clients)
       if (r.mode === 'failed') { setBanner({ tone: 'warning', text: `${inv.number} was created but not emailed: ${r.fallbackReason}` }); return }
-      ok(r.mode === 'gmail' ? `${inv.number} created and emailed to ${sentToLabel(r)}.` : `${inv.number} created and opened in your email app for ${sentToLabel(r)}.`)
+      ok(r.mode === 'outlook' ? `${inv.number} created and emailed to ${sentToLabel(r)}.` : `${inv.number} created and opened in your email app for ${sentToLabel(r)}.`)
       if (client?.id) void logComm(client.id, `Invoice ${inv.number} emailed (${formatMoney(inv.subtotal || 0)})`, 'email')
     } else if (client?.id) {
       void logComm(client.id, `Invoice ${inv.number} created (${formatMoney(inv.subtotal || 0)})`, 'system')

@@ -3,7 +3,7 @@
  *   { action: 'prepare', weekStart? }  prepare (or prepare again) a week; default = last finished week
  *   { action: 'approve', weekStart }   approve all the week's hours (week_close_approve, as the caller)
  *   { action: 'preview', weekStart }   the current week so far, nothing saved
- * Invoices are sent from the browser with the caller's Gmail (Weekly close → Send).
+ * Invoices are sent from the browser through the company Outlook mailbox (Weekly close → Send, send-email).
  */
 const { callerFromEvent, hasPermission, json } = require('./_lib/supa.cjs')
 const { prepareWeek, previewWeek, lastWeekStart } = require('./_lib/weekclose.cjs')

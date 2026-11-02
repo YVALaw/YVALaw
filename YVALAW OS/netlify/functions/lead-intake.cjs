@@ -49,7 +49,7 @@ exports.handler = async function handler(event) {
     if (ip && recent.length >= 6) return reply(429, { error: 'Too many requests' }, origin)
     hits.set(ip, [...recent, now])
     // Site-wide cap (the per-visitor one resets when Netlify starts a new instance): protects staff
-    // phones/inboxes and the Gmail sending quota from a flood of fake leads
+    // phones/inboxes and the Outlook sending quota from a flood of fake leads
     const hour = new Date(now - 3600_000).toISOString()
     const lastHour = await rest(`leads?created_at=gt.${enc(hour)}&select=id&limit=61`)
     if (lastHour.length > 60) return reply(429, { error: 'Too many requests' }, origin)

@@ -1,11 +1,11 @@
 // Emailing an invoice (Invoices page, Weekly close, Home): template + the invoice as a real PDF, To the client
-// and Cc their Invoice CC / billing contacts, through sendEmail (Gmail if connected; failures are shown, never
+// and Cc their Invoice CC / billing contacts, through sendEmail (company Outlook mailbox; failures are shown, never
 // silent). Each send is recorded in the change history (logAction).
 import type { AppSettings, Client, Invoice } from '../data/types'
 import { formatMoney } from '../utils/money'
 import { buildInvoiceHTML } from '../utils/invoiceHtml'
 import { recipientsLabel } from '../utils/emailList'
-import { sendEmail, type SendEmailResult } from './gmail'
+import { sendEmail, type SendEmailResult } from './email'
 import { invoiceRecipients } from './emailRecipients'
 import { logAction } from './activityLog'
 

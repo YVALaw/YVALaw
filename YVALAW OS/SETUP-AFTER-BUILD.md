@@ -33,7 +33,7 @@ If you ever re-run the YVA Time phase 2 script, run `migrate-step4-weekly-close.
 **Netlify → Forms:** if you have an email notification on the `lead-backup` form, add one for the new
 `application-backup` form too (careers applications when EmailJS is blocked). They also land in YVA OS → Candidates.
 
-## 2b. After the redesign (November) is live — 8 more small scripts
+## 2b. After the redesign (November) is live — 9 more small scripts
 
 Same way as step 1, in this order (each is safe to run again):
 1. `supabase/migrate-redesign-portal.sql` — "Request more staff" saves how many people and which project
@@ -48,6 +48,9 @@ Same way as step 1, in this order (each is safe to run again):
    **Database → Publications → supabase_realtime**: `data_versions` and `notifications` should be listed (the script adds
    them). Until this script runs, YVA OS keeps working as before (data kept 1 minute). If you create a new table
    later, run this script again.
+9. `supabase/migrate-outlook-email.sql` — email from Outlook: a log of every email YVA OS sends (who, to whom, sent or
+   failed) and the per-person sending limits; it also deletes the old Gmail sign-in keys that were stored. Set up
+   Outlook first (step 3 below); emails still go out before this script runs, just without the log and limits.
 
 **Crisp chat (client portal → Messages):** make a free account at crisp.chat → Settings → Website settings →
 copy the **Website ID** → YVA OS → Settings → **Integrations** → Crisp → paste → Save. Clients then chat with
@@ -62,15 +65,58 @@ you from the portal; you answer in the Crisp app or website.
    (leave "Copy résumé/video files" ticked). Wait for "Everything is in YVA OS" → **Done — reload YVA OS**.
 4. Optional: Supabase → Storage → empty the `screenshots` bucket (old test screenshots).
 
-## 3. Connect Gmail (for invoices, payslips and automatic emails)
+## 3. Email from Outlook (invoices, reminders, statements and automatic emails)
 
-1. Google Cloud Console → your OAuth client (Web application) → **Authorized redirect URIs** → add
-   `https://yvastaffing.agency/os/oauth-callback`.
-2. Netlify → Site configuration → Environment variables → add **`GMAIL_CLIENT_SECRET`** (the client
-   secret from Google) → redeploy.
-3. YVA OS → Settings → **Integrations** → paste the Client ID → **Connect Gmail**.
-4. YVA OS → Settings → **Notifications** → **Automatic emails are sent from** → **Use my Gmail**.
-5. Same page → **Send me a test**.
+YVA OS sends every email from **one company mailbox** (for example `contact@yvastaffing.agency`) in your Microsoft 365.
+You give YVA OS a "key" that can only send email, and only from that one mailbox. About 20 minutes, once.
+You need a Microsoft 365 **admin** login.
+
+**A. Create the app in Microsoft (Entra)**
+1. Go to **entra.microsoft.com** and sign in as an admin.
+2. Left menu → **Applications → App registrations** → **New registration**.
+   Name: `YVA OS email` · Supported account types: **Accounts in this organizational directory only (single tenant)** ·
+   leave Redirect URI empty → **Register**.
+3. On the app's **Overview** page, copy two values into a note:
+   **Application (client) ID** and **Directory (tenant) ID**.
+4. Left menu of the app → **API permissions** → **Add a permission** → **Microsoft Graph** → **Application permissions** →
+   search **Mail.Send** → tick it → **Add permissions**. Then click **Grant admin consent for …** → **Yes**.
+   The status column must show a green check ("Granted").
+   (If a "User.Read" delegated permission is listed you can remove it — YVA OS doesn't need it.)
+5. Left menu → **Certificates & secrets** → **Client secrets** → **New client secret** → description `YVA OS`,
+   expires **24 months** → **Add**. Copy the **Value** right away (it is shown only once — not the "Secret ID").
+   Put a reminder in your calendar ~2 weeks before it expires: create a new secret and update Netlify (step B).
+
+**B. Give the values to Netlify**
+6. Netlify → your site → **Site configuration → Environment variables** → add these four:
+   - `MS_TENANT_ID` = the Directory (tenant) ID
+   - `MS_CLIENT_ID` = the Application (client) ID
+   - `MS_CLIENT_SECRET` = the secret Value
+   - `MS_SENDER_MAILBOX` = the mailbox emails come from, e.g. `contact@yvastaffing.agency`
+7. If `GMAIL_CLIENT_SECRET` is listed there, delete it (Gmail is no longer used).
+8. Netlify → **Deploys** → **Trigger deploy → Deploy site** (new variables only apply after a deploy).
+
+**C. Lock the app to that one mailbox (important for security)**
+Without this, Mail.Send lets the app send as *any* mailbox in your company. This limits it to the one you chose.
+9. On a Windows computer, open **PowerShell** and run these one at a time (first two only once per computer):
+   ```
+   Install-Module ExchangeOnlineManagement -Scope CurrentUser
+   Connect-ExchangeOnline
+   New-ApplicationAccessPolicy -AppId <Application (client) ID> -PolicyScopeGroupId contact@yvastaffing.agency -AccessRight RestrictAccess -Description "YVA OS sends only as this mailbox"
+   Test-ApplicationAccessPolicy -AppId <Application (client) ID> -Identity contact@yvastaffing.agency
+   ```
+   The last command should say **AccessCheckResult : Granted**. (Optional extra check: run it again with another
+   person's address — it should say **Denied**.) Changes can take up to an hour to apply.
+
+**D. Finish in YVA OS**
+10. Supabase → SQL Editor → run `supabase/migrate-outlook-email.sql` (step 2b, item 9).
+11. YVA OS → Settings → **Integrations** → **Email sending · Outlook** should say **Connected · Sends from contact@…**
+    → click **Send test email to me** and check your inbox (and junk folder). If it says **Problem**, the message
+    explains what to fix (wrong or expired secret, consent not granted, mailbox name, or the policy from step C not
+    active yet — wait an hour and click **Check again**).
+12. YVA OS → Settings → **Notifications** → **Send me a test** (the automatic emails use the same mailbox).
+
+Until this is done, the email buttons still work: YVA OS explains that Outlook isn't set up and offers to open the
+email in your own mail app with the PDF downloaded.
 
 If you haven't yet: Supabase → Authentication → URL Configuration → Site URL
 `https://yvastaffing.agency/os/` and Redirect URL `https://yvastaffing.agency/os/**`.
