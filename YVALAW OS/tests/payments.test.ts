@@ -413,7 +413,9 @@ test('pay link: staff make it; opening it sends the client to Stripe Checkout fo
     }
     fb.stripe = (method, path, form) => {
       if (path === '/checkout/sessions' && method === 'POST') return { id: 'cs_1', url: 'https://checkout.stripe.com/c/cs_1', amount_total: Number(form.get('line_items[0][price_data][unit_amount]')), status: 'open' }
-      if (path === '/checkout/sessions/cs_1') return { id: 'cs_1', url: 'https://checkout.stripe.com/c/cs_1', amount_total: 90000, status: 'open' }
+      if (path === '/checkout/sessions/cs_1') return { id: 'cs_1', url: 'https://checkout.stripe.com/c/cs_1', amount_total: 90000, status: 'open', metadata: { usdOnly: '1' } }
+      if (path === '/checkout/sessions/cs_old') return { id: 'cs_old', url: 'https://checkout.stripe.com/c/cs_old', amount_total: 90000, status: 'open', metadata: {} }
+      if (path === '/checkout/sessions/cs_old/expire') return { id: 'cs_old', status: 'expired' }
       throw new Error(path)
     }
     const { handler } = require('../netlify/functions/pay-link.cjs')
@@ -423,13 +425,17 @@ test('pay link: staff make it; opening it sends the client to Stripe Checkout fo
     const url = new URL(JSON.parse(made.body).url)
     assert.equal(url.pathname, '/pay')
     const open = (t: string | null) => handler({ httpMethod: 'GET', headers: {}, queryStringParameters: t ? { t } : {} })
+    // a page opened before "always USD" (may show the visitor's currency) is closed, never reused
+    fb.table('payment_attempts').push({ invoice_id: INV, client_id: CLIENT, source: 'pay_link', status: 'created', stripe_checkout_session_id: 'cs_old', attempted_at: new Date().toISOString() })
     const r = await open(url.searchParams.get('t'))
     assert.equal(r.statusCode, 303)
     assert.equal(r.headers.Location, 'https://checkout.stripe.com/c/cs_1')
+    assert.ok(fb.stripeCalls.some(c => c.path === '/checkout/sessions/cs_old/expire'), 'the old page was closed')
     const create = fb.stripeCalls.find(c => c.path === '/checkout/sessions')!
     assert.equal(create.form.get('line_items[0][price_data][unit_amount]'), '90000')
     assert.equal(create.form.get('payment_intent_data[metadata][invoiceId]'), INV)
     assert.equal(create.form.get('adaptive_pricing[enabled]'), 'false', 'always USD — no conversion to the visitor\'s currency')
+    assert.equal(create.form.get('metadata[usdOnly]'), '1')
     assert.equal(create.form.get('payment_method_types[1]'), 'us_bank_account')
     // Opened again (or by an email scanner): same Checkout page, no new session
     await open(url.searchParams.get('t'))

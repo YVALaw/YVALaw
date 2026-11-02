@@ -85,12 +85,14 @@ async function openLink(event) {
     if (a.source !== 'pay_link' || !a.stripe_checkout_session_id || now - at(a) > 23 * 3600_000) continue
     try {
       const s = await stripe('GET', `/checkout/sessions/${enc(a.stripe_checkout_session_id)}`)
+      // Pages made before "always USD" (no usdOnly mark) may offer the visitor's currency: close them, make a new one
+      if (s.status === 'open' && s.metadata?.usdOnly !== '1') { await stripe('POST', `/checkout/sessions/${enc(s.id)}/expire`, {}).catch(() => {}); continue }
       if (s.status === 'open' && s.amount_total === cents && s.url) return redirect(s.url)
       if (s.status === 'complete' && s.payment_status !== 'unpaid') return page(200, 'Payment already received', `Invoice ${esc(inv.number)} was just paid. Thank you!`, { company })
     } catch { /* make a new one */ }
   }
   const client = await clientOf(inv)
-  const md = { invoiceId: inv.id, clientId: client?.id || inv.client_id || '', invoiceNumber: inv.number || '', source: 'pay_link' }
+  const md = { invoiceId: inv.id, clientId: client?.id || inv.client_id || '', invoiceNumber: inv.number || '', source: 'pay_link', usdOnly: '1' }
   const params = {
     mode: 'payment',
     // Invoices are in USD and the webhook only applies USD payments: never let Stripe convert the price into the
@@ -108,7 +110,16 @@ async function openLink(event) {
   }
   // Same parameters within 10 minutes → the same Checkout page (a double click or a scanner never makes two)
   const paramHash = crypto.createHash('sha256').update(JSON.stringify(params)).digest('hex').slice(0, 24)
-  const session = await stripe('POST', '/checkout/sessions', params, { idempotencyKey: `checkout-${inv.id}-${paramHash}-${Math.floor(now / 600_000)}` })
+  let session
+  try {
+    session = await stripe('POST', '/checkout/sessions', params, { idempotencyKey: `checkout-${inv.id}-${paramHash}-${Math.floor(now / 600_000)}` })
+  } catch (err) {
+    // If this Stripe account/API version doesn't know the adaptive_pricing option, still open the page (turn
+    // Adaptive Pricing off in Stripe → Settings → Payments to keep it USD-only)
+    if (!/adaptive_pricing/i.test(err.message || '')) throw err
+    const { adaptive_pricing, ...rest } = params
+    session = await stripe('POST', '/checkout/sessions', rest, { idempotencyKey: `checkout-${inv.id}-${paramHash}-noap-${Math.floor(now / 600_000)}` })
+  }
   if (!session.url) return page(500, 'Something went wrong', 'Please try the link again in a minute, or contact us.', { company })
   if (md.clientId) {
     await rest('payment_attempts', { method: 'POST', prefer: 'return=minimal', body: {
