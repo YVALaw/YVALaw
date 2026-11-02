@@ -436,3 +436,13 @@ test('refund: needs the permission, never more than what is left', async () => {
     assert.equal(fb.table('client_payments').length, 3, 'the refund row comes from the webhook, not here')
   } finally { fb.restore() }
 })
+
+test('invoice emails: the pay link goes where {payLink} is, or on its own line after the message', async () => {
+  const src = (await import('node:fs')).readFileSync(new URL('../src/services/invoiceEmail.ts', import.meta.url), 'utf8')
+  const fn = src.slice(src.indexOf('export function withPayLink'), src.indexOf('export function applyInvoiceTemplate'))
+  const withPayLink = new Function(`${fn.replace('export function withPayLink(body: string, link: string | null): string', 'function withPayLink(body, link)')}; return withPayLink`)()
+  assert.equal(withPayLink('Hi\n\nThanks', 'https://x/pay?t=1'), 'Hi\n\nThanks\n\nPay online (card or bank account): https://x/pay?t=1')
+  assert.equal(withPayLink('Hi {payLink} bye', 'https://x/pay?t=1'), 'Hi Pay online (card or bank account): https://x/pay?t=1 bye')
+  assert.equal(withPayLink('Hi {payLink} bye', null), 'Hi  bye')
+  assert.equal(withPayLink('Hi', null), 'Hi')
+})

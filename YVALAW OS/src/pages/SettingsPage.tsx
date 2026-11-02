@@ -39,7 +39,7 @@ const ALL_TABS: { id: SettingsTab; label: string; ceoOnly?: boolean }[] = [
 /** Old / alternative names other screens may link with (?tab=access) */
 const TAB_ALIASES: Record<string, SettingsTab> = { access: 'team', 'team-access': 'team', permissions: 'team', gmail: 'integrations', outlook: 'integrations' }
 
-const PLACEHOLDERS = ['{clientName}', '{invoiceNumber}', '{amount}', '{period}', '{dueDate}', '{companyName}', '{employeeName}']
+const PLACEHOLDERS = ['{clientName}', '{invoiceNumber}', '{amount}', '{period}', '{dueDate}', '{companyName}', '{employeeName}', '{payLink}']
 const TEMPLATES: { key: 'invoiceEmailTemplate' | 'statementEmailTemplate' | 'reminderEmailTemplate'; label: string; sub: string; placeholder: string }[] = [
   { key: 'invoiceEmailTemplate', label: 'Invoice email', sub: 'Sent when emailing an invoice to a client',
     placeholder: `Hi {clientName},\n\nPlease find attached invoice {invoiceNumber} for {amount}.\n\nBilling period: {period}\n{dueDate}\nPlease don't hesitate to reach out with any questions.\n\n{companyName}` },

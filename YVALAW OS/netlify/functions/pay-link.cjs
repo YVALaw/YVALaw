@@ -50,7 +50,7 @@ async function createLink(event) {
   if (!/^[0-9a-f-]{36}$/i.test(String(body.invoiceId || ''))) return json(400, { error: 'invoiceId is required' })
   const inv = (await rest(`invoices?id=eq.${enc(body.invoiceId)}&select=id,status&limit=1`))?.[0]
   if (!inv) return json(404, { error: 'Invoice not found' })
-  if (String(inv.status || '').toLowerCase() === 'draft') return json(409, { error: 'Send the invoice before making a pay link.' })
+  // A draft may get its link while it's being sent; the page only takes payment once the invoice is sent
   const token = P.signPayLink(inv.id)
   return json(200, { url: linkFor(token), expiresAt: new Date(Date.now() + P.PAY_LINK_DAYS * 86400_000).toISOString() })
 }

@@ -33,7 +33,7 @@ If you ever re-run the YVA Time phase 2 script, run `migrate-step4-weekly-close.
 **Netlify → Forms:** if you have an email notification on the `lead-backup` form, add one for the new
 `application-backup` form too (careers applications when EmailJS is blocked). They also land in YVA OS → Candidates.
 
-## 2b. After the redesign (November) is live — 9 more small scripts
+## 2b. After the redesign (November) is live — 10 more small scripts
 
 Same way as step 1, in this order (each is safe to run again):
 1. `supabase/migrate-redesign-portal.sql` — "Request more staff" saves how many people and which project
@@ -51,6 +51,9 @@ Same way as step 1, in this order (each is safe to run again):
 9. `supabase/migrate-outlook-email.sql` — email from Outlook: a log of every email YVA OS sends (who, to whom, sent or
    failed) and the per-person sending limits; it also deletes the old Gmail sign-in keys that were stored. Set up
    Outlook first (step 3 below); emails still go out before this script runs, just without the log and limits.
+10. `supabase/migrate-stripe-secure.sql` — safer online payments: each Stripe payment, refund and dispute is recorded
+   exactly once, card/bank payments recorded by Stripe can't be edited or deleted by mistake, bank (ACH) and saved
+   payment methods. Run it **before** adding the new Stripe webhook events (step 3b).
 
 **Crisp chat (client portal → Messages):** make a free account at crisp.chat → Settings → Website settings →
 copy the **Website ID** → YVA OS → Settings → **Integrations** → Crisp → paste → Save. Clients then chat with
@@ -120,6 +123,49 @@ email in your own mail app with the PDF downloaded.
 
 If you haven't yet: Supabase → Authentication → URL Configuration → Site URL
 `https://yvastaffing.agency/os/` and Redirect URL `https://yvastaffing.agency/os/**`.
+
+## 3b. Stripe — card and bank payments, "Pay now" links, AutoPay
+
+What clients can do: pay an invoice in the portal by **card or US bank account (ACH)**, pay from the **"Pay online" link**
+that is now added to every invoice and reminder email (no login needed; it always charges the current balance and
+expires after 60 days), save a card or bank account, and turn on **AutoPay** (only invoices with a due date; up to 3
+tries, 3 days apart). From YVA OS you can **refund** a card/bank payment (Invoices → 💲 → Refund) and **Copy pay link**.
+
+**A. Test mode first (your current keys)** — about 10 minutes
+1. Run `supabase/migrate-stripe-secure.sql` (2b, item 10).
+2. Stripe → turn **Test mode** on → **Settings → Payment methods** → make sure **Cards** and **ACH Direct Debit** are on.
+3. Stripe → **Developers → Webhooks** → open your existing endpoint
+   (`https://yvastaffing.agency/.netlify/functions/stripe-webhook`) → **Select events / Update details** → tick all of these
+   and save:
+   `payment_intent.succeeded`, `payment_intent.processing`, `payment_intent.payment_failed`, `payment_intent.requires_action`,
+   `payment_intent.canceled`, `charge.refunded`, `charge.dispute.created`, `charge.dispute.funds_withdrawn`,
+   `charge.dispute.funds_reinstated`, `charge.dispute.closed`, `setup_intent.succeeded`, `payment_method.detached`,
+   `payment_method.automatically_updated`, `payment_method.updated`
+4. YVA OS → Settings → Integrations → **Stripe** should say "Connected · Test mode" with no warnings.
+5. Give the new permission **Refund card/bank payments** (Settings → Team Access → Permissions) to whoever should be
+   able to refund. You (CEO) always have it.
+6. Try it with a test client portal login:
+   - Pay an invoice with card `4242 4242 4242 4242` (any future date, any CVC) → the invoice turns Paid.
+   - Pay another with **US bank account** → choose the test bank → the invoice shows "Bank payment on its way"; in test
+     mode it clears after a few minutes and turns Paid.
+   - Billing → **Add card or bank account** with the AutoPay box ticked → AutoPay On.
+   - In YVA OS open that invoice's 💲 → **Refund** part of it → the balance goes back up.
+   - Email yourself an invoice → click **Pay online** → you land on a Stripe page for the balance.
+
+**B. Going live (real money)** — about 15 minutes, when the tests look good
+1. Stripe → turn **Test mode off**. Finish anything Stripe asks for (business details, the bank account for payouts).
+2. **Settings → Payment methods** (live) → turn on **ACH Direct Debit** (cards are on by default).
+3. **Developers → API keys** (live) → copy the **Publishable key** (`pk_live_…`) and the **Secret key** (`sk_live_…`).
+4. **Developers → Webhooks** (live) → **Add endpoint** → `https://yvastaffing.agency/.netlify/functions/stripe-webhook`,
+   the same 14 events as above → save → copy its **Signing secret** (`whsec_…`).
+5. Netlify → **Site configuration → Environment variables** → replace the three values with the live ones:
+   `VITE_STRIPE_PUBLISHABLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` → **Deploys → Trigger deploy**.
+6. YVA OS → Settings → Integrations → Stripe must say **"Connected · Live"**. If one key is test and the other live it
+   shows a warning — and payments from the wrong mode are ignored, so nothing mixes.
+7. Pay a small real invoice (e.g. $1) yourself, then refund it from YVA OS.
+8. Tell clients: cards or bank accounts saved in test mode don't carry over — they add them again once. Re-send any
+   invoice emailed during testing (its pay link was made for test mode).
+Never paste these keys into an email or chat; they only go into Netlify.
 
 ## 4. Turn on phone notifications (you, then your team)
 

@@ -8,12 +8,28 @@ import { recipientsLabel } from '../utils/emailList'
 import { sendEmail, type SendEmailResult } from './email'
 import { invoiceRecipients } from './emailRecipients'
 import { logAction } from './activityLog'
+import { createPayLink } from './payments'
 
 /** What happened, and who it went to (for the page's message) */
 export type InvoiceSendResult = SendEmailResult & { to: string; cc: string[] }
 
 export const DEFAULT_INVOICE_EMAIL = `Hi {clientName},\n\nPlease find attached invoice {invoiceNumber} for {amount}.\n\nBilling period: {period}\n{dueDate}\nPlease don't hesitate to reach out with any questions.\n\n{companyName}`
 export const DEFAULT_REMINDER_EMAIL = `Hi {clientName},\n\nThis is a friendly reminder that invoice {invoiceNumber} for {amount} is past due.\n\nOriginal due date: {dueDate}\n\nPlease let us know when we can expect payment or if you have any questions.\n\n{companyName}`
+
+/** "Pay now" link (card or bank, no portal login) for an invoice that still has a balance, when Stripe is set up.
+ *  Never blocks the email: if the link can't be made the email goes without it. */
+export async function payLinkFor(inv: Invoice): Promise<string | null> {
+  if (!(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined)) return null
+  const owed = (Number(inv.subtotal) || 0) - (Number(inv.amountPaid) || 0)
+  if (owed < 0.5 || (inv.status || '').toLowerCase() === 'paid' || !inv.id) return null
+  try { return (await createPayLink(inv.id)).url } catch { return null }
+}
+
+/** Puts the pay link where the template has {payLink}, or adds a line after the message */
+export function withPayLink(body: string, link: string | null): string {
+  if (/\{payLink\}/.test(body)) return body.replace(/\{payLink\}/g, link ? `Pay online (card or bank account): ${link}` : '')
+  return link ? `${body}\n\nPay online (card or bank account): ${link}` : body
+}
 
 export function applyInvoiceTemplate(template: string, inv: Invoice, settings: AppSettings): string {
   const period = `${inv.billingStart || inv.date || '—'} – ${inv.billingEnd || ''}`
@@ -57,15 +73,15 @@ async function sendWithPdf(kind: 'invoice_emailed' | 'invoice_reminder', inv: In
 /** Email the invoice with the invoice PDF attached */
 export function sendInvoiceEmail(inv: Invoice, settings: AppSettings, clients?: Client[]): Promise<InvoiceSendResult> {
   const subject = `Invoice ${inv.number} — ${settings.companyName || 'YVA Staffing'}`
-  const body = applyInvoiceTemplate(settings.invoiceEmailTemplate || DEFAULT_INVOICE_EMAIL, inv, settings)
-  return sendWithPdf('invoice_emailed', inv, settings, subject, body, clients)
+  return payLinkFor(inv).then(link => sendWithPdf('invoice_emailed', inv, settings, subject,
+    withPayLink(applyInvoiceTemplate(settings.invoiceEmailTemplate || DEFAULT_INVOICE_EMAIL, inv, settings), link), clients))
 }
 
 /** Payment reminder for an unpaid invoice, with the invoice PDF attached */
 export function sendReminderEmail(inv: Invoice, settings: AppSettings, clients?: Client[]): Promise<InvoiceSendResult> {
   const subject = `Payment Reminder — Invoice ${inv.number} — ${settings.companyName || 'YVA Staffing'}`
-  const body = applyInvoiceTemplate(settings.reminderEmailTemplate || DEFAULT_REMINDER_EMAIL, inv, settings)
-  return sendWithPdf('invoice_reminder', inv, settings, subject, body, clients)
+  return payLinkFor(inv).then(link => sendWithPdf('invoice_reminder', inv, settings, subject,
+    withPayLink(applyInvoiceTemplate(settings.reminderEmailTemplate || DEFAULT_REMINDER_EMAIL, inv, settings), link), clients))
 }
 
 /** "ap@firm.com" or "ap@firm.com (cc accounting@firm.com)" */

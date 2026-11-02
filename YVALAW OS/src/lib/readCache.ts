@@ -160,13 +160,17 @@ export const writeAwareFetch: typeof fetch = async (input, init) => {
   return kept ? rebuild(kept, method) : fetch(input, init)
 }
 
+/** Functions that change nothing YVA OS keeps in memory (sending email, making a pay link, the payment window) */
+const NO_DATA_CHANGE = /\/\.netlify\/functions\/(send-email|pay-link|create-payment-intent|setup-payment-method|log-portal-activity)(\?|$)/
+
 /** Netlify functions (week close, payroll, payments…) change data server-side: clear on any POST to them */
 export function watchFunctionWrites() {
   if (typeof window === 'undefined' || (window as unknown as { __yvaFetchWatched?: boolean }).__yvaFetchWatched) return
   ;(window as unknown as { __yvaFetchWatched?: boolean }).__yvaFetchWatched = true
   const orig = window.fetch.bind(window)
   window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-    if (!(urlOf(input).includes('/.netlify/functions/') && isWrite(methodOf(input, init)))) return orig(input, init)
+    const url = urlOf(input)
+    if (!(url.includes('/.netlify/functions/') && isWrite(methodOf(input, init))) || NO_DATA_CHANGE.test(url)) return orig(input, init)
     markOwnWrite()
     clearReadCache()
     try { return await orig(input, init) } finally { clearReadCache() }
