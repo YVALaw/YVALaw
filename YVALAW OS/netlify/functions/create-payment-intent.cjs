@@ -1,283 +1,102 @@
 /**
- * create-payment-intent — Netlify Function
+ * create-payment-intent — the client portal's "Pay" (card or US bank account).
  *
- * Creates a Stripe PaymentIntent for a client portal invoice payment.
- * Gets or creates the Stripe Customer for this client and returns their
- * saved cards so returning clients don't re-enter card details.
+ * POST /.netlify/functions/create-payment-intent   Authorization: Bearer <portal user token>
+ * Body: { invoiceId, clientId, amountCents?, savePaymentMethod?: boolean }
+ * → { clientSecret, paymentIntentId, amountCents, savedMethods }
  *
- * POST /.netlify/functions/create-payment-intent
- * Headers: Authorization: Bearer <user_access_token>
- * Body:    { invoiceId: string, clientId: string, amountCents?: number }
+ * Rules: only the client's own portal login (staff send a pay link instead); the invoice must belong to that
+ * client (client_id, or the name for older invoices) and be payable; the amount is the balance in the database
+ * (the browser's figure is only compared); no new payment while a bank payment for it is still clearing; one
+ * open PaymentIntent per invoice and login is reused (and updated if the balance or "save" choice changed), so
+ * reopening the window or a second tab never creates a second charge. The method is saved for later only when
+ * the client ticks the box.
  *
- * Returns: { clientSecret: string, savedMethods: SavedCard[] }
- *
- * Required Netlify env vars:
- *   SUPABASE_URL              — Supabase project URL
- *   SUPABASE_SERVICE_ROLE_KEY — service role key
- *   STRIPE_SECRET_KEY         — Stripe secret key (sk_live_xxx or sk_test_xxx)
+ * Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, STRIPE_SECRET_KEY
  */
+const { rest, enc, json } = require('./_lib/supa.cjs')
+const { stripe } = require('./_lib/stripe.cjs')
+const P = require('./_lib/payments.cjs')
+const { portalCaller, ensureCustomer, savedMethods } = require('./_lib/portalBilling.cjs')
 
-const PAYABLE_STATUSES = new Set(['sent', 'viewed', 'overdue', 'partial'])
-// Same list as private.is_internal() — 'client', 'pending' and anything else are not staff
-const STAFF_ROLES = new Set(['ceo', 'admin', 'accounting', 'recruiter', 'lead_gen'])
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function json(statusCode, body) {
-  return {
-    statusCode,
-    headers: {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': 'https://yvastaffing.agency',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    },
-    body: JSON.stringify(body),
-  }
-}
-
-/** Encode a flat/nested object as application/x-www-form-urlencoded for Stripe */
-function toForm(obj, prefix) {
-  const parts = []
-  for (const [k, v] of Object.entries(obj)) {
-    if (v === null || v === undefined) continue
-    const key = prefix ? `${prefix}[${k}]` : k
-    if (typeof v === 'object' && !Array.isArray(v)) {
-      parts.push(...toForm(v, key))
-    } else {
-      parts.push(`${encodeURIComponent(key)}=${encodeURIComponent(v)}`)
-    }
-  }
-  return parts
-}
-function formBody(obj) { return toForm(obj).join('&') }
-
-function centsFromUSD(value) {
-  return Math.round((Number(value) || 0) * 100)
-}
-
-/** Stripe API request helper */
-async function stripe(method, path, body) {
-  const key = process.env.STRIPE_SECRET_KEY
-  const opts = {
-    method,
-    headers: {
-      Authorization: `Bearer ${key}`,
-      'Stripe-Version': '2024-06-20',
-    },
-  }
-  if (body) {
-    opts.headers['Content-Type'] = 'application/x-www-form-urlencoded'
-    opts.body = formBody(body)
-  }
-  const res = await fetch(`https://api.stripe.com/v1${path}`, opts)
-  const data = await res.json()
-  if (!res.ok) throw new Error(data?.error?.message || `Stripe ${method} ${path} failed`)
-  return data
-}
-
-/** Supabase REST API helper (uses service role key — bypasses RLS) */
-async function supabaseGet(path) {
-  const url  = process.env.SUPABASE_URL
-  const key  = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const res  = await fetch(`${url}/rest/v1/${path}`, {
-    headers: { Authorization: `Bearer ${key}`, apikey: key, Accept: 'application/json' },
-  })
-  if (!res.ok) throw new Error(`Supabase GET ${path} failed: ${res.status}`)
-  return res.json()
-}
-
-async function supabasePatch(table, filter, body) {
-  const url = process.env.SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const res = await fetch(`${url}/rest/v1/${table}?${filter}`, {
-    method: 'PATCH',
-    headers: {
-      Authorization: `Bearer ${key}`, apikey: key,
-      'Content-Type': 'application/json', Prefer: 'return=minimal',
-    },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) throw new Error(`Supabase PATCH ${table} failed: ${res.status}`)
-}
-
-async function supabaseInsert(table, body) {
-  const url = process.env.SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const res = await fetch(`${url}/rest/v1/${table}`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${key}`,
-      apikey: key,
-      'Content-Type': 'application/json',
-      Prefer: 'return=minimal',
-    },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) throw new Error(`Supabase INSERT ${table} failed: ${res.status}`)
-}
-
-async function recordPaymentAttempt(row) {
-  try {
-    await supabaseInsert('payment_attempts', {
-      ...row,
-      attempted_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-  } catch (err) {
-    console.warn('create-payment-intent: payment_attempts insert skipped', err?.message || err)
-  }
-}
-
-// ── Handler ───────────────────────────────────────────────────────────────────
+const REUSABLE = new Set(['requires_payment_method', 'requires_confirmation', 'requires_action'])
+const DAY = 86400_000
 
 exports.handler = async function handler(event) {
   if (event.httpMethod === 'OPTIONS') return json(200, { ok: true })
-  if (event.httpMethod !== 'POST')    return json(405, { error: 'Method not allowed' })
-
-  // ── Env checks ────────────────────────────────────────────────────────────
-  const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, STRIPE_SECRET_KEY } = process.env
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !STRIPE_SECRET_KEY) {
-    return json(500, { error: 'Missing required env vars' })
+  if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' })
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.STRIPE_SECRET_KEY) {
+    return json(500, { error: 'Online payments are not set up yet. Please contact YVA.' })
   }
+  let body
+  try { body = JSON.parse(event.body || '{}') } catch { return json(400, { error: 'Invalid JSON body' }) }
+  const { invoiceId, clientId, amountCents } = body
+  const save = body.savePaymentMethod === true
+  if (!invoiceId || !/^[0-9a-f-]{36}$/i.test(String(invoiceId))) return json(400, { error: 'invoiceId is required' })
+  if (amountCents != null && !Number.isInteger(amountCents)) return json(400, { error: 'amountCents must be a whole number' })
 
-  // ── Verify caller auth token ──────────────────────────────────────────────
-  const authHeader = (event.headers.authorization || event.headers.Authorization || '')
-  if (!authHeader.startsWith('Bearer ')) return json(401, { error: 'Authorization token required' })
-  const token = authHeader.slice(7)
-
-  const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-    headers: { Authorization: `Bearer ${token}`, apikey: SUPABASE_SERVICE_ROLE_KEY },
-  })
-  if (!userRes.ok) return json(401, { error: 'Invalid or expired token' })
-
-  const user = await userRes.json()
-  if (!user?.id) return json(401, { error: 'Could not identify caller' })
-
-  // ── Parse & validate body ─────────────────────────────────────────────────
-  let invoiceId, clientId, amountCents
   try {
-    const body = JSON.parse(event.body || '{}')
-    invoiceId   = body.invoiceId
-    clientId    = body.clientId
-    amountCents = body.amountCents
-  } catch {
-    return json(400, { error: 'Invalid JSON body' })
-  }
+    const who = await portalCaller(event, clientId)
+    if (who.error) return who.error
+    const { user, row, client } = who
 
-  if (!invoiceId || !clientId) {
-    return json(400, { error: 'invoiceId and clientId are required' })
-  }
-  if (amountCents != null && typeof amountCents !== 'number') {
-    return json(400, { error: 'amountCents must be a number when provided' })
-  }
+    const inv = (await rest(`invoices?id=eq.${enc(invoiceId)}&select=id,number,client_id,client_name,status,subtotal,amount_paid&limit=1`))?.[0]
+    if (!inv) return json(404, { error: 'Invoice not found' })
+    if (!P.invoiceBelongsToClient(inv, client)) return json(403, { error: 'Invoice does not belong to this client' })
+    if (!P.isPayable(inv)) return json(409, { error: 'This invoice has nothing left to pay.' })
+    const cents = P.balanceCents(inv)
+    if (amountCents != null && amountCents !== cents) return json(409, { error: 'The balance changed. Refresh the page and try again.' })
 
-  // ── Verify the client owns this invoice (security check) ──────────────────
-  // Confirm the caller is either the client or an internal user
-  const clientUserRows = await supabaseGet(
-    `client_users?client_id=eq.${clientId}&auth_id=eq.${user.id}&select=id,stripe_customer_id`
-  )
-  const isClient = Array.isArray(clientUserRows) && clientUserRows.length > 0
-
-  if (!isClient) {
-    // Allow internal users (preview mode) — check user_roles
-    const roleRows = await supabaseGet(`user_roles?user_id=eq.${user.id}&select=role`)
-    const isInternal = Array.isArray(roleRows) && STAFF_ROLES.has(roleRows[0]?.role)
-    if (!isInternal) return json(403, { error: 'Access denied' })
-  }
-
-  // ── Fetch client + invoice and compute payable balance server-side ─────────
-  const [clientRows, invoiceRows] = await Promise.all([
-    supabaseGet(`clients?id=eq.${clientId}&select=id,name,email`),
-    supabaseGet(`invoices?id=eq.${invoiceId}&select=id,number,client_name,status,subtotal,amount_paid`),
-  ])
-  const client  = Array.isArray(clientRows) ? clientRows[0] : null
-  const invoice = Array.isArray(invoiceRows) ? invoiceRows[0] : null
-
-  if (!client)  return json(404, { error: 'Client not found' })
-  if (!invoice) return json(404, { error: 'Invoice not found' })
-
-  if (invoice.client_name !== client.name) {
-    return json(403, { error: 'Invoice does not belong to this client' })
-  }
-
-  const status = String(invoice.status || '').toLowerCase()
-  if (!PAYABLE_STATUSES.has(status)) {
-    return json(409, { error: 'This invoice is not payable' })
-  }
-
-  const serverAmountCents = centsFromUSD(Number(invoice.subtotal) - Number(invoice.amount_paid || 0))
-  if (serverAmountCents < 50) {
-    return json(409, { error: 'Invoice has no payable balance' })
-  }
-
-  if (amountCents != null && amountCents !== serverAmountCents) {
-    return json(409, { error: 'Invoice balance changed. Refresh and try again.' })
-  }
-
-  // ── Get or create Stripe Customer ─────────────────────────────────────────
-  let customerId = isClient ? clientUserRows[0].stripe_customer_id : null
-
-  if (!customerId) {
-    const customer = await stripe('POST', '/customers', {
-      email:             user.email || client?.email || '',
-      name:              client?.name || '',
-      'metadata[clientId]': clientId,
-      'metadata[userId]':   user.id,
-    })
-    customerId = customer.id
-
-    // Save stripe_customer_id back to client_users
-    if (isClient) {
-      await supabasePatch('client_users', `client_id=eq.${clientId}&auth_id=eq.${user.id}`, {
-        stripe_customer_id: customerId,
-      })
+    const attempts = await rest(`payment_attempts?invoice_id=eq.${enc(inv.id)}&select=id,status,source,stripe_payment_intent_id,stripe_customer_id,attempted_at,updated_at&order=attempted_at.desc&limit=20`).catch(() => [])
+    const now = Date.now()
+    const at = a => Date.parse(a.updated_at || a.attempted_at || 0) || 0
+    if (attempts.some(a => a.status === 'processing' && now - at(a) < 14 * DAY)) {
+      return json(409, { error: 'A bank payment for this invoice is already on its way (bank payments take about 4 business days). Nothing else is needed.' })
     }
+
+    const customerId = await ensureCustomer(row, user, client)
+    const wantSetup = save ? 'off_session' : null
+
+    // Reuse this login's open payment for the invoice (second tab, closed window, changed choice)
+    let intent = null
+    for (const a of attempts) {
+      if (a.source !== 'portal' || a.stripe_customer_id !== customerId || !a.stripe_payment_intent_id || now - at(a) > DAY) continue
+      if (!['created', 'requires_payment_method', 'requires_confirmation', 'requires_action'].includes(a.status)) continue
+      try {
+        const pi = await stripe('GET', `/payment_intents/${enc(a.stripe_payment_intent_id)}`)
+        if (!REUSABLE.has(pi.status) || pi.currency !== 'usd' || pi.metadata?.invoiceId !== inv.id) continue
+        if (pi.amount !== cents || (pi.setup_future_usage || null) !== wantSetup) {
+          intent = await stripe('POST', `/payment_intents/${enc(pi.id)}`, { amount: cents, setup_future_usage: wantSetup || '' })
+        } else intent = pi
+        break
+      } catch { /* can't reuse that one — make a new one below */ }
+    }
+
+    if (!intent) {
+      intent = await stripe('POST', '/payment_intents', {
+        amount: cents,
+        currency: 'usd',
+        customer: customerId,
+        description: `Invoice ${inv.number || inv.id}`,
+        receipt_email: user.email || client.email || undefined,
+        payment_method_types: ['card', 'us_bank_account'],
+        payment_method_options: { us_bank_account: { verification_method: 'automatic', financial_connections: { permissions: ['payment_method'] } } },
+        setup_future_usage: wantSetup || undefined,
+        metadata: { invoiceId: inv.id, clientId: client.id, clientUserId: row.id, invoiceNumber: inv.number || '', source: 'portal' },
+      }, { idempotencyKey: `pi-${inv.id}-${cents}-${save ? 1 : 0}-${row.id}-${Math.floor(now / 60000)}` })
+    }
+
+    try {
+      const attempt = { invoice_id: inv.id, client_id: client.id, client_name: client.name || null, invoice_number: inv.number || null,
+        stripe_payment_intent_id: intent.id, stripe_customer_id: customerId, amount: cents / 100, currency: 'usd', source: 'portal',
+        status: intent.status === 'requires_payment_method' ? 'created' : intent.status, updated_at: new Date().toISOString() }
+      const upd = await rest(`payment_attempts?stripe_payment_intent_id=eq.${enc(intent.id)}`, { method: 'PATCH', body: attempt, prefer: 'return=representation' })
+      if (!upd?.length) await rest('payment_attempts', { method: 'POST', body: { ...attempt, attempted_at: attempt.updated_at }, prefer: 'return=minimal' })
+    } catch (err) { console.warn('create-payment-intent: attempt not recorded —', err.message) }
+
+    return json(200, { clientSecret: intent.client_secret, paymentIntentId: intent.id, amountCents: cents, savedMethods: await savedMethods(customerId) })
+  } catch (err) {
+    console.error('create-payment-intent:', err.message)
+    return json(err.status && err.status < 500 ? 400 : 500, { error: err.name === 'StripeError' ? `Stripe: ${err.message}` : 'Could not start the payment. Please try again.' })
   }
-
-  // ── List saved payment methods ────────────────────────────────────────────
-  let savedMethods = []
-  try {
-    const pmList = await stripe('GET', `/customers/${customerId}/payment_methods?type=card&limit=5`)
-    savedMethods = (pmList.data || []).map(pm => ({
-      id:       pm.id,
-      brand:    pm.card?.brand ?? 'card',
-      last4:    pm.card?.last4 ?? '????',
-      expMonth: pm.card?.exp_month ?? 0,
-      expYear:  pm.card?.exp_year  ?? 0,
-    }))
-  } catch {
-    // Non-fatal — just proceed without saved methods
-  }
-
-  // ── Create Payment Intent ─────────────────────────────────────────────────
-  const intent = await stripe('POST', '/payment_intents', {
-    amount:                    serverAmountCents,
-    currency:                  'usd',
-    customer:                  customerId,
-    receipt_email:             user.email || client?.email || undefined,
-    'payment_method_types[]':  'card',
-    setup_future_usage:        'off_session',   // saves card for future invoices
-    'metadata[invoiceId]':     invoiceId,
-    'metadata[clientId]':      clientId,
-    'metadata[invoiceNumber]': invoice.number || '',
-  })
-
-  await recordPaymentAttempt({
-    invoice_id:               invoiceId,
-    client_id:                clientId,
-    client_name:              client.name || null,
-    invoice_number:           invoice.number || null,
-    stripe_payment_intent_id: intent.id,
-    stripe_customer_id:       customerId,
-    amount:                   serverAmountCents / 100,
-    currency:                 'usd',
-    source:                   'portal',
-    status:                   intent.status || 'created',
-  })
-
-  return json(200, {
-    clientSecret: intent.client_secret,
-    savedMethods,
-  })
 }

@@ -383,7 +383,7 @@ export type PaymentAttemptStatus =
   | 'requires_payment_method'
   | 'canceled'
 
-export type PaymentAttemptSource = 'portal' | 'autopay'
+export type PaymentAttemptSource = 'portal' | 'autopay' | 'pay_link'
 
 export type PaymentAttempt = {
   id: string

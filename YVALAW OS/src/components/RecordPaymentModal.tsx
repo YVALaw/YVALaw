@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { deletePayment, loadInvoicePaidState, loadPayments, PAYMENT_METHODS, recordPayment, type ClientPayment } from '../services/payments'
-import { usePermission } from '../context/RoleContext'
+import { createPayLink, deletePayment, loadInvoicePaidState, loadPayments, PAYMENT_METHODS, recordPayment, refundableLeft, refundStripePayment, type ClientPayment } from '../services/payments'
+import { usePermission, useRole } from '../context/RoleContext'
 import { localParts } from '../utils/moneyRules'
 import { Banner, Field, Modal, Pill } from './ui'
 
@@ -10,6 +10,9 @@ const usd = (n: number) => n.toLocaleString('en-US', { style: 'currency', curren
 /** Record a client payment (partial or full) — the invoice status follows automatically */
 export default function RecordPaymentModal({ invoice, onClose, onChanged }: { invoice: Inv; onClose: () => void; onChanged: (s: { amountPaid: number; status: string }) => void }) {
   const allowed = usePermission()
+  const { role } = useRole()
+  const [refunding, setRefunding] = useState<{ id: string; amount: string; max: number; busy?: boolean } | null>(null)
+  const [payLink, setPayLink] = useState<{ busy?: boolean; url?: string; copied?: boolean } | null>(null)
   const [list, setList] = useState<ClientPayment[]>([])
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
@@ -57,7 +60,34 @@ export default function RecordPaymentModal({ invoice, onClose, onChanged }: { in
     try { await deletePayment(p.id); await load(); await refreshInvoice() } catch (e) { setError((e as Error).message) }
   }
 
+  async function refund() {
+    if (!refunding) return
+    const amount = Number(refunding.amount.replace(',', '.'))
+    if (!(amount > 0) || amount > refunding.max + 0.001) { setError(`Enter an amount between $0.01 and ${usd(refunding.max)}.`); return }
+    if (!window.confirm(`Refund ${usd(amount)} to the client's card / bank account through Stripe? This can't be undone.`)) return
+    setRefunding(r => r && { ...r, busy: true }); setError(null); setDone(null)
+    try {
+      const r = await refundStripePayment(refunding.id, amount)
+      setRefunding(null)
+      setDone(`Refund of ${usd(r.amount)} sent${r.status === 'pending' ? ' (bank refunds take a few days)' : ''}. The invoice balance updates as soon as Stripe confirms it.`)
+      window.setTimeout(() => { void load(); void refreshInvoice() }, 4000)
+    } catch (e) { setError((e as Error).message); setRefunding(r => r && { ...r, busy: false }) }
+  }
+  async function makePayLink() {
+    setPayLink({ busy: true }); setError(null)
+    try {
+      const { url } = await createPayLink(invoice.id)
+      let copied = false
+      try { await navigator.clipboard.writeText(url); copied = true } catch { /* show it to copy by hand */ }
+      setPayLink({ url, copied })
+    } catch (e) { setError((e as Error).message); setPayLink(null) }
+  }
+
   const canRecord = allowed('payments.record')
+  const canRefund = allowed('payments.refund')
+  const canLink = role === 'ceo' || role === 'admin' || role === 'accounting' || allowed('invoices.send')
+  const kindPill = (p: ClientPayment) => p.kind === 'refund' ? <Pill tone="warning">Refund</Pill> : p.kind === 'dispute' ? <Pill tone="danger">Dispute</Pill>
+    : p.source === 'stripe' ? <Pill tone="info">{p.method === 'ach' ? 'Bank (Stripe)' : 'Card (Stripe)'}</Pill> : null
   return (
     <Modal open onClose={onClose} title="Record payment"
       sub={`${invoice.number}${invoice.clientName ? ` · ${invoice.clientName}` : ''} · balance ${usd(balance)}`}
@@ -80,10 +110,30 @@ export default function RecordPaymentModal({ invoice, onClose, onChanged }: { in
               <span className="muted">{p.paidOn}</span>
               <Pill tone="neutral">{PAYMENT_METHODS.find(m => m.value === p.method)?.label ?? p.method}</Pill>
               {p.reference && <span className="muted">{p.reference}</span>}
-              {p.source === 'stripe' && <Pill tone="info">Portal card</Pill>}
+              {kindPill(p)}
               {canRecord && p.source !== 'stripe' && <button type="button" className="btn btn--xs btn--ghost btn--danger fin-pay-list__del" onClick={() => void remove(p)}>Delete</button>}
+              {canRefund && refundableLeft(p, list) > 0 && (
+                <button type="button" className="btn btn--xs btn--ghost fin-pay-list__del" onClick={() => { const max = refundableLeft(p, list); setRefunding({ id: p.id, amount: max.toFixed(2), max }) }}>Refund</button>
+              )}
             </div>
           ))}
+        </div>
+      )}
+      {refunding && (
+        <div className="fin-refund">
+          <Field label={`Refund amount (up to ${usd(refunding.max)})`}>
+            <input aria-label="Refund amount" className="input" inputMode="decimal" value={refunding.amount} onChange={e => setRefunding(r => r && { ...r, amount: e.target.value })} />
+          </Field>
+          <div className="row">
+            <button type="button" className="btn btn--sm" onClick={() => setRefunding(null)}>Cancel</button>
+            <button type="button" className="btn btn--sm btn--danger" disabled={refunding.busy} onClick={() => void refund()}>{refunding.busy ? 'Refunding…' : 'Refund through Stripe'}</button>
+          </div>
+        </div>
+      )}
+      {canLink && balance > 0 && (
+        <div className="fin-paylink">
+          <button type="button" className="btn btn--sm" disabled={payLink?.busy} onClick={() => void makePayLink()}>{payLink?.busy ? 'Making link…' : 'Copy pay link'}</button>
+          <span className="muted">{payLink?.url ? (payLink.copied ? 'Copied — paste it to the client. It opens a secure Stripe page for the current balance (card or bank) and expires in 60 days.' : payLink.url) : 'A link the client can pay by card or bank without signing in.'}</span>
         </div>
       )}
       {canRecord ? (

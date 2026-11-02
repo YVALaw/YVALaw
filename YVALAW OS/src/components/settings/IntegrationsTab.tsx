@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import StripeStatusCard from './StripeStatusCard'
 import { supabase } from '../../lib/supabase'
 import { disconnectGmail, initiateGmailAuth } from '../../services/gmail'
 import { pushState, type PushState } from '../../services/notifications'
@@ -40,7 +41,6 @@ export type CrispSetting = {
 }
 
 type Facts = {
-  stripeLast?: { at: string; amount: number } | null
   calendlyBooked?: number | null
   devices?: { connected: number; newest: string | null } | null
   push?: { ok: boolean; text: string } | null
@@ -65,8 +65,6 @@ export default function IntegrationsTab({ clientId, onClientId, saveClientId, gm
     let alive = true
     const set = (patch: Facts) => { if (alive) setFacts(f => ({ ...f, ...patch })) }
     // Each read is best-effort: a missing table or a role without access just shows "—"
-    void supabase.from('client_payments').select('created_at,amount').eq('source', 'stripe').order('created_at', { ascending: false }).limit(1)
-      .then(({ data, error }) => set({ stripeLast: error ? undefined : (data?.[0] ? { at: data[0].created_at as string, amount: Number(data[0].amount) || 0 } : null) }))
     void supabase.from('leads').select('id', { count: 'exact', head: true }).eq('calendly_booked', true)
       .then(({ count, error }) => set({ calendlyBooked: error ? undefined : (count ?? 0) }))
     void supabase.from('desktop_devices').select('app_version,signed_out_at,revoked_at')
@@ -105,8 +103,6 @@ export default function IntegrationsTab({ clientId, onClientId, saveClientId, gm
     setBusy(false)
   }
 
-  const pk = (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined) || ''
-  const stripeMode = pk.startsWith('pk_live') ? 'Live' : pk.startsWith('pk_test') ? 'Test mode' : pk ? 'Configured' : ''
   const downloadUrl = (import.meta.env.VITE_YVA_TIME_DOWNLOAD_URL as string | undefined) || ''
   const dash = <span className="soft">—</span>
   const crispOn = !crisp.loading && !!crisp.saved
@@ -167,22 +163,7 @@ export default function IntegrationsTab({ clientId, onClientId, saveClientId, gm
       </section>
 
       {/* ── Stripe ── */}
-      <section className="set-int" aria-label="Stripe">
-        <div className="set-int__head">
-          <span className="set-int__name"><Ic d={P.card} /> Stripe</span>
-          {pk ? <Status tone="ok">{stripeMode === 'Configured' ? 'Connected' : `Connected · ${stripeMode}`}</Status> : <Status tone="off">Not set up</Status>}
-        </div>
-        <span className="set-int__desc">Card payments and AutoPay in the client portal. The webhook marks invoices paid.</span>
-        <div className="set-int__facts">
-          <Fact k="Publishable key" v={pk ? `Set (${stripeMode.toLowerCase()})` : 'Missing'} />
-          <Fact k="Webhook" v="Set on the server" />
-          <Fact k="Last card payment" v={facts.stripeLast === undefined ? dash : facts.stripeLast ? `$${facts.stripeLast.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} · ${dateMed(facts.stripeLast.at)}` : 'None yet'} />
-        </div>
-        <span className="set-hint">
-          {pk ? 'Keys and the webhook secret (STRIPE_WEBHOOK_SECRET) live in Netlify; they are never shown here.'
-            : <>Add <code>VITE_STRIPE_PUBLISHABLE_KEY</code> in Netlify and redeploy to turn on card payments.</>}
-        </span>
-      </section>
+      <StripeStatusCard />
 
       {/* ── Calendly ── */}
       <section className="set-int" aria-label="Calendly">

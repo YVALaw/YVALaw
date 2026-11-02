@@ -311,3 +311,7 @@
 .set-import__cap { text-transform: capitalize; }
 .set-import__list { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; line-height: 1.45; }
 .set-import__progress { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
+
+/* Stripe status: what still needs doing */
+.set-int__problems { margin: 0; padding: 10px 12px 10px 28px; border-radius: 8px; background: var(--gold-soft-bg); color: var(--gold-soft-fg); font-size: 12.5px; line-height: 1.5; }
+.set-int__problems li + li { margin-top: 4px; }

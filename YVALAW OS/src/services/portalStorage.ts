@@ -19,7 +19,14 @@ export type PortalBillingSettings = {
   defaultCardExpYear?: number
   autoPayAuthorizedAt?: string
   autoPayDisabledAt?: string
+  /** card | us_bank_account (supabase/migrate-stripe-secure.sql) */
+  defaultPaymentMethodType?: string
+  defaultBankName?: string
+  autopayFailures?: number
 }
+
+/** A saved card or US bank account, display fields only (never card or account numbers) */
+export type SavedMethod = { id: string; type: 'card' | 'us_bank_account'; brand: string | null; last4: string; expMonth: number | null; expYear: number | null; bankName: string | null }
 
 export type PortalAuditEvent = 'portal_login' | 'document_upload' | 'document_download'
 
@@ -310,17 +317,17 @@ export async function savePortalWorkingHours(prefs: WorkingHourPrefs): Promise<v
   if (error) throw new Error(error.message)
 }
 
-/** Load Stripe/AutoPay settings for the authenticated portal client */
+/** Load Stripe/AutoPay settings for the authenticated portal client (a client with several portal logins:
+ *  the one that has AutoPay on, else the most recent consent — portal users only ever see their own row) */
 export async function loadPortalBillingSettings(clientId: string): Promise<PortalBillingSettings> {
-  const { data, error } = await supabase
-    .from('client_users')
-    .select('stripe_customer_id, auto_pay_enabled, default_payment_method_id, default_card_brand, default_card_last4, default_card_exp_month, default_card_exp_year, auto_pay_authorized_at, auto_pay_disabled_at')
-    .eq('client_id', clientId)
-    .maybeSingle()
-
-  if (error || !data) {
-    return { autoPayEnabled: false }
+  const base = 'stripe_customer_id, auto_pay_enabled, default_payment_method_id, default_card_brand, default_card_last4, default_card_exp_month, default_card_exp_year, auto_pay_authorized_at, auto_pay_disabled_at'
+  let res: { data: unknown[] | null; error: { message: string } | null } = await supabase.from('client_users').select(`${base}, default_payment_method_type, default_bank_name, autopay_failures`)
+    .eq('client_id', clientId).order('auto_pay_enabled', { ascending: false }).order('auto_pay_authorized_at', { ascending: false, nullsFirst: false }).limit(1)
+  if (res.error && /column/i.test(res.error.message)) {
+    res = await supabase.from('client_users').select(base).eq('client_id', clientId).order('auto_pay_enabled', { ascending: false }).limit(1)
   }
+  const data = res.data?.[0]
+  if (res.error || !data) return { autoPayEnabled: false }
 
   const row = toCamel(data as Record<string, unknown>) as Record<string, unknown>
   return {
@@ -333,6 +340,9 @@ export async function loadPortalBillingSettings(clientId: string): Promise<Porta
     defaultCardExpYear:     row.defaultCardExpYear as number | undefined,
     autoPayAuthorizedAt:    row.autoPayAuthorizedAt as string | undefined,
     autoPayDisabledAt:      row.autoPayDisabledAt as string | undefined,
+    defaultPaymentMethodType: (row.defaultPaymentMethodType as string | undefined) ?? (row.defaultCardLast4 ? 'card' : undefined),
+    defaultBankName:        row.defaultBankName as string | undefined,
+    autopayFailures:        Number(row.autopayFailures) || 0,
   }
 }
 
@@ -352,32 +362,30 @@ export async function loadPortalPaymentAttempts(clientId: string, limit = 5): Pr
   return (data as Record<string, unknown>[]).map(r => toCamel(r) as unknown as PaymentAttempt)
 }
 
-/** Enable or disable AutoPay for the authenticated portal client */
-export async function savePortalAutoPaySettings(params: {
-  clientId: string
-  enabled: boolean
-  paymentMethodId?: string
-  cardBrand?: string
-  cardLast4?: string
-  cardExpMonth?: number
-  cardExpYear?: number
-}): Promise<{ card?: { brand: string; last4: string; expMonth: number; expYear: number } }> {
+/** Turn AutoPay on/off, or save a payment method (server checks it belongs to this login) */
+export async function savePortalAutoPaySettings(params: { clientId: string; enabled?: boolean; paymentMethodId?: string; saveOnly?: boolean }): Promise<{ autoPayEnabled: boolean; method?: SavedMethod | null }> {
   const token = await getSessionToken()
   const res = await fetch('/.netlify/functions/update-autopay-settings', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      clientId: params.clientId,
-      enabled: params.enabled,
-      paymentMethodId: params.paymentMethodId,
-    }),
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ clientId: params.clientId, enabled: params.enabled ?? false, paymentMethodId: params.paymentMethodId, saveOnly: params.saveOnly === true }),
   })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) throw new Error(data.error || 'Could not update AutoPay settings.')
-  return { card: data.card }
+  return { autoPayEnabled: data.autoPayEnabled === true, method: data.method ?? null }
+}
+
+/** Start "Add card or bank account" (a Stripe SetupIntent for this login; nothing is charged) */
+export async function startPortalSetup(clientId: string, autopay: boolean): Promise<string> {
+  const token = await getSessionToken()
+  const res = await fetch('/.netlify/functions/setup-payment-method', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ clientId, autopay }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok || !data.clientSecret) throw new Error(data.error || 'Could not start adding the payment method.')
+  return data.clientSecret as string
 }
 
 export async function savePortalProfilePhone(params: {
@@ -421,7 +429,7 @@ export async function removePortalSavedCard(clientId: string): Promise<void> {
     body: JSON.stringify({ clientId }),
   })
   const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error(data.error || 'Could not remove saved card.')
+  if (!res.ok) throw new Error(data.error || 'Could not remove the saved payment method.')
 }
 
 /** Submit a staff request from the client portal.

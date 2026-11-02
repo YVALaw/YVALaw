@@ -331,3 +331,9 @@
 /* paid payroll lines: greyed check (mockup) */
 .fin-pr-table .check input:disabled + .check__box, .fin-pr-m .check input:disabled + .check__box { cursor: default; }
 .fin-pr-table .check input:disabled:checked + .check__box, .fin-pr-m .check input:disabled:checked + .check__box { background: var(--soft); border-color: var(--soft); }
+
+/* Stripe refund form + pay link (Record payment modal) */
+.fin-refund { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.fin-refund .row { justify-content: flex-end; }
+.fin-paylink { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; }
+.fin-paylink .muted { flex: 1 1 220px; overflow-wrap: anywhere; }
