@@ -6,6 +6,7 @@ import { addPlacementRate, deletePlacementRate, loadPlacementRates, type Placeme
 import { PAY_SCHEDULES, localParts, type PaySchedule } from '../utils/moneyRules'
 import { Card, Field, Menu } from './ui'
 import { P } from './Icon'
+import { useToast } from '../context/ToastContext'
 
 const rateDate = (d: string) => !d ? '—' : new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
@@ -17,7 +18,7 @@ export default function EmployeePayRates({ employee }: { employee: Employee }) {
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ from: localParts(Date.now()).date, pay: '', note: '' })
   const [schedule, setSchedule] = useState<{ value: PaySchedule | ''; anchor: string }>({ value: employee.paySchedule ?? '', anchor: employee.payAnchor ?? '' })
-  const [saved, setSaved] = useState<string | null>(null)
+  const toast = useToast()
 
   async function load() { const r = await loadPlacementRates({ employeeId: employee.id }); setRows(r.rows); setError(r.error) }
   const canRates = allowed('rates.manage')   // arrives after the first render for non-CEO roles
@@ -35,8 +36,8 @@ export default function EmployeePayRates({ employee }: { employee: Employee }) {
     const before = schedule
     setSchedule({ value, anchor })
     const { error: e } = await supabase.from('employees').update({ pay_schedule: value || null, pay_anchor: value === 'biweekly' && anchor ? anchor : null }).eq('id', employee.id)
-    if (e) { setSchedule(before); setError(e.message.includes('pay_schedule') ? 'Run supabase/migrate-step2-rates.sql first.' : e.message) }
-    else { setSaved('Saved'); setTimeout(() => setSaved(null), 2000) }
+    if (e) { setSchedule(before); toast.error(e.message.includes('pay_schedule') ? 'Run supabase/migrate-step2-rates.sql first.' : e.message) }
+    else toast.success('Pay schedule saved.')
   }
 
   return (
@@ -71,7 +72,7 @@ export default function EmployeePayRates({ employee }: { employee: Employee }) {
         </div>
       )}
       <div className="card__foot ppl-foot-left">
-        <Field label={<>Pay schedule {saved && <span className="t-success">· {saved}</span>}</>}>
+        <Field label="Pay schedule">
           <select aria-label="Pay schedule" className="select select--sm" value={schedule.value} onChange={e => void saveSchedule(e.target.value as PaySchedule | '', schedule.anchor)}>
             <option value="">Follow the project{employee.worksFor === 'yva' ? ' (weekly for the YVA team)' : ''}</option>
             {PAY_SCHEDULES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}

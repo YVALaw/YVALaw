@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
+import { useToast } from '../context/ToastContext'
 
 type Cand = { id: string; name: string; stage: string; staff_request_id: string | null }
 
@@ -30,14 +31,14 @@ export function OpeningPicker({ candidateId, bare = false, onSaved }: { candidat
   const [requests, setRequests] = useState<Req[]>([])
   const [value, setValue] = useState<string>('')
   const [ready, setReady] = useState(false)
-  const [msg, setMsg] = useState<string | null>(null)
+  const toast = useToast()
   useEffect(() => {
     void Promise.all([
       supabase.from('staff_requests').select('id,client_name,role,status').in('status', ['pending', 'in_review']).order('created_at', { ascending: false }),
       supabase.from('candidates').select('staff_request_id').eq('id', candidateId).maybeSingle(),
     ]).then(([r, c]) => {
       setRequests((r.data || []) as Req[])
-      if (c.error) { setMsg(null); return }
+      if (c.error) return
       setValue(((c.data as { staff_request_id?: string } | null)?.staff_request_id) ?? ''); setReady(true)
     })
   }, [candidateId])
@@ -46,11 +47,11 @@ export function OpeningPicker({ candidateId, bare = false, onSaved }: { candidat
     const before = value
     setValue(v)
     const { error } = await supabase.from('candidates').update({ staff_request_id: v || null }).eq('id', candidateId)
-    if (error) { setValue(before); setMsg(error.message) } else { setMsg('Saved'); onSaved?.(v || null) }
+    if (error) { setValue(before); toast.error(error.message) } else { toast.success('Opening saved.'); onSaved?.(v || null) }
   }
   const field = (
     <label className="field">
-      <span className="field__label">Opening (staff request) {msg && <span className={msg === 'Saved' ? 't-success' : 't-danger'}>· {msg}</span>}</span>
+      <span className="field__label">Opening (staff request)</span>
       <select aria-label="Opening" className="select" value={value} onChange={e => void save(e.target.value)}>
         <option value="">Not for a specific client request</option>
         {requests.map(r => <option key={r.id} value={r.id}>{r.client_name ?? 'Client'} — {r.role ?? 'staff request'}</option>)}

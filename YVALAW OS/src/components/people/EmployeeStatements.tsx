@@ -11,7 +11,8 @@ import { trackedHoursOf, trackedPayEntries } from '../../utils/trackedPay'
 import { employeePremiumConfig, payrollFromInvoiceItem } from '../../utils/payroll'
 import { formatMoney, fmtHoursHM } from '../../utils/money'
 import { Ic, P } from '../Icon'
-import { Banner, EmptyState, Field, KpiStrip, Modal, Pill } from '../ui'
+import { EmptyState, Field, KpiStrip, Modal, Pill } from '../ui'
+import { useToast } from '../../context/ToastContext'
 
 export function getEmpInvoices(name: string, invoices: Invoice[], from?: string, to?: string) {
   return invoices.filter(inv => {
@@ -119,13 +120,13 @@ export default function EmployeeStatements({ emp, invoices, onInvoicesChange, ti
   const [payModal, setPayModal] = useState<Invoice | null>(null)
   const [payDate, setPayDate] = useState('')
   const [payNotes, setPayNotes] = useState('')
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useToast()
   const [sending, setSending] = useState(false)
   const [ownEntries, setOwnEntries] = useState<TimeEntry[]>([])
   useEffect(() => { if (!givenEntries) void loadTimeEntries().then(setOwnEntries) }, [givenEntries])
   const timeEntries = givenEntries ?? ownEntries
 
-  function show(ok: boolean, text: string) { setMsg({ ok, text }); if (ok) setTimeout(() => setMsg(m => (m?.text === text ? null : m)), 4000) }
+  function show(ok: boolean, text: string) { if (ok) toast.success(text); else toast.error(text) }
 
   const empInvoices = getEmpInvoices(emp.name, invoices, dateFrom || undefined, dateTo || undefined)
   const payRate = Number(emp.payRate) || 0
@@ -196,7 +197,6 @@ export default function EmployeeStatements({ emp, invoices, onInvoicesChange, ti
 
   return (
     <div className="ppl-statements">
-      {msg && <Banner tone={msg.ok ? 'success' : 'danger'} onClose={() => setMsg(null)}>{msg.text}</Banner>}
       <div className="ppl-toolbar">
         <Field label="From"><input className="input input--sm" type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} /></Field>
         <Field label="To"><input className="input input--sm" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} /></Field>

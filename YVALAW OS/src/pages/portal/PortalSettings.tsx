@@ -14,6 +14,7 @@ import {
 import type { Client, WorkingHourPrefs } from '../../data/types'
 import { Banner } from '../../components/ui'
 import { usePortal, PortalSkeleton } from '../../components/PortalSection'
+import { useToast } from '../../context/ToastContext'
 
 const DAYS = [
   { key: 'monday',    label: 'Monday'    },
@@ -49,7 +50,7 @@ export default function PortalSettings() {
 
   const [client,  setClient]  = useState<Client | null>(null)
   const [loading, setLoading] = useState(true)
-  const [success, setSuccess] = useState<string | null>(null)
+  const toast = useToast()
 
   // Account
   const [phone,      setPhone]      = useState('')
@@ -94,11 +95,7 @@ export default function PortalSettings() {
     })()
   }, [clientId])
 
-  function flash(text: string) {
-    setSuccess(text)
-    window.scrollTo(0, 0)
-    setTimeout(() => setSuccess(s => (s === text ? null : s)), 4000)
-  }
+  function flash(text: string) { toast.success(text) }
 
   async function saveProfile() {
     if (!clientId) return
@@ -171,7 +168,6 @@ export default function PortalSettings() {
 
   return (
     <div className="por-page">
-      {success && <Banner tone="success" onClose={() => setSuccess(null)}>{success}</Banner>}
       {isPreview && <Banner tone="info">Staff preview: the phone number and password can only be changed by the client.</Banner>}
 
       <div className="por-grid por-grid--settings">

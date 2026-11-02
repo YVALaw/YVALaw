@@ -2,9 +2,10 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { auditPortalActivity, loadPortalClient, loadPortalDocuments, uploadPortalDocument } from '../../services/portalStorage'
 import type { Client, ClientDocument } from '../../data/types'
-import { Banner, Chips, Pill, type Tone } from '../../components/ui'
+import { Chips, Pill, type Tone } from '../../components/ui'
 import { usePortal, PortalSkeleton } from '../../components/PortalSection'
 import { dateShort } from '../../utils/format'
+import { useToast } from '../../context/ToastContext'
 
 type Category = 'all' | ClientDocument['category']
 
@@ -38,7 +39,7 @@ export default function PortalDocuments() {
   const [uploadCat,   setUploadCat]   = useState<ClientDocument['category']>('other')
   const [uploading,   setUploading]   = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
-  const [uploadedMsg, setUploadedMsg] = useState<string | null>(null)
+  const toast = useToast()
   const [dragOver,    setDragOver]    = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -55,7 +56,6 @@ export default function PortalDocuments() {
 
   function pick(file: File | null | undefined) {
     setUploadError(null)
-    setUploadedMsg(null)
     setUploadFile(file ?? null)
   }
   function onDrop(e: DragEvent) {
@@ -85,7 +85,7 @@ export default function PortalDocuments() {
           .catch(err => console.warn('portal document upload audit skipped', err))
       }
       setDocuments(prev => [doc, ...prev])
-      setUploadedMsg(`${doc.name} uploaded. Your YVA team can see it now.`)
+      toast.success(`${doc.name} uploaded. Your YVA team can see it now.`)
       resetUpload()
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : 'Upload failed. Please try again.')
@@ -110,7 +110,6 @@ export default function PortalDocuments() {
     <div className="por-page por-page--narrow">
       <p className="por-summary">{client?.company ? `${client.company} · ` : ''}{documents.length} document{documents.length !== 1 ? 's' : ''}</p>
 
-      {uploadedMsg && <Banner tone="success" onClose={() => setUploadedMsg(null)}>{uploadedMsg}</Banner>}
 
       <div className={`por-drop${dragOver ? ' por-drop--over' : ''}`}
         onDragOver={e => { e.preventDefault(); setDragOver(true) }}

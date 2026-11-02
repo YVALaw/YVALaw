@@ -10,6 +10,7 @@ import { balanceOf, isUnpaid } from '../../services/crm'
 import { Banner, Drawer, Field, Menu, Pill, Segmented, onEnter, useIsMobile, type Tone } from '../ui'
 import { Ic, P } from '../Icon'
 import { dateMed, dateShort, usd } from '../../utils/format'
+import { useToast } from '../../context/ToastContext'
 
 const fmtTs = (ts: number) => new Date(ts).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
 const fmtAttempt = (iso?: string) => (iso ? new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—')
@@ -115,6 +116,7 @@ export function CommsTab({ clientId, log, setLog }: { clientId: string; log: Act
   const [note, setNote] = useState('')
   const [type, setType] = useState<CommEntryType>('note')
   const [error, setError] = useState<string | null>(null)
+  const toast = useToast()
   async function add() {
     if (!note.trim()) return
     const entry: ActivityLogEntry = { id: crypto.randomUUID(), clientId, note: note.trim(), createdAt: Date.now(), type, auto: false }
@@ -127,7 +129,7 @@ export function CommsTab({ clientId, log, setLog }: { clientId: string; log: Act
     const prev = log
     setLog(log.filter(e => e.id !== id))
     try { const all = await loadActivityLog(); await saveActivityLog(all.filter(e => e.id !== id)) }
-    catch (e) { setLog(prev); setError(`Could not delete it: ${(e as Error).message}`) }
+    catch (e) { setLog(prev); toast.error(`Could not delete it: ${(e as Error).message}`) }
   }
   return (
     <section className="card card--pad stack crm-narrow">
@@ -169,6 +171,7 @@ export function ContractsTab({ client, persist }: { client: Client; persist: (c:
   const [file, setFile] = useState<File | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const toast = useToast()
   const fileRef = useRef<HTMLInputElement>(null)
   const contracts = client.contracts ?? []
   const openAdd = () => { setForm(blankContract); setFile(null); setError(null); setPanel({ editId: null }) }
@@ -194,14 +197,13 @@ export function ContractsTab({ client, persist }: { client: Client; persist: (c:
   async function remove(c: Contract) {
     if (!window.confirm(`Delete contract "${c.title}"?`)) return
     if (c.filePath) await deleteFile(c.filePath).catch(() => { /* ignore */ })
-    await persist({ ...client, contracts: contracts.filter(x => x.id !== c.id) }).catch(e => setError(`Could not delete: ${(e as Error).message}`))
+    await persist({ ...client, contracts: contracts.filter(x => x.id !== c.id) }).catch(e => toast.error(`Could not delete: ${(e as Error).message}`))
   }
   const range = (c: Contract) => (c.startDate || c.endDate ? `${c.startDate ? dateMed(c.startDate) : '—'} – ${c.endDate ? dateMed(c.endDate) : '—'}` : '—')
   const menu = (c: Contract) => [{ label: 'Edit', onClick: () => openEdit(c) }, 'sep' as const, { label: 'Delete contract', danger: true, onClick: () => void remove(c) }]
   return (
     <section className="card">
       <div className="card__head"><h2 className="card__title">Contracts</h2><button type="button" className="link" onClick={openAdd}>+ Add contract</button></div>
-      {error && <div className="card__body"><Banner tone="danger" onClose={() => setError(null)}>{error}</Banner></div>}
       {contracts.length === 0 ? <div className="card-empty">No contracts yet.</div> : mobile ? (
         <div>{contracts.map(c => (
           <div key={c.id} className="list-row">
@@ -257,6 +259,7 @@ export function DocumentsTab({ client, docs, setDocs }: { client: Client; docs: 
   const [busy, setBusy] = useState(false)
   const [over, setOver] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const toast = useToast()
   const ref = useRef<HTMLInputElement>(null)
   async function upload() {
     if (!file) return
@@ -276,7 +279,7 @@ export function DocumentsTab({ client, docs, setDocs }: { client: Client; docs: 
   async function remove(doc: ClientDocument) {
     if (!window.confirm(`Remove "${doc.name}"?`)) return
     try { await removeClientDocument(doc.id); await deleteFile(doc.filePath).catch(() => { /* ignore */ }); setDocs(prev => prev.filter(d => d.id !== doc.id)) }
-    catch (e) { setError(`Could not remove it: ${(e as Error).message}`) }
+    catch (e) { toast.error(`Could not remove it: ${(e as Error).message}`) }
   }
   const onDrop = (e: DragEvent) => { e.preventDefault(); setOver(false); const f = e.dataTransfer.files?.[0]; if (f) setFile(f) }
   const ext = (n: string) => (n.split('.').pop() || 'FILE').slice(0, 4).toUpperCase()

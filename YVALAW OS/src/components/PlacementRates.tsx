@@ -6,6 +6,7 @@ import { addPlacementRate, deletePlacementRate, loadPlacementRates, rateClient, 
 import { BILL_SOURCE_LABEL, PAY_SOURCE_LABEL, localParts, num, resolveRates, type Resolved } from '../utils/moneyRules'
 import { dateMed } from '../utils/format'
 import { Banner, Field, Menu, Modal, Pill, Skel, useIsMobile } from './ui'
+import { useToast } from '../context/ToastContext'
 
 const today = () => localParts(Date.now()).date
 const money = (n: number) => (n ? `$${n.toFixed(2)}` : '—')
@@ -20,7 +21,7 @@ export default function PlacementRates({ project, members, client, onAddPeople }
   const mobile = useIsMobile()
   const [rows, setRows] = useState<PlacementRate[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [flash, setFlash] = useState<string | null>(null)
+  const toast = useToast()
   const [form, setForm] = useState<Form | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -50,7 +51,7 @@ export default function PlacementRates({ project, members, client, onAddPeople }
     setSaving(true); setError(null)
     try {
       await addPlacementRate({ employee_id: form.employeeId, project_id: project.id, position: form.position.trim() || null, bill_rate: form.bill, pay_rate: form.pay, effective_from: form.from, note: form.note.trim() || null })
-      setForm(null); setFlash(`Rate change saved for ${emp?.name ?? 'this person'} from ${dateMed(form.from)}.`)
+      setForm(null); toast.success(`Rate change saved for ${emp?.name ?? 'this person'} from ${dateMed(form.from)}.`)
       await load()
     } catch (err) { setError((err as Error).message) }
     setSaving(false)
@@ -58,7 +59,7 @@ export default function PlacementRates({ project, members, client, onAddPeople }
   async function remove(c: PlacementRate) {
     if (!window.confirm('Delete this rate change? Weeks it applied to fall back to the previous rate.')) return
     setError(null)
-    try { await deletePlacementRate(c.id); setFlash('Rate change deleted.'); await load() } catch (err) { setError((err as Error).message) }
+    try { await deletePlacementRate(c.id); toast.success('Rate change deleted.'); await load() } catch (err) { toast.error((err as Error).message) }
   }
 
   const effective = (r: Resolved) => {
@@ -100,7 +101,6 @@ export default function PlacementRates({ project, members, client, onAddPeople }
     <section className="card ops-rates" aria-label="Team and rates">
       {head}
       <div className="ops-rates__msgs">
-        {flash && <Banner tone="success" onClose={() => setFlash(null)}>{flash}</Banner>}
         {error && !form && <Banner tone="danger" onClose={() => setError(null)}>{error}</Banner>}
       </div>
       {members.length === 0 ? (

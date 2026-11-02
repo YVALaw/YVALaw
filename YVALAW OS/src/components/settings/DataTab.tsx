@@ -7,6 +7,7 @@ import { clearAllData, exportBackup, importBackup } from './backup'
 import { scanInlineFiles, slimInlineFiles, type SlimScan } from '../../services/slimRecords'
 import { previewOldCrmImport, runOldCrmImport, type ImportPreview, type ImportProgress, type ImportResult } from '../../services/oldCrmImport'
 import { logAction } from '../../services/activityLog'
+import { useToast } from '../../context/ToastContext'
 
 type Stat = { label: string; count: number }
 
@@ -14,18 +15,14 @@ export default function DataTab({ isCeo, canImportLeads }: { isCeo: boolean; can
   const navigate = useNavigate()
   const fileRef = useRef<HTMLInputElement>(null)
   const [stats, setStats] = useState<Stat[] | null>(null)
-  const [importStatus, setImportStatus] = useState<string | null>(null)
+  const toast = useToast()
   const [importing, setImporting] = useState(false)
   const [exporting, setExporting] = useState(false)
-  const [exportError, setExportError] = useState<string | null>(null)
   const [confirmClear, setConfirmClear] = useState(false)
   const [clearing, setClearing] = useState(false)
-  const [cleared, setCleared] = useState(false)
-  const [clearError, setClearError] = useState<string | null>(null)
   // Photos/files saved inside records (older versions) — slow down every list
   const [slim, setSlim] = useState<SlimScan | null>(null)
   const [slimming, setSlimming] = useState<{ done: number; total: number } | null>(null)
-  const [slimResult, setSlimResult] = useState<{ moved: number; failed: string[] } | null>(null)
 
   useEffect(() => { if (isCeo) void scanInlineFiles().then(setSlim).catch(() => setSlim(null)) }, [isCeo])
 
@@ -52,9 +49,12 @@ export default function DataTab({ isCeo, canImportLeads }: { isCeo: boolean; can
   }
 
   async function doSlim() {
-    setSlimming({ done: 0, total: (slim?.photos ?? 0) + (slim?.files ?? 0) }); setSlimResult(null)
-    try { setSlimResult(await slimInlineFiles((done, total) => setSlimming({ done, total }))) }
-    catch (e) { setSlimResult({ moved: 0, failed: [(e as Error).message] }) }
+    setSlimming({ done: 0, total: (slim?.photos ?? 0) + (slim?.files ?? 0) })
+    let r: { moved: number; failed: string[] }
+    try { r = await slimInlineFiles((done, total) => setSlimming({ done, total })) }
+    catch (e) { r = { moved: 0, failed: [(e as Error).message] } }
+    if (r.failed.length === 0) toast.success(`Moved ${r.moved} record${r.moved === 1 ? '' : 's'}. Lists load faster now.`)
+    else toast.warning(`Moved ${r.moved}. These could not be moved and were left as they were: ${r.failed.slice(0, 5).join('; ')}${r.failed.length > 5 ? ` and ${r.failed.length - 5} more` : ''}`)
     setSlimming(null)
     setSlim(await scanInlineFiles().catch(() => null))
   }
@@ -76,30 +76,29 @@ export default function DataTab({ isCeo, canImportLeads }: { isCeo: boolean; can
   }, [])
 
   async function doExport() {
-    setExporting(true); setExportError(null)
-    try { await exportBackup(); void logAction('export', 'Downloaded a full backup') } catch (e) { setExportError(`Export failed — ${e instanceof Error ? e.message : 'Unknown error'}`) }
+    setExporting(true)
+    try { await exportBackup(); void logAction('export', 'Downloaded a full backup') } catch (e) { toast.error(`Export failed — ${e instanceof Error ? e.message : 'Unknown error'}`) }
     setExporting(false)
   }
 
   async function doImport(file: File) {
-    setImporting(true); setImportStatus(null)
+    setImporting(true)
     const status = await importBackup(file)
-    setImportStatus(status)
+    if (status.startsWith('Import failed')) toast.error(status); else toast.success(status)
     void logAction('import', `Backup restore from ${file.name}`, { details: { result: status.slice(0, 200) } })
     setImporting(false)
   }
 
   async function doClear() {
-    setClearing(true); setClearError(null)
+    setClearing(true)
     try {
       const ok = await clearAllData()
       setConfirmClear(false)
-      if (!ok) { setClearError('Only the CEO can clear all data.'); return }
-      setCleared(true)
+      if (!ok) { toast.error('Only the CEO can clear all data.'); return }
+      toast.success('All data cleared. Reload the page.')
       void logAction('other', 'Cleared all data')
-      setTimeout(() => setCleared(false), 4000)
     } catch (e) {
-      setClearError(e instanceof Error ? e.message : 'Could not clear the data.')
+      toast.error(e instanceof Error ? e.message : 'Could not clear the data.')
     } finally { setClearing(false) }
   }
 
@@ -152,8 +151,6 @@ export default function DataTab({ isCeo, canImportLeads }: { isCeo: boolean; can
             </div>
           )}
         </div>
-        {exportError && <Banner tone="danger">{exportError}</Banner>}
-        {importStatus && <Banner tone={importStatus.startsWith('Import failed') ? 'danger' : 'success'}>{importStatus}</Banner>}
       </section>
 
       {isCeo && (
@@ -262,8 +259,6 @@ export default function DataTab({ isCeo, canImportLeads }: { isCeo: boolean; can
               </button>
             )}
           </div>
-          {slimResult && slimResult.failed.length === 0 && <Banner tone="success">Moved {slimResult.moved} record{slimResult.moved === 1 ? '' : 's'}. Lists load faster now.</Banner>}
-          {slimResult && slimResult.failed.length > 0 && <Banner tone="warning">Moved {slimResult.moved}. These could not be moved and were left as they were: {slimResult.failed.slice(0, 5).join('; ')}{slimResult.failed.length > 5 ? ` and ${slimResult.failed.length - 5} more` : ''}</Banner>}
         </section>
       )}
 
@@ -280,8 +275,6 @@ export default function DataTab({ isCeo, canImportLeads }: { isCeo: boolean; can
             </div>
             <button type="button" className="btn btn--sm btn--danger" onClick={() => setConfirmClear(true)}>Clear all…</button>
           </div>
-          {cleared && <Banner tone="success">All data cleared. Reload the page.</Banner>}
-          {clearError && <Banner tone="danger">{clearError}</Banner>}
         </section>
       )}
 

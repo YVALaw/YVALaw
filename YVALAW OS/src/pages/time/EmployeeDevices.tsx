@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import { useRole } from '../../context/RoleContext'
 import { can } from '../../lib/roles'
 import { disconnectDevice, loadDevices, type DesktopDevice } from '../../services/trackerStorage'
-import { Banner, Dot } from '../../components/ui'
+import { Dot } from '../../components/ui'
 import { Ic, P } from '../../components/Icon'
+import { useToast } from '../../context/ToastContext'
 
 const ONLINE_MS = 5 * 60_000      // the app checks in about once a minute while signed in
 
@@ -16,19 +17,19 @@ export default function EmployeeDevices({ employeeId, firstName }: { employeeId:
   const { role } = useRole()
   const [devices, setDevices] = useState<DesktopDevice[] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
-  const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useToast()
 
   useEffect(() => { void loadDevices(employeeId).then(setDevices) }, [employeeId])
 
   async function disconnect(d: DesktopDevice) {
     if (!window.confirm(`Disconnect "${d.name}" from ${firstName}'s YVA Time?\n\nThe app on that computer signs out within a minute and can't save time any more. ${firstName} can sign in again with their YVA OS password (for example on a new computer).`)) return
-    setBusy(d.id); setMessage(null)
+    setBusy(d.id)
     try {
       await disconnectDevice(d.id)
-      setMessage({ ok: true, text: `"${d.name}" was disconnected.` })
+      toast.success(`"${d.name}" was disconnected.`)
       setDevices(await loadDevices(employeeId))
     } catch (e) {
-      setMessage({ ok: false, text: (e as Error).message })
+      toast.error((e as Error).message)
     } finally { setBusy(null) }
   }
 
@@ -70,7 +71,6 @@ export default function EmployeeDevices({ employeeId, firstName }: { employeeId:
           })}
         </div>
       )}
-      {message && <Banner tone={message.ok ? 'success' : 'danger'} onClose={() => setMessage(null)}>{message.text}</Banner>}
     </div>
   )
 }

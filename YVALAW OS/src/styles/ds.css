@@ -274,6 +274,28 @@ button.kpi-cell:hover { background: var(--surface-2); }
 .banner__body { flex: 1; min-width: 0; }
 .banner__close { border: 0; background: none; color: inherit; opacity: .6; cursor: pointer; padding: 0 2px; font-size: 16px; line-height: 1; }
 
+/* ── Toasts (src/context/ToastContext.tsx) ─────────────────────
+   Result of a click (sent, saved, copied, failed…): top-right pop-up that
+   goes away by itself. Situations that stay true use .banner instead. */
+.toast-stack { position: fixed; top: 76px; right: 20px; z-index: 100; width: min(360px, calc(100vw - 40px)); display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.toast { pointer-events: auto; display: flex; align-items: flex-start; gap: 10px; padding: 11px 10px 11px 12px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-left: 3px solid var(--toast-tone, var(--navy)); border-radius: 10px; box-shadow: var(--shadow-pop); font-size: 13.5px; line-height: 1.45; animation: toast-in .22s ease-out; }
+.toast--success { --toast-tone: var(--success-dot); }
+.toast--error { --toast-tone: var(--danger-dot); }
+.toast--warning { --toast-tone: var(--warning-dot); }
+.toast--info { --toast-tone: var(--navy); }
+.toast__icon { display: inline-flex; margin-top: 1px; color: var(--toast-tone); }
+.toast__body { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.toast__action { flex-shrink: 0; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); border-radius: 8px; padding: 3px 9px; font: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer; }
+.toast__action:hover { border-color: var(--border-hover); background: var(--surface-2); }
+.toast__close { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin: -2px 0 -2px 0; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
+.toast__close:hover { background: var(--segment-bg); color: var(--text); }
+@keyframes toast-in { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: none; } }
+@media (max-width: 759px) {
+  .toast-stack { top: 10px; left: 12px; right: 12px; width: auto; }
+  .toast__close { width: 32px; height: 32px; margin: -6px -4px -6px 0; }
+}
+@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+
 /* ── Overlays: scrim, drawer, modal, popover, menu, sheet ─────── */
 .scrim { position: fixed; inset: 0; z-index: 70; background: var(--scrim); }
 .scrim--clear { background: transparent; }

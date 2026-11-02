@@ -15,6 +15,7 @@ import { EMPTY_EMPLOYEE_FORM, EmployeeFields, STATUS_OPTIONS, employeeFormError,
 import { AttachmentList } from '../components/people/attachments'
 import { PersonAvatar, employeeStatusTone, payScheduleOf, placementOf, projectsOf, upcomingAnniversary } from '../components/people/common'
 import { TIME_STATUS, loadTimeActivity, timeStatusOf } from '../components/people/teamStatus'
+import { useToast } from '../context/ToastContext'
 
 function uid() { return crypto.randomUUID() }
 
@@ -53,7 +54,7 @@ export default function EmployeesPage() {
   useEffect(() => {
     loadSnapshot().then(snap => {
       setEmployees(snap.employees); setInvoices(snap.invoices); setProjects(snap.projects); setClients(snap.clients); setLoaded(true)
-    }).catch(e => { setError(`Could not load the team: ${(e as Error).message}`); setLoaded(true) })
+    }).catch(e => { setLoadError(`Could not load the team: ${(e as Error).message}`); setLoaded(true) })
     void loadTimeActivity().then(setActivity).catch(() => setActivity(null))
   }, [])
 
@@ -69,8 +70,8 @@ export default function EmployeesPage() {
   const [statementsFor, setStatementsFor] = useState<Employee | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Employee | null>(null)
   const [saving, setSaving] = useState(false)
-  const [notice, setNotice] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const toast = useToast()
+  const [loadError, setLoadError] = useState<string | null>(null)   // could not load: stays as a banner
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Create menu deep link: /employees?create=1
@@ -80,9 +81,9 @@ export default function EmployeesPage() {
 
   async function persist(next: Employee[], ok: string) {
     const before = employees
-    setEmployees(next); setError(null)
-    try { await saveEmployees(next); setNotice(ok); return true }
-    catch (e) { setEmployees(before); setError(`Could not save: ${(e as Error).message}`); return false }
+    setEmployees(next)
+    try { await saveEmployees(next); toast.success(ok); return true }
+    catch (e) { setEmployees(before); toast.error(`Could not save: ${(e as Error).message}`); return false }
   }
 
   function openAdd() { setForm({ ...EMPTY_EMPLOYEE_FORM }); setAttachments([]); setProjectIds([]); setEditId(null); setModal('add') }
@@ -95,7 +96,7 @@ export default function EmployeesPage() {
     const before = projects
     setProjects(next)
     try { await saveProjects(next); return true }
-    catch (e) { setProjects(before); setError(`Saved the employee, but not the projects: ${(e as Error).message}`); return false }
+    catch (e) { setProjects(before); toast.error(`Saved the employee, but not the projects: ${(e as Error).message}`); return false }
   }
 
   function handleFileUpload(file: File) {
@@ -299,8 +300,7 @@ export default function EmployeesPage() {
           <button type="button" className="btn btn--primary" onClick={openAdd}><Ic d={P.plus} size={15} />Add employee</button>
         </>}
       />
-      {notice && <Banner onClose={() => setNotice(null)}>{notice}</Banner>}
-      {error && <Banner tone="danger" onClose={() => setError(null)}>{error}</Banner>}
+      {loadError && <Banner tone="danger" onClose={() => setLoadError(null)}>{loadError}</Banner>}
 
       <div className="ppl-filterbar">
         <SearchInput value={search} onChange={setSearch} placeholder="Search team…" label="Search team" />

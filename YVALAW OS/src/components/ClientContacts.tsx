@@ -3,6 +3,7 @@ import { deleteContact, loadContacts, saveContact, type Contact } from '../servi
 import { Banner, Checkbox, Field, Menu } from './ui'
 import { initials } from '../utils/format'
 import { isEmail } from '../utils/emailList'
+import { useToast } from '../context/ToastContext'
 
 const blank = (clientId: string): Partial<Contact> & { client_id: string; name: string } => ({ client_id: clientId, name: '', role: '', email: '', phone: '', whatsapp: '', is_billing: false })
 
@@ -10,6 +11,7 @@ const blank = (clientId: string): Partial<Contact> & { client_id: string; name: 
 export default function ClientContacts({ clientId, onChange }: { clientId: string; onChange?: () => void }) {
   const [rows, setRows] = useState<Contact[]>([])
   const [error, setError] = useState<string | null>(null)
+  const toast = useToast()
   const [form, setForm] = useState<(Partial<Contact> & { client_id: string; name: string }) | null>(null)
   const [saving, setSaving] = useState(false)
   const load = async () => { const r = await loadContacts(clientId); setRows(r.rows); setError(r.error) }
@@ -22,7 +24,7 @@ export default function ClientContacts({ clientId, onChange }: { clientId: strin
   }
   async function remove(c: Contact) {
     if (!window.confirm(`Remove ${c.name}?`)) return
-    try { await deleteContact(c.id); await load(); onChange?.() } catch (e) { setError(`Could not remove ${c.name}: ${(e as Error).message}`) }
+    try { await deleteContact(c.id); await load(); onChange?.() } catch (e) { toast.error(`Could not remove ${c.name}: ${(e as Error).message}`) }
   }
   const set = (patch: Partial<Contact>) => setForm(f => (f ? { ...f, ...patch } : f))
   return (

@@ -7,14 +7,15 @@ import { APP_URL } from '../../lib/appUrl'
 import { loadLatestConsent } from '../../services/trackerStorage'
 import EmployeeDevices from '../../pages/time/EmployeeDevices'
 import { Ic, P } from '../Icon'
-import { Banner, Card, Pill } from '../ui'
+import { Card, Pill } from '../ui'
 import { firstName } from './common'
+import { useToast } from '../../context/ToastContext'
 
 const longDate = (ms: number) => new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 
 export default function YvaTimeLogin({ emp, onLinked, onViewScreens }: { emp: Employee; onLinked: (userId: string) => void; onViewScreens?: () => void }) {
   const [inviteLoading, setInviteLoading] = useState<'email' | 'link' | 'reset' | null>(null)
-  const [inviteMsg, setInviteMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useToast()
   const [consent, setConsent] = useState<{ at: number; version: number } | null>(null)
   useEffect(() => { void loadLatestConsent(emp.id).then(setConsent) }, [emp.id])
   const first = firstName(emp.name)
@@ -22,11 +23,10 @@ export default function YvaTimeLogin({ emp, onLinked, onViewScreens }: { emp: Em
   // YVA Time / My workspace login — created server-side by invite-employee.
   // 'reset' = they already have a login: a one-time link that opens "Choose a new password".
   async function sendEmployeeInvite(mode: 'email' | 'link' | 'reset') {
-    if (!emp.email && mode !== 'reset') { setInviteMsg({ ok: false, text: 'Add an email address to this employee before inviting.' }); return }
+    if (!emp.email && mode !== 'reset') { toast.error('Add an email address to this employee before inviting.'); return }
     setInviteLoading(mode)
-    setInviteMsg(null)
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { setInviteLoading(null); setInviteMsg({ ok: false, text: 'You must be logged in.' }); return }
+    if (!session) { setInviteLoading(null); toast.error('You must be logged in.'); return }
     try {
       const res = await fetch('/.netlify/functions/invite-employee', {
         method: 'POST',
@@ -34,23 +34,23 @@ export default function YvaTimeLogin({ emp, onLinked, onViewScreens }: { emp: Em
         body: JSON.stringify({ employeeId: emp.id, mode, redirectTo: `${APP_URL}${mode === 'reset' ? 'reset-password' : 'me/set-password'}` }),
       })
       const data = await res.json()
-      if (!res.ok) { setInviteMsg({ ok: false, text: data.error || 'Failed to create the link.' }); return }
+      if (!res.ok) { toast.error(data.error || 'Failed to create the link.'); return }
       // The server linked the login; mirror it locally (whole-table saves never write userId)
       if (mode !== 'reset') onLinked(data.userId)
       if (mode === 'link' || mode === 'reset') {
         const what = mode === 'reset' ? 'New sign-in link' : 'Invite link'
         try {
           await navigator.clipboard.writeText(data.inviteLink)
-          setInviteMsg({ ok: true, text: `${what} copied for ${data.email}. Paste it into your own email or message — it works once.` })
+          toast.success(`${what} copied for ${data.email}. Paste it into your own email or message — it works once.`)
         } catch {
           window.prompt(`Copy this ${what.toLowerCase()}:`, data.inviteLink)
-          setInviteMsg({ ok: true, text: `${what} created for ${data.email}.` })
+          toast.success(`${what} created for ${data.email}.`)
         }
       } else {
-        setInviteMsg({ ok: true, text: `Invitation email sent to ${data.email}` })
+        toast.success(`Invitation email sent to ${data.email}`)
       }
     } catch {
-      setInviteMsg({ ok: false, text: 'Network error — could not create the invitation.' })
+      toast.error('Network error — could not create the invitation.')
     } finally {
       setInviteLoading(null)
     }
@@ -61,7 +61,6 @@ export default function YvaTimeLogin({ emp, onLinked, onViewScreens }: { emp: Em
     <div className="grid-auto ppl-tabgrid">
       <Card title="YVA Time login" actions={<Pill tone={emp.userId ? 'success' : 'neutral'}>{emp.userId ? 'Has a login' : 'Not invited'}</Pill>}>
         <div className="card__body stack">
-          {inviteMsg && <Banner tone={inviteMsg.ok ? 'success' : 'danger'} onClose={() => setInviteMsg(null)}>{inviteMsg.text}</Banner>}
           {emp.userId ? (
             <>
               <p className="ppl-p">

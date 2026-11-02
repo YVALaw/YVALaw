@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { OpeningCandidates } from '../components/OpeningCandidates'
 import { loadStaffRequests, updateStaffRequestStatus } from '../services/storage'
 import type { StaffRequest } from '../data/types'
-import { Banner, PageHeader, Pill, Skel, Tabs, type Tone } from '../components/ui'
+import { PageHeader, Pill, Skel, Tabs, type Tone } from '../components/ui'
 import { dateMed, dateShort } from '../utils/format'
+import { useToast } from '../context/ToastContext'
 
 type Filter = 'all' | StaffRequest['status']
 /** Portal redesign columns (migrate-redesign-portal.sql) — null/missing on older rows or before the migration */
@@ -36,19 +37,18 @@ export default function RequestsPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<Filter>('all')
   const [updating, setUpdating] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const toast = useToast()
 
   useEffect(() => { void load() }, [])
   async function load() { setLoading(true); setRequests(await loadStaffRequests()); setLoading(false) }
 
   async function changeStatus(req: Req, status: StaffRequest['status']) {
-    setUpdating(req.id); setError(null)
+    setUpdating(req.id)
     try {
       await updateStaffRequestStatus(req.id, status)
       setRequests(prev => prev.map(r => (r.id === req.id ? { ...r, status } : r)))
-      setNotice(`${req.clientName ?? 'Request'}: marked as ${STATUS_META[status].label.toLowerCase()}.`)
-    } catch (e) { setError(`Could not update the request: ${(e as Error).message}`) }
+      toast.success(`${req.clientName ?? 'Request'}: marked as ${STATUS_META[status].label.toLowerCase()}.`)
+    } catch (e) { toast.error(`Could not update the request: ${(e as Error).message}`) }
     finally { setUpdating(null) }
   }
 
@@ -59,8 +59,6 @@ export default function RequestsPage() {
   return (
     <div className="page crm-page">
       <PageHeader title="Staff requests" sub={<>Sent by clients from their portal · {pending > 0 ? <span className="crm-pending-badge">{pending} pending</span> : '0 pending'}</>} />
-      {error && <Banner tone="danger" onClose={() => setError(null)}>{error}</Banner>}
-      {notice && <Banner tone="success" onClose={() => setNotice(null)}>{notice}</Banner>}
       <Tabs label="Request status" value={filter} onChange={setFilter} tabs={[
         { value: 'all', label: 'All', count: requests.length },
         { value: 'pending', label: 'Pending', count: pending },

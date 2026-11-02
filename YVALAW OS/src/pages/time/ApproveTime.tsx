@@ -5,8 +5,9 @@ import {
   approveTime, blocksActivity, decideRequest, loadManualRequests, loadTrackerBlocks, reopenTime,
   type ManualRequest, type TrackerBlock,
 } from '../../services/trackerStorage'
-import { Activity, Banner, Card, EmptyState, Field, Modal, Skel, Stepper, useIsMobile } from '../../components/ui'
+import { Activity, Card, EmptyState, Field, Modal, Skel, Stepper, useIsMobile } from '../../components/ui'
 import { hmClock, hmText } from '../../utils/format'
+import { useToast } from '../../context/ToastContext'
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
@@ -36,7 +37,7 @@ export default function ApproveTime({ onChanged }: { onChanged?: () => void } = 
   const [blocks,    setBlocks]    = useState<TrackerBlock[] | null>(null)
   const [requests,  setRequests]  = useState<ManualRequest[]>([])
   const [busy,      setBusy]      = useState<string | null>(null)
-  const [message,   setMessage]   = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useToast()
   const [rejecting, setRejecting] = useState<ManualRequest | null>(null)
   const [reason,    setReason]    = useState('')
 
@@ -79,13 +80,13 @@ export default function ApproveTime({ onChanged }: { onChanged?: () => void } = 
 
   async function approve(employeeId: string) {
     if (!lastApprovable) return
-    setBusy(employeeId); setMessage(null)
+    setBusy(employeeId)
     try {
       const r = await approveTime(employeeId, ymd(week), lastApprovable)
-      setMessage({ ok: true, text: `Approved ${nameOf(employeeId)}: ${r.entries} day/project total${r.entries === 1 ? '' : 's'} now in the time log, client portal and invoice import.` })
+      toast.success(`Approved ${nameOf(employeeId)}: ${r.entries} day/project total${r.entries === 1 ? '' : 's'} now in the time log, client portal and invoice import.`)
       await load(); onChanged?.()
     } catch (e) {
-      setMessage({ ok: false, text: (e as Error).message })
+      toast.error((e as Error).message)
     } finally { setBusy(null) }
   }
 
@@ -93,16 +94,15 @@ export default function ApproveTime({ onChanged }: { onChanged?: () => void } = 
   async function approveAll() {
     if (!lastApprovable || waitingPeople.length === 0) return
     if (!window.confirm(`Approve the finished days (${md(week)} – ${md(new Date(`${lastApprovable}T12:00:00`).getTime())}) for ${waitingPeople.length} ${waitingPeople.length === 1 ? 'person' : 'people'}?`)) return
-    setBusy('all'); setMessage(null)
+    setBusy('all')
     let ok = 0, entries = 0
     const failed: string[] = []
     for (const [employeeId] of waitingPeople) {
       try { const r = await approveTime(employeeId, ymd(week), lastApprovable); ok++; entries += r.entries }
       catch (e) { failed.push(`${nameOf(employeeId)} (${(e as Error).message})`) }
     }
-    setMessage(failed.length
-      ? { ok: false, text: `Approved ${ok} of ${waitingPeople.length}. Not approved: ${failed.join('; ')}` }
-      : { ok: true, text: `Approved ${ok} ${ok === 1 ? 'person' : 'people'}: ${entries} day/project total${entries === 1 ? '' : 's'} now in the time log, client portal and invoice import.` })
+    if (failed.length) toast.error(`Approved ${ok} of ${waitingPeople.length}. Not approved: ${failed.join('; ')}`)
+    else toast.success(`Approved ${ok} ${ok === 1 ? 'person' : 'people'}: ${entries} day/project total${entries === 1 ? '' : 's'} now in the time log, client portal and invoice import.`)
     setBusy(null)
     await load(); onChanged?.()
   }
@@ -110,27 +110,27 @@ export default function ApproveTime({ onChanged }: { onChanged?: () => void } = 
   async function reopen(employeeId: string) {
     const range = `${md(week)} – ${md(addDays(week, 6))}`
     if (!window.confirm(`Reopen ${nameOf(employeeId)}'s approved hours for ${range}?\n\nThey go back to "waiting" and leave the time log, the client portal and invoice import until you approve them again. If you already paid or invoiced them, fix that by hand.`)) return
-    setBusy(`reopen:${employeeId}`); setMessage(null)
+    setBusy(`reopen:${employeeId}`)
     try {
       const r = await reopenTime(employeeId, ymd(week), ymd(addDays(week, 6)))
-      setMessage({ ok: true, text: `Reopened ${nameOf(employeeId)}'s week: ${r.entries} day/project total${r.entries === 1 ? '' : 's'} removed from the time log until approved again.` })
+      toast.success(`Reopened ${nameOf(employeeId)}'s week: ${r.entries} day/project total${r.entries === 1 ? '' : 's'} removed from the time log until approved again.`)
       await load(); onChanged?.()
     } catch (e) {
-      setMessage({ ok: false, text: (e as Error).message })
+      toast.error((e as Error).message)
     } finally { setBusy(null) }
   }
 
   async function decide(r: ManualRequest, ok: boolean, note?: string) {
-    setBusy(r.id); setMessage(null)
+    setBusy(r.id)
     try {
       const res = await decideRequest(r.id, ok, note)
-      setMessage({ ok: true, text: ok
+      toast.success(ok
         ? `Approved ${Math.round(res.seconds / 60)} min for ${nameOf(r.employeeId)}${res.seconds < (r.endsAt - r.startsAt) / 1000 ? ' (part of it was already tracked, so it was not added twice)' : ''}.`
-        : `Rejected the request from ${nameOf(r.employeeId)}.` })
+        : `Rejected the request from ${nameOf(r.employeeId)}.`)
       setRejecting(null)
       await load(); onChanged?.()
     } catch (e) {
-      setMessage({ ok: false, text: (e as Error).message })
+      toast.error((e as Error).message)
     } finally { setBusy(null) }
   }
 
@@ -163,7 +163,6 @@ export default function ApproveTime({ onChanged }: { onChanged?: () => void } = 
       </div>
       <p className="ops-help">Approved hours go to the time log, the client portal (client projects) and “Import YVA Time hours” on invoices. Today can't be approved until it's over.</p>
 
-      {message && <Banner tone={message.ok ? 'success' : 'danger'} onClose={() => setMessage(null)}>{message.text}</Banner>}
 
       {blocks === null ? (
         <div className="card card--pad stack">{[0, 1, 2].map(i => <Skel key={i} h={44} />)}</div>

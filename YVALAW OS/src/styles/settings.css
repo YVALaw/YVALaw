@@ -91,9 +91,6 @@
 .set-ns__sendto { display: flex; gap: 8px; flex-wrap: wrap; }
 .set-ns__sendto .input { flex: 1 1 200px; max-width: 340px; }
 .set-ns__foot { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
-.set-msg { font-size: 13px; }
-.set-msg--ok { color: var(--success-text); }
-.set-msg--err { color: var(--danger-text); }
 
 /* ── Team access ───────────────────────────────────────────────────────── */
 .set-user { display: flex; align-items: center; gap: 12px; padding: 12px 20px; border-top: 1px solid var(--row-line); flex-wrap: wrap; }

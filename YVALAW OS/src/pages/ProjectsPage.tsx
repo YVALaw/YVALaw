@@ -8,15 +8,15 @@ import { loadTags, saveTags } from '../services/tagStorage'
 import { rateClient, rateEmployee, rateProject } from '../services/rates'
 import { localParts, num, resolveRates } from '../utils/moneyRules'
 import { TagBadge } from '../components/TagBadge'
-import { AvatarStack, Banner, Drawer, EmptyState, Menu, Modal, PageHeader, Pill, SearchInput, Segmented, Skel } from '../components/ui'
+import { AvatarStack, Drawer, EmptyState, Menu, Modal, PageHeader, Pill, SearchInput, Segmented, Skel } from '../components/ui'
 import ProjectFormFields, { EMPTY_PROJECT_FORM, projectFields, type ProjectFormState } from '../components/ops/ProjectForm'
 import TaskBoard, { mentionsIn, type TaskDraft } from '../components/ops/TaskBoard'
 import ProjectExpenses, { type ExpenseDraft } from '../components/ops/ProjectExpenses'
 import { STAGES, errText, hoursLabel, matchesFilter, monthShort, payShort, projectMonthHours, stageInfo, stageOf, uid, type ProjectFilter, type ProjectStage } from '../components/ops/opsUtils'
 import { usd } from '../utils/format'
+import { useToast } from '../context/ToastContext'
 
 type ViewMode = 'cards' | 'kanban'
-type Flash = { tone: 'success' | 'danger'; text: string } | null
 
 export default function ProjectsPage() {
   const navigate = useNavigate()
@@ -45,7 +45,7 @@ export default function ProjectsPage() {
   const [view, setView] = useStickyView<ViewMode>('projects', 'cards', ['cards', 'kanban'])
   const [filter, setFilter] = useState<ProjectFilter>('active')
   const [search, setSearch] = useState('')
-  const [flash, setFlash] = useState<Flash>(null)
+  const toast = useToast()
   const [creating, setCreating] = useState(false)
   const [form, setForm] = useState<ProjectFormState>(EMPTY_PROJECT_FORM)
   const [saving, setSaving] = useState(false)
@@ -64,8 +64,8 @@ export default function ProjectsPage() {
   async function persist(next: Project[], ok?: string): Promise<boolean> {
     const prev = projects
     setProjects(next)
-    try { await saveProjects(next); if (ok) setFlash({ tone: 'success', text: ok }); return true }
-    catch (e) { setProjects(prev); setFlash({ tone: 'danger', text: `Could not save: ${errText(e)}` }); return false }
+    try { await saveProjects(next); if (ok) toast.success(ok); return true }
+    catch (e) { setProjects(prev); toast.error(`Could not save: ${errText(e)}`); return false }
   }
 
   function openAdd() { setForm({ ...EMPTY_PROJECT_FORM }); setCreating(true) }
@@ -90,14 +90,14 @@ export default function ProjectsPage() {
     const prev = allTags
     const next = [...allTags, tag]
     setAllTags(next)
-    try { await saveTags(next) } catch (e) { setAllTags(prev); setFlash({ tone: 'danger', text: `Could not save the tag: ${errText(e)}` }) }
+    try { await saveTags(next) } catch (e) { setAllTags(prev); toast.error(`Could not save the tag: ${errText(e)}`) }
   }
 
   // Tasks and expenses (whole-list saves; the safe save only deletes rows this page loaded)
   async function persistTasks(next: Task[]): Promise<boolean> {
     const prev = allTasks
     setAllTasks(next)
-    try { await saveTasks(next); return true } catch (e) { setAllTasks(prev); setFlash({ tone: 'danger', text: `Could not save tasks: ${errText(e)}` }); return false }
+    try { await saveTasks(next); return true } catch (e) { setAllTasks(prev); toast.error(`Could not save tasks: ${errText(e)}`); return false }
   }
   function addTask(p: Project, status: TaskStatus, d: TaskDraft) {
     const mentions = mentionsIn(d.description, employees.map(e => e.name))
@@ -106,7 +106,7 @@ export default function ProjectsPage() {
   async function persistExpenses(next: Expense[]): Promise<boolean> {
     const prev = allExpenses
     setAllExpenses(next)
-    try { await saveExpenses(next); return true } catch (e) { setAllExpenses(prev); setFlash({ tone: 'danger', text: `Could not save expenses: ${errText(e)}` }); return false }
+    try { await saveExpenses(next); return true } catch (e) { setAllExpenses(prev); toast.error(`Could not save expenses: ${errText(e)}`); return false }
   }
   function addExpense(p: Project, d: ExpenseDraft) {
     return persistExpenses([{ id: uid(), projectId: p.id, description: d.description.trim(), amount: parseFloat(d.amount) || 0, date: d.date, category: d.category || undefined, recurring: d.recurring || undefined, createdAt: Date.now() }, ...allExpenses])
@@ -213,7 +213,6 @@ export default function ProjectsPage() {
         <button type="button" className="btn btn--primary" onClick={openAdd}>+ New project</button>
       </>} />
 
-      {flash && <Banner tone={flash.tone} onClose={() => setFlash(null)}>{flash.text}</Banner>}
       <MissingRates projects={projects} employees={employees} clients={clients} rates={rates} />
 
       {!loaded ? (
