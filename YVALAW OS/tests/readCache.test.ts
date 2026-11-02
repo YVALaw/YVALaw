@@ -1,6 +1,6 @@
-import { test } from 'node:test'
+import { test, mock } from 'node:test'
 import assert from 'node:assert/strict'
-import { cachedRead, clearReadCache, writeAwareFetch } from '../src/lib/readCache.ts'
+import { cachedRead, clearReadCache, writeAwareFetch, applyVersions, registerVersionSource, checkForChanges, pageChanged, onTeamChange, setLiveConnected, depsOf, changeStampsActive, LIST_MS, __resetForTests, type VersionRow } from '../src/lib/readCache.ts'
 
 const counter = () => { let n = 0; return { load: async () => { n++; return [n] }, get count() { return n } } }
 
@@ -161,6 +161,145 @@ test('different sign-ins never share kept answers', async () => {
   try {
     await writeAwareFetch(`${DB}clients?select=*`, { method: 'GET', headers: { authorization: 'Bearer a' } })
     await writeAwareFetch(`${DB}clients?select=*`, { method: 'GET', headers: { authorization: 'Bearer b' } })
+    assert.equal(net.calls.length, 2)
+  } finally { net.restore() }
+})
+
+// ── change stamps (supabase/migrate-live-updates.sql + services/liveUpdates.ts) ──
+const V = (t: Record<string, number>): VersionRow[] => Object.entries(t).map(([table_name, version]) => ({ table_name, version }))
+const get = (path: string) => writeAwareFetch(`${DB}${path}`, { method: 'GET', ...H })
+
+test('the tables a read depends on include embedded ones', () => {
+  assert.deepEqual(depsOf(new URL(`${DB}invoices?select=*,clients(name),proj:projects!invoices_project_id_fkey(name)`)), ['invoices', 'clients', 'projects'])
+  assert.deepEqual(depsOf(new URL(`${DB}employees?select=id,name`)), ['employees'])
+})
+
+test('with change stamps, a read is kept past one minute until its table changes', async () => {
+  __resetForTests(); const net = fakeNet()
+  mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-11-02T12:00:00Z') })
+  try {
+    applyVersions(V({ employees: 3, clients: 1 }), { complete: true })
+    assert.equal(changeStampsActive(), true)
+    await get('employees?select=*')
+    mock.timers.tick(LIST_MS * 10)        // ten minutes, nobody saved
+    await get('employees?select=*')
+    assert.equal(net.calls.length, 1)
+    applyVersions(V({ clients: 2 }))      // another table changed: still kept
+    await get('employees?select=*')
+    assert.equal(net.calls.length, 1)
+    applyVersions(V({ employees: 4 }))    // a teammate saved an employee
+    await get('employees?select=*')
+    assert.equal(net.calls.length, 2)
+  } finally { mock.timers.reset(); net.restore() }
+})
+
+test('a read with an embedded table is dropped when the embedded table changes', async () => {
+  __resetForTests(); const net = fakeNet()
+  try {
+    applyVersions(V({ invoices: 1, clients: 1 }), { complete: true })
+    await get('invoices?select=*,clients(name)')
+    applyVersions(V({ clients: 2 }))
+    await get('invoices?select=*,clients(name)')
+    assert.equal(net.calls.length, 2)
+  } finally { net.restore() }
+})
+
+test('without stamps (script not run yet) reads are kept one minute, as before', async () => {
+  __resetForTests(); const net = fakeNet()
+  mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-11-02T12:00:00Z') })
+  try {
+    await get('clients?select=*')
+    mock.timers.tick(LIST_MS - 1000); await get('clients?select=*')
+    assert.equal(net.calls.length, 1)
+    mock.timers.tick(2000); await get('clients?select=*')
+    assert.equal(net.calls.length, 2)
+    // a table that has no stamp also stays on the one-minute rule when others have stamps
+    applyVersions(V({ clients: 1 }), { complete: true })
+    await get('tracker_blocks?select=*&block_start=gte.2026-01-05T04:00:00.000Z')
+    mock.timers.tick(LIST_MS + 1000)
+    await get('tracker_blocks?select=*&block_start=gte.2026-01-05T04:00:00.000Z')
+    assert.equal(net.calls.filter(c => c.includes('tracker_blocks')).length, 2)
+  } finally { mock.timers.reset(); net.restore() }
+})
+
+test('a read made before the stamps were known is not kept until-changed', async () => {
+  __resetForTests(); const net = fakeNet()
+  mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-11-02T12:00:00Z') })
+  try {
+    await get('projects?select=*')                       // stamps unknown yet
+    applyVersions(V({ projects: 7 }), { complete: true }) // first check arrives (it may include a change made since)
+    mock.timers.tick(LIST_MS + 1000)
+    await get('projects?select=*')
+    assert.equal(net.calls.length, 2)
+  } finally { mock.timers.reset(); net.restore() }
+})
+
+test('a read whose table changes while it is in flight is not kept', async () => {
+  __resetForTests()
+  applyVersions(V({ leads: 1 }), { complete: true })
+  let release: (r: Response) => void = () => {}
+  let first = true
+  const net = fakeNet(() => first ? (first = false, new Promise<Response>(res => { release = res })) : new Response('[]', { status: 200 }))
+  try {
+    const pending = get('leads?select=*')
+    await new Promise(r => setTimeout(r, 0))
+    applyVersions(V({ leads: 2 }))
+    release(new Response('[{"old":true}]', { status: 200 }))
+    await pending
+    await get('leads?select=*')
+    assert.equal(net.calls.length, 2)
+  } finally { net.restore() }
+})
+
+test('a teammate change to a table the page shows is reported; other tables and own saves are not', async () => {
+  __resetForTests(); const net = fakeNet()
+  const seen: string[][] = []
+  const off = onTeamChange(t => seen.push(t))
+  try {
+    applyVersions(V({ clients: 1, employees: 1, invoices: 1 }), { complete: true })
+    pageChanged()
+    await get('clients?select=*')
+    applyVersions(V({ employees: 2 }))     // not on this page
+    assert.equal(seen.length, 0)
+    applyVersions(V({ clients: 2 }))       // on this page, someone else
+    assert.deepEqual(seen, [['clients']])
+    await writeAwareFetch(`${DB}clients?id=eq.1`, { method: 'PATCH', ...H, body: '{}' })
+    applyVersions(V({ clients: 3 }))       // our own save coming back
+    assert.equal(seen.length, 1)
+    pageChanged()                          // another page: clients no longer on screen
+    applyVersions(V({ invoices: 2 }))
+    assert.equal(seen.length, 1)
+  } finally { off(); net.restore() }
+})
+
+test('opening a page checks for changes when the live connection is down, at most every 10 seconds', async () => {
+  __resetForTests()
+  let reads = 0
+  registerVersionSource(async () => { reads++; return V({ clients: reads }) })
+  mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-11-02T12:00:00Z') })
+  try {
+    pageChanged(); await new Promise(r => setImmediate(r))
+    pageChanged(); await new Promise(r => setImmediate(r))
+    assert.equal(reads, 1)
+    mock.timers.tick(11_000)
+    pageChanged(); await new Promise(r => setImmediate(r))
+    assert.equal(reads, 2)
+    setLiveConnected(true)                 // pushed live: page switches cost nothing
+    mock.timers.tick(60_000)
+    pageChanged(); await new Promise(r => setImmediate(r))
+    assert.equal(reads, 2)
+    // a failing check (script not run) leaves stamps unknown
+    __resetForTests()
+    registerVersionSource(async () => null)
+    await checkForChanges(0)
+    assert.equal(changeStampsActive(), false)
+  } finally { mock.timers.reset() }
+})
+
+test('the change numbers themselves are never kept', async () => {
+  __resetForTests(); const net = fakeNet()
+  try {
+    await get('data_versions?select=table_name,version'); await get('data_versions?select=table_name,version')
     assert.equal(net.calls.length, 2)
   } finally { net.restore() }
 })

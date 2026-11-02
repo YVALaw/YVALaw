@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Ic, P } from './Icon'
 import { loadNotifications, markNotificationsRead, setAppBadge, type AppNotification } from '../services/notifications'
+import { supabase } from '../lib/supabase'
 
 function ago(ms: number, es: boolean): string {
   const m = Math.floor((Date.now() - ms) / 60000)
@@ -17,7 +18,9 @@ const DOT: Record<string, string> = {
 }
 
 /** The bell (redesign): 38px circle (44px on phones), red dot when unread, 380px popover with "Mark all read".
- *  Refreshes every minute and when the app comes back. Also used in My workspace (lang = es). */
+ *  New notifications are pushed by Supabase Realtime (only this person's rows; supabase/migrate-live-updates.sql
+ *  adds the table to Realtime). It also refreshes when the app comes back, and every 2 minutes only while the live
+ *  connection is down (or Realtime isn't switched on). Also used in My workspace (lang = es). */
 export default function NotificationBell({ lang = 'en', linkBase = '', onOpenChange }: { lang?: 'en' | 'es'; linkBase?: string; onOpenChange?: (open: boolean) => void }) {
   const es = lang === 'es'
   const navigate = useNavigate()
@@ -29,11 +32,28 @@ export default function NotificationBell({ lang = 'en', linkBase = '', onOpenCha
 
   async function refresh() { setItems(await loadNotifications()) }
   useEffect(() => {
+    let alive = true, live = false, lastVis = 0
+    let channel: ReturnType<typeof supabase.channel> | null = null
     void refresh()
-    const id = setInterval(() => void refresh(), 60_000)
-    const onVis = () => { if (document.visibilityState === 'visible') void refresh() }
+    void supabase.auth.getSession().then(({ data }) => {
+      const uid = data.session?.user.id
+      if (!alive || !uid) return
+      channel = supabase
+        .channel(`yva-notifications-${uid}-${Math.random().toString(36).slice(2, 8)}`)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${uid}` }, () => { if (alive) void refresh() })
+        .subscribe(state => {
+          const was = live
+          live = state === 'SUBSCRIBED'
+          if (live && !was && alive) void refresh()   // reconnected: catch up on anything missed
+        })
+    })
+    const id = setInterval(() => { if (!live && document.visibilityState === 'visible') void refresh() }, 120_000)
+    const onVis = () => { if (document.visibilityState === 'visible' && Date.now() - lastVis > 30_000) { lastVis = Date.now(); void refresh() } }
     document.addEventListener('visibilitychange', onVis)
-    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVis) }
+    return () => {
+      alive = false; clearInterval(id); document.removeEventListener('visibilitychange', onVis)
+      if (channel) void supabase.removeChannel(channel)
+    }
   }, [])
   useEffect(() => { setAppBadge(unread) }, [unread])
   useEffect(() => {

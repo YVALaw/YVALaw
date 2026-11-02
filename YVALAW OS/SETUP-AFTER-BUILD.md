@@ -33,7 +33,7 @@ If you ever re-run the YVA Time phase 2 script, run `migrate-step4-weekly-close.
 **Netlify → Forms:** if you have an email notification on the `lead-backup` form, add one for the new
 `application-backup` form too (careers applications when EmailJS is blocked). They also land in YVA OS → Candidates.
 
-## 2b. After the redesign (November) is live — 7 more small scripts
+## 2b. After the redesign (November) is live — 8 more small scripts
 
 Same way as step 1, in this order (each is safe to run again):
 1. `supabase/migrate-redesign-portal.sql` — "Request more staff" saves how many people and which project
@@ -43,6 +43,11 @@ Same way as step 1, in this order (each is safe to run again):
 5. `supabase/migrate-redesign-people-extras.sql` — full hire date on employees (anniversaries)
 6. `supabase/migrate-cc-emails.sql` — CC emails on clients, employees and invoices
 7. `supabase/migrate-staff-profiles.sql` — staff profiles + "who did what" history (run it again whenever you re-run the Step 1 script)
+8. `supabase/migrate-live-updates.sql` — live updates: YVA OS only re-reads what someone actually changed (no more
+   background refresh every minute), and the bell gets new notifications pushed. Afterwards check Supabase →
+   **Database → Publications → supabase_realtime**: `data_versions` and `notifications` should be listed (the script adds
+   them). Until this script runs, YVA OS keeps working as before (data kept 1 minute). If you create a new table
+   later, run this script again.
 
 **Crisp chat (client portal → Messages):** make a free account at crisp.chat → Settings → Website settings →
 copy the **Website ID** → YVA OS → Settings → **Integrations** → Crisp → paste → Save. Clients then chat with

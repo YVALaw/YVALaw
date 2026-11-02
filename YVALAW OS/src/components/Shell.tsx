@@ -10,6 +10,7 @@ import { ROLE_LABELS, can, type UserRole } from '../lib/roles'
 import { visibleHubs, visibleCreateItems, locate, canSeePage, SETTINGS_PAGE, type Hub, type HubKey } from '../lib/nav'
 import { loadHubStatus, type HubStatus } from '../services/hubStatus'
 import { startKeepWarm } from '../lib/readCache'
+import { useLiveUpdates } from '../services/liveUpdates'
 import { signOutAndForgetDevice } from '../services/notifications'
 import { canPromptInstall, isIos, isStandalone, promptInstall } from '../lib/install'
 import NotificationBell from './NotificationBell'
@@ -53,14 +54,15 @@ export default function Shell({ children }: { children: ReactNode }) {
   const linkedEmployeeId = myProfile?.id ?? null
   const { hub: curHub, page: curPage, isProfile } = locate(location.pathname)
   const isHome = location.pathname === '/'
+  const live = useLiveUpdates(location.pathname)
 
   // Navigating closes every overlay and scrolls to the top
   useEffect(() => { setOverlay(null); window.scrollTo(0, 0) }, [location.pathname])
   // Live status lines for the hub pop-ups (refreshed on navigation; cached a minute)
   const pageKeys = useMemo(() => hubs.flatMap(h => h.pages.map(p => p.key)), [hubs])
   // The first check waits a moment so the page's own data loads first (the database answers a few queries at a time)
-  // A moment after the first page has loaded: read the main lists in the background and keep everything used
-  // recently fresh while the window is open (about every minute and right after saves) — lib/readCache.ts
+  // A moment after the first page has loaded: read the main lists once in the background. They stay in memory until
+  // someone changes them (change stamps + live updates, lib/readCache.ts / services/liveUpdates.ts)
   useEffect(() => {
     const t = window.setTimeout(() => startKeepWarm(() => warmUpLists()), 2500)
     return () => window.clearTimeout(t)
@@ -161,7 +163,15 @@ export default function Shell({ children }: { children: ReactNode }) {
             ))}
           </div>
         )}
-        <Suspense fallback={<PageLoading />}>{children}</Suspense>
+        {live.teamChanged && (
+          <div className="live-banner" role="status">
+            <Ic d={P.refresh} />
+            <span>Someone on your team just changed something on this page.</span>
+            <button type="button" className="btn btn--sm btn--primary" onClick={live.showLatest}>Show latest</button>
+            <button type="button" className="live-banner__x" aria-label="Dismiss" onClick={live.dismiss}><Ic d={P.x} /></button>
+          </div>
+        )}
+        <Suspense key={live.pageKey} fallback={<PageLoading />}>{children}</Suspense>
       </main>
 
       {overlay && <div className={`scrim os-scrim${overlay.kind === 'search' || (mobile && overlay.kind === 'hub') ? '' : ' scrim--clear'}`} onClick={() => setOverlay(null)} />}

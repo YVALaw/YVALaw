@@ -6,6 +6,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { signOutAndForgetDevice } from '../services/notifications'
 import { loadPortalClient } from '../services/portalStorage'
 import { useRole } from '../context/RoleContext'
+import { useLiveUpdates } from '../services/liveUpdates'
 import { Ic, P } from './Icon'
 import { PageLoading, useIsMobile } from './ui'
 import { initials } from '../utils/format'
@@ -25,6 +26,7 @@ export default function ClientShell({ children, previewClientId }: Props) {
   const { email, clientId: roleClientId } = useRole()
   const navigate = useNavigate()
   const location = useLocation()
+  useLiveUpdates(location.pathname)   // portal pages re-read only what teammates changed
   const mobile = useIsMobile()
   const isPreview = Boolean(previewClientId)
   const clientId = roleClientId ?? previewClientId ?? null

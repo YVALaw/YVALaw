@@ -45,8 +45,11 @@ export default function LiveBoard() {
       if (alive) { setBlocks(rows); setDevices(devs); setLoadedAt(Date.now()) }
     }
     void load()
-    const id = setInterval(() => void load(), 60_000)
-    return () => { alive = false; clearInterval(id) }
+    // live board: every minute while on screen, and at once when the window comes back
+    const id = setInterval(() => { if (document.visibilityState === 'visible') void load() }, 60_000)
+    const onVis = () => { if (document.visibilityState === 'visible') void load() }
+    document.addEventListener('visibilitychange', onVis)
+    return () => { alive = false; clearInterval(id); document.removeEventListener('visibilitychange', onVis) }
   }, [])
 
   const projectName = (id: string | null) => projects.find(p => p.id === id)?.name ?? 'Project'
