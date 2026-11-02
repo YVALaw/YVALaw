@@ -1,9 +1,16 @@
-// Emailing an invoice (Invoices page, Weekly close): template + attached invoice, through sendEmail
-// (Gmail if connected; failures are shown, never silent).
-import type { AppSettings, Invoice } from '../data/types'
+// Emailing an invoice (Invoices page, Weekly close, Home): template + the invoice as a real PDF, To the client
+// and Cc their Invoice CC / billing contacts, through sendEmail (Gmail if connected; failures are shown, never
+// silent). Each send is recorded in the change history (logAction).
+import type { AppSettings, Client, Invoice } from '../data/types'
 import { formatMoney } from '../utils/money'
 import { buildInvoiceHTML } from '../utils/invoiceHtml'
+import { recipientsLabel } from '../utils/emailList'
 import { sendEmail, type SendEmailResult } from './gmail'
+import { invoiceRecipients } from './emailRecipients'
+import { logAction } from './activityLog'
+
+/** What happened, and who it went to (for the page's message) */
+export type InvoiceSendResult = SendEmailResult & { to: string; cc: string[] }
 
 export const DEFAULT_INVOICE_EMAIL = `Hi {clientName},\n\nPlease find attached invoice {invoiceNumber} for {amount}.\n\nBilling period: {period}\n{dueDate}\nPlease don't hesitate to reach out with any questions.\n\n{companyName}`
 export const DEFAULT_REMINDER_EMAIL = `Hi {clientName},\n\nThis is a friendly reminder that invoice {invoiceNumber} for {amount} is past due.\n\nOriginal due date: {dueDate}\n\nPlease let us know when we can expect payment or if you have any questions.\n\n{companyName}`
@@ -25,16 +32,41 @@ export function invoiceHtmlFor(inv: Invoice, settings: AppSettings, autoPrint = 
     companyEmail: settings.companyEmail, companyPhone: settings.companyPhone, autoPrint })
 }
 
-/** Email the invoice with the invoice attached */
-export function sendInvoiceEmail(inv: Invoice, settings: AppSettings): Promise<SendEmailResult> {
-  const subject = `Invoice ${inv.number} — ${settings.companyName || 'YVA Staffing'}`
-  const body = applyInvoiceTemplate(settings.invoiceEmailTemplate || DEFAULT_INVOICE_EMAIL, inv, settings)
-  return sendEmail(inv.clientEmail || '', subject, body, { name: `invoice-${inv.number}.html`, content: invoiceHtmlFor(inv, settings), mimeType: 'text/html' })
+/** The client-facing invoice as a PDF attachment (never DOP) */
+export async function invoicePdf(inv: Invoice, settings: AppSettings) {
+  const { htmlToPdfAttachment } = await import('../utils/pdf')   // PDF code + libraries load only when needed
+  return htmlToPdfAttachment(invoiceHtmlFor(inv, settings), `Invoice-${inv.number || 'draft'}`)
 }
 
-/** Payment reminder for an unpaid invoice (no attachment, as before) */
-export function sendReminderEmail(inv: Invoice, settings: AppSettings): Promise<SendEmailResult> {
+async function sendWithPdf(kind: 'invoice_emailed' | 'invoice_reminder', inv: Invoice, settings: AppSettings, subject: string, body: string, clients?: Client[]): Promise<InvoiceSendResult> {
+  const { to, cc } = await invoiceRecipients(inv, clients)
+  if (!to) return { mode: 'failed', attached: false, fallbackReason: `${inv.number} has no client email on file.`, to, cc }
+  let pdf
+  try { pdf = await invoicePdf(inv, settings) } catch (e) {
+    return { mode: 'failed', attached: false, fallbackReason: `The invoice PDF could not be made (${(e as Error).message}). Nothing was sent.`, to, cc }
+  }
+  const r = await sendEmail(to, subject, body, { attachments: [pdf], cc })
+  if (r.mode !== 'failed') {
+    const what = kind === 'invoice_emailed' ? `Emailed invoice ${inv.number}` : `Sent a payment reminder for invoice ${inv.number}`
+    void logAction(kind, `${what} to ${recipientsLabel(to, cc)}${r.mode === 'mailto' ? ' (opened in the email app)' : ''}`,
+      { table: 'invoices', recordId: inv.id, details: { to, cc, via: r.mode } })
+  }
+  return { ...r, to, cc }
+}
+
+/** Email the invoice with the invoice PDF attached */
+export function sendInvoiceEmail(inv: Invoice, settings: AppSettings, clients?: Client[]): Promise<InvoiceSendResult> {
+  const subject = `Invoice ${inv.number} — ${settings.companyName || 'YVA Staffing'}`
+  const body = applyInvoiceTemplate(settings.invoiceEmailTemplate || DEFAULT_INVOICE_EMAIL, inv, settings)
+  return sendWithPdf('invoice_emailed', inv, settings, subject, body, clients)
+}
+
+/** Payment reminder for an unpaid invoice, with the invoice PDF attached */
+export function sendReminderEmail(inv: Invoice, settings: AppSettings, clients?: Client[]): Promise<InvoiceSendResult> {
   const subject = `Payment Reminder — Invoice ${inv.number} — ${settings.companyName || 'YVA Staffing'}`
   const body = applyInvoiceTemplate(settings.reminderEmailTemplate || DEFAULT_REMINDER_EMAIL, inv, settings)
-  return sendEmail(inv.clientEmail || '', subject, body)
+  return sendWithPdf('invoice_reminder', inv, settings, subject, body, clients)
 }
+
+/** "ap@firm.com" or "ap@firm.com (cc accounting@firm.com)" */
+export const sentToLabel = (r: { to: string; cc: string[] }) => recipientsLabel(r.to, r.cc)

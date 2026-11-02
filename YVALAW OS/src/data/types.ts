@@ -17,6 +17,7 @@ export type Employee = {
   manualTimeAllowed?: boolean   // YVA Time: may add time by hand (needs admin approval)
   employeeNumber?: string
   email?: string
+  ccEmails?: string[]      // "Statement CC": copied on earnings statement emails (migrate-cc-emails.sql)
   phone?: string
   payRate?: string | number
   defaultShiftStart?: string
@@ -43,6 +44,7 @@ export type Client = {
   name: string
   company?: string
   email?: string
+  ccEmails?: string[]      // "Invoice CC": copied on invoice emails and payment reminders (migrate-cc-emails.sql)
   phone?: string
   address?: string
   timezone?: string
@@ -132,6 +134,7 @@ export type Invoice = {
   dueDate?: string
   clientName?: string
   clientEmail?: string
+  clientCcEmails?: string[]   // who was CC'd when the invoice was saved (client Invoice CC + billing contacts)
   clientAddress?: string
   billingStart?: string
   billingEnd?: string

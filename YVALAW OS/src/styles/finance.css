@@ -66,6 +66,7 @@
 .fin-pick__right { display: flex; align-items: center; gap: 8px; }
 .fin-pick__empty { padding: 16px 22px; }
 .fin-preview { flex: 1; width: 100%; min-height: 60dvh; border: 1px solid var(--border); border-radius: 10px; background: #fff; }
+.fin-preview__to { display: block; margin-bottom: 8px; overflow-wrap: anywhere; }
 .fin-phone-block { padding: 28px 20px; display: flex; flex-direction: column; gap: 8px; text-align: center; }
 .fin-phone-block__title { margin: 0; font-size: 16px; font-weight: 600; }
 .fin-phone-block__text { margin: 0 0 8px; font-size: 14px; color: var(--muted); line-height: 1.5; }
@@ -80,6 +81,7 @@
 .fin-builder__title { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
 .fin-builder__num { font-size: 14px; color: var(--muted); font-weight: 500; margin-left: 4px; }
 .fin-builder__fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.fin-builder__fields .field--full { grid-column: 1 / -1; }
 .fin-readonly { background: var(--surface-2); color: var(--text-2); cursor: default; }
 .fin-readonly:focus { border-color: var(--border-strong); box-shadow: none; }
 .fin-builder__hours { overflow: hidden; }

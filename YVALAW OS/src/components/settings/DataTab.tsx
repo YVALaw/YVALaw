@@ -6,6 +6,7 @@ import { Banner, Checkbox, Modal, Skel } from '../ui'
 import { clearAllData, exportBackup, importBackup } from './backup'
 import { scanInlineFiles, slimInlineFiles, type SlimScan } from '../../services/slimRecords'
 import { previewOldCrmImport, runOldCrmImport, type ImportPreview, type ImportProgress, type ImportResult } from '../../services/oldCrmImport'
+import { logAction } from '../../services/activityLog'
 
 type Stat = { label: string; count: number }
 
@@ -45,7 +46,7 @@ export default function DataTab({ isCeo, canImportLeads }: { isCeo: boolean; can
   async function doOldImport() {
     if (!oldPreview) return
     setOldError(null)
-    try { setOldResult(await runOldCrmImport(oldPreview, { copyFiles: copyOldFiles }, setOldProgress)) }
+    try { setOldResult(await runOldCrmImport(oldPreview, { copyFiles: copyOldFiles }, setOldProgress)); void logAction('import', 'Imported data from the old CRM') }
     catch (e) { setOldError((e as Error).message) }
     setOldProgress(null)
   }
@@ -76,13 +77,15 @@ export default function DataTab({ isCeo, canImportLeads }: { isCeo: boolean; can
 
   async function doExport() {
     setExporting(true); setExportError(null)
-    try { await exportBackup() } catch (e) { setExportError(`Export failed — ${e instanceof Error ? e.message : 'Unknown error'}`) }
+    try { await exportBackup(); void logAction('export', 'Downloaded a full backup') } catch (e) { setExportError(`Export failed — ${e instanceof Error ? e.message : 'Unknown error'}`) }
     setExporting(false)
   }
 
   async function doImport(file: File) {
     setImporting(true); setImportStatus(null)
-    setImportStatus(await importBackup(file))
+    const status = await importBackup(file)
+    setImportStatus(status)
+    void logAction('import', `Backup restore from ${file.name}`, { details: { result: status.slice(0, 200) } })
     setImporting(false)
   }
 
@@ -93,6 +96,7 @@ export default function DataTab({ isCeo, canImportLeads }: { isCeo: boolean; can
       setConfirmClear(false)
       if (!ok) { setClearError('Only the CEO can clear all data.'); return }
       setCleared(true)
+      void logAction('other', 'Cleared all data')
       setTimeout(() => setCleared(false), 4000)
     } catch (e) {
       setClearError(e instanceof Error ? e.message : 'Could not clear the data.')
@@ -203,6 +207,7 @@ export default function DataTab({ isCeo, canImportLeads }: { isCeo: boolean; can
                 {s.formerStaff.length > 0 && <li>Invoice lines of people no longer in the employee list keep their names: {s.formerStaff.join(', ')}.</li>}
                 {s.duplicateEmployeeNumbers.length > 0 && <li>Employee numbers used twice in the old CRM (kept as they are — fix them on the employee pages if you like): {s.duplicateEmployeeNumbers.join(', ')}.</li>}
                 {s.invoicesWithoutClient.length > 0 && <li>{s.invoicesWithoutClient.length} invoice(s) name a client that isn't in the file: {s.invoicesWithoutClient.slice(0, 6).join(', ')}.</li>}
+                {d.placementRates.length > 0 && <li>Per-person rates on projects: {d.placementRates.length} (kept as each person's bill/pay rate on that project — Project → Team &amp; rates).</li>}
                 {d.employeeCounter != null && <li>New employee numbers will continue at YVA{String(new Date().getFullYear()).slice(2)}{String(d.employeeCounter).padStart(3, '0')}.</li>}
               </ul>
               {d.files.length > 0 && (
@@ -228,6 +233,7 @@ export default function DataTab({ isCeo, canImportLeads }: { isCeo: boolean; can
                 ? `Everything is in YVA OS: ${oldResult.verified.counts.employees} employees, ${oldResult.verified.counts.clients} clients, ${oldResult.verified.counts.projects} projects, ${oldResult.verified.counts.invoices} invoices ($${oldResult.verified.billed.toLocaleString('en-US', { minimumFractionDigits: 2 })}), ${oldResult.verified.counts.candidates} candidates.`
                 : `Saved, but the check found a difference: ${JSON.stringify(oldResult.verified.counts)} · billed $${oldResult.verified.billed}. Tell Claude what this says.`}
             </Banner>
+            {oldResult.ratesWritten > 0 && <p className="set-hint">{oldResult.ratesWritten} per-person project rate{oldResult.ratesWritten === 1 ? '' : 's'} saved.</p>}
             {oldResult.filesCopied > 0 && <p className="set-hint">{oldResult.filesCopied} file{oldResult.filesCopied === 1 ? '' : 's'} copied into YVA OS.</p>}
             {oldResult.filesKept.length > 0 && <Banner tone="warning">Not copied (still linked where they were): {oldResult.filesKept.join('; ')}</Banner>}
             {oldResult.skippedFields.length > 0 && <p className="set-hint">Fields YVA OS doesn't use were left out: {oldResult.skippedFields.join(', ')}.</p>}

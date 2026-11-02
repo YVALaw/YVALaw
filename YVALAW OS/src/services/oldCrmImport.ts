@@ -53,6 +53,7 @@ export async function previewOldCrmImport(text: string): Promise<ImportPreview> 
 export type ImportProgress = { step: string; done: number; total: number }
 export type ImportResult = {
   written: Record<Table, number>
+  ratesWritten: number
   verified: { ok: boolean; counts: Record<Table, number>; billed: number }
   filesCopied: number
   filesKept: string[]       // could not be copied → still linked to where they were
@@ -131,6 +132,16 @@ export async function runOldCrmImport(preview: ImportPreview, opts: { copyFiles:
     onProgress({ step: `Saving ${t}`, done: 0, total: rows.length })
     written[t] = rows.length ? await upsertAll(t, rows, skipped, n => onProgress({ step: `Saving ${t}`, done: n, total: rows.length })) : 0
   }
+  // Per-person project rates (after employees + projects exist)
+  let ratesWritten = 0
+  if (data.placementRates.length) {
+    onProgress({ step: 'Saving per-person rates', done: 0, total: data.placementRates.length })
+    const rows = data.placementRates.map(r => ({ employee_id: r.employeeId, project_id: r.projectId, bill_rate: r.billRate, pay_rate: r.payRate, position: r.position, effective_from: r.effectiveFrom, note: 'From the old CRM' }))
+    const { error } = await supabase.from('placement_rates').upsert(rows, { onConflict: 'employee_id,project_id,effective_from' })
+    if (error) skipped.add(`placement_rates (${error.code === '42P01' ? 'run migrate-step2-rates.sql' : error.message})`)
+    else ratesWritten = rows.length
+  }
+
   // Number counters continue after the imported numbers (never go backwards)
   if (data.employeeCounter != null) {
     const cur = await loadEmployeeCounter().catch(() => 1)
@@ -159,5 +170,5 @@ export async function runOldCrmImport(preview: ImportPreview, opts: { copyFiles:
   billed = Math.round(billed * 100) / 100
   const ok = TABLES.every(t => counts[t] === (data[t] as Raw[]).length) && Math.abs(billed - data.summary.billed) < 0.05
   onProgress({ step: 'Done', done: 1, total: 1 })
-  return { written, verified: { ok, counts, billed }, filesCopied, filesKept, skippedFields: [...skipped] }
+  return { written, ratesWritten, verified: { ok, counts, billed }, filesCopied, filesKept, skippedFields: [...skipped] }
 }

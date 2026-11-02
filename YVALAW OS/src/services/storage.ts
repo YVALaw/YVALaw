@@ -122,7 +122,8 @@ export async function loadEmployees(): Promise<Employee[]> {
 export async function saveEmployees(employees: Employee[]): Promise<void> {
   // userId (the login link) is never written by a whole-table save — a stale list
   // must not unlink a login. It is set by linkEmployeeLogin or the invite-employee function.
-  const rows = employees.map(e => { const row = { ...e }; delete row.userId; return row })
+  const keepCc = await ccColumnReady('employees', employees.some(e => e.ccEmails?.length))
+  const rows = employees.map(e => { const row = { ...e }; delete row.userId; if (!keepCc) delete row.ccEmails; return row })
   invalidateSnapshotCache(); return syncAll('employees', rows)
 }
 
@@ -139,7 +140,9 @@ export async function loadClients(): Promise<Client[]> {
   return fetchAll<Client>('clients')
 }
 export async function saveClients(clients: Client[]): Promise<void> {
-  invalidateSnapshotCache(); return syncAll('clients', clients)
+  const keepCc = await ccColumnReady('clients', clients.some(c => c.ccEmails?.length))
+  const rows = keepCc ? clients : clients.map(c => { const row = { ...c }; delete row.ccEmails; return row })
+  invalidateSnapshotCache(); return syncAll('clients', rows)
 }
 
 // ─── Projects ─────────────────────────────────────────────────────────────────
@@ -167,7 +170,34 @@ async function loadInvoicesNow(): Promise<Invoice[]> {
   return items
 }
 export async function saveInvoices(invoices: Invoice[]): Promise<void> {
-  invalidateSnapshotCache(); return syncAll('invoices', invoices)
+  const keepCc = await ccColumnReady('invoices', invoices.some(i => i.clientCcEmails?.length))
+  const rows = keepCc ? invoices : invoices.map(i => { const row = { ...i }; delete row.clientCcEmails; return row })
+  invalidateSnapshotCache(); return syncAll('invoices', rows)
+}
+
+// ─── CC email columns (supabase/migrate-cc-emails.sql) ────────────────────────
+
+const CC_COLUMN = { clients: 'cc_emails', employees: 'cc_emails', invoices: 'client_cc_emails' } as const
+const columnChecks = new Map<string, Promise<boolean>>()
+/** Does the database have this CC column yet? false only when it answers "no such column" (SQL not run);
+ *  a network error counts as yes, so the save goes ahead and reports its own error. Asked once per session. */
+export function ccColumnExists(table: keyof typeof CC_COLUMN): Promise<boolean> {
+  const column = CC_COLUMN[table]
+  let check = columnChecks.get(table)
+  if (!check) {
+    check = Promise.resolve(supabase.from(table).select(column).limit(1)).then(
+      ({ error }) => !(error && (error.code === '42703' || error.code === 'PGRST204' || /column .* does not exist|could not find .* column/i.test(error.message))),
+      () => true,
+    )
+    columnChecks.set(table, check)
+    void check.then(ok => { if (ok) return; columnChecks.delete(table) })   // asked again next time (the SQL may have just run)
+  }
+  return check
+}
+/** Rows only carry a CC list when it's non-empty; if one does and the column is missing, the list is left out of
+ *  the save (the form already says the SQL is needed) instead of the whole save failing. */
+async function ccColumnReady(table: keyof typeof CC_COLUMN, anyCc: boolean): Promise<boolean> {
+  return anyCc ? ccColumnExists(table) : true
 }
 
 // ─── Candidates ───────────────────────────────────────────────────────────────

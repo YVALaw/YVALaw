@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useStickyView } from '../lib/stickyView'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import MissingRates, { findMissingRates, usePlacementRateRows } from '../components/MissingRates'
 import type { Client, Employee, Expense, Invoice, Project, Tag, Task, TaskStatus, TimeEntry } from '../data/types'
@@ -41,7 +42,7 @@ export default function ProjectsPage() {
     void loadTimeEntries().then(setEntries).catch(() => setEntries([]))
   }, [])
 
-  const [view, setView] = useState<ViewMode>('cards')
+  const [view, setView] = useStickyView<ViewMode>('projects', 'cards', ['cards', 'kanban'])
   const [filter, setFilter] = useState<ProjectFilter>('active')
   const [search, setSearch] = useState('')
   const [flash, setFlash] = useState<Flash>(null)

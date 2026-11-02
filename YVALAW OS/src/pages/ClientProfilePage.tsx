@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import RecordSignature from '../components/RecordSignature'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { uploadPhoto } from '../utils/photo'
 import ClientContacts from '../components/ClientContacts'
@@ -17,6 +18,8 @@ import { Banner, KpiStrip, Menu, Modal, PageHeader, Pill, Skel, Tabs, type Tone 
 import { Ic, P } from '../components/Icon'
 import ClientFormDrawer, { CLIENT_STAGES, avatarTone, normTags } from '../components/crm/ClientFormDrawer'
 import { BillingTab, CommsTab, ContractsTab, DocumentsTab } from '../components/crm/ClientProfileTabs'
+import { formatEmailList, recipientsLabel } from '../utils/emailList'
+import { useClientRecipients } from '../components/EmailRecipients'
 import { dateMed, dateShort, initials, usd } from '../utils/format'
 
 type TabKey = 'overview' | 'billing' | 'comms' | 'contracts' | 'docs' | 'history'
@@ -64,6 +67,8 @@ export default function ClientProfilePage() {
 
   // Computed (hooks above the early return)
   const clientInvoices = useMemo(() => (client ? invoicesOf(client, invoices) : []), [client, invoices])
+  const [contactsVersion, setContactsVersion] = useState(0)
+  const recipients = useClientRecipients(client, contactsVersion)
   const health = useMemo(() => (client && (client.status || 'lead').toLowerCase() !== 'lead' ? clientHealth(client, invoices, allActivity, requests) : null), [client, invoices, allActivity, requests])
 
   if (!client) {
@@ -144,7 +149,7 @@ export default function ClientProfilePage() {
     try {
       const r = await sendClientReminder(clientNN, invoices)
       if (!r) return
-      if (r.result.mode === 'gmail') setMsg({ ok: true, text: `Reminder sent via Gmail to ${clientNN.email} for ${usd(r.total)} (${r.count} invoice${r.count === 1 ? '' : 's'}).` })
+      if (r.result.mode === 'gmail') setMsg({ ok: true, text: `Reminder sent via Gmail to ${recipientsLabel(r.to, r.cc)} for ${usd(r.total)} (${r.count} invoice${r.count === 1 ? '' : 's'}).` })
       else if (r.result.mode === 'mailto') setMsg({ ok: true, text: `Reminder for ${usd(r.total)} opened in your email app.` })
       else setMsg({ ok: false, text: `Reminder not sent: ${r.result.fallbackReason ?? 'Gmail could not send it.'}` })
     } catch (e) { setMsg({ ok: false, text: `Reminder not sent: ${(e as Error).message}` }) }
@@ -160,6 +165,8 @@ export default function ClientProfilePage() {
     : { text: 'No portal', tone: 'neutral', title: 'No client portal account yet' }
   const info = [
     { k: 'Email', v: clientNN.email },
+    { k: 'Invoice CC', v: formatEmailList(clientNN.ccEmails) || undefined },
+    { k: 'Invoice emails go to', v: clientNN.email && recipients ? recipientsLabel(recipients.to, recipients.cc) : undefined },
     { k: 'Phone', v: clientNN.phone },
     { k: 'Company', v: clientNN.company },
     { k: 'Default rate', v: clientNN.defaultRate ? `$${Number(clientNN.defaultRate).toFixed(2)}/hr` : undefined },
@@ -210,6 +217,7 @@ export default function ClientProfilePage() {
         </div>
       </div>
       {msg && <Banner tone={msg.ok ? 'success' : 'danger'} onClose={() => setMsg(null)}>{msg.text}</Banner>}
+      <RecordSignature table="clients" recordId={clientNN.id} refreshKey={clientNN} />
 
       <KpiStrip compact items={[
         { label: 'Revenue, all time', value: usd(totalRevenue, { cents: false }) },
@@ -250,7 +258,7 @@ export default function ClientProfilePage() {
                 )
               })}
             </section>
-            <ClientContacts clientId={clientNN.id} />
+            <ClientContacts clientId={clientNN.id} onChange={() => setContactsVersion(v => v + 1)} />
           </div>
         </div>
       )}

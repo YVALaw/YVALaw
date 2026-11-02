@@ -1,5 +1,7 @@
 import { loadSettings, saveSettings } from './storage'
 import { supabase } from '../lib/supabase'
+import { buildMailtoUrl, buildMimeMessage, utf8ToBase64, type MimeAttachment } from '../utils/mime'
+import { mergeCc } from '../utils/emailList'
 
 type GmailUserData = {
   gmailAccessToken?: string
@@ -8,7 +10,9 @@ type GmailUserData = {
   gmailEmail?: string
 }
 
-type EmailAttachment = { name: string; content: string; mimeType: string }
+/** `content` = text; `base64` = binary (a PDF from utils/pdf.ts) */
+export type EmailAttachment = MimeAttachment
+export type SendEmailOptions = { attachments?: EmailAttachment[]; cc?: readonly string[] }
 
 // null removes a key from Supabase user metadata; undefined is dropped by JSON.stringify
 // and leaves the stored value in place (the old Disconnect did nothing).
@@ -178,10 +182,6 @@ export async function disconnectGmail(): Promise<void> {
   })
 }
 
-function utf8ToBase64(value: string): string {
-  return btoa(unescape(encodeURIComponent(value)))
-}
-
 function utf8ToBase64Url(value: string): string {
   return utf8ToBase64(value)
     .replace(/\+/g, '-')
@@ -189,70 +189,19 @@ function utf8ToBase64Url(value: string): string {
     .replace(/=/g, '')
 }
 
-function encodeMimeHeader(value: string): string {
-  if (!/[^\x20-\x7E]/.test(value)) return value
-  return `=?UTF-8?B?${utf8ToBase64(value)}?=`
-}
-
-// RFC 2045: base64 lines of at most 76 characters
-function wrapBase64(value: string): string {
-  return value.match(/.{1,76}/g)?.join('\r\n') ?? value
-}
-
-function buildRaw(to: string, subject: string, body: string, from: string): string {
-  const msg = [
-    `From: ${from}`,
-    `To: ${to}`,
-    `Subject: ${encodeMimeHeader(subject)}`,
-    'MIME-Version: 1.0',
-    'Content-Type: text/plain; charset=utf-8',
-    '',
-    body,
-  ].join('\r\n')
-  return utf8ToBase64Url(msg)
-}
-
-function buildRawWithAttachments(
-  to: string,
-  subject: string,
-  body: string,
-  from: string,
-  attachments: EmailAttachment[],
-): string {
-  const boundary = `yva-os-${crypto.randomUUID()}`
-  const parts = [
-    `From: ${from}`,
-    `To: ${to}`,
-    `Subject: ${encodeMimeHeader(subject)}`,
-    'MIME-Version: 1.0',
-    `Content-Type: multipart/mixed; boundary="${boundary}"`,
-    '',
-    `--${boundary}`,
-    'Content-Type: text/plain; charset="UTF-8"',
-    'Content-Transfer-Encoding: 7bit',
-    '',
-    body.replace(/\r?\n/g, '\r\n'),
-  ]
-
-  for (const attachment of attachments) {
-    parts.push(
-      '',
-      `--${boundary}`,
-      `Content-Type: ${attachment.mimeType}; name="${attachment.name}"`,
-      'Content-Transfer-Encoding: base64',
-      `Content-Disposition: attachment; filename="${attachment.name}"`,
-      '',
-      wrapBase64(utf8ToBase64(attachment.content)),
-    )
+function attachmentBlob(attachment: EmailAttachment): Blob {
+  if (attachment.base64 != null) {
+    const bin = atob(attachment.base64)
+    const bytes = new Uint8Array(bin.length)
+    for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i)
+    return new Blob([bytes], { type: attachment.mimeType || 'application/octet-stream' })
   }
-
-  parts.push('', `--${boundary}--`)
-  return utf8ToBase64Url(parts.join('\r\n'))
+  return new Blob([attachment.content ?? ''], { type: attachment.mimeType || 'application/octet-stream' })
 }
 
-function downloadAttachment(attachment: EmailAttachment) {
-  const blob = new Blob([attachment.content], { type: attachment.mimeType || 'application/octet-stream' })
-  const url = URL.createObjectURL(blob)
+/** Save an attachment (the PDF) to the computer — the mail app route can't attach it by itself */
+export function downloadAttachment(attachment: EmailAttachment) {
+  const url = URL.createObjectURL(attachmentBlob(attachment))
   const link = document.createElement('a')
   link.href = url
   link.download = attachment.name
@@ -267,13 +216,12 @@ export async function sendGmailMessage(
   subject: string,
   body: string,
   attachments: EmailAttachment[] = [],
+  cc: readonly string[] = [],
 ): Promise<void> {
   const userData = await getGmailUserData()
   if (!userData.gmailEmail) throw new GmailReconnectError(`Gmail is not connected. ${RECONNECT_HINT}`)
 
-  const raw = attachments.length > 0
-    ? buildRawWithAttachments(to, subject, body, userData.gmailEmail, attachments)
-    : buildRaw(to, subject, body, userData.gmailEmail)
+  const raw = utf8ToBase64Url(buildMimeMessage({ from: userData.gmailEmail, to, cc, subject, body, attachments }))
 
   const send = async (token: string) => {
     try {
@@ -294,34 +242,37 @@ export async function sendGmailMessage(
     const detail = err?.error?.message || `HTTP ${res.status}`
     if (res.status === 401) throw new GmailReconnectError(`Google rejected the saved Gmail sign-in (${detail}). ${RECONNECT_HINT}`)
     if (res.status === 403 && /insufficient/i.test(detail)) throw new GmailReconnectError(`Permission to send email was not granted (${detail}). ${RECONNECT_HINT}`)
+    if (/invalid (to|cc) header/i.test(detail)) throw new Error(`Gmail rejected a recipient address (${detail}). Check the email and CC addresses on file.`)
     throw new Error(`Gmail API error ${res.status}: ${detail}`)
   }
 }
 
-function openInMailApp(to: string, subject: string, body: string, attachments: EmailAttachment[]) {
+function openInMailApp(to: string, subject: string, body: string, attachments: EmailAttachment[], cc: readonly string[]) {
   for (const file of attachments) downloadAttachment(file)
-  // Percent-encoded: mailto does not decode "+" as a space
-  window.location.href = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+  window.location.href = buildMailtoUrl(to, subject, body, cc)
 }
 
-/** Gmail if connected; never falls back silently — the user sees why Gmail failed and decides */
+/** Gmail if connected; never falls back silently — the user sees why Gmail failed and decides.
+ *  `cc` is cleaned (valid addresses, once each, never the To address). */
 export async function sendEmail(
   to: string,
   subject: string,
   body: string,
-  attachment?: EmailAttachment,
+  options: SendEmailOptions = {},
 ): Promise<SendEmailResult> {
   if (!to) return { mode: 'mailto', attached: false }
-  const attachments = attachment ? [attachment] : []
+  const attachments = options.attachments ?? []
+  const cc = mergeCc(to, options.cc)
+  const hasPdf = attachments.some(a => a.mimeType === 'application/pdf')
   let fallbackReason: string
   try {
     if (await isGmailConnected()) {
-      await sendGmailMessage(to, subject, body, attachments)
+      await sendGmailMessage(to, subject, body, attachments, cc)
       return { mode: 'gmail', attached: attachments.length > 0 }
     }
     // With no OAuth client set up nobody here sends through Gmail: the mail app is the expected route
     if (!(await loadSettings()).gmailClientId) {
-      openInMailApp(to, subject, body, attachments)
+      openInMailApp(to, subject, body, attachments, cc)
       return { mode: 'mailto', attached: false }
     }
     fallbackReason = 'Gmail is not connected for the account you are signed in with. Connect it in Settings → Integrations.'
@@ -331,9 +282,9 @@ export async function sendEmail(
   }
   const useMailApp = window.confirm(
     `Gmail could not send this email.\n\n${fallbackReason}\n\n` +
-    `Open it in your email app instead?${attachments.length > 0 ? ' The PDF will be downloaded so you can attach it.' : ''}`,
+    `Open it in your email app instead?${attachments.length > 0 ? ` The ${hasPdf ? 'PDF' : 'attachment'} will be downloaded so you can attach it.` : ''}`,
   )
   if (!useMailApp) return { mode: 'failed', attached: false, fallbackReason }
-  openInMailApp(to, subject, body, attachments)
+  openInMailApp(to, subject, body, attachments, cc)
   return { mode: 'mailto', attached: false, fallbackReason }
 }

@@ -3,7 +3,9 @@
 import { useEffect, useState } from 'react'
 import type { Employee, Invoice, TimeEntry } from '../../data/types'
 import { loadSettings, loadTimeEntries, saveInvoices } from '../../services/storage'
-import { sendEmail } from '../../services/gmail'
+import { sendEmail, type SendEmailResult } from '../../services/gmail'
+import { logAction } from '../../services/activityLog'
+import { mergeCc, normalizeEmailList, recipientsLabel } from '../../utils/emailList'
 import { buildStatementHTML } from '../../utils/statementHtml'
 import { trackedHoursOf, trackedPayEntries } from '../../utils/trackedPay'
 import { employeePremiumConfig, payrollFromInvoiceItem } from '../../utils/payroll'
@@ -43,7 +45,14 @@ export function summarizeEmployeeInvoices(emp: Employee, invoices: Invoice[]) {
   }, { hours: 0, regularHours: 0, premiumHours: 0, totalPay: 0 })
 }
 
-export async function emailStatement(emp: Employee, empInvoices: Invoice[], dateFrom: string, dateTo: string, tracked: TimeEntry[] = []) {
+/** Who a statement email goes to: the employee, Cc their Statement CC */
+export function statementRecipients(emp: Employee): { to: string; cc: string[] } {
+  const to = (emp.email || '').trim()
+  return { to, cc: mergeCc(to, normalizeEmailList(emp.ccEmails)) }
+}
+
+/** Email the statement with a PDF of it attached (DOP included: it's the employee's own statement) */
+export async function emailStatement(emp: Employee, empInvoices: Invoice[], dateFrom: string, dateTo: string, tracked: TimeEntry[] = []): Promise<SendEmailResult & { to: string; cc: string[] }> {
   const settings = await loadSettings()
   const payRate = Number(emp.payRate) || 0
   const dopRate = settings.usdToDop || 0
@@ -72,11 +81,17 @@ export async function emailStatement(emp: Employee, empInvoices: Invoice[], date
   const statementHtml = buildStatementHTML(emp, empInvoices, dateFrom, dateTo, dopRate, false, tracked)
   const safeName = emp.name.replace(/\s+/g, '-').toLowerCase()
   const periodSlug = period.replace(/\s/g, '').replace(/[^a-zA-Z0-9-]/g, '-')
-  return sendEmail(emp.email || '', subject, bodyText, {
-    name: `statement-${safeName}-${periodSlug}.html`,
-    content: statementHtml,
-    mimeType: 'text/html',
-  })
+  const { to, cc } = statementRecipients(emp)
+  let pdf
+  try { const { htmlToPdfAttachment } = await import('../../utils/pdf'); pdf = await htmlToPdfAttachment(statementHtml, `statement-${safeName}-${periodSlug}`) } catch (e) {
+    return { mode: 'failed', attached: false, fallbackReason: `The statement PDF could not be made (${(e as Error).message}). Nothing was sent.`, to, cc }
+  }
+  const r = await sendEmail(to, subject, bodyText, { attachments: [pdf], cc })
+  if (r.mode !== 'failed' && to) {
+    void logAction('statement_emailed', `Emailed ${emp.name}'s earnings statement (${period}) to ${recipientsLabel(to, cc)}${r.mode === 'mailto' ? ' (opened in the email app)' : ''}`,
+      { table: 'employees', recordId: emp.id, details: { to, cc, via: r.mode, period } })
+  }
+  return { ...r, to, cc }
 }
 
 export async function printPayslip(emp: Employee, empInvoices: Invoice[], dateFrom: string, dateTo: string, tracked: TimeEntry[] = []) {
@@ -159,8 +174,8 @@ export default function EmployeeStatements({ emp, invoices, onInvoicesChange, ti
     try {
       const r = await emailStatement(emp, empInvoices, dateFrom, dateTo, empTracked)
       const mode = r.mode
-      if (mode === 'failed') show(false, 'Not sent — check the Gmail connection in Settings.')
-      else show(true, mode === 'mailto' ? 'Opened in your mail app — attach the downloaded statement.' : `Statement sent to ${emp.email}`)
+      if (mode === 'failed') show(false, `Not sent: ${r.fallbackReason ?? 'check the Gmail connection in Settings.'}`)
+      else show(true, mode === 'mailto' ? `Opened in your mail app for ${recipientsLabel(r.to, r.cc)} — attach the downloaded PDF.` : `Statement sent to ${recipientsLabel(r.to, r.cc)} with the PDF attached.`)
     } catch { show(false, 'Failed to send — check Gmail connection in Settings') }
     finally { setSending(false) }
   }
@@ -187,7 +202,7 @@ export default function EmployeeStatements({ emp, invoices, onInvoicesChange, ti
         <Field label="To"><input className="input input--sm" type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} /></Field>
         {(dateFrom || dateTo) && <button type="button" className="btn btn--sm btn--ghost" onClick={() => { setDateFrom(''); setDateTo('') }}>Clear</button>}
         <span className="spacer" />
-        <button type="button" className="btn btn--sm" disabled={nothing || !emp.email || sending} title={!emp.email ? 'No email address on file — add one in the employee profile' : ''} onClick={() => void sendStatement()}>
+        <button type="button" className="btn btn--sm" disabled={nothing || !emp.email || sending} title={!emp.email ? 'No email address on file — add one in the employee profile' : `Sends to ${recipientsLabel(statementRecipients(emp).to, statementRecipients(emp).cc)}`} onClick={() => void sendStatement()}>
           <Ic d={P.mail} size={15} />{sending ? 'Sending…' : 'Email statement'}
         </button>
         <button type="button" className="btn btn--sm" disabled={nothing} onClick={() => void printPayslip(emp, empInvoices, dateFrom, dateTo, empTracked)}>

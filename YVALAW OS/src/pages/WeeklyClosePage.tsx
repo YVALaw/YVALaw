@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import type { AppSettings, Employee, Invoice, Project } from '../data/types'
 import { loadEmployees, loadProjects, loadSettings } from '../services/storage'
 import { usePermission } from '../context/RoleContext'
-import { invoiceHtmlFor, sendInvoiceEmail } from '../services/invoiceEmail'
+import { invoiceHtmlFor, sendInvoiceEmail, sentToLabel } from '../services/invoiceEmail'
 import { isGmailConnected } from '../services/gmail'
 import RecordPaymentModal from '../components/RecordPaymentModal'
 import WeekTimeGrid, { type Editing, type GridTarget } from '../components/finance/WeekTimeGrid'
@@ -95,11 +95,13 @@ export default function WeeklyClosePage() {
     setBusy(null)
   }
   /** 'sent' only when Gmail delivered it; 'mailto' = handed to the mail app, which we can't confirm */
+  const sentTo = new Map<string, string>()   // invoice id → "to (cc …)" of its last send, for the message
   async function send(inv: Invoice): Promise<'sent' | 'mailto' | 'failed'> {
     if (!settings) return 'failed'
     if (!inv.clientEmail) { setError(`${inv.number}: ${inv.clientName} has no email address. Add it on the client's profile and prepare again.`); return 'failed' }
     const r = await sendInvoiceEmail(inv, settings)
     if (r.mode === 'failed') { setError(`${inv.number} was not sent: ${r.fallbackReason}`); return 'failed' }
+    sentTo.set(inv.id, sentToLabel(r))
     if (r.mode !== 'gmail') return 'mailto'
     await markInvoiceSent(inv)
     return 'sent'
@@ -108,7 +110,7 @@ export default function WeeklyClosePage() {
     setBusy(`send-${inv.id}`); setError(null); setMsg(null)
     try {
       const r = await send(inv)
-      if (r === 'sent') setMsg(`${inv.number} sent to ${inv.clientEmail}.`)
+      if (r === 'sent') setMsg(`${inv.number} sent to ${sentTo.get(inv.id) ?? inv.clientEmail}.`)
       else if (r === 'mailto' && window.confirm(`${inv.number} was opened in your email app. Mark it as sent? Only say OK once you have actually sent the email.`)) {
         await markInvoiceSent(inv)
         setMsg(`${inv.number} marked as sent.`)

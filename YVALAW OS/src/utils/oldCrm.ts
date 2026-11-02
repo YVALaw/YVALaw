@@ -81,10 +81,12 @@ export function invoiceHoursFormat(inv: Raw): HoursFormat {
   return str(inv.date) >= HM_SINCE ? 'hm' : 'decimal'
 }
 
+export type PlacementRateImport = { employeeId: string; projectId: string; billRate: number | null; payRate: number | null; position: string | null; effectiveFrom: string }
 export type FileJob = { table: 'candidates' | 'employees'; recordId: string; index: number; name: string; size: number; kind: 'inline' | 'copy' }
 export type ConvertedBackup = {
   employees: Raw[]; clients: Raw[]; projects: Raw[]; invoices: Raw[]; candidates: Raw[]
   files: FileJob[]
+  placementRates: PlacementRateImport[]   // per-person rates on projects
   employeeCounter: number | null    // next employee number for this year, from the imported numbers
   invoiceCounter: number | null
   summary: {
@@ -101,13 +103,13 @@ export type ConvertedBackup = {
 
 const pick = (row: Raw, keys: string[]) => Object.fromEntries(keys.filter(k => k in row && row[k] !== undefined).map(k => [k, row[k]]))
 
-const EMPLOYEE_KEYS = ['name', 'employeeNumber', 'email', 'phone', 'payRate', 'defaultShiftStart', 'defaultShiftEnd', 'premiumEnabled',
+const EMPLOYEE_KEYS = ['ccEmails', 'name', 'employeeNumber', 'email', 'phone', 'payRate', 'defaultShiftStart', 'defaultShiftEnd', 'premiumEnabled',
   'premiumStartTime', 'premiumPercent', 'role', 'employmentType', 'location', 'timezone', 'startYear', 'status', 'notes', 'photoUrl', 'createdAt']
-const CLIENT_KEYS = ['name', 'company', 'email', 'phone', 'address', 'timezone', 'defaultRate', 'paymentTerms', 'tags', 'notes', 'status',
+const CLIENT_KEYS = ['ccEmails', 'name', 'company', 'email', 'phone', 'address', 'timezone', 'defaultRate', 'paymentTerms', 'tags', 'notes', 'status',
   'contractEnd', 'photoUrl', 'links', 'contracts', 'createdAt']
 const PROJECT_KEYS = ['name', 'rate', 'budget', 'nextInvoiceSeq', 'status', 'billingModel', 'startDate', 'endDate', 'description', 'projectNeeds',
   'notes', 'tags', 'links', 'contracts', 'createdAt']
-const INVOICE_KEYS = ['number', 'date', 'dueDate', 'clientName', 'clientEmail', 'clientAddress', 'billingStart', 'billingEnd', 'projectName',
+const INVOICE_KEYS = ['clientCcEmails', 'number', 'date', 'dueDate', 'clientName', 'clientEmail', 'clientAddress', 'billingStart', 'billingEnd', 'projectName',
   'subtotal', 'amountPaid', 'notes', 'statusHistory', 'tags', 'createdAt', 'updatedAt']
 const CANDIDATE_KEYS = ['name', 'email', 'phone', 'role', 'source', 'stage', 'notes', 'resumeUrl', 'linkedinUrl', 'appliedAt', 'updatedAt', 'createdAt']
 
@@ -140,6 +142,7 @@ export async function convertOldCrmBackup(b: OldCrmBackup, ownStorageHost = ''):
   }
 
   const projects: Raw[] = []
+  const placementRates: PlacementRateImport[] = []
   for (const p of b.projects || []) {
     const employeeIds = (Array.isArray(p.employeeIds) ? p.employeeIds : []).map(String)
     const row: Raw = {
@@ -149,8 +152,15 @@ export async function convertOldCrmBackup(b: OldCrmBackup, ownStorageHost = ''):
       employeeIds: await Promise.all(employeeIds.map(idOf)),
     }
     if (typeof row.billingModel === 'string') row.billingModel = row.billingModel.toLowerCase()
-    if (Array.isArray(p.assignments)) {
-      row.assignments = await Promise.all((p.assignments as Raw[]).map(async a => ({ ...a, employeeId: await idOf(a.employeeId) })))
+    // Per-person rates on this project (old `assignments`) → placement rates (YVA OS keeps them in their own table)
+    for (const a of (Array.isArray(p.assignments) ? p.assignments : []) as Raw[]) {
+      const employeeId = await idOf(a.employeeId)
+      const billRate = a.billRate == null || a.billRate === '' ? null : num(a.billRate)
+      const payRate = a.payRate == null || a.payRate === '' ? null : num(a.payRate)
+      const position = str(a.position).trim() || null
+      if (employeeId && row.id && (billRate != null || payRate != null || position)) {
+        placementRates.push({ employeeId, projectId: row.id as string, billRate, payRate, position, effectiveFrom: '' })
+      }
     }
     projects.push(row)
   }
@@ -195,6 +205,11 @@ export async function convertOldCrmBackup(b: OldCrmBackup, ownStorageHost = ''):
     if (inv.date) dates.push(str(inv.date))
   }
 
+  for (const r of placementRates) {
+    const first = invoices.filter(i => i.projectId === r.projectId && i.date).map(i => str(i.date)).sort()[0]
+    const proj = projects.find(x => x.id === r.projectId)
+    r.effectiveFrom = first || str(proj?.startDate) || '2025-01-01'
+  }
   const knownEmployees = new Set(employees.map(e => e.id))
   const formerStaff = [...new Set(invoices.flatMap(i => (i.items as Raw[]).filter(it => it.employeeId && !knownEmployees.has(it.employeeId)).map(it => str(it.employeeName))))].filter(Boolean).sort()
 
@@ -215,7 +230,7 @@ export async function convertOldCrmBackup(b: OldCrmBackup, ownStorageHost = ''):
   const yy = String(new Date().getFullYear()).slice(2)
   const seqs = [...numbers.keys()].map(n => new RegExp(`^YVA${yy}(\\d{3,})$`).exec(n)).filter(Boolean).map(m => Number(m![1]))
   return {
-    employees, clients, projects, invoices, candidates, files,
+    employees, clients, projects, invoices, candidates, files, placementRates,
     employeeCounter: seqs.length ? Math.max(...seqs) + 1 : null,
     invoiceCounter: typeof b.invoiceCounter === 'number' ? b.invoiceCounter : null,
     summary: {

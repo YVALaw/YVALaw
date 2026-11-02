@@ -322,3 +322,8 @@
 }
 .ops-rates__table td:not(:nth-child(7)) { white-space: nowrap; }
 .ops-filters .seg__opt { height: 28px; }
+
+/* Project → Team: quick "add a person" */
+.ops-addperson { display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin-bottom: 12px; flex-wrap: wrap; }
+.ops-addperson__label { font-size: 13.5px; font-weight: 600; }
+.ops-addperson .select { flex: 1; min-width: 220px; max-width: 420px; }

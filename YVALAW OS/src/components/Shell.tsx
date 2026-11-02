@@ -16,6 +16,8 @@ import NotificationBell from './NotificationBell'
 import { Ic, P } from './Icon'
 import { Modal, PageLoading, SearchInput, useIsMobile } from './ui'
 import { initials } from '../utils/format'
+import { refreshMyProfile } from '../services/staffProfiles'
+import StaffProfileModal from './StaffProfileModal'
 
 type Overlay = null | { kind: 'hub'; hub: HubKey; left: number } | { kind: 'search' } | { kind: 'create' } | { kind: 'account' }
 type Result = { type: 'Page' | 'Client' | 'Employee' | 'Project' | 'Invoice' | 'Candidate' | 'Lead'; label: string; sub: string; to: string }
@@ -26,7 +28,7 @@ export default function Shell({ children }: { children: ReactNode }) {
   const location = useLocation()
   const navigate = useNavigate()
   const mobile = useIsMobile()
-  const { role, email } = useRole()
+  const { role, email, userId } = useRole()
   const allowed = usePermission()
   const hubs = useMemo(() => visibleHubs(role, allowed), [role, allowed])
   const createItems = useMemo(() => visibleCreateItems(role, allowed), [role, allowed])
@@ -34,7 +36,21 @@ export default function Shell({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<HubStatus>({})
   const [previewOpen, setPreviewOpen] = useState(false)
   const [installOpen, setInstallOpen] = useState(false)
-  const linkedEmployeeId = sessionStorage.getItem('linkedEmployeeId')
+  // My employee record (staff profile). Starts from the session's link and is checked against the database on
+  // load and whenever the account menu opens, so a deleted record never leaves a dead "My profile".
+  const [myProfile, setMyProfile] = useState<{ id: string; name?: string } | null | undefined>(() => {
+    const id = sessionStorage.getItem('linkedEmployeeId'); return id ? { id } : undefined
+  })
+  const [creatingProfile, setCreatingProfile] = useState(false)
+  const accountOpen = overlay?.kind === 'account'
+  const profileCheckedFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (!userId || (!accountOpen && profileCheckedFor.current === userId)) return   // first check on load, then on each menu open
+    profileCheckedFor.current = userId
+    // not cancelled when the menu closes again: the answer is still the latest one
+    void refreshMyProfile(userId).then(setMyProfile).catch(() => { /* keep what we have */ })
+  }, [userId, accountOpen])
+  const linkedEmployeeId = myProfile?.id ?? null
   const { hub: curHub, page: curPage, isProfile } = locate(location.pathname)
   const isHome = location.pathname === '/'
 
@@ -77,14 +93,15 @@ export default function Shell({ children }: { children: ReactNode }) {
   const go = (to: string) => { setOverlay(null); navigate(to) }
   const openHubData = overlay?.kind === 'hub' ? hubs.find(h => h.key === overlay.hub) ?? null : null
 
-  const displayName = email ? email.split('@')[0].replace(/[._-]+/g, ' ') : 'You'
+  const displayName = myProfile?.name || (email ? email.split('@')[0].replace(/[._-]+/g, ' ') : 'You')
   const myInitials = initials(displayName)
   const pageTitle = isHome ? 'Home' : curPage?.label ?? 'YVA OS'
   const crumbs = isHome ? ['Home'] : curPage ? [curHub?.label ?? 'Account', curPage.label, ...(isProfile ? ['Profile'] : [])] : []
   const siblings = curHub ? hubs.find(h => h.key === curHub.key)?.pages ?? [] : []
 
   const accountItems = [
-    linkedEmployeeId && { label: 'My profile', icon: P.user, onClick: () => go(`/employees/${linkedEmployeeId}`) },
+    linkedEmployeeId && can.viewEmployees(role) && { label: 'My profile', icon: P.user, onClick: () => go(`/employees/${linkedEmployeeId}`) },
+    myProfile === null && role === 'ceo' && userId && { label: 'Create my profile', icon: P.user, onClick: () => { setOverlay(null); setCreatingProfile(true) } },
     { label: 'Settings', icon: P.gear, onClick: () => go(SETTINGS_PAGE.to) },
     (role === 'ceo' || role === 'admin' || role === 'accounting') && { label: 'Preview client portal', icon: P.eye, onClick: () => { setOverlay(null); setPreviewOpen(true) } },
     linkedEmployeeId && { label: 'Open employee workspace', icon: P.user, onClick: () => go('/me') },
@@ -228,6 +245,8 @@ export default function Shell({ children }: { children: ReactNode }) {
       )}
 
       <PreviewPortalPicker open={previewOpen} onClose={() => setPreviewOpen(false)} />
+      <StaffProfileModal login={creatingProfile && userId ? { userId, email: email || '', role } : null} meId={userId} onClose={() => setCreatingProfile(false)}
+        onCreated={emp => { setCreatingProfile(false); setMyProfile({ id: emp.id, name: emp.name }); go(`/employees/${emp.id}`) }} />
       <Modal open={installOpen} onClose={() => setInstallOpen(false)} title="Install YVA OS" sub="Open it from your home screen like an app, with notifications."
         footer={<button type="button" className="btn btn--primary" onClick={() => setInstallOpen(false)}>Got it</button>}>
         {isIos()

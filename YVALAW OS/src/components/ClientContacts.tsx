@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react'
 import { deleteContact, loadContacts, saveContact, type Contact } from '../services/crm'
 import { Banner, Checkbox, Field, Menu } from './ui'
 import { initials } from '../utils/format'
+import { isEmail } from '../utils/emailList'
 
 const blank = (clientId: string): Partial<Contact> & { client_id: string; name: string } => ({ client_id: clientId, name: '', role: '', email: '', phone: '', whatsapp: '', is_billing: false })
 
 /** Client profile → Contacts: the people at the firm (Step 9; redesign 2026-11) */
-export default function ClientContacts({ clientId }: { clientId: string }) {
+export default function ClientContacts({ clientId, onChange }: { clientId: string; onChange?: () => void }) {
   const [rows, setRows] = useState<Contact[]>([])
   const [error, setError] = useState<string | null>(null)
   const [form, setForm] = useState<(Partial<Contact> & { client_id: string; name: string }) | null>(null)
@@ -15,12 +16,13 @@ export default function ClientContacts({ clientId }: { clientId: string }) {
   useEffect(() => { void load() }, [clientId])   // eslint-disable-line react-hooks/exhaustive-deps
   async function save() {
     if (!form || !form.name.trim() || saving) return
+    if (form.email?.trim() && !isEmail(form.email)) { setError(`"${form.email.trim()}" doesn't look like an email address.`); return }
     setSaving(true)
-    try { await saveContact(form); setForm(null); await load() } catch (e) { setError((e as Error).message) } finally { setSaving(false) }
+    try { await saveContact(form); setForm(null); await load(); onChange?.() } catch (e) { setError((e as Error).message) } finally { setSaving(false) }
   }
   async function remove(c: Contact) {
     if (!window.confirm(`Remove ${c.name}?`)) return
-    try { await deleteContact(c.id); await load() } catch (e) { setError(`Could not remove ${c.name}: ${(e as Error).message}`) }
+    try { await deleteContact(c.id); await load(); onChange?.() } catch (e) { setError(`Could not remove ${c.name}: ${(e as Error).message}`) }
   }
   const set = (patch: Partial<Contact>) => setForm(f => (f ? { ...f, ...patch } : f))
   return (
@@ -34,7 +36,7 @@ export default function ClientContacts({ clientId }: { clientId: string }) {
             <span className="list-row__title">{c.name}{c.role && <span className="crm-contact-role"> · {c.role}</span>}</span>
             <span className="list-row__meta">{[c.email, c.phone].filter(Boolean).join(' · ') || 'No email or phone'}</span>
           </div>
-          {c.is_billing && <span className="crm-primary-tag" title="Gets invoices">BILLING</span>}
+          {c.is_billing && <span className="crm-primary-tag" title={c.email ? 'Gets invoices: copied (Cc) on invoice emails and payment reminders' : 'Gets invoices — add an email so they can be copied on invoice emails'}>BILLING</span>}
           <Menu label={`Actions for ${c.name}`} buttonClass="btn btn--icon btn--ghost btn--sm" items={[
             { label: 'Email', hidden: !c.email, onClick: () => { window.location.href = `mailto:${c.email}` } },
             { label: 'WhatsApp', hidden: !(c.whatsapp || c.phone), onClick: () => { window.open(`https://wa.me/${(c.whatsapp || c.phone || '').replace(/\D/g, '')}`, '_blank', 'noreferrer') } },
@@ -53,7 +55,7 @@ export default function ClientContacts({ clientId }: { clientId: string }) {
             <Field label="Email"><input aria-label="Contact email" className="input" value={form.email ?? ''} onChange={e => set({ email: e.target.value })} /></Field>
             <Field label="Phone"><input aria-label="Contact phone" className="input" value={form.phone ?? ''} onChange={e => set({ phone: e.target.value })} /></Field>
             <Field label="WhatsApp"><input aria-label="Contact WhatsApp" className="input" value={form.whatsapp ?? ''} onChange={e => set({ whatsapp: e.target.value })} /></Field>
-            <div className="field crm-check-field"><Checkbox checked={!!form.is_billing} onChange={v => set({ is_billing: v })} label="Gets invoices" /></div>
+            <div className="field crm-check-field"><Checkbox checked={!!form.is_billing} onChange={v => set({ is_billing: v })} label="Gets invoices (Cc’d on invoices)" /></div>
           </div>
           <div className="row"><button type="button" className="btn btn--primary" disabled={!form.name.trim() || saving} onClick={() => void save()}>{saving ? 'Saving…' : 'Save'}</button><button type="button" className="btn" onClick={() => setForm(null)}>Cancel</button></div>
         </div>

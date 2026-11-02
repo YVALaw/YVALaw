@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useStickyView } from '../lib/stickyView'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { clientHealth, HEALTH_TONE, type Health } from '../utils/clientHealth'
 import type { ActivityLogEntry, Client, Invoice, Project, StaffRequest, Tag } from '../data/types'
@@ -11,6 +12,7 @@ import { Banner, Menu, Modal, PageHeader, Pill, SearchInput, Segmented, Skel, Fi
 import ClientFormDrawer, { CLIENT_STAGES, avatarTone, normTags } from '../components/crm/ClientFormDrawer'
 import ClientActivityModal from '../components/crm/ClientActivityModal'
 import { loadViews, storeViews, type SavedView } from '../components/crm/savedViews'
+import { recipientsLabel } from '../utils/emailList'
 import { initials, usd, usdShort } from '../utils/format'
 
 type ViewMode = 'list' | 'pipeline'
@@ -43,7 +45,7 @@ export default function ClientsPage() {
   const [healthRequests, setHealthRequests] = useState<StaffRequest[]>([])
   const [portal, setPortal] = useState<Map<string, PortalInfo> | null | undefined>(undefined)
   const [loaded, setLoaded] = useState(false)
-  const [view, setView] = useState<ViewMode>('list')
+  const [view, setView] = useStickyView<ViewMode>('clients', 'list', ['list', 'pipeline'])
   const [tab, setTab] = useState<BaseTab>('all')
   const [savedId, setSavedId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -89,7 +91,7 @@ export default function ClientsPage() {
     try {
       const r = await sendClientReminder(c, invoices)
       if (!r) return
-      if (r.result.mode === 'gmail') setNotice(`Reminder sent via Gmail to ${c.email} for ${usd(r.total)} (${r.count} invoice${r.count === 1 ? '' : 's'}).`)
+      if (r.result.mode === 'gmail') setNotice(`Reminder sent via Gmail to ${recipientsLabel(r.to, r.cc)} for ${usd(r.total)} (${r.count} invoice${r.count === 1 ? '' : 's'}).`)
       else if (r.result.mode === 'mailto') setNotice(`Reminder for ${usd(r.total)} opened in your email app.`)
       else setError(`Reminder not sent: ${r.result.fallbackReason ?? 'Gmail could not send it.'}`)
     } catch (e) { setError(`Reminder not sent: ${(e as Error).message}`) }

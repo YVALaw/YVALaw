@@ -4,6 +4,7 @@ import { cachedRead } from '../lib/readCache'
 import { isStaff, type AppRole } from '../lib/roles'
 import { hasPermission, type Permission } from '../lib/permissions'
 import { auditPortalActivity } from '../services/portalStorage'
+import { logAction } from '../services/activityLog'
 
 type RoleCtx = {
   role:               AppRole
@@ -29,6 +30,21 @@ function clearPortalLoginAuditKeys() {
     const key = sessionStorage.key(i)
     if (key?.startsWith(PORTAL_LOGIN_AUDIT_PREFIX)) sessionStorage.removeItem(key)
   }
+}
+
+// "Signed in" goes into the who-did-what trail once per sign-in: keyed by the login session (JWT session_id, shared by
+// every tab of that sign-in); without one, once per tab. Never blocks or fails the app.
+const SIGNIN_LOG_KEY = 'yva_signin_logged'
+function logSignInOnce(userId: string, accessToken: string | undefined) {
+  try {
+    let sid = ''
+    try { sid = String(JSON.parse(atob((accessToken || '').split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).session_id || '') } catch { /* no session id */ }
+    const store = sid ? localStorage : sessionStorage
+    const mark = `${userId}:${sid}`
+    if (store.getItem(SIGNIN_LOG_KEY) === mark) return
+    store.setItem(SIGNIN_LOG_KEY, mark)
+    void logAction('signed_in', 'Signed in')
+  } catch { /* storage blocked: skip */ }
 }
 
 const Ctx = createContext<RoleCtx>({
@@ -86,6 +102,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
         setClientId(null)
         sessionStorage.setItem(ROLE_CACHE_KEY, roleRow.role)
         setLoading(false)
+        if (isStaff(roleRow.role as AppRole)) logSignInOnce(user.id, session?.access_token)
         return
       }
 
@@ -149,6 +166,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT') {
         sessionStorage.removeItem(ROLE_CACHE_KEY)
+        try { sessionStorage.removeItem(SIGNIN_LOG_KEY); localStorage.removeItem(SIGNIN_LOG_KEY) } catch { /* ignore */ }
         clearPortalLoginAuditKeys()
         setRole('recruiter')
         setUserId(null)

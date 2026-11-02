@@ -2,6 +2,10 @@
 import { supabase } from '../lib/supabase'
 import { loadSettings, loadInvoiceCounter, saveInvoiceCounter, logComm, invalidateSnapshotCache } from './storage'
 import { sendEmail, type SendEmailResult } from './gmail'
+import { clientRecipients } from './emailRecipients'
+import { invoicePdf } from './invoiceEmail'
+import { logAction } from './activityLog'
+import { recipientsLabel } from '../utils/emailList'
 import type { Client as Cli, Estimate, Invoice as Inv, Project } from '../data/types'
 import { itemLinesFromEstimate, itemLinesSubtotal } from '../utils/invoiceLines'
 
@@ -125,8 +129,10 @@ export const balanceOf = (i: Inv) => (Number(i.subtotal) || 0) - (Number(i.amoun
 export const revenueOf = (c: Cli, invoices: Inv[]) => invoicesOf(c, invoices).reduce((s, i) => s + (Number(i.subtotal) || 0), 0)
 export const outstandingOf = (c: Cli, invoices: Inv[]) => invoicesOf(c, invoices).filter(isUnpaid).reduce((s, i) => s + balanceOf(i), 0)
 
-/** Payment reminder for every unpaid invoice of a client (Settings → Email reminder template). null = nothing unpaid. */
-export async function sendClientReminder(c: Cli, invoices: Inv[]): Promise<{ result: SendEmailResult; count: number; total: number } | null> {
+const MAX_REMINDER_PDFS = 10
+/** Payment reminder for every unpaid invoice of a client (Settings → Email reminder template), Cc their Invoice CC +
+ *  billing contacts, each unpaid invoice attached as a PDF (up to 10). null = nothing unpaid. */
+export async function sendClientReminder(c: Cli, invoices: Inv[]): Promise<{ result: SendEmailResult; count: number; total: number; to: string; cc: string[] } | null> {
   const settings = await loadSettings()
   const unpaidInvs = invoicesOf(c, invoices).filter(isUnpaid)
   if (unpaidInvs.length === 0) return null
@@ -141,8 +147,19 @@ export async function sendClientReminder(c: Cli, invoices: Inv[]): Promise<{ res
         .replace(/\{dueDate\}/g, unpaidInvs[0]?.dueDate || '')
         .replace(/\{companyName\}/g, companyName)
     : `Hi ${c.name},\n\nThis is a friendly reminder that you have ${unpaidInvs.length === 1 ? 'an outstanding invoice' : `${unpaidInvs.length} outstanding invoices`} totaling $${totalOwed.toFixed(2)}:\n\n${invoiceList}\n\nPlease let us know when we can expect payment or if you have any questions.\n\n${settings.emailSignature || companyName}`
-  const result = await sendEmail(c.email || '', `Outstanding Balance Reminder — ${companyName}`, bodyText)
-  return { result, count: unpaidInvs.length, total: totalOwed }
+  const { to, cc } = await clientRecipients(c)
+  const attachments = []
+  try {
+    for (const inv of unpaidInvs.slice(0, MAX_REMINDER_PDFS)) attachments.push(await invoicePdf(inv, settings))   // one at a time: each draws in its own frame
+  } catch (e) {
+    return { result: { mode: 'failed', attached: false, fallbackReason: `The invoice PDFs could not be made (${(e as Error).message}). Nothing was sent.` }, count: unpaidInvs.length, total: totalOwed, to, cc }
+  }
+  const result = await sendEmail(to, `Outstanding Balance Reminder — ${companyName}`, bodyText, { attachments, cc })
+  if (result.mode !== 'failed' && to) {
+    void logAction('invoice_reminder', `Sent a balance reminder ($${totalOwed.toFixed(2)}, ${unpaidInvs.length} invoice${unpaidInvs.length === 1 ? '' : 's'}) to ${recipientsLabel(to, cc)}${result.mode === 'mailto' ? ' (opened in the email app)' : ''}`,
+      { table: 'clients', recordId: c.id, details: { to, cc, via: result.mode, invoices: unpaidInvs.map(i => i.number) } })
+  }
+  return { result, count: unpaidInvs.length, total: totalOwed, to, cc }
 }
 
 /** Accepted estimate → a draft invoice for Finance to review and send. The estimate's lines become real

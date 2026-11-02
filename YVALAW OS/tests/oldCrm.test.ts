@@ -29,14 +29,14 @@ test('old short ids become the same UUID every time; UUIDs are kept', async () =
 
 test('a backup converts with its links intact, statuses fixed and totals untouched', async () => {
   const b = {
-    employees: [{ id: 'emp1', name: 'Ana', employeeNumber: 'YVA26004', status: 'Active', attachments: null, hireYear: '2024' },
+    employees: [{ id: 'emp1', name: 'Ana', employeeNumber: 'YVA26004', status: 'Active', attachments: null, hireYear: '2024', ccEmails: ['boss@x.com'] },
                 { id: 'emp2', name: 'Luis', employeeNumber: 'YVA26004', status: 'Active' }],
-    clients: [{ id: 'cli1', name: 'Halavi Law' }],
+    clients: [{ id: 'cli1', name: 'Halavi Law', ccEmails: ['ap@halavi.com'] }],
     projects: [{ id: 'prj1', name: 'VA', clientId: 'cli1', employeeIds: ['emp1'], billingModel: 'Hourly', assignments: [{ employeeId: 'emp1', billRate: 5 }] }],
     invoices: [{ id: 'inv1', number: 'HLVA0001', date: '2026-10-19', clientName: 'halavi law', projectId: 'prj1', status: 'Paid', subtotal: 187.01,
       items: [{ employeeId: 'emp1', employeeName: 'Ana', hoursTotal: '39.51', rate: 4.5, premiumHours: 11.386, regularHours: 28.464, premiumPercent: 15, billAmount: 187.01,
                 daily: { '2026-10-19': '8.00', '2026-10-21': '7.51' } }],
-      employeePayments: { emp1: { status: 'paid' } } },
+      employeePayments: { emp1: { status: 'paid' } }, clientCcEmails: ['ap@halavi.com'] },
       { id: 'inv2', number: 'X1', date: '2026-01-01', clientName: 'Gone Co', status: 'sent', subtotal: 10, items: [{ employeeId: 'oldguy', employeeName: 'Oven', hoursTotal: '2', rate: 5 }] }],
     candidates: [{ id: 'k1', name: 'Pia', attachments: [{ id: 'a', name: 'cv.pdf', mimeType: 'application/pdf', size: 3, dataUrl: 'data:application/pdf;base64,AAA=', uploadedAt: 1 },
       { id: 'b', name: 'v.mkv', mimeType: 'video/x', size: 9, dataUrl: 'https://old.supabase.co', storageUrl: 'https://old.supabase.co/storage/v1/object/public/attachments/x.mkv', uploadedAt: 1 }] }],
@@ -50,10 +50,14 @@ test('a backup converts with its links intact, statuses fixed and totals untouch
   assert.equal(c.projects[0].clientId, cli1)
   assert.deepEqual(c.projects[0].employeeIds, [emp1])
   assert.equal(c.projects[0].billingModel, 'hourly')
-  assert.equal((c.projects[0].assignments as { employeeId: string }[])[0].employeeId, emp1)
+  assert.deepEqual(c.placementRates, [{ employeeId: emp1, projectId: prj1, billRate: 5, payRate: null, position: null, effectiveFrom: '2026-10-19' }])
+  assert.equal('assignments' in c.projects[0], false)
   const inv = c.invoices[0] as any
   assert.equal(inv.status, 'paid'); assert.equal(inv.clientId, cli1); assert.equal(inv.projectId, prj1)
   assert.equal(inv.subtotal, 187.01)
+  assert.deepEqual(inv.clientCcEmails, ['ap@halavi.com'])
+  assert.deepEqual(c.clients[0].ccEmails, ['ap@halavi.com'])
+  assert.deepEqual(c.employees[0].ccEmails, ['boss@x.com'])
   assert.equal(inv.items[0].hoursTotal, 39.85)
   assert.equal(inv.items[0].billAmount, 187.01)
   assert.deepEqual(inv.items[0].daily, { '2026-10-19': '8:00', '2026-10-21': '7:51' })

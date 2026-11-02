@@ -1,5 +1,8 @@
 // People hub: every employee field, shared by Team → Add / Edit and the employee profile's inline edit.
+import { useEffect, useState } from 'react'
 import type { Employee } from '../../data/types'
+import { emailListForSave, formatEmailList, parseEmailList } from '../../utils/emailList'
+import { ccColumnExists } from '../../services/storage'
 import { normalizeClockInput } from '../../utils/payroll'
 import { PAY_SCHEDULES, type PaySchedule } from '../../utils/moneyRules'
 import { Field } from '../ui'
@@ -8,7 +11,7 @@ export const STATUS_OPTIONS = ['Active', 'Onboarding', 'Trial', 'On hold', 'Inac
 export const TYPE_OPTIONS = ['', 'Full-time', 'Part-time', 'Project-based']
 
 export type EmployeeFormData = {
-  name: string; email: string; phone: string; payRate: string
+  name: string; email: string; ccEmails: string; phone: string; payRate: string
   defaultShiftStart: string; defaultShiftEnd: string
   premiumEnabled: boolean; premiumStartTime: string; premiumPercent: string
   role: string; employmentType: string; location: string
@@ -18,13 +21,13 @@ export type EmployeeFormData = {
 }
 
 export const EMPTY_EMPLOYEE_FORM: EmployeeFormData = {
-  name: '', email: '', phone: '', payRate: '', defaultShiftStart: '', defaultShiftEnd: '', premiumEnabled: false, premiumStartTime: '21:00', premiumPercent: '15', role: '', employmentType: '',
+  name: '', email: '', ccEmails: '', phone: '', payRate: '', defaultShiftStart: '', defaultShiftEnd: '', premiumEnabled: false, premiumStartTime: '21:00', premiumPercent: '15', role: '', employmentType: '',
   location: '', timezone: '', startYear: '', hireDate: '', status: 'Active', notes: '', worksFor: 'client', manualTimeAllowed: false, paySchedule: '', payAnchor: '',
 }
 
 export function employeeToForm(e: Employee): EmployeeFormData {
   return {
-    name: e.name ?? '', email: e.email ?? '', phone: e.phone ?? '',
+    name: e.name ?? '', email: e.email ?? '', ccEmails: formatEmailList(e.ccEmails), phone: e.phone ?? '',
     payRate: e.payRate != null ? String(e.payRate) : '',
     defaultShiftStart: e.defaultShiftStart || '',
     defaultShiftEnd: e.defaultShiftEnd || '',
@@ -58,6 +61,7 @@ export function formToEmployee(form: EmployeeFormData, opts: { schedule: boolean
     hireDate: form.hireDate || null,
     notes: form.notes || undefined,
     email: form.email || undefined,
+    ccEmails: emailListForSave(form.ccEmails),   // only valid addresses; the field shows the rest as an error
     phone: form.phone || undefined,
     role: form.role || undefined,
     employmentType: form.employmentType || undefined,
@@ -65,6 +69,12 @@ export function formToEmployee(form: EmployeeFormData, opts: { schedule: boolean
     timezone: form.timezone || undefined,
     ...(opts.schedule ? { paySchedule: paySchedule || null, payAnchor: paySchedule === 'biweekly' && payAnchor ? payAnchor : null } : {}),
   }
+}
+
+/** A message when the form can't be saved as typed (Statement CC entries that aren't email addresses), else null */
+export function employeeFormError(form: EmployeeFormData): string | null {
+  const { invalid } = parseEmailList(form.ccEmails)
+  return invalid.length ? `Statement CC: ${invalid.join(', ')} ${invalid.length === 1 ? "isn't an email address" : "aren't email addresses"}.` : null
 }
 
 /** Grouped fields: Basics · YVA Time · Schedule & pay · Contact · Notes.
@@ -77,6 +87,9 @@ export function EmployeeFields({ form, setForm, pay, schedule, withName = true }
   withName?: boolean
 }) {
   const set = (patch: Partial<EmployeeFormData>) => setForm({ ...form, ...patch })
+  const [ccReady, setCcReady] = useState(true)
+  useEffect(() => { void ccColumnExists('employees').then(setCcReady) }, [])
+  const ccInvalid = parseEmailList(form.ccEmails).invalid
   return (
     <div className="ppl-form">
       <section className="form-section">
@@ -153,6 +166,11 @@ export function EmployeeFields({ form, setForm, pay, schedule, withName = true }
           <Field label="Email"><input className="input" type="email" value={form.email} onChange={e => set({ email: e.target.value })} placeholder="name@example.com" /></Field>
           <Field label="Phone"><input className="input" value={form.phone} onChange={e => set({ phone: e.target.value })} placeholder="+1 555 000 0000" /></Field>
           <Field label="Location"><input className="input" value={form.location} onChange={e => set({ location: e.target.value })} placeholder="Santo Domingo, DO" /></Field>
+          <Field label="Statement CC" full
+            error={ccInvalid.length ? `Not an email address: ${ccInvalid.join(', ')}` : undefined}
+            hint={ccReady ? 'Copied (Cc) when earnings statements are sent. Separate several with commas.' : 'Needs a database update first: run supabase/migrate-cc-emails.sql in Supabase.'}>
+            <input className="input" aria-label="Statement CC" type="text" inputMode="email" autoComplete="off" disabled={!ccReady} value={form.ccEmails} onChange={e => set({ ccEmails: e.target.value })} placeholder="someone@example.com" />
+          </Field>
         </div>
       </section>
 
