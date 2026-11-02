@@ -3,6 +3,7 @@ import { usePermission } from '../context/RoleContext'
 import { deleteAnnouncement, deleteHoliday, loadAnnouncements, loadHolidays, saveAnnouncement, saveHoliday, type Announcement, type Holiday } from '../services/workspace'
 import { Banner, Card, Checkbox, EmptyState, Field, Menu, Modal, PageHeader, Pill, Segmented, Skel, Switch } from '../components/ui'
 import { P } from '../components/Icon'
+import { useToast } from '../context/ToastContext'
 
 const AUD: Record<Announcement['audience'], string> = { all: 'Everyone', client: 'Client team', yva: 'YVA team' }
 type Status = 'published' | 'scheduled' | 'draft'
@@ -19,8 +20,8 @@ export default function AnnouncementsPage() {
   const canManage = allowed('announcements.manage')
   const [items, setItems] = useState<Announcement[] | null>(null)
   const [holidays, setHolidays] = useState<Holiday[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)   // could not load: stays as a banner
+  const toast = useToast()
   const [form, setForm] = useState<{ id?: string; title: string; body: string; audience: Announcement['audience']; pinned: boolean }>(EMPTY)
   const [hForm, setHForm] = useState({ day: '', name: '', paid: true })
   const [addingHoliday, setAddingHoliday] = useState(false)
@@ -29,7 +30,7 @@ export default function AnnouncementsPage() {
   const [busy, setBusy] = useState(false)
 
   async function load() {
-    const r = await loadAnnouncements(true); setItems(r.rows); setError(r.error)
+    const r = await loadAnnouncements(true); setItems(r.rows); setLoadError(r.error)
     setHolidays(await loadHolidays(new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)))
   }
   useEffect(() => { if (canManage) void load() }, [canManage])   // permissions arrive after the first render for non-CEO roles
@@ -41,19 +42,19 @@ export default function AnnouncementsPage() {
   /** publish: 'now' | ISO time (scheduled) | null (draft) | 'keep' (save an edit, keep its publish time) */
   async function save(when: 'now' | 'keep' | null | string) {
     if (!valid || busy) return
-    setBusy(true); setError(null)
+    setBusy(true)
     const published_at = when === 'now' ? (editing && editing.published_at && statusOf(editing) === 'published' ? editing.published_at : new Date().toISOString())
       : when === 'keep' ? editing?.published_at ?? null
       : when
     try {
       await saveAnnouncement({ ...form, published_at })
       const st = !published_at ? 'Saved as a draft.' : Date.parse(published_at) > Date.now() ? `Scheduled for ${dt(published_at)} — the team is notified then.` : 'Published — the team is notified.'
-      setForm(EMPTY); setNotice(st); await load()
-    } catch (e) { setError((e as Error).message) }
+      setForm(EMPTY); toast.success(st); await load()
+    } catch (e) { toast.error((e as Error).message) }
     finally { setBusy(false) }
   }
   async function publishNow(a: Announcement) {
-    try { await saveAnnouncement({ ...a, published_at: new Date().toISOString() }); setNotice('Published — the team is notified.'); await load() } catch (e) { setError((e as Error).message) }
+    try { await saveAnnouncement({ ...a, published_at: new Date().toISOString() }); toast.success('Published — the team is notified.'); await load() } catch (e) { toast.error((e as Error).message) }
   }
   function openSchedule() {
     const base = editing?.published_at && statusOf(editing) === 'scheduled' ? Date.parse(editing.published_at) : Date.now() + 86400000
@@ -67,8 +68,7 @@ export default function AnnouncementsPage() {
   return (
     <div className="page">
       <PageHeader title="Announcements" sub="Posts shown on the team's My workspace home. Publishing sends a notification." />
-      {notice && <Banner onClose={() => setNotice(null)}>{notice}</Banner>}
-      {error && <Banner tone="danger" onClose={() => setError(null)}>{error}</Banner>}
+      {loadError && <Banner tone="danger" onClose={() => setLoadError(null)}>{loadError}</Banner>}
 
       <div className="grid-auto">
         <Card title={form.id ? 'Edit announcement' : 'New announcement'} className="ppl-composer">
@@ -110,7 +110,7 @@ export default function AnnouncementsPage() {
                         { label: 'Edit', icon: P.edit, onClick: () => setForm({ id: a.id, title: a.title, body: a.body, audience: a.audience, pinned: a.pinned }) },
                         { label: 'Publish now', icon: P.send, onClick: () => void publishNow(a), hidden: st === 'published' },
                         'sep',
-                        { label: 'Delete', icon: P.trash, danger: true, onClick: () => { if (window.confirm('Delete this announcement?')) void deleteAnnouncement(a.id).then(load).catch(e => setError(`Could not delete: ${(e as Error).message}`)) } },
+                        { label: 'Delete', icon: P.trash, danger: true, onClick: () => { if (window.confirm('Delete this announcement?')) void deleteAnnouncement(a.id).then(load).catch(e => toast.error(`Could not delete: ${(e as Error).message}`)) } },
                       ]} />
                     </div>
                     <span className="ppl-post__title">{a.title}</span>
@@ -129,7 +129,7 @@ export default function AnnouncementsPage() {
                 <div className="ppl-inline-form__btns">
                   <button type="button" className="btn btn--sm" onClick={() => setAddingHoliday(false)}>Cancel</button>
                   <button type="button" className="btn btn--sm btn--primary" disabled={!hForm.day || hForm.name.trim().length < 2}
-                    onClick={() => void saveHoliday(hForm).then(() => { setHForm({ day: '', name: '', paid: true }); setAddingHoliday(false); return load() }).catch(e => setError(e.message))}>Add</button>
+                    onClick={() => void saveHoliday(hForm).then(() => { setHForm({ day: '', name: '', paid: true }); setAddingHoliday(false); return load() }).catch(e => toast.error(e.message))}>Add</button>
                 </div>
               </div>
             )}
@@ -138,7 +138,7 @@ export default function AnnouncementsPage() {
               <div key={h.id} className="list-row">
                 <div className="list-row__main"><span className="list-row__title">{h.name}</span>{h.paid && <span className="list-row__meta">Paid</span>}</div>
                 <span className="muted">{new Date(`${h.day}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                <Menu label={`Actions for ${h.name}`} buttonClass="btn btn--icon btn--sm btn--ghost" items={[{ label: 'Delete', icon: P.trash, danger: true, onClick: () => void deleteHoliday(h.id).then(load).catch(e => setError(`Could not delete: ${(e as Error).message}`)) }]} />
+                <Menu label={`Actions for ${h.name}`} buttonClass="btn btn--icon btn--sm btn--ghost" items={[{ label: 'Delete', icon: P.trash, danger: true, onClick: () => void deleteHoliday(h.id).then(load).catch(e => toast.error(`Could not delete: ${(e as Error).message}`)) }]} />
               </div>
             ))}
           </Card>

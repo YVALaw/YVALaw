@@ -17,6 +17,7 @@ import {
 } from '../services/weeklyClose'
 import { addDays, DEFAULT_TZ, localParts } from '../utils/moneyRules'
 import { hmClock, hmText as hm } from '../utils/format'
+import { useToast } from '../context/ToastContext'
 
 const usd = (n: number) => (Number(n) || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
 const md = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -40,9 +41,9 @@ export default function WeeklyClosePage() {
   const navigate = useNavigate()
   const [closes, setCloses] = useState<WeekClose[]>([])
   const [weekStart, setWeekStart] = useState(lastFinishedWeek())
-  const [error, setError] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)   // could not load: stays as a banner
   const [busy, setBusy] = useState<string | null>(null)
-  const [msg, setMsg] = useState<string | null>(null)
+  const toast = useToast()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [blocks, setBlocks] = useState<WeekBlock[]>([])
   const [adjustments, setAdjustments] = useState<Adjustment[]>([])
@@ -62,7 +63,7 @@ export default function WeeklyClosePage() {
   const close = isCurrent ? previewData?.close ?? null : closes.find(c => c.weekStart === weekStart) ?? null
   async function loadAll() {
     const r = await loadWeekCloses()
-    setCloses(r.rows); setError(e => r.error ?? e)
+    setCloses(r.rows); setLoadError(e => r.error ?? e)
     const c = r.rows.find(x => x.weekStart === weekStart)
     const [inv, b, a] = await Promise.all([c ? loadWeekInvoices(c.id) : Promise.resolve([]), loadWeekBlocks(weekStart), loadAdjustments(weekStart)])
     setInvoices(inv); setBlocks(b); setAdjustments(a); setLoaded(true)
@@ -73,7 +74,7 @@ export default function WeeklyClosePage() {
   useEffect(() => { if (invoices[0] && open.size === 0) setOpen(new Set([invoices[0].id])) }, [invoices])   // eslint-disable-line react-hooks/exhaustive-deps
 
   async function run(action: 'prepare' | 'approve') {
-    setBusy(action); setMsg(null); setError(null)
+    setBusy(action)
     if (isCurrent) {
       try {
         const r = await callWeekClose('preview', weekStart) as { summary: WeekClose['summary']; flags: WeekFlag[]; payroll: WeekClose['payroll']
@@ -83,50 +84,50 @@ export default function WeeklyClosePage() {
           invoices: r.invoices.map((inv, i) => ({ id: `preview-${i}`, number: '(not created yet)', clientName: inv.clientName, projectName: inv.projectName, subtotal: inv.subtotal, items: inv.items, status: 'draft' } as unknown as Invoice)),
         })
         await loadAll()
-      } catch (e) { setError((e as Error).message) }
+      } catch (e) { toast.error((e as Error).message) }
       setBusy(null)
       return
     }
     try {
       await callWeekClose(action, weekStart)
-      setMsg(action === 'prepare' ? 'Prepared — invoices and flags are up to date.' : 'Week approved. Hours are final; invoices are ready to send.')
+      toast.success(action === 'prepare' ? 'Prepared — invoices and flags are up to date.' : 'Week approved. Hours are final; invoices are ready to send.')
       await loadAll()
-    } catch (e) { setError((e as Error).message) }
+    } catch (e) { toast.error((e as Error).message) }
     setBusy(null)
   }
   /** 'sent' only when the company mailbox sent it; 'mailto' = handed to the mail app, which we can't confirm */
   const sentTo = new Map<string, string>()   // invoice id → "to (cc …)" of its last send, for the message
   async function send(inv: Invoice): Promise<'sent' | 'mailto' | 'failed'> {
     if (!settings) return 'failed'
-    if (!inv.clientEmail) { setError(`${inv.number}: ${inv.clientName} has no email address. Add it on the client's profile and prepare again.`); return 'failed' }
+    if (!inv.clientEmail) { toast.error(`${inv.number}: ${inv.clientName} has no email address. Add it on the client's profile and prepare again.`); return 'failed' }
     const r = await sendInvoiceEmail(inv, settings)
-    if (r.mode === 'failed') { setError(`${inv.number} was not sent: ${r.fallbackReason}`); return 'failed' }
+    if (r.mode === 'failed') { toast.error(`${inv.number} was not sent: ${r.fallbackReason}`); return 'failed' }
     sentTo.set(inv.id, sentToLabel(r))
     if (r.mode !== 'outlook') return 'mailto'
     await markInvoiceSent(inv)
     return 'sent'
   }
   async function sendOne(inv: Invoice) {
-    setBusy(`send-${inv.id}`); setError(null); setMsg(null)
+    setBusy(`send-${inv.id}`)
     try {
       const r = await send(inv)
-      if (r === 'sent') setMsg(`${inv.number} sent to ${sentTo.get(inv.id) ?? inv.clientEmail}.`)
+      if (r === 'sent') toast.success(`${inv.number} sent to ${sentTo.get(inv.id) ?? inv.clientEmail}.`)
       else if (r === 'mailto' && window.confirm(`${inv.number} was opened in your email app. Mark it as sent? Only say OK once you have actually sent the email.`)) {
         await markInvoiceSent(inv)
-        setMsg(`${inv.number} marked as sent.`)
+        toast.success(`${inv.number} marked as sent.`)
       }
-    } catch (e) { setError((e as Error).message) }
+    } catch (e) { toast.error((e as Error).message) }
     await loadAll(); setBusy(null)
   }
   async function sendAll() {
     const drafts = invoices.filter(i => (i.status || 'draft') === 'draft')
     const email = await loadEmailStatus().catch(() => null)
     if (!email?.configured) {
-      setError('"Send all" needs Outlook email set up (Settings → Integrations → Email sending). Without it, send the invoices one at a time with each row\'s Send button.')
+      toast.error('"Send all" needs Outlook email set up (Settings → Integrations → Email sending). Without it, send the invoices one at a time with each row\'s Send button.')
       return
     }
     if (!window.confirm(`Email ${drafts.length} invoice${drafts.length === 1 ? '' : 's'} to the clients now?`)) return
-    setBusy('send-all'); setError(null); setMsg(null)
+    setBusy('send-all')
     let ok = 0
     let stopped = false
     for (const inv of drafts) {
@@ -135,9 +136,10 @@ export default function WeeklyClosePage() {
         if (r === 'sent') ok++
         // sending failed mid-run and the user chose the mail app: stop instead of opening one mail window per invoice
         if (r === 'mailto') { stopped = true; break }
-      } catch (e) { setError((e as Error).message) }
+      } catch (e) { toast.error((e as Error).message) }
     }
-    setMsg(stopped
+    const report = stopped || ok < drafts.length ? toast.warning : toast.success   // not everything went: amber, stays 6 s
+    report(stopped
       ? `${ok} of ${drafts.length} invoices sent from the company mailbox. Stopped: email isn't sending, so the rest were not sent — check Settings → Integrations → Email sending, or send them one at a time. The invoice opened in your email app is still a draft; use its Send button to mark it sent.`
       : `${ok} of ${drafts.length} invoices sent.`)
     await loadAll(); setBusy(null)
@@ -171,23 +173,23 @@ export default function WeeklyClosePage() {
   async function saveAdjustment(editing: Editing, minutes: string, note: string, target: GridTarget | undefined): Promise<boolean> {
     // Accept "-15", "−15" (the hint's minus sign), "+30" and a comma decimal
     const mins = Number(minutes.trim().replace(/[−–]/g, '-').replace(',', '.'))
-    if (!mins || note.trim().length < 2) { setError('Enter minutes (use − to remove time) and a short note — the employee will see it.'); return false }
+    if (!mins || note.trim().length < 2) { toast.error('Enter minutes (use − to remove time) and a short note — the employee will see it.'); return false }
     try {
       const args = { employeeId: editing.employeeId, projectId: target?.projectId ?? null, workType: target?.workType ?? null, day: editing.day, seconds: Math.abs(mins) * 60 * (editing.mode === 'move' ? 1 : Math.sign(mins)), note }
       if (editing.mode === 'move') await moveToNextWeek({ ...args, weekStart })
       else await addAdjustment(args)
-      setError(null); setMsg('Saved. Press "Re-prepare" to update the invoices.')
+      toast.success('Saved. Press "Re-prepare" to update the invoices.')
       setAdjustments(await loadAdjustments(weekStart))
       return true
-    } catch (e) { setError((e as Error).message); return false }
+    } catch (e) { toast.error((e as Error).message); return false }
   }
   async function moveLate(f: WeekFlag) {
     if (!f.employeeId || !f.byDay) return
     if (!window.confirm(`Move ${hm(f.seconds || 0)} of ${f.employeeName}'s late time to next week?`)) return
     try {
       for (const [day, sec] of Object.entries(f.byDay)) await moveToNextWeek({ employeeId: f.employeeId, projectId: f.projectId ?? null, workType: f.workType ?? null, day, seconds: sec, note: 'Uploaded after the week closed — moved to next week', weekStart })
-      setMsg('Moved. Press "Re-prepare" to update the invoices.'); setAdjustments(await loadAdjustments(weekStart))
-    } catch (e) { setError((e as Error).message) }
+      toast.success('Moved. Press "Re-prepare" to update the invoices.'); setAdjustments(await loadAdjustments(weekStart))
+    } catch (e) { toast.error((e as Error).message) }
   }
 
   // After every hook: permissions arrive asynchronously for non-CEO roles, so an earlier return changes the hook count
@@ -248,8 +250,7 @@ export default function WeeklyClosePage() {
         </>} />
 
       {isCurrent && <Banner tone="info">Preview of the week in progress ({md(weekStart)} – today). Computed live, nothing is saved: no invoices are created and nothing can be approved or sent. The week closes automatically on Monday at 12:05 am (Dominican time).</Banner>}
-      {error && <Banner tone="danger" onClose={() => setError(null)}>{error}</Banner>}
-      {msg && <Banner tone="success" onClose={() => setMsg(null)}>{msg}</Banner>}
+      {loadError && <Banner tone="danger" onClose={() => setLoadError(null)}>{loadError}</Banner>}
       {lateCount > 0 && !isCurrent && <Banner tone="warning" action={<button type="button" className="btn btn--sm" disabled={!!busy} onClick={() => void run('prepare')}>Re-prepare</button>}>
         {lateCount} block{lateCount === 1 ? '' : 's'} of time arrived after this week was prepared.</Banner>}
 
@@ -392,7 +393,7 @@ export default function WeeklyClosePage() {
               <button type="button" className="btn btn--sm" aria-expanded={showTime} onClick={() => setShowTime(v => !v)}>{showTime ? 'Hide time' : `Show time (${grid.size} ${grid.size === 1 ? 'person' : 'people'})`}</button>
             </div>
             {showTime && <div className="card__body"><WeekTimeGrid grid={grid} days={days} empName={empName} projName={projName} adjustments={adjustments}
-              onSave={saveAdjustment} onUndo={a => void cancelAdjustment(a).then(async () => setAdjustments(await loadAdjustments(weekStart))).catch(e => setError(`Could not undo: ${(e as Error).message}`))} /></div>}
+              onSave={saveAdjustment} onUndo={a => void cancelAdjustment(a).then(async () => setAdjustments(await loadAdjustments(weekStart))).catch(e => toast.error(`Could not undo: ${(e as Error).message}`))} /></div>}
           </section>
         </>
       )}

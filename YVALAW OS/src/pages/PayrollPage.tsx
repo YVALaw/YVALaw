@@ -12,6 +12,7 @@ import { addDays, localParts, weekdayOf } from '../utils/moneyRules'
 import { Banner, Checkbox, EmptyState, Field, Menu, Modal, PageHeader, Pill, Stepper, useIsMobile } from '../components/ui'
 import { P } from '../components/Icon'
 import { hmClock } from '../utils/format'
+import { useToast } from '../context/ToastContext'
 
 const usd = (n: number) => (Number(n) || 0).toLocaleString('en-US', { style: 'currency', currency: 'USD' })
 const signed = (n: number) => `${n < 0 ? '−' : '+'}${usd(Math.abs(n))}`
@@ -47,8 +48,8 @@ export default function PayrollPage() {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [payouts, setPayouts] = useState<PayoutMethod[]>([])
   const [company, setCompany] = useState('YVA Staffing')
-  const [error, setError] = useState<string | null>(null)
-  const [msg, setMsg] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)   // could not load: stays as a banner
+  const toast = useToast()
   const [busy, setBusy] = useState<string | null>(null)
   const [rateInput, setRateInput] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -60,7 +61,7 @@ export default function PayrollPage() {
   const run = runs.find(r => r.payday === payday) ?? null
   async function load() {
     const r = await loadRuns()
-    setRuns(r.rows); setError(r.error)
+    setRuns(r.rows); setLoadError(r.error)
     const cur = r.rows.find(x => x.payday === payday)
     setRateInput(cur?.exchange_rate ? String(cur.exchange_rate) : '')
     setLines(cur ? await loadLines(cur.id) : [])
@@ -72,7 +73,7 @@ export default function PayrollPage() {
   useEffect(() => {
     void loadEmployees().then(setEmployees)
     void loadSettings().then(s => setCompany(s.companyName || 'YVA Staffing'))
-    if (canBank) void loadPayoutMethods().then(setPayouts).catch(e => setError(`Could not load payout details: ${(e as Error).message}`))
+    if (canBank) void loadPayoutMethods().then(setPayouts).catch(e => setLoadError(`Could not load payout details: ${(e as Error).message}`))
   }, [canBank])
   useEffect(() => { void load() }, [payday])   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -94,13 +95,13 @@ export default function PayrollPage() {
   }
 
   async function act(name: string, fn: () => Promise<void>, ok?: string) {
-    setBusy(name); setError(null); setMsg(null)
-    try { await fn(); if (ok) setMsg(ok); await load() } catch (e) { setError((e as Error).message) }
+    setBusy(name)
+    try { await fn(); if (ok) toast.success(ok); await load() } catch (e) { toast.error((e as Error).message) }
     setBusy(null)
   }
   const prepare = () => act('prepare', () => preparePayroll(payday), 'Payroll prepared from approved hours.')
   async function bhd() {
-    try { const r = await fetchBhdRate(); setRateInput(String(r.buy)); setMsg(`${r.entity}: buys USD at RD$${r.buy} (sells at RD$${r.sell}). Check it, then Save rate.`) } catch (e) { setError((e as Error).message) }
+    try { const r = await fetchBhdRate(); setRateInput(String(r.buy)); toast.success(`${r.entity}: buys USD at RD$${r.buy} (sells at RD$${r.sell}). Check it, then Save rate.`) } catch (e) { toast.error((e as Error).message) }
   }
   const saveRate = () => act('rate', () => setExchangeRate(run!.id, Number(rateInput.replace(',', '.')), 'manual'), 'Exchange rate saved.')
   function payslip(l: PayrollLine) {
@@ -167,8 +168,7 @@ export default function PayrollPage() {
           </div>
           {canManage && <button type="button" className="btn" disabled={!!busy} onClick={() => void prepare()}>{busy === 'prepare' ? 'Preparing…' : run ? 'Prepare again' : 'Prepare payroll'}</button>}
         </>} />
-      {error && <Banner tone="danger" onClose={() => setError(null)}>{error}</Banner>}
-      {msg && <Banner tone="success" onClose={() => setMsg(null)}>{msg}</Banner>}
+      {loadError && <Banner tone="danger" onClose={() => setLoadError(null)}>{loadError}</Banner>}
 
       {!run ? (
         <EmptyState>{loaded ? <>This payroll isn't prepared yet. It's prepared automatically on Wednesday morning, or press <strong>Prepare payroll</strong>. Only approved hours are paid.</> : 'Loading…'}</EmptyState>
@@ -310,7 +310,7 @@ export default function PayrollPage() {
       <Modal open={!!payForm} onClose={() => setPayForm(null)} title={payForm ? `Mark ${payForm.ids.length} paid` : ''} sub="Each person gets a notification and can download their payslip in My workspace."
         footer={payForm ? <>
           <button type="button" className="btn" onClick={() => setPayForm(null)}>Cancel</button>
-          <button type="button" className="btn btn--primary" disabled={!run?.exchange_rate || busy === 'pay'} onClick={() => { const f = payForm; setPayForm(null); setRefInput(''); void act('pay', async () => { const n = await markPaid(f.ids, f.paidOn, f.reference); setMsg(`${n} marked paid.`) }) }}>Mark paid</button>
+          <button type="button" className="btn btn--primary" disabled={!run?.exchange_rate || busy === 'pay'} onClick={() => { const f = payForm; setPayForm(null); setRefInput(''); void act('pay', async () => { const n = await markPaid(f.ids, f.paidOn, f.reference); toast.success(`${n} marked paid.`) }) }}>Mark paid</button>
         </> : undefined}>
         {payForm && <>
           {!run?.exchange_rate && <Banner tone="danger">Save the exchange rate first — DOP amounts are fixed when people are marked paid.</Banner>}

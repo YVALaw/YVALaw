@@ -7,6 +7,7 @@ import { csvToLeads } from '../utils/csv'
 import { Banner, Chips, Drawer, Field, PageHeader, Pill, SearchInput, Segmented, Skel, onEnter, useIsMobile, type Tone } from '../components/ui'
 import { Ic, P } from '../components/Icon'
 import { dateShort, usdShort } from '../utils/format'
+import { useToast } from '../context/ToastContext'
 
 const SERVICES = ['Legal Intake', 'Legal Assistants', 'Demand Writing', 'Case Managers', 'Other']
 const KIND_LABEL: Record<LeadActivity['kind'], string> = { note: 'Note', call: 'Call', email: 'Email', meeting: 'Meeting', whatsapp: 'WhatsApp', follow_up: 'Follow-up', system: 'YVA OS' }
@@ -44,8 +45,8 @@ export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [loaded, setLoaded] = useState(false)
   const [staff, setStaff] = useState<{ user_id: string; email: string }[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<{ text: string; clientId?: string } | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)   // the list could not load: stays until closed
+  const toast = useToast()
   const [search, setSearch] = useState('')
   const [mine, setMine] = useState(!canAll)
   const [mStage, setMStage] = useState<LeadStage>('new')
@@ -61,22 +62,21 @@ export default function LeadsPage() {
   // Permissions arrive after the first render for non-CEO roles: follow leads.view_all once it is known
   useEffect(() => { setMine(!canAll) }, [canAll])
 
-  async function load() { const r = await loadLeads(); setLeads(r.rows); setError(r.error); setLoaded(true); return r.rows }
+  async function load() { const r = await loadLeads(); setLeads(r.rows); setLoadError(r.error); setLoaded(true); return r.rows }
   // Import older leads from a CSV (Netlify → Forms → lead-backup → Download as CSV, or any spreadsheet with name/email columns)
   const importInput = useRef<HTMLInputElement>(null)
   const [importing, setImporting] = useState(false)
   async function importCsv(file: File) {
-    setNotice(null); setError(null)
     try {
       const { leads: rows, columns } = csvToLeads(await file.text())
-      if (!rows.length) { setError('No leads found in that file. It needs a header row with at least a name or email column.'); return }
+      if (!rows.length) { toast.error('No leads found in that file. It needs a header row with at least a name or email column.'); return }
       if (!window.confirm(`Import ${rows.length} lead${rows.length === 1 ? '' : 's'} from "${file.name}"?\nColumns used: ${columns.join(', ')}.\nPeople already in your list are skipped.`)) return
       setImporting(true)
       let added = 0
       for (let i = 0; i < rows.length; i += 500) added += await importLeads(rows.slice(i, i + 500))
-      setNotice({ text: `${added} lead${added === 1 ? '' : 's'} added from ${file.name}${rows.length - added ? ` · ${rows.length - added} already in the list (or repeated in the file) skipped` : ''}.` })
+      toast.success(`${added} lead${added === 1 ? '' : 's'} added from ${file.name}${rows.length - added ? ` · ${rows.length - added} already in the list (or repeated in the file) skipped` : ''}.`)
       await load()
-    } catch (e) { setError(`Import failed: ${(e as Error).message}`) }
+    } catch (e) { toast.error(`Import failed: ${(e as Error).message}`) }
     setImporting(false)
   }
   useEffect(() => {
@@ -102,9 +102,9 @@ export default function LeadsPage() {
 
   async function save() {
     if (!open || saving) return
-    setSaving(true); setError(null)
-    try { const saved = await saveLead({ ...open, owner_id: open.owner_id ?? (canManage ? null : userId) }); setOpen(saved); await load(); setNotice({ text: `${saved.name} saved.` }) }
-    catch (e) { setError((e as Error).message) }
+    setSaving(true)
+    try { const saved = await saveLead({ ...open, owner_id: open.owner_id ?? (canManage ? null : userId) }); setOpen(saved); await load(); toast.success(`${saved.name} saved.`) }
+    catch (e) { toast.error((e as Error).message) }
     finally { setSaving(false) }
   }
   async function move(id: string, stage: LeadStage) {
@@ -117,7 +117,7 @@ export default function LeadsPage() {
       patch = { stage, lost_reason: reason.trim() || null }
     }
     setLeads(prev => prev.map(x => (x.id === id ? { ...x, ...patch } : x)))   // optimistic; load() below puts back the truth
-    try { await updateLead(id, patch) } catch (e) { setError((e as Error).message) }
+    try { await updateLead(id, patch) } catch (e) { toast.error((e as Error).message) }
     await addActivity({ leadId: id, kind: 'system', body: `Moved to ${STAGES.find(s => s.key === stage)?.label}` }).catch(() => {})
     await load()
   }
@@ -127,27 +127,27 @@ export default function LeadsPage() {
       await addActivity({ leadId: open.id, kind: act.kind, body: act.body, dueOn: act.dueOn || null })
       if (act.kind === 'follow_up' && act.dueOn) await updateLead(open.id, { next_follow_up: act.dueOn })
       setAct({ kind: 'note', body: '', dueOn: '' }); setActs(await loadActivities(open.id)); await load()
-    } catch (e) { setError((e as Error).message) }
+    } catch (e) { toast.error((e as Error).message) }
   }
   async function doneAct(a: LeadActivity) {
-    try { await completeActivity(a.id); if (open?.id) setActs(await loadActivities(open.id)) } catch (e) { setError((e as Error).message) }
+    try { await completeActivity(a.id); if (open?.id) setActs(await loadActivities(open.id)) } catch (e) { toast.error((e as Error).message) }
   }
   async function doConvert() {
     if (!open?.id || !convert || convertingRef.current) return
-    if ((open as Lead).client_id) { setError('This lead was already converted — its client and project exist. Open the client from Clients instead.'); return }
+    if ((open as Lead).client_id) { toast.error('This lead was already converted — its client and project exist. Open the client from Clients instead.'); return }
     const rate = convert.rate.trim() ? Number(convert.rate.trim().replace(',', '.')) : null
-    if (rate !== null && !(rate >= 0)) { setError('Enter the bill rate as a number, e.g. 10.50.'); return }
-    convertingRef.current = true; setConverting(true); setError(null)
+    if (rate !== null && !(rate >= 0)) { toast.error('Enter the bill rate as a number, e.g. 10.50.'); return }
+    convertingRef.current = true; setConverting(true)
     try {
       const r = await convertLead(open as Lead, { clientName: convert.clientName, projectName: convert.projectName, rate, paymentTerms: convert.terms })
-      setNotice({ text: `${convert.clientName} is now a client. Project and contact created.`, clientId: r.clientId })
+      toast.success(`${convert.clientName} is now a client. Project and contact created.`, r.clientId ? { action: { label: 'Open client', onClick: () => navigate(`/clients/${r.clientId}`) } } : undefined)
       setConvert(null); setOpen(null); await load()
-    } catch (e) { setError((e as Error).message) }
+    } catch (e) { toast.error((e as Error).message) }
     finally { convertingRef.current = false; setConverting(false) }
   }
   async function remove() {
     if (!open?.id || !window.confirm('Delete this lead?')) return
-    try { await deleteLead(open.id); setOpen(null); await load() } catch (e) { setError((e as Error).message) }
+    try { await deleteLead(open.id); setOpen(null); await load() } catch (e) { toast.error((e as Error).message) }
   }
 
   const followUp = (l: Lead): { text: string; tone: Tone } | null => {
@@ -192,8 +192,7 @@ export default function LeadsPage() {
           <button type="button" className="btn btn--primary" onClick={() => { setConvert(null); setOpen(empty()) }}>+ New lead</button>
         </>}
       />
-      {error && <Banner tone="danger" onClose={() => setError(null)}>{error}</Banner>}
-      {notice && <Banner tone="success" onClose={() => setNotice(null)} action={notice.clientId ? <button type="button" className="btn btn--sm" onClick={() => navigate(`/clients/${notice.clientId}`)}>Open client</button> : undefined}>{notice.text}</Banner>}
+      {loadError && <Banner tone="danger" onClose={() => setLoadError(null)}>{loadError}</Banner>}
 
       {!loaded ? (
         <div className="kanban crm-board">{STAGES.map(s => <div key={s.key} className="kanban__col"><Skel h={18} w="60%" /><Skel h={92} r={12} /><Skel h={92} r={12} /></div>)}</div>

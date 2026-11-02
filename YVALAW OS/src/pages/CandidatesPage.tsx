@@ -12,6 +12,7 @@ import { AttachmentList, downloadAttachment, attUrl } from '../components/people
 import { HireModal, OnboardingModal, convertCandidateToEmployee, type HireDetails } from '../components/people/hire'
 import { PersonAvatar } from '../components/people/common'
 import { ago } from '../utils/format'
+import { useToast } from '../context/ToastContext'
 
 type Cand = Candidate & { staffRequestId?: string | null }
 
@@ -44,7 +45,7 @@ export default function CandidatesPage() {
   const [openings, setOpenings] = useState<Record<string, { client: string; role: string; open: boolean }>>({})
   useEffect(() => {
     loadCandidates().then(all => setCandidates((hiredOnly ? all.filter(c => c.stage === 'hired') : all) as Cand[]))
-      .catch(e => { setError(`Could not load candidates: ${(e as Error).message}`); setCandidates([]) })
+      .catch(e => { setLoadError(`Could not load candidates: ${(e as Error).message}`); setCandidates([]) })
   }, [hiredOnly])
   useEffect(() => { if (!hiredOnly) void loadOpeningLabels().then(setOpenings) }, [hiredOnly])
 
@@ -59,8 +60,8 @@ export default function CandidatesPage() {
   const [onboarding, setOnboarding] = useState<{ cand: Candidate; employee: Employee } | null>(null)
   const [mStage, setMStage] = useState<CandidateStage>('applied')
   const [dropOn, setDropOn] = useState<CandidateStage | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const toast = useToast()
+  const [loadError, setLoadError] = useState<string | null>(null)   // could not load: stays as a banner
   const dragId = useRef<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const list = candidates ?? []
@@ -69,9 +70,9 @@ export default function CandidatesPage() {
 
   async function persist(next: Cand[], ok?: string) {
     const before = candidates
-    setCandidates(next); setError(null)
-    try { await saveCandidates(next); if (ok) setNotice(ok); return true }
-    catch (e) { setCandidates(before); setError(`Could not save: ${(e as Error).message}`); return false }
+    setCandidates(next)
+    try { await saveCandidates(next); if (ok) toast.success(ok); return true }
+    catch (e) { setCandidates(before); toast.error(`Could not save: ${(e as Error).message}`); return false }
   }
 
   function handleFileUpload(file: File) {
@@ -104,13 +105,13 @@ export default function CandidatesPage() {
   async function confirmHire(d: HireDetails) {
     const cand = hiring
     if (!cand) return
-    setHireBusy(true); setError(null)
+    setHireBusy(true)
     try {
       const hired = { ...cand, stage: 'hired' as const, updatedAt: Date.now() }
       const { employee, existed } = await convertCandidateToEmployee(hired, d)
       const ok = await persist(list.filter(c => c.id !== cand.id), existed ? `${cand.name} already had an employee profile (${employee.employeeNumber ?? employee.name}) — linked as hired.` : `${employee.name} hired as ${employee.employeeNumber}.`)
       if (ok) { setHiring(null); setOpenId(null); setOnboarding({ cand: hired, employee }) }
-    } catch (e) { setError(`Could not create the employee: ${(e as Error).message}`) }
+    } catch (e) { toast.error(`Could not create the employee: ${(e as Error).message}`) }
     finally { setHireBusy(false) }
   }
 
@@ -178,8 +179,7 @@ export default function CandidatesPage() {
     <div className="page">
       <PageHeader title="Candidates" sub={`${inPipeline} in pipeline · applications from the Careers page arrive automatically`}
         actions={<button type="button" className="btn btn--primary" onClick={openAdd}><Ic d={P.plus} size={15} />Add candidate</button>} />
-      {notice && <Banner onClose={() => setNotice(null)}>{notice}</Banner>}
-      {error && <Banner tone="danger" onClose={() => setError(null)}>{error}</Banner>}
+      {loadError && <Banner tone="danger" onClose={() => setLoadError(null)}>{loadError}</Banner>}
 
       {candidates === null ? (
         <div className="kanban">{STAGES.map(s => <div key={s.key} className="kanban__col"><Skel w={90} h={14} /><div className="kanban__card"><Skel w="70%" h={14} /><Skel w="50%" h={11} /></div></div>)}</div>

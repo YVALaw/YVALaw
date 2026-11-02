@@ -39,8 +39,8 @@ mounted by `YVA OS.dc.html`; a sub-file opened alone renders its desktop branch 
    If you move code out of a page into a sub-component, keep behaviour identical.
 4. Permission pattern: every hook above any early `return`; permission-gated loaders list the permission in effect deps
    (permissions load after first render for non-CEO roles).
-5. Writes surface failures (optimistic update → await → roll back + message on error). Success = green `Banner` at the top
-   of the page (or the existing ToastContext).
+5. Writes surface failures (optimistic update → await → roll back + message on error). Results of a click (success or failure)
+   are toasts (`useToast()`: `toast.success/error/warning/info`); `Banner` only for lasting situations and form errors (CLAUDE.md → Toasts vs banners).
 6. Destructive actions live in `⋯` `Menu`s or drawer footers in red text — never next to the primary button.
 7. Loading: skeletons shaped like the cards/tables (`Skel`). Empty states: white card, centered muted copy (mockup copy).
 8. Phone: tap targets ≥ 44px (ds.css does this for `.btn/.input` under 760px); no horizontal page scroll at 390px;

@@ -24,6 +24,7 @@ import { AttachmentList } from '../components/people/attachments'
 import { EmployeeFields, employeeFormError, employeeToForm, formToEmployee, EMPTY_EMPLOYEE_FORM, type EmployeeFormData } from '../components/people/EmployeeForm'
 import { PersonAvatar, employeeStatusTone, firstName, hireDateLabel, payScheduleOf, placementOf, projectsOf, upcomingAnniversary } from '../components/people/common'
 import { useEmployeeWeekStats } from '../components/people/weekStats'
+import { useToast } from '../context/ToastContext'
 
 function uid() { return crypto.randomUUID() }
 
@@ -48,14 +49,14 @@ export default function EmployeeProfilePage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [clients, setClients] = useState<Client[]>([])
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)   // could not load: stays as a banner
+  const toast = useToast()
   const [assigning, setAssigning] = useState(false)
   const [removeFrom, setRemoveFrom] = useState<Project | null>(null)
   useEffect(() => {
     loadSnapshot().then(snap => {
       setEmployeesState(snap.employees); setInvoices(snap.invoices); setProjects(snap.projects); setClients(snap.clients); setLoaded(true)
-    }).catch(e => { setError(`Could not load: ${(e as Error).message}`); setLoaded(true) })
+    }).catch(e => { setLoadError(`Could not load: ${(e as Error).message}`); setLoaded(true) })
     void loadTimeEntries().then(setTimeEntries)
   }, [])
 
@@ -117,18 +118,18 @@ export default function EmployeeProfilePage() {
     const next = withEmployeeOn(projects, empNN.id, ids)
     if (next.every((p, i) => p === projects[i])) return
     const before = projects
-    setProjects(next); setError(null); setAssigning(true)
-    try { await saveProjects(next); setNotice(ok) }
-    catch (e) { setProjects(before); setError(`Could not save the projects: ${(e as Error).message}`) }
+    setProjects(next); setAssigning(true)
+    try { await saveProjects(next); toast.success(ok) }
+    catch (e) { setProjects(before); toast.error(`Could not save the projects: ${(e as Error).message}`) }
     setAssigning(false)
   }
 
   async function persistUpdate(updated: Employee, ok?: string) {
     const before = employees
     const next = employees.map(e => e.id === updated.id ? updated : e)
-    setEmployeesState(next); setError(null)
-    try { await saveEmployees(next); if (ok) setNotice(ok); return true }
-    catch (e) { setEmployeesState(before); setError(`Could not save: ${(e as Error).message}`); return false }
+    setEmployeesState(next)
+    try { await saveEmployees(next); if (ok) toast.success(ok); return true }
+    catch (e) { setEmployeesState(before); toast.error(`Could not save: ${(e as Error).message}`); return false }
   }
 
   async function handleSave() {
@@ -155,7 +156,7 @@ export default function EmployeeProfilePage() {
     const next = employees.filter(e => e.id !== empNN.id)
     setEmployeesState(next)
     try { await saveEmployees(next); navigate('/employees') }
-    catch (e) { setEmployeesState(before); setError(`Could not delete: ${(e as Error).message}`) }
+    catch (e) { setEmployeesState(before); toast.error(`Could not delete: ${(e as Error).message}`) }
   }
 
   function handlePhotoUpload(file: File) {
@@ -376,8 +377,7 @@ export default function EmployeeProfilePage() {
   return (
     <div className="page ppl-profile">
       <button type="button" className="back-link" onClick={() => navigate('/employees')}><Ic d={P.chevL} size={15} />Team</button>
-      {notice && <Banner onClose={() => setNotice(null)}>{notice}</Banner>}
-      {error && <Banner tone="danger" onClose={() => setError(null)}>{error}</Banner>}
+      {loadError && <Banner tone="danger" onClose={() => setLoadError(null)}>{loadError}</Banner>}
 
       <input ref={photoInputRef} type="file" accept="image/*" hidden onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f); e.target.value = '' }} />
       <div className="ppl-prof-head">

@@ -6,9 +6,10 @@ import { createInvoiceFromEstimate } from '../services/crm'
 import { sendEmail } from '../services/email'
 import { useRole } from '../context/RoleContext'
 import { can } from '../lib/roles'
-import { Banner, Drawer, Field, Menu, Modal, PageHeader, Pill, SearchInput, Skel, Tabs, useIsMobile, type Tone } from '../components/ui'
+import { Drawer, Field, Menu, Modal, PageHeader, Pill, SearchInput, Skel, Tabs, useIsMobile, type Tone } from '../components/ui'
 import { Ic, P } from '../components/Icon'
 import { dateMed, dateShort, usd } from '../utils/format'
+import { useToast } from '../context/ToastContext'
 
 const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` }
 const STATUSES: EstimateStatus[] = ['draft', 'sent', 'accepted', 'declined', 'expired']
@@ -46,8 +47,7 @@ export default function EstimatesPage() {
   const [form, setForm] = useState<FormState>(emptyForm([]))
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<Estimate | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<{ text: string; invoiceId?: string } | null>(null)
+  const toast = useToast()
   const [converting, setConverting] = useState<string | null>(null)
 
   useEffect(() => {
@@ -60,7 +60,7 @@ export default function EstimatesPage() {
   async function persist(next: Estimate[]) {
     const prev = estimates
     setEstimates(next)
-    try { await saveEstimates(next) } catch (e) { setEstimates(prev); setError(`Could not save: ${(e as Error).message}`); throw e }
+    try { await saveEstimates(next) } catch (e) { setEstimates(prev); toast.error(`Could not save: ${(e as Error).message}`); throw e }
   }
 
   function openNew() { setForm(emptyForm(estimates)); setPanel({ open: true, editing: null }) }
@@ -77,8 +77,8 @@ export default function EstimatesPage() {
     if (!form.number.trim() || saving) return
     const selectedClient = clients.find(c => c.id === form.clientId)
     const selectedProject = projects.find(p => p.id === form.projectId)
-    if (send && !selectedClient?.email) { setError('Pick a client with an email address to send the estimate.'); return }
-    setSaving(true); setError(null)
+    if (send && !selectedClient?.email) { toast.error('Pick a client with an email address to send the estimate.'); return }
+    setSaving(true)
     const status: EstimateStatus = send && form.status === 'draft' ? 'sent' : form.status
     const fields = {
       number: form.number.trim(), date: form.date, expiryDate: form.expiryDate || undefined,
@@ -93,27 +93,27 @@ export default function EstimatesPage() {
         const lines = saved.items.filter(i => i.description || i.unitPrice).map(i => `  • ${i.description || 'Item'} — ${i.qty} × ${usd(i.unitPrice)} = ${usd((i.qty || 0) * (i.unitPrice || 0))}`).join('\n')
         const body = `Hi ${selectedClient.name},\n\nHere is estimate ${saved.number}${saved.projectName ? ` for ${saved.projectName}` : ''}:\n\n${lines}\n\nTotal: ${usd(saved.total)}${saved.expiryDate ? `\nValid until ${dateMed(saved.expiryDate)}.` : ''}${saved.notes ? `\n\n${saved.notes}` : ''}\n\nReply to this email to accept or ask questions.\n\nYVA Staffing`
         const r = await sendEmail(selectedClient.email, `Estimate ${saved.number} — YVA Staffing`, body)
-        if (r.mode === 'outlook') setNotice({ text: `Estimate ${saved.number} saved and emailed to ${selectedClient.email}.` })
-        else if (r.mode === 'mailto') setNotice({ text: `Estimate ${saved.number} saved and opened in your email app.` })
-        else setError(`Estimate saved, but the email was not sent: ${r.fallbackReason ?? 'the company mailbox could not send it.'}`)
-      } else setNotice({ text: `Estimate ${saved.number} saved.` })
+        if (r.mode === 'outlook') toast.success(`Estimate ${saved.number} saved and emailed to ${selectedClient.email}.`)
+        else if (r.mode === 'mailto') toast.success(`Estimate ${saved.number} saved and opened in your email app.`)
+        else toast.error(`Estimate saved, but the email was not sent: ${r.fallbackReason ?? 'the company mailbox could not send it.'}`)
+      } else toast.success(`Estimate ${saved.number} saved.`)
     } catch { /* persist already showed the error */ }
     finally { setSaving(false) }
   }
   async function doDelete(est: Estimate) {
     setConfirmDelete(null)
-    await persist(estimates.filter(e => e.id !== est.id)).then(() => setNotice({ text: `Estimate ${est.number} deleted.` })).catch(() => {})
+    await persist(estimates.filter(e => e.id !== est.id)).then(() => toast.success(`Estimate ${est.number} deleted.`)).catch(() => {})
   }
   async function convertToInvoice(est: Estimate) {
     if (converting) return
     const prior = invoices.find(i => (i.notes || '').startsWith(`From estimate ${est.number}`))
     if (!window.confirm(prior ? `Estimate ${est.number} was already turned into invoice ${prior.number}. Create another draft invoice?` : `Create a draft invoice for ${usd(est.total)} from ${est.number}? Finance reviews and sends it from Invoices.`)) return
-    setConverting(est.id); setError(null)
+    setConverting(est.id)
     try {
       const r = await createInvoiceFromEstimate(est, clients.find(c => c.id === est.clientId), projects.find(p => p.id === est.projectId))
       setInvoices(prev => [{ id: r.id, number: r.number, notes: `From estimate ${est.number}` } as Invoice, ...prev])
-      setNotice({ text: `Draft invoice ${r.number} created from ${est.number}.`, invoiceId: r.id })
-    } catch (e) { setError(`Could not create the invoice: ${(e as Error).message}`) }
+      toast.success(`Draft invoice ${r.number} created from ${est.number}.`, { action: { label: 'Open invoice', onClick: () => navigate(`/invoice?open=${r.id}`) } })
+    } catch (e) { toast.error(`Could not create the invoice: ${(e as Error).message}`) }
     finally { setConverting(null) }
   }
 
@@ -136,8 +136,6 @@ export default function EstimatesPage() {
           <SearchInput value={filterSearch} onChange={setFilterSearch} placeholder="Search client or #" width={mobile ? '100%' : 220} />
           <button type="button" className="btn btn--primary" onClick={openNew}>+ New estimate</button>
         </>} />
-      {error && <Banner tone="danger" onClose={() => setError(null)}>{error}</Banner>}
-      {notice && <Banner tone="success" onClose={() => setNotice(null)} action={notice.invoiceId ? <button type="button" className="btn btn--sm" onClick={() => navigate(`/invoice?open=${notice.invoiceId}`)}>Open invoice</button> : undefined}>{notice.text}</Banner>}
       <Tabs label="Estimate status" value={filterStatus} onChange={setFilterStatus} tabs={[
         { value: 'all', label: 'All', count: searched.length },
         ...STATUSES.map(s => ({ value: s, label: label(s), count: searched.filter(e => e.status === s).length })),

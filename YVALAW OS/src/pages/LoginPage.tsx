@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { APP_URL } from '../lib/appUrl'
 import AuthLayout from '../components/settings/AuthLayout'
 import { Banner, Checkbox, Field } from '../components/ui'
+import { useToast } from '../context/ToastContext'
 
 type ResetState = 'idle' | 'sending' | 'sent' | 'error'
 
@@ -33,7 +34,8 @@ export default function LoginPage() {
   const [error, setError]         = useState<string | null>(null)
   const [lockRemaining, setLockRemaining] = useState(getLockoutRemaining())
   const [resetState, setResetState]       = useState<ResetState>('idle')
-  const [resetMsg, setResetMsg]           = useState<string | null>(null)
+  const [resetMsg, setResetMsg]           = useState<string | null>(null)   // problems only; "email sent" is a toast
+  const toast = useToast()
 
   useEffect(() => {
     if (lockRemaining <= 0) return
@@ -93,7 +95,7 @@ export default function LoginPage() {
       setResetMsg(error.message)
     } else {
       setResetState('sent')
-      setResetMsg(`Password reset email sent to ${trimmedEmail}. Check your inbox.`)
+      toast.success(`Password reset email sent to ${trimmedEmail}. Check your inbox.`)
     }
   }
 
@@ -123,7 +125,7 @@ export default function LoginPage() {
           </button>
         </div>
 
-        {resetMsg && <Banner tone={resetState === 'sent' ? 'success' : 'danger'}>{resetMsg}</Banner>}
+        {resetMsg && <Banner tone="danger">{resetMsg}</Banner>}
         {lockRemaining > 0 && <Banner tone="danger">{lockText}</Banner>}
         {error && <Banner tone="danger">{error}</Banner>}
 

@@ -4,12 +4,14 @@ import { GRANTABLE_ROLES, PERMISSIONS } from '../lib/permissions'
 import { ROLE_LABELS } from '../lib/roles'
 import { Banner, Skel } from './ui'
 import BoxToggle from './settings/BoxToggle'
+import { useToast } from '../context/ToastContext'
 
 /** Settings → Team access → Permissions (CEO only; the database enforces it too).
  *  Roles are columns; click a box to grant or remove. The CEO always has everything. */
 export default function PermissionsMatrix() {
   const [granted, setGranted] = useState<Set<string>>(new Set())
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)   // setup / load problem (a failed switch is a toast)
+  const toast = useToast()
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
@@ -29,7 +31,7 @@ export default function PermissionsMatrix() {
       ? await supabase.from('role_permissions').insert({ role, permission })
       : await supabase.from('role_permissions').delete().eq('role', role).eq('permission', permission)
     if (e) {
-      setError(e.message)
+      toast.error(e.message)
       setGranted(s => { const n = new Set(s); if (on) n.delete(key); else n.add(key); return n })
     }
   }

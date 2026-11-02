@@ -5,6 +5,7 @@ import {
 } from '../services/notifications'
 import { Ic, P } from './Icon'
 import BoxToggle from './settings/BoxToggle'
+import { useToast } from '../context/ToastContext'
 
 type Kind = { kind: string; label: string; labelEs?: string }
 
@@ -39,7 +40,7 @@ export default function NotificationSettings({ kinds, lang = 'en' }: { kinds: Ki
   const [prefs, setPrefs] = useState<NotificationPref[]>([])
   const [state, setState] = useState<PushState | null>(null)
   const [busy, setBusy] = useState(false)
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useToast()
   const [emailTo, setEmailTo] = useState('')
 
   useEffect(() => {
@@ -52,23 +53,24 @@ export default function NotificationSettings({ kinds, lang = 'en' }: { kinds: Ki
     const next = { ...pref(kind), [field]: !pref(kind)[field] }
     const before = prefs
     setPrefs(list => [...list.filter(p => p.kind !== kind), next])
-    try { await saveNotificationPref(next) } catch (e) { setPrefs(before); setMsg({ ok: false, text: (e as Error).message }) }
+    try { await saveNotificationPref(next) } catch (e) { setPrefs(before); toast.error((e as Error).message) }
   }
   async function saveEmailTo() {
-    try { await saveNotificationPref({ ...pref('*'), emailTo: emailTo.trim() || null }); setMsg({ ok: true, text: t.saved }) }
-    catch (e) { setMsg({ ok: false, text: (e as Error).message }) }
+    try { await saveNotificationPref({ ...pref('*'), emailTo: emailTo.trim() || null }); toast.success(t.saved) }
+    catch (e) { toast.error((e as Error).message) }
   }
   async function device(on: boolean) {
-    setBusy(true); setMsg(null)
-    try { if (on) await enablePush(); else await disablePush() } catch (e) { setMsg({ ok: false, text: e instanceof PushSetupError ? t.pushErr[e.code] : (e as Error).message }) }
+    setBusy(true)
+    try { if (on) await enablePush(); else await disablePush() } catch (e) { toast.error(e instanceof PushSetupError ? t.pushErr[e.code] : (e as Error).message) }
     setState(await pushState()); setBusy(false)
   }
   async function test() {
-    setBusy(true); setMsg(null)
+    setBusy(true)
     try {
       const r = await sendNotificationsNow(true)
-      setMsg({ ok: !r.emailProblem, text: t.testOk(r.emailed, r.pushed) + (r.emailProblem ? ` ${t.emailProblem}${r.emailProblem}` : '') })
-    } catch (e) { setMsg({ ok: false, text: (e as Error).message }) }
+      const text = t.testOk(r.emailed, r.pushed) + (r.emailProblem ? ` ${t.emailProblem}${r.emailProblem}` : '')
+      if (r.emailProblem) toast.error(text); else toast.success(text)
+    } catch (e) { toast.error((e as Error).message) }
     setBusy(false)
   }
 
@@ -121,7 +123,6 @@ export default function NotificationSettings({ kinds, lang = 'en' }: { kinds: Ki
         <button type="button" className="btn btn--sm" disabled={busy} onClick={() => void test()}>
           <Ic d={P.send} size={14} /> {busy ? t.testing : t.test}
         </button>
-        {msg && <span className={`set-msg set-msg--${msg.ok ? 'ok' : 'err'}`} role="status">{msg.text}</span>}
       </div>
     </div>
   )

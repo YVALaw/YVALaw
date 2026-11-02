@@ -8,7 +8,7 @@ import RecordPaymentModal from '../components/RecordPaymentModal'
 import InvoiceBuilder from '../components/InvoiceBuilder'
 import RecurringInvoices from '../components/finance/RecurringInvoices'
 import { useSavedViews } from '../components/finance/savedViews'
-import { Banner, Checkbox, EmptyState, Field, Menu, Modal, PageHeader, Pill, SearchInput, Segmented, Skel, Tabs, useIsMobile, type MenuItem } from '../components/ui'
+import { Checkbox, EmptyState, Field, Menu, Modal, PageHeader, Pill, SearchInput, Segmented, Skel, Tabs, useIsMobile, type MenuItem } from '../components/ui'
 import { Ic, P } from '../components/Icon'
 import { usePermission, useRole } from '../context/RoleContext'
 import type { AppSettings, Client, Invoice, Project, RecurringInvoice } from '../data/types'
@@ -25,6 +25,7 @@ import { RecipientsHint, useClientRecipients, useInvoiceRecipients } from '../co
 import { dateShort } from '../utils/format'
 import { localParts } from '../utils/moneyRules'
 import RecordSignature from '../components/RecordSignature'
+import { useToast } from '../context/ToastContext'
 
 type InvoiceStatus = 'draft' | 'sent' | 'viewed' | 'paid' | 'overdue' | 'partial'
 type Tab = 'all' | InvoiceStatus | 'recurring'
@@ -74,7 +75,7 @@ export default function InvoicePage() {
   const [settings, setSettings] = useState<AppSettings>({ usdToDop: 0 })
   const [recurring, setRecurring] = useState<RecurringInvoice[]>([])
   const [collected, setCollected] = useState<number | null>(null)
-  const [banner, setBanner] = useState<{ tone: 'success' | 'danger' | 'warning'; text: string } | null>(null)
+  const toast = useToast()
 
   // List filters (a saved view is a snapshot of these)
   const [tab, setTab] = useState<Tab>('all')
@@ -107,8 +108,8 @@ export default function InvoicePage() {
 
   const quickRecipients = useClientRecipients(quickModal ? clients.find(c => c.name === form.clientName) : null)
   const previewRecipients = useInvoiceRecipients(previewInv, clients)
-  const ok = (text: string) => setBanner({ tone: 'success', text })
-  const fail = (text: string) => setBanner({ tone: 'danger', text })
+  const ok = (text: string) => { toast.success(text) }
+  const fail = (text: string) => { toast.error(text) }
 
   useEffect(() => {
     void loadSnapshot().then(snap => {
@@ -227,7 +228,7 @@ export default function InvoicePage() {
     void saveInvoiceCounter(counter + 1)
     if (inv.clientEmail) {
       const r = await sendInvoiceEmail(inv, settings, clients)
-      if (r.mode === 'failed') { setBanner({ tone: 'warning', text: `${inv.number} was created but not emailed: ${r.fallbackReason}` }); return }
+      if (r.mode === 'failed') { toast.warning(`${inv.number} was created but not emailed: ${r.fallbackReason}`); return }
       ok(r.mode === 'outlook' ? `${inv.number} created and emailed to ${sentToLabel(r)}.` : `${inv.number} created and opened in your email app for ${sentToLabel(r)}.`)
       if (client?.id) void logComm(client.id, `Invoice ${inv.number} emailed (${formatMoney(inv.subtotal || 0)})`, 'email')
     } else if (client?.id) {
@@ -248,7 +249,7 @@ export default function InvoicePage() {
       if ((f.status || '') !== (inv.status || '')) changed.push(inv.number)
       return { ...inv, status: f.status, amountPaid: f.amountPaid }
     }))
-    if (changed.length) setBanner({ tone: 'warning', text: `${changed.join(', ')} ${changed.length === 1 ? 'has' : 'have'} recorded payments, so the status follows the payments. Record or delete a payment (💲) to change it.` })
+    if (changed.length) toast.warning(`${changed.join(', ')} ${changed.length === 1 ? 'has' : 'have'} recorded payments, so the status follows the payments. Record or delete a payment (💲) to change it.`)
   }
   async function saveStatus() {
     const target = statusFor
@@ -329,7 +330,7 @@ export default function InvoicePage() {
     try {
       const { url } = await createPayLink(inv.id)
       try { await navigator.clipboard.writeText(url); ok(`Pay link for ${inv.number} copied. It opens a secure Stripe page for what's still owed (card or bank account) and works for 60 days.`) }
-      catch { setBanner({ tone: 'success', text: `Pay link for ${inv.number}: ${url}` }) }
+      catch { toast.success(`Pay link for ${inv.number}: ${url}`, { duration: 30000 }) }   // clipboard blocked: time to copy it by hand
     } catch (e) { fail(`Could not make the pay link: ${(e as Error).message}`) }
   }
   function menuFor(inv: Invoice): MenuItem[] {
@@ -484,7 +485,6 @@ export default function InvoicePage() {
         )}
       </div>
 
-      {banner && <Banner tone={banner.tone} onClose={() => setBanner(null)}>{banner.text}</Banner>}
 
       {tab === 'recurring' ? (
         <RecurringInvoices recurring={recurring} clients={clients} projects={allProjects} persist={persistRec} />
