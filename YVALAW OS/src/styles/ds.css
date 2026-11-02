@@ -359,3 +359,4 @@ button.kpi-cell:hover { background: var(--surface-2); }
 
 /* PageLoading (screen code still downloading) */
 .page-loading__gap { display: block; height: 16px; }
+.form-section__hint { font-size: 12.5px; color: var(--muted); margin: 2px 0 8px; line-height: 1.4; }

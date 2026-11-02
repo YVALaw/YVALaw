@@ -1,6 +1,7 @@
 // Finance → Invoices (redesign 2026-11, design_handoff_yva_os_redesign/designs/Invoices.dc.html).
 // List with status tabs + saved views, contextual row actions, bulk status, project grouping,
 // Recurring tab, the invoice builder as a full page (blocked on phones), Quick invoice, Record payment.
+import { useStickyView } from '../lib/stickyView'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import RecordPaymentModal from '../components/RecordPaymentModal'
@@ -73,7 +74,7 @@ export default function InvoicePage() {
   const [tab, setTab] = useState<Tab>('all')
   const [search, setSearch] = useState('')
   const [projectFilter, setProjectFilter] = useState('')
-  const [grouping, setGrouping] = useState<Grouping>('list')
+  const [grouping, setGrouping] = useStickyView<Grouping>('invoices', 'project', ['project', 'list'])   // by project unless changed
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkStatus, setBulkStatus] = useState<InvoiceStatus>('sent')
@@ -462,7 +463,7 @@ export default function InvoicePage() {
               {allProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
               <option value="__none__">No project</option>
             </select>
-            <Segmented<Grouping> label="Group invoices" value={grouping} onChange={setGrouping} options={[{ value: 'list', label: 'List' }, { value: 'project', label: 'By project' }]} />
+            <Segmented<Grouping> label="Group invoices" value={grouping} onChange={setGrouping} options={[{ value: 'project', label: 'By project' }, { value: 'list', label: 'List' }]} />
             {selected.size > 0 && (
               <div className="fin-bulk" role="region" aria-label="Bulk status">
                 <span className="fin-bulk__count">{selected.size} selected</span>

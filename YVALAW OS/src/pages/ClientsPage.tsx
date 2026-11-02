@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useStickyView } from '../lib/stickyView'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { clientHealth, HEALTH_TONE, type Health } from '../utils/clientHealth'
 import type { ActivityLogEntry, Client, Invoice, Project, StaffRequest, Tag } from '../data/types'
@@ -43,7 +44,7 @@ export default function ClientsPage() {
   const [healthRequests, setHealthRequests] = useState<StaffRequest[]>([])
   const [portal, setPortal] = useState<Map<string, PortalInfo> | null | undefined>(undefined)
   const [loaded, setLoaded] = useState(false)
-  const [view, setView] = useState<ViewMode>('list')
+  const [view, setView] = useStickyView<ViewMode>('clients', 'list', ['list', 'pipeline'])
   const [tab, setTab] = useState<BaseTab>('all')
   const [savedId, setSavedId] = useState<string | null>(null)
   const [search, setSearch] = useState('')

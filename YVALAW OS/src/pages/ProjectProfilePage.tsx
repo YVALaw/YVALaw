@@ -237,6 +237,20 @@ export default function ProjectProfilePage() {
         { value: 'history', label: 'History', hidden: !canHistory },
       ]} />
 
+      {tab === 'rates' && (() => {
+        // Quick add: put someone on this team without opening Edit (rates are added below / on Team & rates)
+        const others = employees.filter(e => !(projectNN.employeeIds ?? []).includes(e.id) && !/inactive|terminated/i.test(String(e.status || ''))).sort((a, b) => a.name.localeCompare(b.name))
+        return others.length > 0 && (
+          <div className="card ops-addperson">
+            <label className="ops-addperson__label" htmlFor="ops-addperson">Add a person to this project</label>
+            <select id="ops-addperson" className="select" value=""
+              onChange={e => { const emp = employees.find(x => x.id === e.target.value); if (emp) void persistProject({ ...projectNN, employeeIds: [...(projectNN.employeeIds ?? []), emp.id] }, `${emp.name} added to ${projectNN.name}.`) }}>
+              <option value="">+ Choose someone…</option>
+              {others.map(e => <option key={e.id} value={e.id}>{e.name}{e.role ? ` — ${e.role}` : ''}</option>)}
+            </select>
+          </div>
+        )
+      })()}
       {tab === 'rates' && (canRates
         ? <PlacementRates project={projectNN} members={assignedEmps} client={client} onAddPeople={openEdit} />
         : teamList)}

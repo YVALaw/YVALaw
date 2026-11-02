@@ -6,7 +6,8 @@ import EmployeePayoutMethod from '../components/EmployeePayoutMethod'
 import EmployeeDocuments from '../components/EmployeeDocuments'
 import RecordHistory from '../components/RecordHistory'
 import type { Attachment, Client, Employee, Invoice, Project, TimeEntry } from '../data/types'
-import { loadSnapshot, saveEmployees, loadTimeEntries } from '../services/storage'
+import { loadSnapshot, saveEmployees, saveProjects, loadTimeEntries } from '../services/storage'
+import { isOpenProject, withEmployeeOn, projectIdsOf } from '../components/people/ProjectAssign'
 import { uploadFile, deleteFile } from '../services/fileStorage'
 import { usePermission, useRole } from '../context/RoleContext'
 import { can } from '../lib/roles'
@@ -36,6 +37,7 @@ export default function EmployeeProfilePage() {
   const showPayRates = can.viewPayRates(myRole)
   const canSchedule = allowed('rates.manage')
   const canTracker = can.viewTracker(myRole)
+  const canAssign = can.viewClients(myRole)   // sees projects → may put people on them (same as Project → Edit → Team)
 
   const [loaded, setLoaded] = useState(false)
   const [employees, setEmployeesState] = useState<Employee[]>([])
@@ -45,6 +47,8 @@ export default function EmployeeProfilePage() {
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [assigning, setAssigning] = useState(false)
+  const [removeFrom, setRemoveFrom] = useState<Project | null>(null)
   useEffect(() => {
     loadSnapshot().then(snap => {
       setEmployeesState(snap.employees); setInvoices(snap.invoices); setProjects(snap.projects); setClients(snap.clients); setLoaded(true)
@@ -102,6 +106,17 @@ export default function EmployeeProfilePage() {
   const canScreens = !!empNN.userId && client && can.viewScreenshots(myRole)
   const viewScreens = () => navigate(`/time?tab=screens&employee=${empNN.id}`)
   const payTab = showPayRates || canSchedule || allowed('bank.view') || allowed('bank.manage') || allowed('payroll.view') || allowed('payroll.manage')
+
+  /** Put this person on exactly `ids` (only projects whose team changes are written; rates are kept) */
+  async function assign(ids: string[], ok: string) {
+    const next = withEmployeeOn(projects, empNN.id, ids)
+    if (next.every((p, i) => p === projects[i])) return
+    const before = projects
+    setProjects(next); setError(null); setAssigning(true)
+    try { await saveProjects(next); setNotice(ok) }
+    catch (e) { setProjects(before); setError(`Could not save the projects: ${(e as Error).message}`) }
+    setAssigning(false)
+  }
 
   async function persistUpdate(updated: Employee, ok?: string) {
     const before = employees
@@ -236,9 +251,10 @@ export default function EmployeeProfilePage() {
         </Card>
         <div className="stack stack--lg">
           <Card title="Assigned projects">
-            {assignedProjects.length === 0 ? <div className="card-empty">{client ? 'Not on a project yet — add them from the project’s Team & rates.' : 'YVA team — no client project.'}</div>
-              : assignedProjects.map(p => (
-                <button type="button" key={p.id} className="list-row ppl-rowbtn" onClick={() => navigate('/projects/' + p.id)}>
+            {assignedProjects.length === 0 && <div className="card-empty">{client ? 'Not on a project yet.' : 'YVA team — client projects are optional.'}</div>}
+            {assignedProjects.map(p => (
+              <div key={p.id} className="ppl-assign-row">
+                <button type="button" className="list-row ppl-rowbtn" onClick={() => navigate('/projects/' + p.id)}>
                   <span className="list-row__main">
                     <span className="list-row__title">{p.name}</span>
                     <span className="list-row__meta">{clients.find(c => c.id === p.clientId)?.name || 'No client'}{p.paySchedule ? ` · paid ${p.paySchedule}` : ''}</span>
@@ -246,7 +262,21 @@ export default function EmployeeProfilePage() {
                   {p.status && <Pill status={p.status} />}
                   <Ic d={P.chevR} size={15} />
                 </button>
-              ))}
+                {canAssign && <button type="button" className="btn btn--icon btn--sm btn--ghost" aria-label={`Remove from ${p.name}`} title="Remove from this project" disabled={assigning} onClick={() => setRemoveFrom(p)}><Ic d={P.x} size={14} /></button>}
+              </div>
+            ))}
+            {canAssign && (() => {
+              const options = projects.filter(p => isOpenProject(p) && !(p.employeeIds ?? []).includes(empNN.id)).sort((a, b) => a.name.localeCompare(b.name))
+              return options.length > 0 && (
+                <div className="ppl-assign-add">
+                  <select className="select" aria-label="Add to a project" value="" disabled={assigning}
+                    onChange={e => { const id = e.target.value; if (id) void assign([...projectIdsOf(projects, empNN.id), id], `${empNN.name} added to ${projects.find(p => p.id === id)?.name}.`) }}>
+                    <option value="">+ Add to a project…</option>
+                    {options.map(p => <option key={p.id} value={p.id}>{p.name}{clients.find(c => c.id === p.clientId) ? ` — ${clients.find(c => c.id === p.clientId)!.name}` : ''}</option>)}
+                  </select>
+                </div>
+              )
+            })()}
           </Card>
           <div className="card ppl-mini-stats">
             <div className="ppl-mini-stat"><span className="info__label">Hours, {now.toLocaleString('en-US', { month: 'short' })}</span><span className="ppl-mini-stat__v num">{fmtHoursHM(monthHours)}</span></div>
@@ -394,6 +424,13 @@ export default function EmployeeProfilePage() {
       {tab === 'time' && <YvaTimeLogin emp={empNN} onLinked={userId => setEmployeesState(prev => prev.map(e => e.id === empNN.id ? { ...e, userId } : e))} onViewScreens={canScreens ? viewScreens : undefined} />}
       {tab === 'docs' && docs}
       {tab === 'history' && <RecordHistory inline table="employees" recordId={empNN.id} />}
+
+      <Modal open={!!removeFrom} onClose={() => setRemoveFrom(null)} title={`Remove ${empNN.name} from ${removeFrom?.name ?? ''}?`}
+        sub="Their hours, invoices and the rates set for this project are kept."
+        footer={<>
+          <button type="button" className="btn" onClick={() => setRemoveFrom(null)}>Cancel</button>
+          <button type="button" className="btn btn--danger" onClick={() => { const p = removeFrom!; setRemoveFrom(null); void assign(projectIdsOf(projects, empNN.id).filter(i => i !== p.id), `${empNN.name} removed from ${p.name}.`) }}>Remove from project</button>
+        </>} />
 
       <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)} title={`Delete ${empNN.name}?`} sub="This cannot be undone."
         footer={<><button type="button" className="btn" onClick={() => setConfirmDelete(false)}>Cancel</button><button type="button" className="btn btn--danger" onClick={() => void handleDelete()}>Delete</button></>} />

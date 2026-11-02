@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useStickyView } from '../lib/stickyView'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { uploadFile } from '../services/fileStorage'
 import type { Attachment, Client, Employee, Invoice, Project } from '../data/types'
-import { loadSnapshot, saveEmployees, loadEmployeeCounter, saveEmployeeCounter } from '../services/storage'
+import { loadSnapshot, saveEmployees, saveProjects, loadEmployeeCounter, saveEmployeeCounter } from '../services/storage'
+import { ProjectPicker, projectIdsOf, withEmployeeOn } from '../components/people/ProjectAssign'
 import { formatMoney } from '../utils/money'
 import { usePermission, useRole } from '../context/RoleContext'
 import { can } from '../lib/roles'
@@ -40,6 +42,7 @@ export default function EmployeesPage() {
   const mobile = useIsMobile()
   const showPayRates = can.viewPayRates(role)
   const canSchedule = allowed('rates.manage')
+  const canAssign = can.viewClients(role)   // sees projects → may put people on them (same as Project → Edit → Team)
 
   const [loaded, setLoaded] = useState(false)
   const [employees, setEmployees] = useState<Employee[]>([])
@@ -55,13 +58,14 @@ export default function EmployeesPage() {
   }, [])
 
   const [team, setTeam] = useState<Team>('all')
-  const [view, setView] = useState<View>('table')
+  const [view, setView] = useStickyView<View>('team', 'projects', ['projects', 'table', 'capacity'])   // by project unless changed
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
   const [modal, setModal] = useState<null | 'add' | 'edit'>(null)
   const [form, setForm] = useState<EmployeeFormData>(EMPTY_EMPLOYEE_FORM)
   const [editId, setEditId] = useState<string | null>(null)
   const [attachments, setAttachments] = useState<Attachment[]>([])
+  const [projectIds, setProjectIds] = useState<string[]>([])
   const [statementsFor, setStatementsFor] = useState<Employee | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Employee | null>(null)
   const [saving, setSaving] = useState(false)
@@ -81,8 +85,18 @@ export default function EmployeesPage() {
     catch (e) { setEmployees(before); setError(`Could not save: ${(e as Error).message}`); return false }
   }
 
-  function openAdd() { setForm({ ...EMPTY_EMPLOYEE_FORM }); setAttachments([]); setEditId(null); setModal('add') }
-  function openEdit(e: Employee) { setForm(employeeToForm(e)); setAttachments(e.attachments || []); setEditId(e.id); setModal('edit') }
+  function openAdd() { setForm({ ...EMPTY_EMPLOYEE_FORM }); setAttachments([]); setProjectIds([]); setEditId(null); setModal('add') }
+  function openEdit(e: Employee) { setForm(employeeToForm(e)); setAttachments(e.attachments || []); setProjectIds(projectIdsOf(projects, e.id)); setEditId(e.id); setModal('edit') }
+
+  /** Put the person on exactly `ids` (only projects whose team changes are written) */
+  async function saveAssignments(employeeId: string, ids: string[]): Promise<boolean> {
+    const next = withEmployeeOn(projects, employeeId, ids)
+    if (next.every((p, i) => p === projects[i])) return true
+    const before = projects
+    setProjects(next)
+    try { await saveProjects(next); return true }
+    catch (e) { setProjects(before); setError(`Saved the employee, but not the projects: ${(e as Error).message}`); return false }
+  }
 
   function handleFileUpload(file: File) {
     const MAX = 5 * 1024 * 1024
@@ -101,9 +115,12 @@ export default function EmployeesPage() {
     let ok = false
     if (modal === 'add') {
       const empNum = await generateEmployeeNumber()
-      ok = await persist([...employees, { ...payload, id: uid(), employeeNumber: empNum, attachments }], `${form.name.trim()} added as ${empNum}.`)
+      const id = uid()
+      ok = await persist([...employees, { ...payload, id, employeeNumber: empNum, attachments }], `${form.name.trim()} added as ${empNum}.`)
+      if (ok && canAssign) ok = await saveAssignments(id, projectIds)
     } else if (editId) {
       ok = await persist(employees.map(e => e.id === editId ? { ...e, ...payload, attachments } : e), 'Changes saved.')
+      if (ok && canAssign) ok = await saveAssignments(editId, projectIds)
     }
     setSaving(false)
     if (ok) setModal(null)
@@ -291,7 +308,7 @@ export default function EmployeesPage() {
           {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
         <span className="spacer" />
-        <Segmented label="View" value={view} onChange={setView} options={[{ value: 'table', label: 'List' }, { value: 'projects', label: 'By project' }, { value: 'capacity', label: 'Capacity' }]} />
+        <Segmented label="View" value={view} onChange={setView} options={[{ value: 'projects', label: 'By project' }, { value: 'table', label: 'List' }, { value: 'capacity', label: 'Capacity' }]} />
       </div>
 
       {!loaded ? (
@@ -314,6 +331,13 @@ export default function EmployeesPage() {
           <button type="button" className="btn btn--primary" onClick={() => void saveForm()} disabled={!form.name.trim() || saving}>{saving ? 'Saving…' : modal === 'add' ? 'Add employee' : 'Save changes'}</button>
         </>}>
         <EmployeeFields form={form} setForm={setForm} pay={showPayRates} schedule={canSchedule} />
+        {canAssign && (
+          <section className="form-section">
+            <h3 className="form-section__title">Projects</h3>
+            <p className="form-section__hint">The client projects this person works on. Rates per project are set on the project page (Team &amp; rates).</p>
+            <ProjectPicker ids={projectIds} onChange={setProjectIds} projects={projects} clients={clients} />
+          </section>
+        )}
         <section className="form-section">
           <div className="row row--between">
             <h3 className="form-section__title">Files &amp; documents {attachments.length > 0 && `(${attachments.length})`}</h3>

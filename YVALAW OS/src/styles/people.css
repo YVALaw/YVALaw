@@ -235,3 +235,13 @@ th.ppl-day span { display: block; color: var(--soft); font-weight: 400; }
 @media (max-width: 759px) {
   .ppl-info { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* Project picker (employee form + employee page) */
+.ppl-projpick { display: flex; flex-direction: column; gap: 8px; }
+.ppl-projpick__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ppl-projpick__chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; }
+.ppl-projpick__x { display: inline-grid; place-items: center; width: 18px; height: 18px; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; padding: 0; }
+.ppl-projpick__x:hover { background: rgba(0, 0, 0, .08); }
+.ppl-assign-row { display: flex; align-items: center; gap: 4px; }
+.ppl-assign-row .ppl-rowbtn { flex: 1; min-width: 0; }
+.ppl-assign-add { padding: 10px 14px 14px; display: flex; flex-direction: column; gap: 6px; }
