@@ -129,3 +129,15 @@
 .palette { z-index: 66; }
 .create-fab { z-index: 67; }
 @media (max-width: 759px) { .create-pop { z-index: 67; } }
+
+/* Live updates: a teammate changed data this page shows (services/liveUpdates.ts) */
+.live-banner {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 16px; padding: 10px 12px 10px 14px;
+  border: 1px solid var(--border); border-left: 3px solid var(--brand); border-radius: 10px;
+  background: var(--surface); font-size: 13.5px; color: var(--text);
+}
+.live-banner > svg { flex: none; color: var(--muted); }
+.live-banner > span { flex: 1 1 200px; }
+.live-banner__x { border: 0; background: none; padding: 6px; cursor: pointer; color: var(--muted); display: inline-flex; border-radius: 6px; }
+.live-banner__x:hover { background: rgba(15, 23, 42, .06); }
