@@ -5,7 +5,7 @@ import { createRequire } from 'node:module'
 const require = createRequire(import.meta.url)
 const { checkEmail, safeFileName, isEmail, addressList, EmailRuleError } = require('../netlify/functions/_lib/emailRules.cjs')
 
-const pdf = (bytes = 10) => ({ name: 'Invoice.pdf', contentType: 'application/pdf', base64: Buffer.alloc(bytes, 7).toString('base64') })
+const pdf = (bytes = 10) => ({ name: 'Invoice.pdf', contentType: 'application/pdf', base64: Buffer.concat([Buffer.from('%PDF-'), Buffer.alloc(Math.max(0, bytes - 5), 7)]).toString('base64') })
 const ok = { to: 'ap@halavi.com', subject: 'Invoice HAL-1', text: 'Hello' }
 const fails = (input: object, re: RegExp) => assert.throws(() => checkEmail(input), (e: Error) => e instanceof EmailRuleError && re.test(e.message))
 

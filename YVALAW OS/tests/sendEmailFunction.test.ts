@@ -15,6 +15,7 @@ type Call = { url: string; method: string; headers: Record<string, string>; body
 type World = {
   users: Record<string, { id: string; email: string }>
   roles: Record<string, string>
+  perms: Record<string, string[]>
   log: Record<string, unknown>[]
   logTableMissing: boolean
   tokenCalls: number
@@ -38,6 +39,7 @@ beforeEach(() => {
   w = {
     users: { 'tok-ceo': { id: 'u-ceo', email: 'hans@yva.com' }, 'tok-emp': { id: 'u-emp', email: 'ana@yva.com' }, 'tok-rec': { id: 'u-rec', email: 'rec@yva.com' } },
     roles: { 'u-ceo': 'ceo', 'u-emp': 'employee', 'u-rec': 'recruiter' },
+    perms: { recruiter: ['email.send'] },
     log: [], logTableMissing: false, tokenCalls: 0, tokenFails: null, graph: { status: 202 }, sent: [], calls: [],
   }
   setEnv(true)
@@ -59,12 +61,17 @@ beforeEach(() => {
         const id = (u.searchParams.get('user_id') || '').replace('eq.', '')
         return res(200, w.roles[id] ? [{ role: w.roles[id] }] : [])
       }
+      if (u.pathname === '/rest/v1/role_permissions') {
+        const role = (u.searchParams.get('role') || '').replace('eq.', ''), perm = (u.searchParams.get('permission') || '').replace('eq.', '')
+        return res(200, (w.perms[role] || []).includes(perm) ? [{ role }] : [])
+      }
       if (u.pathname === '/rest/v1/email_log') {
         if (w.logTableMissing) return res(404, { message: 'relation "public.email_log" does not exist' })
-        if (method === 'POST') { w.log.push(JSON.parse(body!)); return res(201) }
+        if (method === 'POST') { const row = { ...JSON.parse(body!), id: `log-${w.log.length + 1}` }; w.log.push(row); return res(201, [row]) }
+        if (method === 'PATCH') { const id = (u.searchParams.get('id') || '').replace('eq.', ''); const row = w.log.find(r => r.id === id); if (row) Object.assign(row, JSON.parse(body!)); return res(204) }
         const who = (u.searchParams.get('sent_by') || '').replace('eq.', '')
         const since = Date.parse(decodeURIComponent((u.searchParams.get('created_at') || '').replace('gte.', '')))
-        return res(200, w.log.filter(r => r.sent_by === who && Date.parse(String(r.created_at ?? new Date().toISOString())) >= since).map((_, i) => ({ id: i })))
+        return res(200, w.log.filter(r => r.sent_by === who && r.status !== 'blocked' && Date.parse(String(r.created_at ?? new Date().toISOString())) >= since).map((_, i) => ({ id: i })))
       }
       if (u.pathname === '/rest/v1/notifications') {
         if (method === 'GET') return res(200, (w.notifications || []).filter(n => !n.dispatch_claimed_at).map(n => ({ id: n.id })))
@@ -115,6 +122,18 @@ test('signed-out callers and non-staff are refused before anything is sent', asy
   assert.equal((await sendFn.handler({ httpMethod: 'GET', headers: {} })).statusCode, 405)
 })
 
+test('staff need a sender role or the permission; only real PDFs named .pdf', async () => {
+  w.perms = {}
+  const r = await call('tok-rec', invoiceEmail)
+  assert.equal(r.status, 403); assert.match(r.body.error, /Send email from YVA OS/)
+  w.perms = { recruiter: ['invoices.send'] }
+  assert.equal((await call('tok-rec', invoiceEmail)).status, 200)
+  const fake = await call('tok-ceo', { ...invoiceEmail, attachments: [{ name: 'x.pdf', contentType: 'application/pdf', base64: Buffer.from('<html>').toString('base64') }] })
+  assert.equal(fake.status, 400); assert.match(fake.body.error, /not a PDF/)
+  await call('tok-ceo', { ...invoiceEmail, attachments: [{ name: 'page.html', contentType: 'application/pdf', base64: pdfB64 }] })
+  assert.equal(w.sent.at(-1)!.body.message.attachments[0].name, 'page.pdf')
+})
+
 test('a bad email is refused with the reason (nothing sent, nothing logged)', async () => {
   const r = await call('tok-ceo', { ...invoiceEmail, attachments: [{ name: 'x.exe', contentType: 'application/x-msdownload', base64: 'AAAA' }] })
   assert.equal(r.status, 400); assert.match(r.body.error, /Only PDF attachments/)
@@ -136,7 +155,8 @@ test('success: Graph gets the right message from the company mailbox, and the lo
   assert.deepEqual(s.body.message.ccRecipients, [{ emailAddress: { address: 'acct@halavi.com' } }])
   assert.deepEqual(s.body.message.attachments, [{ '@odata.type': '#microsoft.graph.fileAttachment', name: 'Invoice-HAL-1.pdf', contentType: 'application/pdf', contentBytes: pdfB64 }])
   assert.equal(w.log.length, 1)
-  assert.deepEqual({ ...w.log[0] }, {
+  const { id: _id, ...logged } = w.log[0]
+  assert.deepEqual(logged, {
     sent_by: 'u-rec', sent_by_email: 'rec@yva.com', to_addresses: ['ap@halavi.com'], cc_addresses: ['acct@halavi.com'], subject: 'Invoice HAL-1',
     attachments: [{ name: 'Invoice-HAL-1.pdf', size: 13 }], status: 'sent', from_address: 'contact@yvastaffing.agency',
   })
@@ -151,6 +171,8 @@ test('limits: 100 an hour per person (others unaffected), then 500 a day', async
   for (let i = 0; i < 100; i++) w.log.push({ sent_by: 'u-ceo', status: 'sent', created_at: now })
   const r = await call('tok-ceo', invoiceEmail)
   assert.equal(r.status, 429); assert.match(r.body.error, /100 emails in the last hour/)
+  assert.equal(w.log.at(-1)!.status, 'blocked', 'the refused one is logged as blocked (and not counted)')
+  assert.equal(w.sent.length, 0)
   assert.equal((await call('tok-rec', invoiceEmail)).status, 200)
   w.log = []
   const earlier = new Date(Date.now() - 3 * 3600_000).toISOString()

@@ -12,7 +12,7 @@
  *
  * Events (add them all to the Stripe webhook endpoint — SETUP-AFTER-BUILD.md):
  *   payment_intent.succeeded / processing / payment_failed / requires_action / canceled
- *   charge.refunded
+ *   charge.refunded, charge.refund.updated (a bank refund that failed later)
  *   charge.dispute.created / funds_withdrawn / funds_reinstated / closed
  *   setup_intent.succeeded
  *   payment_method.detached / payment_method.automatically_updated / payment_method.updated
@@ -60,17 +60,23 @@ const missingTable = e => e && (e.status === 404 || /does not exist|Could not fi
 const missingColumn = e => /Could not find the '([^']+)' column/i.exec(e?.message || '')?.[1]
 
 // ── Small writers (audit trail rows are best effort; money rows must succeed) ────────────────────────────────
+/** Final states a late or retried event may not overwrite (a 'processing' arriving after 'succeeded', …) */
+const FINAL = new Set(['succeeded', 'canceled'])
 async function saveAttempt(row) {
   try {
     const now = new Date().toISOString()
     const body = { ...row, updated_at: now }
     for (const k of Object.keys(body)) if (body[k] === undefined) delete body[k]
     if (row.stripe_payment_intent_id) {
-      const updated = await rest(`payment_attempts?stripe_payment_intent_id=eq.${enc(row.stripe_payment_intent_id)}`, { method: 'PATCH', body, prefer: 'return=representation' })
-      if (updated?.length) return
+      const prev = (await rest(`payment_attempts?stripe_payment_intent_id=eq.${enc(row.stripe_payment_intent_id)}&select=id,status&limit=1`))?.[0]
+      if (prev) {
+        if (FINAL.has(prev.status) && body.status !== 'succeeded') return
+        await rest(`payment_attempts?id=eq.${enc(prev.id)}`, { method: 'PATCH', body, prefer: 'return=minimal' })
+        return
+      }
     }
     if (!body.client_id) return
-    await rest('payment_attempts', { method: 'POST', body: { ...body, attempted_at: now }, prefer: 'return=minimal' })
+    await rest('payment_attempts', { method: 'POST', body: { ...body, attempted_at: now }, prefer: 'resolution=ignore-duplicates,return=minimal' })
   } catch (err) {
     console.warn('stripe-webhook: payment_attempts write skipped —', err.message)
   }
@@ -199,9 +205,12 @@ async function onFailed(pi) {
   const type = pi.last_payment_error?.payment_method?.type || undefined
   await attemptFromPI(pi, 'failed', { failure_reason: reason.slice(0, 500), payment_method_type: type })
   const source = sourceOf(pi)
-  if (source === 'autopay') {
+  if (source === 'autopay' && pi.customer) {
+    // Counted from the attempts themselves, so a repeated event never counts twice
     const row = await portalRowByCustomer(pi.customer)
-    if (row) await rest(`client_users?id=eq.${enc(row.id)}`, { method: 'PATCH', prefer: 'return=minimal', body: { autopay_failures: (row.autopay_failures || 0) + 1, autopay_last_failed_at: new Date().toISOString() } }).catch(() => {})
+    const since = new Date(Date.now() - 30 * 86400_000).toISOString()
+    const fails = await rest(`payment_attempts?stripe_customer_id=eq.${enc(pi.customer)}&source=eq.autopay&status=eq.failed&attempted_at=gte.${enc(since)}&select=id`).catch(() => null)
+    if (row && fails) await rest(`client_users?id=eq.${enc(row.id)}`, { method: 'PATCH', prefer: 'return=minimal', body: { autopay_failures: fails.length, autopay_last_failed_at: new Date().toISOString() } }).catch(() => {})
   }
   const lastTry = source === 'autopay' && Number(md.try) >= P.AUTOPAY_MAX_TRIES
   if (source === 'autopay' || type === 'us_bank_account') {
@@ -215,7 +224,10 @@ async function onFailed(pi) {
 async function onRequiresAction(pi) {
   const md = pi.metadata || {}
   if (!md.invoiceId) return 'not ours'
-  await attemptFromPI(pi, 'requires_action', { failure_reason: 'The card needs the client to confirm the payment (bank security check).' })
+  const microdeposits = pi.next_action?.type === 'verify_with_microdeposits'
+  await attemptFromPI(pi, 'requires_action', { failure_reason: microdeposits
+    ? 'Waiting for the client to confirm two small test deposits in their bank account (Stripe emailed them the steps).'
+    : 'The card needs the client to confirm the payment (bank security check).' })
   if (sourceOf(pi) === 'autopay') {
     await tell('payment_failed', `AutoPay needs the client: invoice ${md.invoiceNumber || ''}`, 'Their bank asked them to confirm this charge. Send them the invoice email (it has a Pay now link) or ask them to pay in the portal.')
   }
@@ -229,20 +241,27 @@ async function onCanceled(pi) {
 }
 
 // ── Refunds and disputes ─────────────────────────────────────────────────────
-async function onRefunded(charge) {
-  const pay = await findPayment({ chargeId: charge.id, paymentIntentId: typeof charge.payment_intent === 'string' ? charge.payment_intent : null })
+/** Refunds: one row per Stripe refund (external_ref = re_…), from the charge's refund list — safe when events
+ *  arrive together or out of order. A refund that failed or was canceled (bank refunds can fail days later) is
+ *  removed again, which puts the amount back on the invoice. */
+async function onRefunded(chargeId, paymentIntentId) {
+  const pay = await findPayment({ chargeId, paymentIntentId })
   if (!pay) return 'not ours'
-  const prior = await rest(`client_payments?stripe_charge_id=eq.${enc(charge.id)}&kind=eq.refund&select=amount`)
-  const recordedCents = -(prior || []).reduce((s, r) => s + P.centsFromUSD(r.amount), 0)
-  const diff = Number(charge.amount_refunded || 0) - recordedCents
-  if (diff <= 0) return 'already recorded'
-  await insertMoneyRow({
-    invoice_id: pay.invoice_id, client_id: pay.client_id, amount: -diff / 100, method: pay.method, source: 'stripe', kind: 'refund',
-    external_ref: `refund:${charge.id}:${charge.amount_refunded}`, reference: charge.id, stripe_charge_id: charge.id,
-    paid_on: todayInBusiness(), note: 'Refund (Stripe)', created_by: null,
-  })
-  await logActivity(pay.client_id, `Refund of ${usd(diff)} sent through Stripe. Charge: ${charge.id}`)
-  return 'refund recorded'
+  const list = await stripe('GET', `/refunds?charge=${enc(chargeId)}&limit=100`)
+  let added = 0
+  for (const r of list.data || []) {
+    if (r.status === 'failed' || r.status === 'canceled') {
+      await rest(`client_payments?external_ref=eq.${enc(r.id)}&kind=eq.refund`, { method: 'DELETE', prefer: 'return=minimal' })
+      continue
+    }
+    if (!(r.amount > 0)) continue
+    const isNew = await insertMoneyRow({
+      invoice_id: pay.invoice_id, client_id: pay.client_id, amount: -r.amount / 100, method: pay.method, source: 'stripe', kind: 'refund',
+      external_ref: r.id, reference: r.id, stripe_charge_id: chargeId, paid_on: todayInBusiness(), note: 'Refund (Stripe)', created_by: null,
+    })
+    if (isNew) { added++; await logActivity(pay.client_id, `Refund of ${usd(r.amount)} sent through Stripe. Refund: ${r.id}`) }
+  }
+  return added ? `${added} refund(s) recorded` : 'refunds up to date'
 }
 
 async function onDispute(type, d) {
@@ -312,7 +331,11 @@ async function handle(type, obj) {
     case 'payment_intent.payment_failed':  return onFailed(obj)
     case 'payment_intent.requires_action': return onRequiresAction(obj)
     case 'payment_intent.canceled':        return onCanceled(obj)
-    case 'charge.refunded':                return onRefunded(obj)
+    case 'charge.refunded':                return onRefunded(obj.id, typeof obj.payment_intent === 'string' ? obj.payment_intent : null)
+    case 'charge.refund.updated':
+    case 'refund.created':
+    case 'refund.updated':
+    case 'refund.failed':                  return typeof obj.charge === 'string' ? onRefunded(obj.charge, typeof obj.payment_intent === 'string' ? obj.payment_intent : null) : 'ignored'
     case 'charge.dispute.created':
     case 'charge.dispute.funds_withdrawn':
     case 'charge.dispute.funds_reinstated':
@@ -352,8 +375,10 @@ exports.handler = async function handler(event) {
     const rows = await rest('stripe_events?on_conflict=id', { method: 'POST', prefer: 'resolution=ignore-duplicates,return=representation',
       body: { id: evt.id, type: evt.type, livemode: !!evt.livemode, object_id: obj.id || null } })
     if (!rows?.length) {
-      const prev = (await rest(`stripe_events?id=eq.${enc(evt.id)}&select=processed_at&limit=1`))?.[0]
+      const prev = (await rest(`stripe_events?id=eq.${enc(evt.id)}&select=processed_at,received_at,error&limit=1`))?.[0]
       if (prev?.processed_at) return { statusCode: 200, body: JSON.stringify({ duplicate: true }) }
+      // The same event is being processed right now (Stripe sometimes sends twice): let Stripe retry later
+      if (prev && !prev.error && Date.now() - Date.parse(prev.received_at) < 120_000) return { statusCode: 409, body: 'Already processing' }
     }
   } catch (err) {
     if (!missingTable(err)) { console.error('stripe-webhook: claim failed —', err.message); return { statusCode: 500, body: 'Try again' } }

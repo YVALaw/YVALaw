@@ -16,7 +16,7 @@ import {
   loadInvoices, saveInvoices, loadInvoiceCounter, saveInvoiceCounter, loadSnapshot, loadSettings,
   loadRecurringInvoices, saveRecurringInvoices, logComm,
 } from '../services/storage'
-import { loadPayments } from '../services/payments'
+import { loadInvoicePaidState, loadPayments } from '../services/payments'
 import { formatMoney } from '../utils/money'
 import { buildInvoiceHTML, printInvoice as printInvoiceUtil } from '../utils/invoiceHtml'
 import { sendInvoiceEmail, sendReminderEmail, sentToLabel } from '../services/invoiceEmail'
@@ -234,24 +234,38 @@ export default function InvoicePage() {
 
   // ── Status, duplicate, delete, bulk ─────────────────────────────────────
   function openStatusEdit(inv: Invoice) { setStatusFor(inv); setNewStatus(statusOf(inv)); setNewAmountPaid(inv.amountPaid != null ? String(inv.amountPaid) : '') }
+  /** Invoices with recorded payments keep the status and amount paid that the payments give (the database enforces
+   *  it — a status change can never make a paid invoice payable again); show what it really is now */
+  async function reconcilePaid(ids: string[]) {
+    const changed: string[] = []
+    const fresh = await Promise.all(ids.map(async id => ({ id, s: await loadInvoicePaidState(id).catch(() => null) })))
+    setInvoices(prev => prev.map(inv => {
+      const f = fresh.find(x => x.id === inv.id)?.s
+      if (!f) return inv
+      if ((f.status || '') !== (inv.status || '')) changed.push(inv.number)
+      return { ...inv, status: f.status, amountPaid: f.amountPaid }
+    }))
+    if (changed.length) setBanner({ tone: 'warning', text: `${changed.join(', ')} ${changed.length === 1 ? 'has' : 'have'} recorded payments, so the status follows the payments. Record or delete a payment (💲) to change it.` })
+  }
   async function saveStatus() {
     const target = statusFor
     if (!target) return
-    const amtPaid = newStatus === 'partial' ? (parseFloat(newAmountPaid) || 0) : undefined
+    const amtPaid = newStatus === 'partial' ? (parseFloat(newAmountPaid) || 0) : target.amountPaid
     setStatusFor(null)
     const done = await persist(invoices.map(inv => inv.id !== target.id ? inv
       : { ...inv, status: newStatus, amountPaid: amtPaid, updatedAt: Date.now(), statusHistory: [...(inv.statusHistory || []), { status: newStatus, changedAt: Date.now() }] }),
     `${target.number} is now ${label(newStatus)}.`)
     const cId = clientIdOf(target)
     if (done && cId) void logComm(cId, `Invoice ${target.number} status changed to ${newStatus}`, 'system')
+    if (done) void reconcilePaid([target.id])
   }
   async function applyBulk() {
     const ids = selected
     const targets = invoices.filter(i => ids.has(i.id))
     const done = await persist(invoices.map(inv => !ids.has(inv.id) ? inv
-      : { ...inv, status: bulkStatus, amountPaid: bulkStatus === 'partial' ? inv.amountPaid : undefined, updatedAt: Date.now(), statusHistory: [...(inv.statusHistory || []), { status: bulkStatus, changedAt: Date.now() }] }),
+      : { ...inv, status: bulkStatus, amountPaid: inv.amountPaid, updatedAt: Date.now(), statusHistory: [...(inv.statusHistory || []), { status: bulkStatus, changedAt: Date.now() }] }),
     `${ids.size} invoice${ids.size === 1 ? '' : 's'} set to ${label(bulkStatus)}.`)
-    if (done) { setSelected(new Set()); for (const t of targets) { const cId = clientIdOf(t); if (cId) void logComm(cId, `Invoice ${t.number} status changed to ${bulkStatus}`, 'system') } }
+    if (done) { void reconcilePaid([...ids]); setSelected(new Set()); for (const t of targets) { const cId = clientIdOf(t); if (cId) void logComm(cId, `Invoice ${t.number} status changed to ${bulkStatus}`, 'system') } }
   }
   async function duplicateInvoice(inv: Invoice) {
     const counter = await loadInvoiceCounter()

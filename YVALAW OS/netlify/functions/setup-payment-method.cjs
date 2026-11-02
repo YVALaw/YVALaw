@@ -30,7 +30,7 @@ exports.handler = async function handler(event) {
       customer: customerId,
       usage: 'off_session',
       payment_method_types: ['card', 'us_bank_account'],
-      payment_method_options: { us_bank_account: { verification_method: 'automatic', financial_connections: { permissions: ['payment_method'] } } },
+      payment_method_options: { us_bank_account: { verification_method: 'instant', financial_connections: { permissions: ['payment_method'] } } },
       metadata: { clientId: client.id, clientUserId: row.id, autopay: body.autopay === true ? 'true' : 'false' },
     })
     return json(200, { clientSecret: si.client_secret })

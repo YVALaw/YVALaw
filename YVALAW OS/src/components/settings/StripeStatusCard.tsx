@@ -49,13 +49,14 @@ export default function StripeStatusCard() {
   if (s?.failedEvents) problems.push(`${s.failedEvents} webhook event${s.failedEvents > 1 ? 's' : ''} in the last 7 days could not be recorded yet (Stripe retries automatically). If this stays, check the Netlify function log for stripe-webhook.`)
   if (s?.eventsTable === false) problems.push('Run supabase/migrate-stripe-secure.sql so each Stripe event is recorded once.')
   const mode = s?.secretKey ?? pkMode
-  const tone: Tone = !pk && !s?.secretKey ? 'off' : problems.length ? (mismatch || (s && (!s.secretKey || !s.webhookSecret)) ? 'bad' : 'warn') : 'ok'
+  const tone: Tone = !pk && !s?.secretKey ? 'off' : err ? 'warn' : !s ? 'off' : problems.length ? (mismatch || !s.secretKey || !s.webhookSecret ? 'bad' : 'warn') : 'ok'
+  const label = tone === 'off' ? (!pk && !s?.secretKey ? 'Not set up' : 'Checking…') : err ? "Can't check" : tone === 'bad' ? 'Needs attention' : `Connected · ${mode === 'live' ? 'Live' : 'Test mode'}`
 
   return (
     <section className="set-int" aria-label="Stripe">
       <div className="set-int__head">
         <span className="set-int__name"><Ic d={P.card} /> Stripe</span>
-        <Status tone={tone}>{tone === 'off' ? 'Not set up' : tone === 'ok' ? `Connected · ${mode === 'live' ? 'Live' : 'Test mode'}` : tone === 'bad' ? 'Needs attention' : `Connected · ${mode === 'live' ? 'Live' : 'Test mode'}`}</Status>
+        <Status tone={tone}>{label}</Status>
       </div>
       <span className="set-int__desc">Card and US bank (ACH) payments in the client portal and from the “Pay now” link in invoice emails, saved payment methods and AutoPay. The webhook records every payment, refund and dispute.</span>
       <div className="set-int__facts">

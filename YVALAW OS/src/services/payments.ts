@@ -59,7 +59,8 @@ export function refundableLeft(p: ClientPayment, all: ClientPayment[]): number {
 
 /** Refund a Stripe payment (permission payments.refund). The refund row appears when Stripe confirms it (webhook). */
 export function refundStripePayment(paymentId: string, amount?: number, reason?: string) {
-  return callFunction<{ ok: boolean; refundId: string; status: string; amount: number }>('refund-payment', { paymentId, amount, reason })
+  // A new id for every refund the person asks for (Stripe treats a repeat of the same id as the same refund)
+  return callFunction<{ ok: boolean; refundId: string; status: string; amount: number }>('refund-payment', { paymentId, amount, reason, requestId: crypto.randomUUID() })
 }
 
 /** A "Pay now" link for an invoice (card or bank, no portal login); expires in 60 days */

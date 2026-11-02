@@ -4,7 +4,8 @@
  * Charges due invoices for clients who turned AutoPay on (explicit consent in the portal), with their saved card
  * or US bank account. Rules (`autopayDecision` in _lib/payments.cjs, unit-tested):
  *   - only invoices with a due date that has arrived (no due date = never charged automatically)
- *   - invoices matched by client_id (older invoices without one: by client name)
+ *   - invoices matched by client_id only (never by name — names aren't unique); invoices that had a refund or
+ *     dispute are left for staff to decide
  *   - nothing while a payment for that invoice may still take money (bank payment clearing, card waiting for
  *     the client's confirmation, a success the webhook hasn't recorded yet)
  *   - at most 3 tries per invoice, 3 days apart; staff are told after the last one (stripe-webhook)
@@ -34,9 +35,7 @@ async function saveAttempt(row) {
 }
 
 async function invoicesFor(client) {
-  const byId = await rest(`invoices?client_id=eq.${enc(client.id)}&status=in.(sent,viewed,overdue,partial)&select=${INV_FIELDS}`)
-  const byName = client.name ? await rest(`invoices?client_id=is.null&client_name=eq.${enc(client.name)}&status=in.(sent,viewed,overdue,partial)&select=${INV_FIELDS}`) : []
-  return [...byId, ...byName]
+  return rest(`invoices?client_id=eq.${enc(client.id)}&status=in.(sent,viewed,overdue,partial)&select=${INV_FIELDS}`)
 }
 
 async function run({ now = Date.now() } = {}) {
@@ -50,13 +49,27 @@ async function run({ now = Date.now() } = {}) {
     seen.add(login.client_id)
     if (Date.now() - started > TIME_BUDGET_MS) { summary.unfinished = true; break }
     summary.clients++
-    const client = (await rest(`clients?id=eq.${enc(login.client_id)}&select=id,name,email&limit=1`))?.[0]
-    if (!client) continue
-    const invoices = await invoicesFor(client)
-    if (!invoices.length) continue
-    const attempts = await rest(`payment_attempts?invoice_id=in.(${invoices.map(i => enc(i.id)).join(',')})&select=invoice_id,status,source,attempted_at,updated_at`).catch(() => [])
+    let client, invoices, attempts, refunded
+    try {
+      client = (await rest(`clients?id=eq.${enc(login.client_id)}&select=id,name,email&limit=1`))?.[0]
+      if (!client) continue
+      invoices = await invoicesFor(client)
+      if (!invoices.length) continue
+      const ids = invoices.map(i => enc(i.id)).join(',')
+      // Fails closed: if the history can't be read, this client is skipped today
+      attempts = await rest(`payment_attempts?invoice_id=in.(${ids})&select=invoice_id,status,source,attempted_at,updated_at`)
+      refunded = new Set((await rest(`client_payments?invoice_id=in.(${ids})&kind=in.(refund,dispute)&select=invoice_id`).catch(err => {
+        if (/kind/.test(err.message)) return []   // before migrate-stripe-secure.sql there are no refunds
+        throw err
+      })).map(r => String(r.invoice_id)))
+    } catch (err) {
+      summary.skipped.read_error = (summary.skipped.read_error || 0) + 1
+      console.warn(`run-autopay: skipped client ${login.client_id} —`, err.message)
+      continue
+    }
     for (const inv of invoices) {
-      const d = P.autopayDecision({ invoice: inv, attempts: attempts.filter(a => a.invoice_id === inv.id), today, now })
+      const d = refunded.has(String(inv.id)) ? { charge: false, reason: 'refunded' }
+        : P.autopayDecision({ invoice: inv, attempts: attempts.filter(a => a.invoice_id === inv.id), today, now })
       if (!d.charge) {
         summary.skipped[d.reason] = (summary.skipped[d.reason] || 0) + 1
         continue

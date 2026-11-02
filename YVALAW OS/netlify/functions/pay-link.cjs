@@ -15,6 +15,7 @@
  * Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, STRIPE_SECRET_KEY, optional PAY_LINK_SECRET, PUBLIC_APP_URL
  */
 const { rest, enc, json, callerFromEvent, roleOf, hasPermission, APP_URL } = require('./_lib/supa.cjs')
+const crypto = require('crypto')
 const { stripe } = require('./_lib/stripe.cjs')
 const P = require('./_lib/payments.cjs')
 
@@ -57,23 +58,23 @@ async function createLink(event) {
 
 async function openLink(event) {
   const q = event.queryStringParameters || {}
-  const company = (await rest('settings?id=eq.1&select=company_name&limit=1').catch(() => []))?.[0]?.company_name || 'YVA Staffing'
-  if (q.done) return page(200, 'Thank you!', 'Your payment was received by Stripe. Card payments show as paid right away; bank payments take about 4 business days to clear. You can close this page.', { company })
+  if (q.done) return page(200, 'Thank you!', 'Your payment was received by Stripe. Card payments show as paid right away; bank payments take about 4 business days to clear. You can close this page.')
   const v = P.verifyPayLink(q.t)
-  if (!v.ok) {
+  if (!v.ok) {   // checked before touching the database
     return v.reason === 'expired'
-      ? page(410, 'This payment link has expired', 'Please reply to the invoice email or sign in to your client portal to pay.', { company })
-      : page(400, 'This payment link is not valid', 'Please use the link exactly as it appears in your invoice email, or contact us.', { company })
+      ? page(410, 'This payment link has expired', 'Please reply to the invoice email or sign in to your client portal to pay.')
+      : page(400, 'This payment link is not valid', 'Please use the link exactly as it appears in your invoice email, or contact us.')
   }
+  const company = (await rest('settings?id=eq.1&select=company_name&limit=1').catch(() => []))?.[0]?.company_name || 'YVA Staffing'
   const inv = (await rest(`invoices?id=eq.${enc(v.invoiceId)}&select=id,number,status,subtotal,amount_paid,client_id,client_name&limit=1`))?.[0]
   if (!inv) return page(404, 'Invoice not found', 'This invoice is no longer available. Please contact us.', { company })
   if (!P.isPayable(inv)) {
     return P.balanceCents(inv) <= 0 || String(inv.status).toLowerCase() === 'paid'
-      ? page(200, `Invoice ${esc(inv.number)} is paid`, 'There is nothing left to pay. Thank you!', { company })
-      : page(409, `Invoice ${esc(inv.number)} can't be paid online`, 'Please contact us about this invoice.', { company })
+      ? page(200, `Invoice ${inv.number} is paid`, 'There is nothing left to pay. Thank you!', { company })
+      : page(409, `Invoice ${inv.number} can't be paid online`, 'Please contact us about this invoice.', { company })
   }
   const cents = P.balanceCents(inv)
-  const attempts = await rest(`payment_attempts?invoice_id=eq.${enc(inv.id)}&select=status,source,stripe_checkout_session_id,attempted_at,updated_at&order=attempted_at.desc&limit=20`).catch(() => [])
+  const attempts = await rest(`payment_attempts?invoice_id=eq.${enc(inv.id)}&select=status,source,stripe_checkout_session_id,attempted_at,updated_at&order=attempted_at.desc&limit=20`)   // fails closed
   const now = Date.now()
   const at = a => Date.parse(a.updated_at || a.attempted_at || 0) || 0
   if (attempts.some(a => a.status === 'processing' && now - at(a) < 14 * 86400_000)) {
@@ -85,12 +86,12 @@ async function openLink(event) {
     try {
       const s = await stripe('GET', `/checkout/sessions/${enc(a.stripe_checkout_session_id)}`)
       if (s.status === 'open' && s.amount_total === cents && s.url) return redirect(s.url)
-      if (s.status === 'complete') return page(200, 'Payment already received', `Invoice ${esc(inv.number)} was just paid. Thank you!`, { company })
+      if (s.status === 'complete' && s.payment_status !== 'unpaid') return page(200, 'Payment already received', `Invoice ${esc(inv.number)} was just paid. Thank you!`, { company })
     } catch { /* make a new one */ }
   }
   const client = await clientOf(inv)
   const md = { invoiceId: inv.id, clientId: client?.id || inv.client_id || '', invoiceNumber: inv.number || '', source: 'pay_link' }
-  const session = await stripe('POST', '/checkout/sessions', {
+  const params = {
     mode: 'payment',
     payment_method_types: ['card', 'us_bank_account'],
     payment_method_options: { us_bank_account: { verification_method: 'automatic' } },
@@ -100,7 +101,11 @@ async function openLink(event) {
     metadata: md,
     success_url: `${ORIGIN}/pay?done=1`,
     cancel_url: linkFor(q.t),
-  }, { idempotencyKey: `checkout-${inv.id}-${cents}-${Math.floor(now / 600_000)}` })
+  }
+  // Same parameters within 10 minutes → the same Checkout page (a double click or a scanner never makes two)
+  const paramHash = crypto.createHash('sha256').update(JSON.stringify(params)).digest('hex').slice(0, 24)
+  const session = await stripe('POST', '/checkout/sessions', params, { idempotencyKey: `checkout-${inv.id}-${paramHash}-${Math.floor(now / 600_000)}` })
+  if (!session.url) return page(500, 'Something went wrong', 'Please try the link again in a minute, or contact us.', { company })
   if (md.clientId) {
     await rest('payment_attempts', { method: 'POST', prefer: 'return=minimal', body: {
       invoice_id: inv.id, client_id: md.clientId, client_name: client?.name || inv.client_name || null, invoice_number: inv.number || null,

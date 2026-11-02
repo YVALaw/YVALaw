@@ -5,7 +5,7 @@
 import type { AppRole } from './roles'
 
 export type Permission =
-  | 'weekly_close.manage' | 'invoices.send' | 'payments.record' | 'payments.refund'
+  | 'weekly_close.manage' | 'invoices.send' | 'payments.record' | 'payments.refund' | 'email.send'
   | 'payroll.view' | 'payroll.manage' | 'rates.manage' | 'bank.view' | 'bank.manage'
   | 'timeoff.approve' | 'announcements.manage' | 'documents.manage'
   | 'leads.view_all' | 'leads.manage' | 'history.view'
@@ -25,6 +25,7 @@ export const PERMISSIONS: { key: Permission; label: string; help: string; group:
   { key: 'documents.manage',     group: 'Team',      label: 'Employee documents',            help: 'Upload and remove documents in employees\' My workspace' },
   { key: 'leads.view_all',       group: 'Sales',     label: 'See all leads',                 help: 'Without it, people only see leads assigned to them' },
   { key: 'leads.manage',         group: 'Sales',     label: 'Manage leads',                  help: 'Assign leads and turn a won lead into a client' },
+  { key: 'email.send',           group: 'Admin',     label: 'Send email from YVA OS',        help: 'Emails go out from the company mailbox. CEO, Admin and Accounting always can' },
   { key: 'history.view',         group: 'Admin',     label: 'See the change history',        help: 'Who changed what and when, across YVA OS' },
 ]
 

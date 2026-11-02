@@ -61,7 +61,11 @@ function checkEmail(input) {
     if (!base64 || base64.length % 4 !== 0 || !/^[A-Za-z0-9+/]+={0,2}$/.test(base64)) throw new EmailRuleError(`Attachment ${i + 1} is empty or damaged.`)
     const size = base64Bytes(base64)
     total += size
-    return { name: safeFileName(a?.name, `document-${i + 1}.pdf`), contentType, base64, size }
+    // A real PDF (starts with %PDF-) named .pdf — the declared type alone proves nothing
+    if (!base64.startsWith('JVBERi0')) throw new EmailRuleError(`Attachment ${i + 1} is not a PDF file.`)
+    let name = safeFileName(a?.name, `document-${i + 1}.pdf`)
+    if (!/\.pdf$/i.test(name)) name = `${name.replace(/\.[a-z0-9]{1,6}$/i, '')}.pdf`
+    return { name, contentType, base64, size }
   })
   if (total > MAX_ATTACHMENT_BYTES) throw new EmailRuleError(`The attachments are too large together (${(total / 1048576).toFixed(1)} MB; max 4.5 MB). Send fewer PDFs per email.`)
   return { to, cc, subject, text, attachments }

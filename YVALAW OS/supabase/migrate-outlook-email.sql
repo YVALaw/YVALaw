@@ -18,10 +18,13 @@ CREATE TABLE IF NOT EXISTS public.email_log (
   cc_addresses  text[] NOT NULL DEFAULT '{}',
   subject       text,
   attachments   jsonb NOT NULL DEFAULT '[]'::jsonb,
-  status        text NOT NULL CHECK (status IN ('sent', 'failed')),
+  status        text NOT NULL,
   error         text,
   created_at    timestamptz NOT NULL DEFAULT now()
 );
+-- sending = counted against the limits before Microsoft is called (parallel requests can't slip past); blocked = over the limit
+ALTER TABLE public.email_log DROP CONSTRAINT IF EXISTS email_log_status_check;
+ALTER TABLE public.email_log ADD CONSTRAINT email_log_status_check CHECK (status IN ('sending', 'sent', 'failed', 'blocked'));
 CREATE INDEX IF NOT EXISTS email_log_sender_time ON public.email_log (sent_by, created_at DESC);
 CREATE INDEX IF NOT EXISTS email_log_time ON public.email_log (created_at DESC);
 

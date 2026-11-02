@@ -11,6 +11,11 @@
 --   payment_attempts     read-only from the app (written only by the payment functions), + payment method
 --                        type, pay-link source, AutoPay retry count
 --   client_users         + saved method type / bank name, AutoPay failure count
+--   invoices             once an invoice has recorded payments, its amount paid IS their sum and its status follows
+--                        (paid / partial / back to sent) — a status edit or a whole-list save can no longer wipe the
+--                        amount paid and make a paid invoice payable (and chargeable by AutoPay) again. Amounts paid
+--                        before payments were recorded one by one are kept as one "earlier payments" row.
+-- Re-run this script after re-running migrate-step4-weekly-close.sql.
 -- ============================================================================
 
 -- ── 1. Webhook events (each processed once) ─────────────────────────────────
@@ -61,8 +66,18 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 DECLARE
-  how text;
+  how  text;
+  prev numeric;
 BEGIN
+  -- First payment row of an invoice that already showed an amount paid: keep that amount as an "earlier payments" row
+  IF TG_OP = 'INSERT' AND NOT EXISTS (SELECT 1 FROM public.client_payments WHERE invoice_id::text = NEW.invoice_id::text AND id <> NEW.id) THEN
+    SELECT amount_paid INTO prev FROM public.invoices WHERE id::text = NEW.invoice_id::text;
+    IF coalesce(prev, 0) > 0.005 THEN
+      INSERT INTO public.client_payments (invoice_id, client_id, amount, method, source, kind, note, created_by, paid_on)
+      VALUES (NEW.invoice_id, NEW.client_id, round(prev, 2), 'other', 'manual', 'payment',
+              'Earlier payments (recorded before payments were tracked one by one)', NULL, current_date);
+    END IF;
+  END IF;
   IF TG_OP = 'INSERT' THEN
     PERFORM private.client_payment_adjust(NEW.invoice_id, NEW.amount);
   ELSIF TG_OP = 'DELETE' THEN
@@ -89,6 +104,75 @@ BEGIN
   RETURN NULL;
 END
 $$;
+
+-- ── 2b. Amount paid = the sum of the invoice's payments ──────────────────────
+-- Manual payment rows can't carry a Stripe reference (a hand-made row with a pi_… id would make the real Stripe
+-- payment look like a duplicate and be skipped). NOT VALID: checked for new and changed rows.
+ALTER TABLE public.client_payments DROP CONSTRAINT IF EXISTS client_payments_manual_refs;
+ALTER TABLE public.client_payments ADD CONSTRAINT client_payments_manual_refs
+  CHECK (source = 'stripe' OR (external_ref IS NULL AND stripe_charge_id IS NULL)) NOT VALID;
+
+CREATE OR REPLACE FUNCTION private.invoice_paid_from_payments()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  n     integer;
+  total numeric;
+BEGIN
+  SELECT count(*), coalesce(sum(amount), 0) INTO n, total FROM public.client_payments WHERE invoice_id::text = NEW.id::text;
+  IF n = 0 THEN RETURN NEW; END IF;   -- no recorded payments: the invoice keeps what staff set
+  NEW.amount_paid := greatest(0, round(total, 2));
+  IF NEW.amount_paid > 0 AND NEW.amount_paid >= coalesce(NEW.subtotal, 0) - 0.005 THEN NEW.status := 'paid';
+  ELSIF NEW.amount_paid > 0 THEN NEW.status := 'partial';
+  ELSIF lower(coalesce(NEW.status, '')) IN ('paid', 'partial') THEN NEW.status := 'sent';
+  END IF;
+  IF NEW.status IS DISTINCT FROM OLD.status AND NEW.status_history IS NOT DISTINCT FROM OLD.status_history THEN
+    NEW.status_history := coalesce(OLD.status_history, '[]'::jsonb)
+      || jsonb_build_array(jsonb_build_object('status', NEW.status, 'changedAt', (extract(epoch FROM now()) * 1000)::bigint));
+  END IF;
+  RETURN NEW;
+END
+$$;
+REVOKE ALL ON FUNCTION private.invoice_paid_from_payments() FROM PUBLIC;
+DROP TRIGGER IF EXISTS invoice_paid_from_payments ON public.invoices;
+CREATE TRIGGER invoice_paid_from_payments BEFORE UPDATE OF amount_paid, status, subtotal ON public.invoices
+  FOR EACH ROW EXECUTE FUNCTION private.invoice_paid_from_payments();
+
+-- A payment row changed: recompute the invoice (the trigger above does the sum)
+CREATE OR REPLACE FUNCTION private.client_payment_adjust(inv_id uuid, delta numeric)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF inv_id IS NULL THEN RETURN; END IF;
+  UPDATE public.invoices SET amount_paid = amount_paid WHERE id::text = inv_id::text;
+END
+$$;
+REVOKE ALL ON FUNCTION private.client_payment_adjust(uuid, numeric) FROM PUBLIC;
+
+-- What invoices already show as paid beyond their payment rows (old CRM, the status window, the step-4 trigger that
+-- added amounts) becomes one "earlier payments" row, so switching to sums changes no balance
+DO $$
+DECLARE r record;
+BEGIN
+  FOR r IN
+    SELECT i.id::text AS id, max(i.client_id::text) AS client_id, round(coalesce(max(i.amount_paid), 0) - coalesce(sum(p.amount), 0), 2) AS diff
+    FROM public.invoices i JOIN public.client_payments p ON p.invoice_id::text = i.id::text
+    WHERE i.id::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+    GROUP BY i.id
+  LOOP
+    IF r.diff > 0.005 THEN
+      INSERT INTO public.client_payments (invoice_id, client_id, amount, method, source, kind, note, created_by, paid_on)
+      VALUES (r.id::uuid, CASE WHEN r.client_id ~* '^[0-9a-f-]{36}$' THEN r.client_id::uuid END, r.diff, 'other', 'manual', 'payment',
+              'Earlier payments (recorded before payments were tracked one by one)', NULL, current_date);
+    END IF;
+  END LOOP;
+END $$;
 
 -- ── 3. Payment attempts: written only by the payment functions ──────────────
 ALTER TABLE public.payment_attempts ADD COLUMN IF NOT EXISTS payment_method_type text;

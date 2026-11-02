@@ -159,19 +159,45 @@ test('webhook: a payment that overpays tells the team; non-USD payments are not 
   } finally { fb.restore() }
 })
 
-test('webhook: partial refunds add negative rows once per new refunded total, in any order', async () => {
+test('webhook: one row per Stripe refund — events together, out of order or repeated count once; a failed refund is undone', async () => {
   const fb = webhookBackend()
   try {
     const { handler } = require('../netlify/functions/stripe-webhook.cjs')
     await handler(signedEvent(evt('evt_p', 'payment_intent.succeeded', pi()), WH))
+    const refunds = [{ id: 're_1', amount: 10000, status: 'succeeded' }]
+    const base = fb.stripe
+    fb.stripe = (method, path, form) => path === '/refunds' && method === 'GET' ? (assert.equal(form.get('charge'), 'ch_1'), { data: refunds }) : base(method, path, form, {})
     const charge = (refunded: number) => ({ id: 'ch_1', object: 'charge', payment_intent: 'pi_1', amount: 100000, amount_refunded: refunded })
-    await handler(signedEvent(evt('evt_r2', 'charge.refunded', charge(30000)), WH))   // second refund arrives first
-    await handler(signedEvent(evt('evt_r1', 'charge.refunded', charge(10000)), WH))
-    await handler(signedEvent(evt('evt_r3', 'charge.refunded', charge(30000)), WH))   // repeat with a new event id
-    const refunds = fb.table('client_payments').filter(p => p.kind === 'refund')
-    assert.deepEqual(refunds.map(r => r.amount), [-300])
-    await handler(signedEvent(evt('evt_r4', 'charge.refunded', charge(100000)), WH))
-    assert.equal(fb.table('client_payments').filter(p => p.kind === 'refund').reduce((s, r) => s + Number(r.amount), 0), -1000)
+    refunds.push({ id: 're_2', amount: 20000, status: 'pending' })
+    await Promise.all([handler(signedEvent(evt('evt_r2', 'charge.refunded', charge(30000)), WH)), handler(signedEvent(evt('evt_r1', 'charge.refunded', charge(10000)), WH))])
+    await handler(signedEvent(evt('evt_r3', 'charge.refunded', charge(30000)), WH))
+    const rows = () => fb.table('client_payments').filter(p => p.kind === 'refund')
+    assert.deepEqual(rows().map(r => [r.external_ref, r.amount]).sort(), [['re_1', -100], ['re_2', -200]])
+    refunds[1].status = 'failed'   // a bank refund that failed days later
+    await handler(signedEvent(evt('evt_r4', 'charge.refund.updated', { id: 're_2', object: 'refund', charge: 'ch_1', payment_intent: 'pi_1', status: 'failed', amount: 20000 }), WH))
+    assert.deepEqual(rows().map(r => r.external_ref), ['re_1'])
+  } finally { fb.restore() }
+})
+
+test('webhook: a late "processing" event never overwrites a finished payment', async () => {
+  const fb = webhookBackend()
+  try {
+    const { handler } = require('../netlify/functions/stripe-webhook.cjs')
+    await handler(signedEvent(evt('evt_ok', 'payment_intent.succeeded', pi()), WH))
+    await handler(signedEvent(evt('evt_late', 'payment_intent.processing', pi({ status: 'processing' })), WH))
+    assert.equal(fb.table('payment_attempts')[0].status, 'succeeded')
+    assert.equal(fb.table('payment_attempts').length, 1)
+  } finally { fb.restore() }
+})
+
+test('webhook: the same event arriving twice at once is processed once (409 → Stripe retries later)', async () => {
+  const fb = webhookBackend()
+  try {
+    fb.table('stripe_events').push({ id: 'evt_dup', type: 'payment_intent.succeeded', received_at: new Date().toISOString(), processed_at: null })
+    const { handler } = require('../netlify/functions/stripe-webhook.cjs')
+    const r = await handler(signedEvent(evt('evt_dup', 'payment_intent.succeeded', pi()), WH))
+    assert.equal(r.statusCode, 409)
+    assert.equal(fb.table('client_payments').length, 0)
   } finally { fb.restore() }
 })
 
@@ -210,13 +236,14 @@ test('webhook: a paid-with card is saved only if asked and only when nothing is 
 test('webhook: AutoPay failure counts up and the last try tells the team', async () => {
   const fb = webhookBackend()
   try {
-    fb.table('client_users').push({ id: 'cu1', client_id: CLIENT, stripe_customer_id: 'cus_1', autopay_failures: 2 })
+    fb.table('client_users').push({ id: 'cu1', client_id: CLIENT, stripe_customer_id: 'cus_1', autopay_failures: 0 })
+    for (const n of [1, 2]) fb.table('payment_attempts').push({ stripe_payment_intent_id: `pi_old${n}`, stripe_customer_id: 'cus_1', source: 'autopay', status: 'failed', attempted_at: new Date().toISOString() })
     const { handler } = require('../netlify/functions/stripe-webhook.cjs')
     const failed = pi({ status: 'requires_payment_method', amount_received: 0, last_payment_error: { message: 'Your card was declined.' }, metadata: { invoiceId: INV, clientId: CLIENT, invoiceNumber: 'ACM0001', autoPay: 'true', try: '3' } })
     await handler(signedEvent(evt('evt_x', 'payment_intent.payment_failed', failed), WH))
-    assert.equal(fb.table('client_users')[0].autopay_failures, 3)
+    assert.equal(fb.table('client_users')[0].autopay_failures, 3, 'counted from the attempts, so a repeated event never double-counts')
     assert.ok(fb.table('notifications').some(n => /AutoPay stopped trying/.test(String(n.title))))
-    assert.equal(fb.table('payment_attempts')[0].status, 'failed')
+    assert.equal(fb.table('payment_attempts').find(a => a.stripe_payment_intent_id === 'pi_1')!.status, 'failed')
   } finally { fb.restore() }
 })
 
@@ -349,7 +376,9 @@ test('AutoPay run: one login per client, due invoices only, idempotency key per 
         { id: 'a0000000-0000-4000-8000-000000000003', number: 'OLD1', client_id: null, client_name: 'Acme', subtotal: 80, amount_paid: 0, status: 'overdue', due_date: '2026-10-01' },
       ],
       payment_attempts: [],
+      client_payments: [{ invoice_id: 'a0000000-0000-4000-8000-000000000004', kind: 'refund', amount: -10 }],
     }
+    fb.table('invoices').push({ id: 'a0000000-0000-4000-8000-000000000004', number: 'ACM0004', client_id: CLIENT, subtotal: 100, amount_paid: 0, status: 'sent', due_date: '2026-01-02' })
     fb.stripe = (_m, path, form) => {
       if (path === '/payment_intents') return { id: `pi_${form.get('metadata[invoiceNumber]')}`, status: 'succeeded', currency: 'usd' }
       throw new Error(path)
@@ -358,11 +387,12 @@ test('AutoPay run: one login per client, due invoices only, idempotency key per 
     const now = Date.now()
     const today = new Date(now).toLocaleDateString('en-CA', { timeZone: 'America/Santo_Domingo' })
     const s = await _test.run({ now })
-    assert.equal(s.charged, 2)
+    assert.equal(s.charged, 1, 'only the due invoice of this client_id')
     assert.equal(s.skipped.no_due_date, 1)
+    assert.equal(s.skipped.refunded, 1, 'an invoice that had a refund is left for staff')
     const calls = fb.stripeCalls.filter(c => c.path === '/payment_intents')
-    assert.deepEqual(calls.map(c => c.form.get('customer')), ['cus_1', 'cus_1'], 'the most recent consent only')
-    assert.deepEqual(calls.map(c => c.headers['idempotency-key']).sort(), [`autopay-${INV}-50000-${today}`, `autopay-a0000000-0000-4000-8000-000000000003-8000-${today}`])
+    assert.deepEqual(calls.map(c => c.form.get('customer')), ['cus_1'], 'the most recent consent only')
+    assert.deepEqual(calls.map(c => c.headers['idempotency-key']), [`autopay-${INV}-50000-${today}`], 'never by client name (OLD1 has no client_id)')
     assert.equal(fb.restCalls.filter(c => c.path.startsWith('invoices') && c.method !== 'GET').length, 0)
     // Next run the same day: the successes are in flight/recent → nothing charged again
     const again = await _test.run({ now: now + 3600_000 })
@@ -427,12 +457,16 @@ test('refund: needs the permission, never more than what is left', async () => {
     }
     fb.stripe = (_m, path, form) => { if (path === '/refunds') return { id: 're_1', status: 'succeeded', amount: Number(form.get('amount')) }; throw new Error(path) }
     const { handler } = require('../netlify/functions/refund-payment.cjs')
-    assert.equal((await handler(call('tok-acc', { paymentId: 'b0000000-0000-4000-8000-000000000001' }))).statusCode, 403)
-    assert.equal((await handler(call('tok-ceo', { paymentId: 'b0000000-0000-4000-8000-000000000003' }))).statusCode, 400, 'manual payments are refunded outside Stripe')
-    assert.equal((await handler(call('tok-ceo', { paymentId: 'b0000000-0000-4000-8000-000000000001', amount: 300.01 }))).statusCode, 400)
-    const ok = await handler(call('tok-ceo', { paymentId: 'b0000000-0000-4000-8000-000000000001' }))
+    const RID = 'e0000000-0000-4000-8000-000000000001'
+    assert.equal((await handler(call('tok-acc', { paymentId: 'b0000000-0000-4000-8000-000000000001', requestId: RID }))).statusCode, 403)
+    assert.equal((await handler(call('tok-ceo', { paymentId: 'b0000000-0000-4000-8000-000000000001' }))).statusCode, 400, 'a request id per refund is required')
+    assert.equal((await handler(call('tok-ceo', { paymentId: 'b0000000-0000-4000-8000-000000000003', requestId: RID }))).statusCode, 400, 'manual payments are refunded outside Stripe')
+    assert.equal((await handler(call('tok-ceo', { paymentId: 'b0000000-0000-4000-8000-000000000001', amount: 300.01, requestId: RID }))).statusCode, 400)
+    const ok = await handler(call('tok-ceo', { paymentId: 'b0000000-0000-4000-8000-000000000001', requestId: RID }))
     assert.equal(ok.statusCode, 200, ok.body)
-    assert.equal(fb.stripeCalls.find(c => c.path === '/refunds')!.form.get('amount'), '30000')
+    const refundCall = fb.stripeCalls.find(c => c.path === '/refunds')!
+    assert.equal(refundCall.form.get('amount'), '30000')
+    assert.equal(refundCall.headers['idempotency-key'], `refund-b0000000-0000-4000-8000-000000000001-${RID}`)
     assert.equal(fb.table('client_payments').length, 3, 'the refund row comes from the webhook, not here')
   } finally { fb.restore() }
 })

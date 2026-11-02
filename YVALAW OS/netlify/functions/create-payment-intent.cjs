@@ -47,7 +47,7 @@ exports.handler = async function handler(event) {
     const cents = P.balanceCents(inv)
     if (amountCents != null && amountCents !== cents) return json(409, { error: 'The balance changed. Refresh the page and try again.' })
 
-    const attempts = await rest(`payment_attempts?invoice_id=eq.${enc(inv.id)}&select=id,status,source,stripe_payment_intent_id,stripe_customer_id,attempted_at,updated_at&order=attempted_at.desc&limit=20`).catch(() => [])
+    const attempts = await rest(`payment_attempts?invoice_id=eq.${enc(inv.id)}&select=id,status,source,stripe_payment_intent_id,stripe_customer_id,attempted_at,updated_at&order=attempted_at.desc&limit=20`)   // fails closed: no read, no new payment
     const now = Date.now()
     const at = a => Date.parse(a.updated_at || a.attempted_at || 0) || 0
     if (attempts.some(a => a.status === 'processing' && now - at(a) < 14 * DAY)) {
@@ -80,7 +80,8 @@ exports.handler = async function handler(event) {
         description: `Invoice ${inv.number || inv.id}`,
         receipt_email: user.email || client.email || undefined,
         payment_method_types: ['card', 'us_bank_account'],
-        payment_method_options: { us_bank_account: { verification_method: 'automatic', financial_connections: { permissions: ['payment_method'] } } },
+        // Instant bank verification (bank login). No micro-deposit fallback in the portal: the client picks another method instead
+        payment_method_options: { us_bank_account: { verification_method: 'instant', financial_connections: { permissions: ['payment_method'] } } },
         setup_future_usage: wantSetup || undefined,
         metadata: { invoiceId: inv.id, clientId: client.id, clientUserId: row.id, invoiceNumber: inv.number || '', source: 'portal' },
       }, { idempotencyKey: `pi-${inv.id}-${cents}-${save ? 1 : 0}-${row.id}-${Math.floor(now / 60000)}` })
