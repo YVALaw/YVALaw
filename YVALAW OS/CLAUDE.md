@@ -17,7 +17,7 @@
 - **Data loading (2026-11) — `src/lib/readCache.ts` + `src/services/liveUpdates.ts`, read their headers before touching loaders.** (1) Every database read goes through `writeAwareFetch` (the Supabase client's fetch): successful GET/HEAD reads are kept in memory and identical reads share one request, so every page/loader is covered automatically. Never kept: `notifications`, `counters`, `desktop_link_codes`, `push_subscriptions`, `data_versions`, and any read asking for "since <a moment in the last ~25 h>" (tracking now, today's live board, recently seen computers). (2) `cachedRead(key, loader)` shares parsed results for a few seconds (and remembers which tables its loader read). (3) **Change stamps** (`supabase/migrate-live-updates.sql`): `public.data_versions` holds one number per watched table, bumped by a statement-level trigger on every insert/update/delete/truncate (any role, server functions included). `liveUpdates.ts` subscribes to it with Supabase Realtime; a push drops only the kept reads whose tables (main + embedded `select=…,clients(…)`) changed. A read of stamped tables is kept until it changes (30 min safety net); unstamped tables, reads made before the first stamp check, and everything before the SQL runs are kept `LIST_MS` (1 min). **No timed background refresh** (the old keep-warm interval is gone: it cost a re-read per window per minute). If the live connection is down, opening a page (`pageChanged`, ≥10 s apart) or returning to the window (≥30 s) does one small `data_versions` read. **When adding a table that pages show, add it to the `watched` list in that script** (otherwise it stays on the 1-minute rule). (4) **Any write clears everything** — through the client (except read-only RPCs in `READ_ONLY_RPC`: add new read-only RPCs there) and POSTs to Netlify functions (`watchFunctionWrites`) — before sending and again when it finishes; stamps arriving within 8 s of your own save are treated as yours. (5) Shell shows "Someone on your team just changed something on this page — Show latest" when a teammate's change touches a table the current page read (`onTeamChange`; Show latest remounts the page via a `key`); ClientShell uses the same hook without the banner. (6) `startKeepWarm` (Shell, 2.5 s after the first page) now only runs `warmUpLists()` once. The bell gets new notifications pushed (Realtime on `notifications`, filtered to the person; poll every 2 min only while not live); Home "working now" and the Live board poll every minute only while visible. `loadInvoiceCounter` / `loadEmployeeCounter` are always live; the InvoiceBuilder clears the cache when it opens. Sign-out → `forgetEverything()`. Screens are `React.lazy` (`lib/lazyPage.ts`, `rarePage` for sign-in screens; `preloadPages()` 4 at a time after sign-in). Dock status lines start 1.5 s after the first page and use count/column queries. Tests: `tests/readCache.test.ts`, scratchpad `live-ui.cjs` (mocked Realtime socket), `live-updates-sql-test.py`, `perf-*.cjs`.
 - **Photos/files never inside records:** profile photos are shrunk to 320 px and uploaded (`utils/photo.ts` → `attachments` bucket, `photos/<table>/<id>/…`); add-employee/candidate attachments upload via `uploadFile`. Settings → Data → **Make lists load faster** (CEO, `services/slimRecords.ts`) moves old inline photos/files to Storage (only changed columns written; failures left as they were).
 - **Old CRM → YVA OS (2026-11):** `supabase/start-fresh-DELETES-ALL-DATA.sql` (owner runs it once: empties every business table incl. paid payroll lines and history, removes every non-CEO login, keeps settings / permissions / CEO logins, resets counters; refuses if there's no CEO; 30 SQL checks both ID modes). Settings → Data → **Import from old CRM** (CEO): `utils/oldCrm.ts` (pure conversion, `tests/oldCrm.test.ts`) + `services/oldCrmImport.ts` (preview → copy files → upsert on id with original `created_at` → counters → read-back check). Old short ids → deterministic UUIDs (re-import updates, never duplicates); hours per invoice from its own total (old CRM wrote "39.51" = 39 h 51 min from April 2026, decimals before) → decimal `hoursTotal` + `daily` "h:mm"; `billAmount` kept; status lower-cased; `client_id` from the client name; résumés/videos copied from inline data or the old project's storage; columns the database lacks are dropped and reported. Invoice lines now show `billAmount` when present (`lineAmount`), so night-premium lines add up to the total; the builder stores `billAmount`.
-- **Old-CRM parity (2026-11):** (1) **CC emails** — SQL `migrate-cc-emails.sql` (`clients.cc_emails`, `employees.cc_emails`, `invoices.client_cc_emails`, text[] nullable). Client "Invoice CC" + billing contacts (Client → Contacts "Gets invoices") are Cc'd on invoice emails, reminders, quick invoices, weekly-close sends, client reminders; each invoice keeps its Cc snapshot; employee "Statement CC" on statements. Rules in `services/emailRecipients.ts`, lists in `utils/emailList.ts`; `sendEmail(to, subject, body, { attachments, cc })` (`utils/mime.ts` builds the raw message, header-injection safe; mailto gets `cc=`). Works before the SQL runs (fields disabled, CC never sent if the column is missing — `ccColumnExists` in storage.ts). (2) **Real PDFs** — `utils/pdf.ts` (jsPDF + html2canvas, loaded only when a PDF is made) attaches letter-size PDFs to invoice, reminder and statement emails; client invoices never show DOP. (3) **Staff profiles + who-did-what** — SQL `migrate-staff-profiles.sql`: audit trigger on the remaining tables, `audit_log.action` allows `'event'`, `public.log_action()` (staff only, actor stamped server-side; browser helper `services/activityLog.ts`, never throws; in `READ_ONLY_RPC`), index `audit_log_actor`, `lead_activities` history needs `leads.view_all`. **Re-run it after re-running Step 1.** Settings → Team Access: Open / Create / Link profile (`services/staffProfiles.ts`, `StaffProfileModal`); account menu My profile / Create my profile; employee page **Activity** tab (`HistoryList actorId`, history.view); "Created by · Last changed by" (`RecordSignature`, `services/auditTrail.ts`) on client, employee, project pages and the invoice preview; sign-ins, emails, exports/imports logged. (4) Import carries CC lists and turns old per-person project rates (`assignments`) into `placement_rates` (effective from the project's first invoice). (5) People ↔ projects from the people side: `components/people/ProjectAssign.tsx` (employee form, employee page, project Team tab quick add). Team / Invoices open grouped by project; view switches remember the last choice (`lib/stickyView.ts`, localStorage `yva_view_<page>`).
+- **Old-CRM parity (2026-11):** (1) **CC emails** — SQL `migrate-cc-emails.sql` (`clients.cc_emails`, `employees.cc_emails`, `invoices.client_cc_emails`, text[] nullable). Client "Invoice CC" + billing contacts (Client → Contacts "Gets invoices") are Cc'd on invoice emails, reminders, quick invoices, weekly-close sends, client reminders; each invoice keeps its Cc snapshot; employee "Statement CC" on statements. Rules in `services/emailRecipients.ts`, lists in `utils/emailList.ts`; `sendEmail(to, subject, body, { attachments, cc })` (`utils/mime.ts` builds the send-email request, header-injection safe; mailto gets `cc=`). Works before the SQL runs (fields disabled, CC never sent if the column is missing — `ccColumnExists` in storage.ts). (2) **Real PDFs** — `utils/pdf.ts` (jsPDF + html2canvas, loaded only when a PDF is made) attaches letter-size PDFs to invoice, reminder and statement emails; client invoices never show DOP. (3) **Staff profiles + who-did-what** — SQL `migrate-staff-profiles.sql`: audit trigger on the remaining tables, `audit_log.action` allows `'event'`, `public.log_action()` (staff only, actor stamped server-side; browser helper `services/activityLog.ts`, never throws; in `READ_ONLY_RPC`), index `audit_log_actor`, `lead_activities` history needs `leads.view_all`. **Re-run it after re-running Step 1.** Settings → Team Access: Open / Create / Link profile (`services/staffProfiles.ts`, `StaffProfileModal`); account menu My profile / Create my profile; employee page **Activity** tab (`HistoryList actorId`, history.view); "Created by · Last changed by" (`RecordSignature`, `services/auditTrail.ts`) on client, employee, project pages and the invoice preview; sign-ins, emails, exports/imports logged. (4) Import carries CC lists and turns old per-person project rates (`assignments`) into `placement_rates` (effective from the project's first invoice). (5) People ↔ projects from the people side: `components/people/ProjectAssign.tsx` (employee form, employee page, project Team tab quick add). Team / Invoices open grouped by project; view switches remember the last choice (`lib/stickyView.ts`, localStorage `yva_view_<page>`).
 - InvoicePage keeps the builder mounted (only `hidden`) at phone width — a resize/rotation across 760 px used to wipe a half-built invoice.
 - Browser tests per hub: scratchpad `redesign-<hub>-ui.cjs` (the old `step*-ui.cjs` target the old markup and are retired).
 
@@ -195,9 +195,9 @@ Groundwork for the YVA Time Windows desktop tracker (Electron, Phase 1). Plan de
 - **Permissions:** `role_permissions(role, permission)` + `private.has_permission(text)` (CEO always true) + `private.users_with_permission(text)`. List + labels in `src/lib/permissions.ts`; `usePermission()` from `RoleContext` (loads the role's grants). Settings → Team Access → **Permissions** matrix (CEO writes, staff read). Existing `can.*` checks are unchanged; new features use permissions. Nothing granted by default.
 - **Change history:** `audit_log` filled by `private.audit_row()` AFTER triggers on invoices, clients, projects, employees, expenses, candidates, time_entries, user_roles, role_permissions, client_users, settings (Gmail token columns shown as •••; values > 20k chars summarised). Updates store `{col: [old, new]}` for changed columns only; `actor_id` NULL = automatic. Readable with `history.view`; nobody can edit it. UI: `components/HistoryList.tsx` (Settings → **History**) and `RecordHistory` on client / employee / project profiles. Later steps attach the same trigger to their tables.
 - **Portal drafts:** `portal_client_invoices` re-created with `coalesce(status,'draft') <> 'draft'`.
-- **Gmail (browser):** `services/gmail.ts` now throws on failed lookups, Disconnect writes `null`, refresh errors map Google codes (`invalid_grant` → reconnect), one forced refresh on 401, and `sendEmail` never falls back silently (confirm dialog with the reason; `mode: 'failed'` if declined; no Client ID → mail app directly).
-- **Gmail (server):** `netlify/functions/_lib/gmail.cjs` sends as the user in `settings.notify_sender_user_id` (CEO: Settings → Notifications → **Use my Gmail**) with their stored refresh token + `GMAIL_CLIENT_SECRET`; errors explain what's missing (`GmailNotSetUp`). Text + HTML + attachments, header-injection safe.
-- **Notifications:** `notifications` (bell; users may only set `read_at`), `notification_prefs` (per kind email/push; `'*'` row = `email_to`), `push_subscriptions`, `app_secrets` (service-role only). `private.notify_user` / `private.notify_permission` for SQL; `_lib/notify.cjs` (`notify`, `notifyPermission`, `dispatchPending` — claims rows with a conditional PATCH so concurrent runs never double-send). Functions: **`notifications-dispatch`** (scheduled every 5 min), **`notifications-send-now`** (POST, staff/employees; `{test:true}`), **`push-config`** (GET public key). Kinds in `src/lib/notifications.ts`. UI: `NotificationBell` (Shell topbar + My workspace; app icon badge), `NotificationSettings` (Settings → Notifications, My workspace → Notifications), `AutoEmailSender`.
+- **Email:** replaced in 2026-11 by the company Outlook mailbox — see **Email (Outlook)** below. (Step 1 built per-person Gmail; that code, the `gmail-oauth` function and the stored Google tokens are gone.)
+- **Email (server):** `_lib/notify.cjs` emails notifications through `_lib/outlook.cjs` (one company mailbox); a setup problem stops that run's emails and is reported as `emailProblem`. `settings.notify_sender_user_id` is no longer used.
+- **Notifications:** `notifications` (bell; users may only set `read_at`), `notification_prefs` (per kind email/push; `'*'` row = `email_to`), `push_subscriptions`, `app_secrets` (service-role only). `private.notify_user` / `private.notify_permission` for SQL; `_lib/notify.cjs` (`notify`, `notifyPermission`, `dispatchPending` — claims rows with a conditional PATCH so concurrent runs never double-send). Functions: **`notifications-dispatch`** (scheduled every 5 min), **`notifications-send-now`** (POST, staff/employees; `{test:true}`), **`push-config`** (GET public key). Kinds in `src/lib/notifications.ts`. UI: `NotificationBell` (Shell topbar + My workspace; app icon badge), `NotificationSettings` (Settings → Notifications, My workspace → Notifications).
 - **Web Push** without a package (`_lib/webpush.cjs`): VAPID ES256 JWT + RFC 8291 aes128gcm with `node:crypto`; keys from `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` or auto-created in `app_secrets`. 404/410 subscriptions are deleted. Test decrypts as the phone would.
 - **Installable app "YVA OS":** `public/manifest.webmanifest` (scope `/os/`, standalone), icons in `public/icons/` (180/192/512, maskable, badge), `public/sw.js` (push + notification click only — **no page caching**), registered in `main.tsx` (production only). `index.html`: manifest, theme-color, apple-mobile-web-app tags, `viewport-fit=cover`; portal bottom bar pads for the iPhone home bar. iPhone push needs iOS 16.4+ and the app opened from the home-screen icon. Sidebar/brand text renamed "YVA OS".
 - Tests: 47 SQL checks (local Postgres), 30 server checks (fake Supabase/Google/push), 28 unit tests, 24 browser checks.
@@ -299,7 +299,7 @@ Groundwork for the YVA Time Windows desktop tracker (Electron, Phase 1). Plan de
 
 **Fixes applied**:
 - `netlify/functions/invite-client.cjs` now uses `generate_link` for **both** `email` and `link` modes. Both modes get the correct `redirect_to` pointing at `/portal/set-password`.
-- `ClientProfilePage.tsx` now sends the invite email from the frontend using the existing `sendEmail()` utility (Gmail API if connected, mailto fallback otherwise) for `mode='email'`.
+- `ClientProfilePage.tsx` now sends the invite email from the frontend using the existing `sendEmail()` utility (company Outlook mailbox since 2026-11, mailto fallback otherwise) for `mode='email'`.
 - `RoleContext.tsx` now checks `user.user_metadata.role === 'client'` before the recruiter fallback. Invited clients without a `client_users` row are kept as `role='client'` in memory (no DB write to `user_roles`), preventing OS access.
 - Added `auth_id` duplicate check in `invite-client.cjs` to prevent linking one email to multiple clients.
 
@@ -425,7 +425,7 @@ STRIPE_SECRET_KEY             (test mode key)
 STRIPE_WEBHOOK_SECRET         (test mode webhook)
 ```
 
-`GMAIL_CLIENT_SECRET` was skipped because Gmail is not connected for this project yet. Add it later only when Gmail OAuth is configured.
+Email (2026-11): `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_SENDER_MAILBOX` (company Outlook mailbox — SETUP-AFTER-BUILD.md §3). `GMAIL_CLIENT_SECRET` is no longer used and can be deleted.
 
 ---
 
@@ -487,7 +487,7 @@ Payments and AutoPay are now working in test mode. The next missing operational 
 5. **AutoPay notifications** — internal timeline notifications are implemented. Email/SMS notification remains optional later.
 6. **Mobile portal QA** — test bottom nav, Billing, payment modal, AutoPay status, Documents upload/download, PDF download, Team cards, and Staff Request modal on mobile.
 7. **Live-mode readiness** — before real charges, switch Stripe keys/webhook from test to live, create the live webhook endpoint, verify live env vars, and repeat a small live payment test.
-8. Gmail integration remains optional/pending until Google OAuth client ID/secret are configured.
+8. Email: Gmail was replaced by the company Outlook mailbox (2026-11); set the four `MS_*` variables (SETUP-AFTER-BUILD.md §3).
 
 Tomorrow's suggested start:
 1. Create a small due unpaid invoice for an AutoPay-enabled test client.
@@ -518,7 +518,7 @@ Security hardening validation before push/deploy:
 - Reports payroll CSV now uses premium-aware invoice items instead of raw hours × rate.
 - Per-project invoice numbering now recovers from saved invoices if `nextInvoiceSeq` drifts, instead of blindly trusting the cached counter.
 - Hour parsing accepts decimal hours, `h:mm`, and legacy minute-style values like `3.08` meaning `3h 08m`.
-- Gmail auth now uses a Netlify server function for token exchange and refresh; the Google client secret lives in `GMAIL_CLIENT_SECRET` on Netlify, not in the browser.
+- Email goes out from one company Outlook mailbox through the `send-email` Netlify function (Microsoft Graph); no email tokens in the browser (Gmail removed 2026-11).
 - USD→DOP auto-fetch now comes from InfoDolar Banco BHD data via a Netlify function, with manual entry still available.
 - Candidate conversion now creates the employee record when moved to hired and removes the candidate card once conversion is complete.
 
@@ -574,11 +574,11 @@ All data is scoped to the authenticated user via Supabase RLS.
 | `/candidates/:id` | CandidateProfilePage | Full profile: inline edit, attachments, onboarding checklist (when hired) |
 | `/projects` | ProjectsPage | Kanban + cards + employee assignment |
 | `/projects/:id` | ProjectProfilePage | Full profile: inline edit, task board, expenses, invoice history, team |
-| `/settings` | SettingsPage | Tabbed: Company, Email (templates), Integrations (Gmail), Currency, Notifications, Data (backup/restore/danger) |
+| `/settings` | SettingsPage | Tabbed: Company, Email (templates), Integrations (Email sending · Outlook), Currency, Notifications, Data (backup/restore/danger) |
 | `/estimates` | EstimatesPage | Estimates list + right-side slide panel + line-item builder; status: draft/sent/accepted/declined/expired |
 | `/time` | TimeTrackingPage | Time log with KPI cards, filters, slide panel to log hours per employee/project |
 | `/portal` | PortalPage | Read-only client-facing invoice view (outside Shell, no nav) |
-| `/oauth-callback` | OAuthCallbackPage | Handles Google OAuth2 redirect after Gmail authorization (outside Shell) |
+| `/oauth-callback` | — | Old Gmail sign-in return address; now redirects to Settings → Integrations |
 | `/login` | LoginPage | Email/password login + sign-up toggle + Remember Me |
 | `/me` | EmployeeWorkspace | Invited employees only (outside Shell): YVA Time info, assigned projects, own details — via `employee-me` |
 
@@ -613,7 +613,7 @@ All data is scoped to the authenticated user via Supabase RLS.
   - **All groups collapsed by default** — uses an `expanded` Set (empty = all closed)
   - Each group header shows **unpaid count** (sent/overdue/partial) in red dot badge
 - Each project group has "+ Quick" and "+ Invoice" buttons that pre-fill the project
-- Email button: sends via Gmail if connected, otherwise opens mailto: — **invoice HTML attached as `invoice-{number}.html`**
+- Email button: sends from the company Outlook mailbox with the invoice **PDF** attached and the client's Cc list; if sending fails the person can open their mail app instead (PDF downloaded)
 - PDF button: opens print-formatted window with logo, due date, notes — **no DOP on client-facing PDFs**
 - Share button: copies base64 portal link to clipboard
 
@@ -642,9 +642,9 @@ All data is scoped to the authenticated user via Supabase RLS.
 - Premium split is shown when an employee has a saved premium schedule
 - "Totals by Project" section
 - **PDF Payslip** — opens print-formatted window (includes DOP)
-- **Email Statement** — sends via Gmail API with statement attached as `statement-{name}-{period}.html`
+- **Email Statement** — sends from the company Outlook mailbox with the statement PDF attached (+ Statement CC)
   - Button shows "Sending…" while in flight; disabled to prevent double-send
-  - Green toast on success, error toast if Gmail fails
+  - Green toast on success, error toast with the reason if sending fails
   - Shared HTML builder: `src/utils/statementHtml.ts` → `buildStatementHTML()`
 
 ## Activity Log (Clients)
@@ -709,22 +709,16 @@ Also shows: Employee Performance table, Revenue by Client/Project, All-Time Clie
 - `partial` (orange badge): invoice partially paid — stores `amountPaid` amount on the record
 - Partial payment amount editable in the status-change modal
 
-## Gmail Integration
-- Service: `src/services/gmail.ts` — OAuth2 PKCE flow, Netlify-backed token exchange/refresh, `sendGmailMessage()`, `sendEmail()` (universal)
-- `sendEmail(to, subject, body, attachment?)` — uses Gmail API if connected, falls back to `mailto:` if not
-  - Optional `attachment: { name, content, mimeType }` — builds multipart/mixed MIME when provided
-  - Attachment content is base64-encoded and line-wrapped at 76 chars per RFC 2822
-  - `mailto:` fallback does not support attachments (browser limitation)
-- **Per-user OAuth**: each logged-in user connects their own Gmail account independently
-  - `gmailClientId` stored in shared `settings` table (one per org)
-  - `GMAIL_CLIENT_SECRET` lives in Netlify environment variables
-  - `gmailAccessToken`, `gmailRefreshToken`, `gmailTokenExpiry`, `gmailEmail` stored in **Supabase user metadata** (`supabase.auth.updateUser({ data: {...} })`)
-  - Read via `supabase.auth.getUser()` → `user.user_metadata`
-- **OAuth flow**: User enters Google OAuth Client ID in Settings → clicks "Connect Gmail" → PKCE redirect to Google → callback at `/oauth-callback` → token exchange/refresh handled by `/.netlify/functions/gmail-oauth` → tokens saved to user metadata
-- Token auto-refreshes on expiry using stored refresh token
-- Disconnect option in Settings clears all Gmail tokens from user metadata
-- **Setup**: Google Cloud Console → enable Gmail API → OAuth 2.0 Client ID (Web application) → add `{origin}/oauth-callback` as Authorized Redirect URI
-- All email-sending functions (invoice email, payment reminder, statement email, client reminder) use `sendEmail()` and therefore support Gmail automatically
+## Email (Outlook) — 2026-11, replaces Gmail
+- **One company mailbox** (Microsoft 365, e.g. contact@yvastaffing.agency) sends everything: invoices, reminders, quick invoices, weekly-close sends, statements, estimates, team invites, notification emails. A copy lands in that mailbox's Sent Items (`saveToSentItems`).
+- **Server:** `netlify/functions/_lib/outlook.cjs` — Microsoft Graph app-only sign-in (client credentials, token cached in memory until ~5 min before expiry) and `POST /users/{MS_SENDER_MAILBOX}/sendMail`. Setup problems throw `OutlookNotSetUp` with a plain reason (missing variables, wrong/expired secret, no Mail.Send consent, unknown mailbox). `_lib/emailRules.cjs` (pure, `tests/emailRules.test.ts`): ≤ 10 recipients, valid addresses, To never repeated in Cc, subject ≤ 300 chars on one line, text ≤ 200 KB, **PDF attachments only**, ≤ 4.5 MB together (Netlify body limit), safe file names.
+- **`send-email`** (POST, staff roles only — never pending/client/employee): checks the Supabase session, validates, limits **100 emails per person per hour / 500 per day** from `public.email_log`, sends, and logs every attempt (who, To/Cc, subject, attachment names + sizes, sent/failed + Microsoft's reason; never the PDF). Before `migrate-outlook-email.sql` runs it still sends (no log, no limit). Answers 400 bad email · 401/403 · 429 · 503 `{notSetUp}` · 502 Microsoft error. **`email-status`** (GET, staff): `{ configured, mailbox, missing[] }`; `?check=1` also signs in to Microsoft (no email sent) → `{ ok, problem }`.
+- **Browser:** `src/services/email.ts` — `sendEmail(to, subject, body, { attachments, cc })` → `{ mode: 'outlook' | 'mailto' | 'failed', attached, fallbackReason }`. Failures are never silent: a confirm dialog explains why (or that Outlook isn't set up yet) and offers the mail app (the PDFs are downloaded to attach by hand); declining returns `failed`. `utils/mime.ts` builds the request body and the `mailto:` link. Weekly close "Send all" needs Outlook configured (`loadEmailStatus`).
+- **Settings:** Integrations → **Email sending · Outlook** (`components/settings/emailStatus.ts`): Connected / Not set up (names the missing Netlify variables) / Problem (reason), **Send test email to me** (to the signed-in login's address), Check again. Email tab shows "Sending from …".
+- **Security:** no email tokens or secrets in the browser or database; the Entra app has only the Mail.Send **application** permission and is limited to the one mailbox by an Exchange **application access policy** (or RBAC for Applications) — SETUP-AFTER-BUILD.md §3; only staff can call `send-email`; per-person rate limits; `email_log` readable by CEO/Admin only, written by the server only.
+- **Env (Netlify):** `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET` (expires — renew in Entra, then update Netlify), `MS_SENDER_MAILBOX`.
+- **SQL:** `supabase/migrate-outlook-email.sql` — `email_log` + RLS; blanks the old Google tokens in `settings` and removes `gmail*` keys from every login's user metadata (columns kept for older app versions).
+- Tests: `tests/emailRules.test.ts`, `tests/sendEmailFunction.test.ts` (send-email / email-status / notification emails against fake Supabase + Microsoft), scratchpad `outlook-sql/` (40 checks, both ID modes), `cc-pdf-ui.cjs`, `redesign-settings-ui.cjs`. The real Microsoft Graph can only be exercised on the live site (Settings → Send test email).
 
 ## Expense Tracking
 - Projects have an "Expenses" button → modal to log expenses per project (stored in `expenses` table)
@@ -761,8 +755,8 @@ Also shows: Employee Performance table, Revenue by Client/Project, All-Time Clie
 - Uses shared `buildStatementHTML()` from `src/utils/statementHtml.ts`
 
 ## Employee Statement Email
-- Both EmployeesPage and EmployeeProfilePage: "Email Statement" sends via Gmail API
-- Attaches full statement HTML as `statement-{name}-{period}.html`
+- Both EmployeesPage and EmployeeProfilePage: "Email Statement" sends from the company Outlook mailbox
+- Attaches the statement as a PDF (+ the employee's Statement CC)
 - Includes sending state + toast confirmation (see Employee Statements section)
 
 ## Onboarding Checklist
@@ -793,7 +787,7 @@ Also shows: Employee Performance table, Revenue by Client/Project, All-Time Clie
 - [x] Per-project task board (3-column kanban in modal)
 - [x] Employee-to-project assignment UI (multi-select checkboxes, shown on cards)
 - [x] Document/link storage on Client and Project records
-- [x] Employee email invoices (Gmail API with invoice HTML attached; mailto: fallback)
+- [x] Employee email invoices (company Outlook mailbox with the invoice PDF attached; mailto: fallback)
 - [x] Invoice PDF export (print window with logo + notes + due date — no DOP on client invoices)
 - [x] USD→DOP currency conversion (manual + auto-fetch from InfoDolar Banco BHD)
 - [x] Browser notifications (overdue/draft invoice alerts)
@@ -809,13 +803,12 @@ Also shows: Employee Performance table, Revenue by Client/Project, All-Time Clie
 - [x] Expense tracking per project (log expenses, budget vs actual, category)
 - [x] Employee capacity view (toggle in EmployeesPage — projects + hours this month)
 - [x] Employee payslip PDF (print-formatted window; shared `buildStatementHTML` util)
-- [x] Employee statement email (Gmail API with HTML attachment; sending state + toast confirmation)
+- [x] Employee statement email (company Outlook mailbox with PDF attachment; sending state + toast confirmation)
 - [x] Candidate hire conversion (creates employee record, removes candidate card, opens onboarding checklist)
 - [x] Employee schedule + premium pay rules (saved shift defaults, night premium start/percent)
 - [x] Premium-aware invoice/payroll math (billing + statements)
 - [x] Legacy minute-style hour parsing (`3.08` = 3h08m)
 - [x] Per-project invoice counter recovery from real saved invoices
-- [x] Gmail server-side token exchange/refresh via Netlify function
 - [x] InfoDolar Banco BHD USD→DOP auto-fetch via Netlify function
 - [x] Onboarding checklist (auto-opens when candidate moved to Hired stage)
 - [x] Weekly invoice reminder scheduler (day-of-week trigger, fires on app open)
@@ -829,12 +822,11 @@ Also shows: Employee Performance table, Revenue by Client/Project, All-Time Clie
 - [x] Profile photo upload on Employee and Client profile pages (base64 dataUrl, camera overlay on hover)
 - [x] Invoice page: project-grouped collapsible list view (replaced kanban — sections per project, table rows per invoice)
 - [x] Invoice auto-send on creation (status → `sent` + email via `sendEmail()`)
-- [x] Gmail OAuth2 PKCE integration (`src/services/gmail.ts`) — actual Gmail API send, Netlify-backed token exchange/refresh, mailto: fallback if not connected
+- [x] Email from the company Outlook mailbox (`src/services/email.ts` → `send-email`, Microsoft Graph) — replaced the Gmail OAuth integration in 2026-11
 - [x] **Supabase migration** — all data moved from localStorage to Supabase PostgreSQL + Auth
 - [x] **Login page** — email/password auth with sign-up toggle and Remember Me checkbox
 - [x] **Invoice groups collapsed by default** — all project sections closed on load; unpaid count shown in header
 - [x] **Business Expenses KPI on dashboard** — general expenses card + deducted from Net Earnings
-- [x] **Per-user Gmail OAuth** — each user's Gmail tokens stored in Supabase user metadata (not shared)
 - [x] **Role-based dashboards** — CEO sees full financials; Admin sees team/ops KPIs; Accounting sees invoice/AR KPIs; Recruiter/Lead Gen see their own views
 - [x] **CEO-only financials** — revenue charts, invoice history, payroll CSV, AR aging, forecasting all gated by `can.viewOwnerStats(role)`
 - [x] **Team Access settings tab** — visible and editable by CEO only
@@ -864,7 +856,7 @@ Also shows: Employee Performance table, Revenue by Client/Project, All-Time Clie
 ## Architecture Notes
 
 ### App.tsx routing
-- `/portal` and `/oauth-callback` and `/login` render **outside** Shell (no nav/sidebar)
+- `/portal` and `/login` render **outside** Shell (no nav/sidebar); `/oauth-callback` (old Gmail return address) redirects to Settings → Integrations
 - All other routes render inside `Shell`, protected by auth check
 - Unauthenticated users redirected to `/login`
 
