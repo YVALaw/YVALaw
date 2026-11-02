@@ -10,13 +10,13 @@ import RecurringInvoices from '../components/finance/RecurringInvoices'
 import { useSavedViews } from '../components/finance/savedViews'
 import { Banner, Checkbox, EmptyState, Field, Menu, Modal, PageHeader, Pill, SearchInput, Segmented, Skel, Tabs, useIsMobile, type MenuItem } from '../components/ui'
 import { Ic, P } from '../components/Icon'
-import { useRole } from '../context/RoleContext'
+import { usePermission, useRole } from '../context/RoleContext'
 import type { AppSettings, Client, Invoice, Project, RecurringInvoice } from '../data/types'
 import {
   loadInvoices, saveInvoices, loadInvoiceCounter, saveInvoiceCounter, loadSnapshot, loadSettings,
   loadRecurringInvoices, saveRecurringInvoices, logComm,
 } from '../services/storage'
-import { loadInvoicePaidState, loadPayments } from '../services/payments'
+import { createPayLink, loadInvoicePaidState, loadPayments } from '../services/payments'
 import { formatMoney } from '../utils/money'
 import { buildInvoiceHTML, printInvoice as printInvoiceUtil } from '../utils/invoiceHtml'
 import { sendInvoiceEmail, sendReminderEmail, sentToLabel } from '../services/invoiceEmail'
@@ -61,7 +61,10 @@ type QuickForm = { clientName: string; date: string; dueDate: string; subtotal: 
 const EMPTY_FORM = (): QuickForm => ({ clientName: '', date: new Date().toISOString().slice(0, 10), dueDate: '', subtotal: '', notes: '' })
 
 export default function InvoicePage() {
-  const { userId } = useRole()
+  const { userId, role } = useRole()
+  const allowed = usePermission()
+  const stripeOn = !!(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string | undefined)
+  const canPayLink = stripeOn && (role === 'ceo' || role === 'admin' || role === 'accounting' || allowed('invoices.send'))
   const mobile = useIsMobile()
   const [params, setParams] = useSearchParams()
   const [loading, setLoading] = useState(true)
@@ -321,15 +324,25 @@ export default function InvoicePage() {
       { label: 'Payment', primary: true, onClick: () => setPayingInv(inv) },
     ]
   }
+  /** "Pay now" link for the client (card or bank, no portal login) — copied to the clipboard */
+  async function copyPayLink(inv: Invoice) {
+    try {
+      const { url } = await createPayLink(inv.id)
+      try { await navigator.clipboard.writeText(url); ok(`Pay link for ${inv.number} copied. It opens a secure Stripe page for what's still owed (card or bank account) and works for 60 days.`) }
+      catch { setBanner({ tone: 'success', text: `Pay link for ${inv.number}: ${url}` }) }
+    } catch (e) { fail(`Could not make the pay link: ${(e as Error).message}`) }
+  }
   function menuFor(inv: Invoice): MenuItem[] {
     const s = statusOf(inv)
+    const owed = amountOf(inv) - (Number(inv.amountPaid) || 0) >= 0.5
     return [
       { label: 'Preview', icon: P.eye, onClick: () => setPreviewInv(inv) },
       { label: 'Download PDF', icon: P.printer, onClick: () => printInvoice(inv), hidden: s !== 'draft' },
       { label: 'Email invoice', icon: P.mail, onClick: () => void emailAgain(inv), hidden: !inv.clientEmail || s === 'draft' },
       { label: 'Payment reminder', icon: P.bell, onClick: () => void remind(inv), hidden: !inv.clientEmail || !['overdue', 'sent', 'partial'].includes(s) },
       { label: 'Payments received', icon: P.cash, onClick: () => setPayingInv(inv), hidden: s === 'draft' },
-      { label: 'Copy portal link', icon: P.link, onClick: () => shareInvoice(inv, settings.usdToDop, ok) },
+      { label: 'Copy pay link (card or bank)', icon: P.card, onClick: () => void copyPayLink(inv), hidden: !canPayLink || s === 'draft' || s === 'paid' || !owed },
+      { label: 'Copy read-only link', icon: P.link, onClick: () => shareInvoice(inv, settings.usdToDop, ok) },
       { label: 'Duplicate', icon: P.copy, onClick: () => void duplicateInvoice(inv) },
       { label: 'Edit invoice', icon: P.edit, onClick: () => openEditInvoice(inv), hidden: s === 'draft' },
       { label: 'Change status', icon: P.refresh, onClick: () => openStatusEdit(inv) },
