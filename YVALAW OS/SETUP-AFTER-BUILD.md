@@ -170,6 +170,14 @@ tries, 3 days apart). From YVA OS you can **refund** a card/bank payment (Invoic
    invoice emailed during testing (its pay link was made for test mode).
 Never paste these keys into an email or chat; they only go into Netlify.
 
+## 3c. Live updates (turn on when your team uses YVA OS)
+
+Live updates are **paused** to keep the database quiet while you're the only one using YVA OS (Settings → Integrations
+shows "Live updates · Paused"). When your team starts working in it: Netlify → **Site configuration → Environment
+variables** → add `VITE_LIVE_UPDATES` = `on` → **Deploys → Trigger deploy**. Changes teammates make then appear right
+away and the bell gets notifications instantly. If the Supabase dashboard ever warns about the **Disk IO budget**, set it
+back to `off` (or upgrade the Supabase compute).
+
 ## 4. Turn on phone notifications (you, then your team)
 
 **iPhone:** open `yvastaffing.agency/os` in **Safari** → Share → **Add to Home Screen** → open

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Ic, P } from './Icon'
 import { loadNotifications, markNotificationsRead, setAppBadge, type AppNotification } from '../services/notifications'
 import { supabase } from '../lib/supabase'
+import { LIVE_UPDATES_ON } from '../lib/liveConfig'
 
 function ago(ms: number, es: boolean): string {
   const m = Math.floor((Date.now() - ms) / 60000)
@@ -35,7 +36,8 @@ export default function NotificationBell({ lang = 'en', linkBase = '', onOpenCha
     let alive = true, live = false, lastVis = 0
     let channel: ReturnType<typeof supabase.channel> | null = null
     void refresh()
-    void supabase.auth.getSession().then(({ data }) => {
+    // Live updates paused (lib/liveConfig.ts): no Realtime connection; checks every 10 minutes and on return instead
+    if (LIVE_UPDATES_ON) void supabase.auth.getSession().then(({ data }) => {
       const uid = data.session?.user.id
       if (!alive || !uid) return
       channel = supabase
@@ -47,7 +49,7 @@ export default function NotificationBell({ lang = 'en', linkBase = '', onOpenCha
           if (live && !was && alive) void refresh()   // reconnected: catch up on anything missed
         })
     })
-    const id = setInterval(() => { if (!live && document.visibilityState === 'visible') void refresh() }, 120_000)
+    const id = setInterval(() => { if (!live && document.visibilityState === 'visible') void refresh() }, LIVE_UPDATES_ON ? 120_000 : 600_000)
     const onVis = () => { if (document.visibilityState === 'visible' && Date.now() - lastVis > 30_000) { lastVis = Date.now(); void refresh() } }
     document.addEventListener('visibilitychange', onVis)
     return () => {
