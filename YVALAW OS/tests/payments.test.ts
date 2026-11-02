@@ -429,6 +429,8 @@ test('pay link: staff make it; opening it sends the client to Stripe Checkout fo
     const create = fb.stripeCalls.find(c => c.path === '/checkout/sessions')!
     assert.equal(create.form.get('line_items[0][price_data][unit_amount]'), '90000')
     assert.equal(create.form.get('payment_intent_data[metadata][invoiceId]'), INV)
+    assert.equal(create.form.get('adaptive_pricing[enabled]'), 'false', 'always USD — no conversion to the visitor\'s currency')
+    assert.equal(create.form.get('payment_method_types[1]'), 'us_bank_account')
     // Opened again (or by an email scanner): same Checkout page, no new session
     await open(url.searchParams.get('t'))
     assert.equal(fb.stripeCalls.filter(c => c.path === '/checkout/sessions' && c.method === 'POST').length, 1)
