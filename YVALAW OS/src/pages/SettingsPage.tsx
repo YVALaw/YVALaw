@@ -5,12 +5,11 @@ import { loadInvoices, loadSettings, loadUserRoles, saveSettings, settingsHaveBr
 import { deleteFile, uploadFile } from '../services/fileStorage'
 import { usePermission, useRole } from '../context/RoleContext'
 import NotificationSettings from '../components/NotificationSettings'
-import AutoEmailSender from '../components/AutoEmailSender'
 import HistoryList from '../components/HistoryList'
 import IntegrationsTab from '../components/settings/IntegrationsTab'
 import DataTab from '../components/settings/DataTab'
 import TeamAccessTab from '../components/settings/TeamAccessTab'
-import { useGmailStatus, type GmailStatus } from '../components/settings/gmailStatus'
+import { useEmailStatus, type EmailStatusView } from '../components/settings/emailStatus'
 import { Banner, Field, PageHeader, Skel } from '../components/ui'
 import { Ic, P } from '../components/Icon'
 import { STAFF_KINDS } from '../lib/notifications'
@@ -38,9 +37,9 @@ const ALL_TABS: { id: SettingsTab; label: string; ceoOnly?: boolean }[] = [
   { id: 'history',       label: 'History' },
 ]
 /** Old / alternative names other screens may link with (?tab=access) */
-const TAB_ALIASES: Record<string, SettingsTab> = { access: 'team', 'team-access': 'team', permissions: 'team', gmail: 'integrations' }
+const TAB_ALIASES: Record<string, SettingsTab> = { access: 'team', 'team-access': 'team', permissions: 'team', gmail: 'integrations', outlook: 'integrations' }
 
-const PLACEHOLDERS = ['{clientName}', '{invoiceNumber}', '{amount}', '{period}', '{dueDate}', '{companyName}', '{employeeName}']
+const PLACEHOLDERS = ['{clientName}', '{invoiceNumber}', '{amount}', '{period}', '{dueDate}', '{companyName}', '{employeeName}', '{payLink}']
 const TEMPLATES: { key: 'invoiceEmailTemplate' | 'statementEmailTemplate' | 'reminderEmailTemplate'; label: string; sub: string; placeholder: string }[] = [
   { key: 'invoiceEmailTemplate', label: 'Invoice email', sub: 'Sent when emailing an invoice to a client',
     placeholder: `Hi {clientName},\n\nPlease find attached invoice {invoiceNumber} for {amount}.\n\nBilling period: {period}\n{dueDate}\nPlease don't hesitate to reach out with any questions.\n\n{companyName}` },
@@ -56,13 +55,13 @@ type Form = {
   companyName: string; companyEmail: string; companyPhone: string; companyAddress: string; monthlyGoal: string; reminderDay: string
   companyWebsite: string; invoiceFooter: string
   emailSignature: string; invoiceEmailTemplate: string; statementEmailTemplate: string; reminderEmailTemplate: string
-  usdToDop: string; gmailClientId: string; crispWebsiteId: string
+  usdToDop: string; crispWebsiteId: string
 }
 const toForm = (s: AppSettings): Form => ({
   companyName: s.companyName ?? '', companyEmail: s.companyEmail ?? '', companyPhone: s.companyPhone ?? '', companyAddress: s.companyAddress ?? '',
   monthlyGoal: s.monthlyGoal != null ? String(s.monthlyGoal) : '', reminderDay: s.reminderDay != null ? String(s.reminderDay) : '',
   emailSignature: s.emailSignature ?? '', invoiceEmailTemplate: s.invoiceEmailTemplate ?? '', statementEmailTemplate: s.statementEmailTemplate ?? '',
-  reminderEmailTemplate: s.reminderEmailTemplate ?? '', usdToDop: s.usdToDop ? String(s.usdToDop) : '', gmailClientId: s.gmailClientId ?? '',
+  reminderEmailTemplate: s.reminderEmailTemplate ?? '', usdToDop: s.usdToDop ? String(s.usdToDop) : '',
   companyWebsite: s.companyWebsite ?? '', invoiceFooter: s.invoiceFooter ?? '', crispWebsiteId: s.crispWebsiteId ?? '',
 })
 const COMPANY_FIELDS = ['companyName', 'companyWebsite', 'companyEmail', 'companyPhone', 'companyAddress', 'monthlyGoal', 'reminderDay', 'invoiceFooter'] as const
@@ -109,7 +108,7 @@ export default function SettingsPage() {
   const [rateSourceMeta, setRateSourceMeta] = useState<InfoDolarBhdResponse | null>(null)
   const [notifPerm, setNotifPerm] = useState<NotificationPermission>(typeof Notification !== 'undefined' ? Notification.permission : 'default')
   const [userRoles, setUserRoles] = useState<(UserRoleRow & { created_at?: string })[] | null>(null)
-  const gmail = useGmailStatus()
+  const email = useEmailStatus()
   const logoInput = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -260,11 +259,10 @@ export default function SettingsPage() {
     </div>
   )
   const loadingCard = <section className="set-card"><Skel w={140} h={18} /><Skel h={42} /><Skel h={42} /><Skel w={90} h={40} /></section>
-  const gmailPill = (s: GmailStatus) => s.state === 'ok' ? <span className="set-status set-status--ok">Connected · {s.email}</span>
-    : s.state === 'reconnect' ? <span className="set-status set-status--warn">Reconnect needed</span>
-    : s.state === 'problem' ? <span className="set-status set-status--bad">Connection problem</span>
+  const emailPill = (s: EmailStatusView) => s.state === 'ok' ? <span className="set-status set-status--ok">Sending from {s.mailbox}</span>
+    : s.state === 'problem' ? <span className="set-status set-status--bad">Can't send right now</span>
     : s.state === 'checking' ? <span className="set-status set-status--off">Checking…</span>
-    : <span className="set-status set-status--off">Not connected</span>
+    : <span className="set-status set-status--off">Not set up</span>
 
   return (
     <div className="page">
@@ -345,14 +343,14 @@ export default function SettingsPage() {
           {/* ── Email ── */}
           {activeTab === 'email' && (!saved ? loadingCard : (
             <section className="set-card" aria-label="Email">
-              <div className="set-gmail-line">
+              <div className="set-email-line">
                 <div className="set-card__titles">
                   <h2 className="set-card__title">Email</h2>
-                  <span className="set-card__sub">Invoices and reminders are sent from your Gmail</span>
+                  <span className="set-card__sub">Invoices, reminders and statements are sent from the company Outlook mailbox</span>
                 </div>
                 <div className="set-actions">
-                  {gmailPill(gmail.status)}
-                  {gmail.status.state !== 'ok' && gmail.status.state !== 'checking' && (
+                  {emailPill(email.status)}
+                  {email.status.state !== 'ok' && email.status.state !== 'checking' && (
                     <button type="button" className="link" onClick={() => setTab('integrations')}>Set up in Integrations →</button>
                   )}
                 </div>
@@ -384,12 +382,8 @@ export default function SettingsPage() {
           {/* ── Integrations ── */}
           {activeTab === 'integrations' && (
             <IntegrationsTab
-              clientId={form.gmailClientId}
-              onClientId={v => setForm(f => ({ ...f, gmailClientId: v }))}
-              saveClientId={async () => (dirty(['gmailClientId']) ? save(fromForm(form, ['gmailClientId']), 'gmail', 'Client ID saved.') : true)}
-              gmail={gmail.status}
-              recheck={gmail.recheck}
-              onGmailChange={gmail.setStatus}
+              email={email.status}
+              recheck={email.recheck}
               notify={notify}
               crisp={{
                 value: form.crispWebsiteId,
@@ -453,7 +447,6 @@ export default function SettingsPage() {
                 </div>
                 <NotificationSettings kinds={STAFF_KINDS} />
               </section>
-              {isCeo && <AutoEmailSender />}
               <section className="set-card" aria-label="Browser notifications">
                 <div className="set-card__head">
                   <div className="set-card__titles">

@@ -149,9 +149,9 @@ export default function ClientProfilePage() {
     try {
       const r = await sendClientReminder(clientNN, invoices)
       if (!r) return
-      if (r.result.mode === 'gmail') setMsg({ ok: true, text: `Reminder sent via Gmail to ${recipientsLabel(r.to, r.cc)} for ${usd(r.total)} (${r.count} invoice${r.count === 1 ? '' : 's'}).` })
+      if (r.result.mode === 'outlook') setMsg({ ok: true, text: `Reminder sent to ${recipientsLabel(r.to, r.cc)} for ${usd(r.total)} (${r.count} invoice${r.count === 1 ? '' : 's'}).` })
       else if (r.result.mode === 'mailto') setMsg({ ok: true, text: `Reminder for ${usd(r.total)} opened in your email app.` })
-      else setMsg({ ok: false, text: `Reminder not sent: ${r.result.fallbackReason ?? 'Gmail could not send it.'}` })
+      else setMsg({ ok: false, text: `Reminder not sent: ${r.result.fallbackReason ?? 'the company mailbox could not send it.'}` })
     } catch (e) { setMsg({ ok: false, text: `Reminder not sent: ${(e as Error).message}` }) }
   }
   function handleTagCreated(tag: Tag) { const next = [...allTags, tag]; setAllTags(next); void saveTags(next).catch(() => {}) }

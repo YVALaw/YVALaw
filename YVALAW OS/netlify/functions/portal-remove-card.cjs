@@ -1,121 +1,49 @@
 /**
- * portal-remove-card — Netlify Function
+ * portal-remove-card — portal client removes their saved card / bank account.
  *
- * Removes a client's saved card and disables AutoPay using the Supabase
- * service role key, bypassing the RLS policy that blocks direct client
- * UPDATE access on the client_users table.
+ * POST /.netlify/functions/portal-remove-card   Authorization: Bearer <portal user token>
+ * Body: { clientId }  → { ok }
  *
- * POST /.netlify/functions/portal-remove-card
- * Headers: Authorization: Bearer <user_access_token>
- * Body:    { clientId: string }
+ * The method is detached in Stripe first (so it can never be charged again), then cleared here and AutoPay is
+ * turned off. A method that's already gone from Stripe is simply cleared.
  *
- * Required Netlify env vars:
- *   SUPABASE_URL              — Supabase project URL
- *   SUPABASE_SERVICE_ROLE_KEY — service role key (server-only, bypasses RLS)
+ * Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, STRIPE_SECRET_KEY
  */
-
-function json(statusCode, body) {
-  return {
-    statusCode,
-    headers: {
-      'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': 'https://yvastaffing.agency',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    },
-    body: JSON.stringify(body),
-  }
-}
-
-function enc(value) {
-  return encodeURIComponent(String(value ?? ''))
-}
-
-async function getUserFromToken(token) {
-  const res = await fetch(`${process.env.SUPABASE_URL}/auth/v1/user`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      apikey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-    },
-  })
-  if (!res.ok) return null
-  return res.json()
-}
-
-async function supabaseGet(path) {
-  const url = process.env.SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const res = await fetch(`${url}/rest/v1/${path}`, {
-    headers: {
-      Authorization: `Bearer ${key}`,
-      apikey: key,
-      Accept: 'application/json',
-    },
-  })
-  if (!res.ok) throw new Error(`Supabase GET ${path} failed: ${res.status}`)
-  return res.json()
-}
-
-async function supabasePatch(table, filter, body) {
-  const url = process.env.SUPABASE_URL
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const res = await fetch(`${url}/rest/v1/${table}?${filter}`, {
-    method: 'PATCH',
-    headers: {
-      Authorization: `Bearer ${key}`,
-      apikey: key,
-      'Content-Type': 'application/json',
-      Prefer: 'return=minimal',
-    },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) throw new Error(`Supabase PATCH ${table} failed: ${res.status}`)
-}
+const { rest, enc, json } = require('./_lib/supa.cjs')
+const { stripe } = require('./_lib/stripe.cjs')
+const P = require('./_lib/payments.cjs')
+const { portalCaller } = require('./_lib/portalBilling.cjs')
 
 exports.handler = async function handler(event) {
   if (event.httpMethod === 'OPTIONS') return json(200, { ok: true })
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' })
-
-  const { SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    return json(500, { error: 'Missing required env vars' })
-  }
-
-  // ── Auth ──────────────────────────────────────────────────────────────────
-  const authHeader = event.headers.authorization || event.headers.Authorization || ''
-  if (!authHeader.startsWith('Bearer ')) return json(401, { error: 'Authorization token required' })
-
-  const user = await getUserFromToken(authHeader.slice(7))
-  if (!user?.id) return json(401, { error: 'Invalid or expired token' })
-
-  // ── Parse body ────────────────────────────────────────────────────────────
-  let clientId
+  let body
+  try { body = JSON.parse(event.body || '{}') } catch { return json(400, { error: 'Invalid JSON body' }) }
   try {
-    const body = JSON.parse(event.body || '{}')
-    clientId = body.clientId
-  } catch {
-    return json(400, { error: 'Invalid JSON body' })
+    const who = await portalCaller(event, body.clientId)
+    if (who.error) return who.error
+    const { row } = who
+    const pmId = row.default_payment_method_id
+    if (pmId) {
+      if (!process.env.STRIPE_SECRET_KEY) return json(500, { error: 'Online payments are not set up yet.' })
+      try {
+        const pm = await stripe('GET', `/payment_methods/${enc(pmId)}`)
+        const owner = typeof pm.customer === 'string' ? pm.customer : pm.customer?.id
+        if (owner && owner === row.stripe_customer_id) await stripe('POST', `/payment_methods/${enc(pmId)}/detach`, {})
+      } catch (err) {
+        if (err.status !== 404 && err.code !== 'resource_missing') throw err
+      }
+    }
+    await rest(`client_users?id=eq.${enc(row.id)}`, { method: 'PATCH', prefer: 'return=minimal',
+      body: { ...P.savedMethodColumns(null), auto_pay_enabled: false, auto_pay_authorized_at: null, auto_pay_disabled_at: new Date().toISOString() } })
+      .catch(async err => {
+        if (!/Could not find the '/.test(err.message)) throw err
+        const { default_payment_method_type, default_bank_name, ...old } = P.savedMethodColumns(null)
+        await rest(`client_users?id=eq.${enc(row.id)}`, { method: 'PATCH', prefer: 'return=minimal', body: { ...old, auto_pay_enabled: false, auto_pay_authorized_at: null } })
+      })
+    return json(200, { ok: true })
+  } catch (err) {
+    console.error('portal-remove-card:', err.message)
+    return json(500, { error: err.name === 'StripeError' ? `Stripe: ${err.message}` : 'Could not remove the payment method.' })
   }
-
-  if (!clientId) return json(400, { error: 'clientId is required' })
-
-  // ── Confirm caller has the portal_client role (owns this client row) ──────
-  const rows = await supabaseGet(
-    `client_users?client_id=eq.${enc(clientId)}&auth_id=eq.${enc(user.id)}&select=id`
-  )
-  const portalUser = Array.isArray(rows) ? rows[0] : null
-  if (!portalUser) return json(403, { error: 'Access denied' })
-
-  // ── Clear card data using service role key (bypasses RLS) ─────────────────
-  await supabasePatch('client_users', `id=eq.${enc(portalUser.id)}`, {
-    auto_pay_enabled:           false,
-    default_payment_method_id:  null,
-    default_card_brand:         null,
-    default_card_last4:         null,
-    default_card_exp_month:     null,
-    default_card_exp_year:      null,
-    auto_pay_authorized_at:     null,
-  })
-
-  return json(200, { ok: true })
 }

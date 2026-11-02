@@ -30,8 +30,28 @@
 [functions."publish-scheduled-posts"]
   schedule = "@hourly"
 
-# Internal staff app (YVA LawOS) — keep it out of search results
+# Internal staff app (YVA OS) — security headers + keep it out of search results.
+# Netlify only reads headers from here or a _headers file at the publish root, so "YVALAW OS/public/_headers"
+# (copied to /os/_headers by the build) was never applied — these rules are the ones in force.
+# Allowed outside hosts: this project's Supabase (data, files, live updates — change the host here if the project ever
+# moves), Stripe (payment form, bank login, card checks), Crisp (client portal chat), Google Fonts. No inline scripts
+# except the three one-line "print when loaded" scripts of the invoice / statement / payslip print windows, allowed by
+# hash — if one of those lines changes (utils/invoiceHtml.ts, statementHtml.ts, payslipHtml.ts, PayrollPage.tsx),
+# update its sha256 here or printing stops (tests/csp.test.ts checks this).
 [[headers]]
   for = "/os/*"
   [headers.values]
     X-Robots-Tag = "noindex, nofollow"
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Strict-Transport-Security = "max-age=31536000"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=(self \"https://js.stripe.com\")"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'sha256-XsEvYQeI61UwT9Mz4WdasBY8eAeHqQfnMuYdrCWz23s=' 'sha256-8UIUAuIdPqhicaAtMhPXbnBNCGBLYwp9LdDkhrWt3K4=' 'sha256-aQzETIWrcnXJrGr4qjb7OHpKRZUZv5t/DsJ8ritU7So=' https://js.stripe.com https://*.js.stripe.com https://client.crisp.chat https://settings.crisp.chat; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://client.crisp.chat; font-src 'self' data: https://fonts.gstatic.com https://client.crisp.chat; img-src 'self' data: blob: https:; media-src 'self' blob: https://rwgteyixmbpaxfebwznb.supabase.co https://client.crisp.chat; connect-src 'self' https://rwgteyixmbpaxfebwznb.supabase.co wss://rwgteyixmbpaxfebwznb.supabase.co https://api.stripe.com https://*.stripe.com https://client.crisp.chat https://storage.crisp.chat wss://client.relay.crisp.chat wss://stream.relay.crisp.chat; frame-src 'self' blob: https://js.stripe.com https://*.js.stripe.com https://hooks.stripe.com https://*.stripe.com https://game.crisp.chat; worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self' https://*.stripe.com; frame-ancestors 'none'"
+
+# "Pay now" links in invoice emails → Stripe Checkout (netlify/functions/pay-link.cjs)
+[[redirects]]
+  from = "/pay"
+  to = "/.netlify/functions/pay-link"
+  status = 200
+  force = true

@@ -16,7 +16,7 @@ import {
   loadInvoices, saveInvoices, loadInvoiceCounter, saveInvoiceCounter, loadSnapshot, loadSettings,
   loadRecurringInvoices, saveRecurringInvoices, logComm,
 } from '../services/storage'
-import { loadPayments } from '../services/payments'
+import { loadInvoicePaidState, loadPayments } from '../services/payments'
 import { formatMoney } from '../utils/money'
 import { buildInvoiceHTML, printInvoice as printInvoiceUtil } from '../utils/invoiceHtml'
 import { sendInvoiceEmail, sendReminderEmail, sentToLabel } from '../services/invoiceEmail'
@@ -172,20 +172,20 @@ export default function InvoicePage() {
     try {
       const r = await sendInvoiceEmail(inv, settings, clients)
       if (r.mode === 'failed') { fail(`${inv.number} was not sent: ${r.fallbackReason}`); return }
-      const msg = r.mode === 'gmail' ? `${inv.number} sent to ${sentToLabel(r)} with the PDF attached.` : `${inv.number} opened in your email app for ${sentToLabel(r)} and marked as sent — attach the downloaded PDF.`
+      const msg = r.mode === 'outlook' ? `${inv.number} sent to ${sentToLabel(r)} with the PDF attached.` : `${inv.number} opened in your email app for ${sentToLabel(r)} and marked as sent — attach the downloaded PDF.`
       if (await persist(markSent(), msg) && cId) void logComm(cId, `Invoice ${inv.number} emailed (${formatMoney(amountOf(inv))})`, 'email')
     } finally { setBusy(null) }
   }
   async function emailAgain(inv: Invoice) {
     const r = await sendInvoiceEmail(inv, settings, clients)
     if (r.mode === 'failed') { fail(`${inv.number} was not sent: ${r.fallbackReason}`); return }
-    ok(r.mode === 'gmail' ? `Invoice ${inv.number} emailed to ${sentToLabel(r)}.` : `Invoice ${inv.number} opened in your email app for ${sentToLabel(r)} — attach the downloaded PDF.`)
+    ok(r.mode === 'outlook' ? `Invoice ${inv.number} emailed to ${sentToLabel(r)}.` : `Invoice ${inv.number} opened in your email app for ${sentToLabel(r)} — attach the downloaded PDF.`)
     const cId = clientIdOf(inv); if (cId) void logComm(cId, `Invoice ${inv.number} emailed (${formatMoney(amountOf(inv))})`, 'email')
   }
   async function remind(inv: Invoice) {
     const r = await sendReminderEmail(inv, settings, clients)
     if (r.mode === 'failed') { fail(`Reminder for ${inv.number} was not sent: ${r.fallbackReason}`); return }
-    ok(r.mode === 'gmail' ? `Payment reminder sent to ${sentToLabel(r)}.` : `Reminder for ${inv.number} opened in your email app for ${sentToLabel(r)}.`)
+    ok(r.mode === 'outlook' ? `Payment reminder sent to ${sentToLabel(r)}.` : `Reminder for ${inv.number} opened in your email app for ${sentToLabel(r)}.`)
     const cId = clientIdOf(inv); if (cId) void logComm(cId, `Payment reminder sent for Invoice ${inv.number}`, 'email')
   }
   async function remindAll() {
@@ -225,7 +225,7 @@ export default function InvoicePage() {
     if (inv.clientEmail) {
       const r = await sendInvoiceEmail(inv, settings, clients)
       if (r.mode === 'failed') { setBanner({ tone: 'warning', text: `${inv.number} was created but not emailed: ${r.fallbackReason}` }); return }
-      ok(r.mode === 'gmail' ? `${inv.number} created and emailed to ${sentToLabel(r)}.` : `${inv.number} created and opened in your email app for ${sentToLabel(r)}.`)
+      ok(r.mode === 'outlook' ? `${inv.number} created and emailed to ${sentToLabel(r)}.` : `${inv.number} created and opened in your email app for ${sentToLabel(r)}.`)
       if (client?.id) void logComm(client.id, `Invoice ${inv.number} emailed (${formatMoney(inv.subtotal || 0)})`, 'email')
     } else if (client?.id) {
       void logComm(client.id, `Invoice ${inv.number} created (${formatMoney(inv.subtotal || 0)})`, 'system')
@@ -234,24 +234,38 @@ export default function InvoicePage() {
 
   // ── Status, duplicate, delete, bulk ─────────────────────────────────────
   function openStatusEdit(inv: Invoice) { setStatusFor(inv); setNewStatus(statusOf(inv)); setNewAmountPaid(inv.amountPaid != null ? String(inv.amountPaid) : '') }
+  /** Invoices with recorded payments keep the status and amount paid that the payments give (the database enforces
+   *  it — a status change can never make a paid invoice payable again); show what it really is now */
+  async function reconcilePaid(ids: string[]) {
+    const changed: string[] = []
+    const fresh = await Promise.all(ids.map(async id => ({ id, s: await loadInvoicePaidState(id).catch(() => null) })))
+    setInvoices(prev => prev.map(inv => {
+      const f = fresh.find(x => x.id === inv.id)?.s
+      if (!f) return inv
+      if ((f.status || '') !== (inv.status || '')) changed.push(inv.number)
+      return { ...inv, status: f.status, amountPaid: f.amountPaid }
+    }))
+    if (changed.length) setBanner({ tone: 'warning', text: `${changed.join(', ')} ${changed.length === 1 ? 'has' : 'have'} recorded payments, so the status follows the payments. Record or delete a payment (💲) to change it.` })
+  }
   async function saveStatus() {
     const target = statusFor
     if (!target) return
-    const amtPaid = newStatus === 'partial' ? (parseFloat(newAmountPaid) || 0) : undefined
+    const amtPaid = newStatus === 'partial' ? (parseFloat(newAmountPaid) || 0) : target.amountPaid
     setStatusFor(null)
     const done = await persist(invoices.map(inv => inv.id !== target.id ? inv
       : { ...inv, status: newStatus, amountPaid: amtPaid, updatedAt: Date.now(), statusHistory: [...(inv.statusHistory || []), { status: newStatus, changedAt: Date.now() }] }),
     `${target.number} is now ${label(newStatus)}.`)
     const cId = clientIdOf(target)
     if (done && cId) void logComm(cId, `Invoice ${target.number} status changed to ${newStatus}`, 'system')
+    if (done) void reconcilePaid([target.id])
   }
   async function applyBulk() {
     const ids = selected
     const targets = invoices.filter(i => ids.has(i.id))
     const done = await persist(invoices.map(inv => !ids.has(inv.id) ? inv
-      : { ...inv, status: bulkStatus, amountPaid: bulkStatus === 'partial' ? inv.amountPaid : undefined, updatedAt: Date.now(), statusHistory: [...(inv.statusHistory || []), { status: bulkStatus, changedAt: Date.now() }] }),
+      : { ...inv, status: bulkStatus, amountPaid: inv.amountPaid, updatedAt: Date.now(), statusHistory: [...(inv.statusHistory || []), { status: bulkStatus, changedAt: Date.now() }] }),
     `${ids.size} invoice${ids.size === 1 ? '' : 's'} set to ${label(bulkStatus)}.`)
-    if (done) { setSelected(new Set()); for (const t of targets) { const cId = clientIdOf(t); if (cId) void logComm(cId, `Invoice ${t.number} status changed to ${bulkStatus}`, 'system') } }
+    if (done) { void reconcilePaid([...ids]); setSelected(new Set()); for (const t of targets) { const cId = clientIdOf(t); if (cId) void logComm(cId, `Invoice ${t.number} status changed to ${bulkStatus}`, 'system') } }
   }
   async function duplicateInvoice(inv: Invoice) {
     const counter = await loadInvoiceCounter()

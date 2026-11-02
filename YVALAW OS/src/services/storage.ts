@@ -345,13 +345,6 @@ async function loadSettingsNow(): Promise<AppSettings> {
     invoiceEmailTemplate:   (row.invoice_email_template as string | undefined),
     statementEmailTemplate: (row.statement_email_template as string | undefined),
     reminderEmailTemplate:  (row.reminder_email_template as string | undefined),
-    gmailClientId:          (row.gmail_client_id as string | undefined),
-    // gmailClientSecret is intentionally omitted — it must only live in the
-    // GMAIL_CLIENT_SECRET Netlify env var and must never be loaded from the DB.
-    gmailAccessToken:       (row.gmail_access_token as string | undefined),
-    gmailRefreshToken:      (row.gmail_refresh_token as string | undefined),
-    gmailTokenExpiry:       row.gmail_token_expiry != null ? (row.gmail_token_expiry as number) : undefined,
-    gmailEmail:             (row.gmail_email as string | undefined),
   }
   // Printed invoices / statements pick up the logo, website and footer without every caller passing them
   setCompanyBranding({ logoUrl: settings.companyLogoUrl, website: settings.companyWebsite, invoiceFooter: settings.invoiceFooter })
@@ -379,13 +372,6 @@ export async function saveSettings(s: AppSettings): Promise<void> {
     invoice_email_template:   s.invoiceEmailTemplate ?? null,
     statement_email_template: s.statementEmailTemplate ?? null,
     reminder_email_template:  s.reminderEmailTemplate ?? null,
-    gmail_client_id:          s.gmailClientId ?? null,
-    // gmail_client_secret is intentionally excluded — it must only live in
-    // the GMAIL_CLIENT_SECRET Netlify env var, never in the database.
-    gmail_access_token:       s.gmailAccessToken ?? null,
-    gmail_refresh_token:      s.gmailRefreshToken ?? null,
-    gmail_token_expiry:       s.gmailTokenExpiry ?? null,
-    gmail_email:              s.gmailEmail ?? null,
   }).eq('id', 1)
   if (error) console.error('saveSettings', error)
 }

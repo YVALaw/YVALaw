@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { emailListForSave, formatEmailList, isEmail, mergeCc, normalizeEmailList, parseEmailList, recipientsLabel } from '../src/utils/emailList.ts'
-import { buildMailtoUrl, buildMimeMessage, headerSafe } from '../src/utils/mime.ts'
+import { buildMailtoUrl, buildSendRequest, headerSafe } from '../src/utils/mime.ts'
 
 test('CC list: commas, semicolons, spaces and new lines; duplicates (any case) once; bad entries reported', () => {
   const r = parseEmailList(' accounting@toplawassist.com; Owner@Firm.com,\nowner@firm.com  ap@x.co , nope, a@b ,, ')
@@ -42,46 +42,32 @@ test('Cc = client CC + billing contacts, deduped, never the To address', () => {
   assert.equal(recipientsLabel('a@x.com'), 'a@x.com')
 })
 
-const decode = (b64: string) => Buffer.from(b64.replace(/\r\n/g, ''), 'base64')
-
-test('Gmail raw message: Cc header, UTF-8 subject, PDF attachment kept byte for byte', () => {
+test('send-email request: To/Cc lists, subject on one line, PDF bytes kept exactly', () => {
   const pdfBytes = Buffer.from('%PDF-1.7\n%âãÏÓ\nbinary\x00\x01\xff', 'latin1')
-  const raw = buildMimeMessage({
-    from: 'hans@yva.com', to: 'ap@halavi.com', cc: ['accounting@halavi.com', 'owner@halavi.com'],
-    subject: 'Invoice HAL-0042 — YVA Staffing', body: 'Hi Halavi,\nPlease find attached.\nGracias — ñ',
-    attachments: [{ name: 'Invoice-HAL-0042.pdf', mimeType: 'application/pdf', base64: pdfBytes.toString('base64') }],
-    boundary: 'B',
-  })
-  const [head] = raw.split('\r\n\r\n')
-  const headers = head.split('\r\n')
-  assert.ok(headers.includes('To: ap@halavi.com'))
-  assert.ok(headers.includes('Cc: accounting@halavi.com, owner@halavi.com'))
-  assert.ok(headers.some(h => h.startsWith('Subject: =?UTF-8?B?')))
-  assert.ok(headers.includes('Content-Type: multipart/mixed; boundary="B"'))
-  const parts = raw.split('--B')
-  const text = parts[1].split('\r\n\r\n')
-  assert.equal(decode(text[1].trim()).toString('utf8'), 'Hi Halavi,\r\nPlease find attached.\r\nGracias — ñ')
-  const att = parts[2]
-  assert.ok(att.includes('Content-Type: application/pdf; name="Invoice-HAL-0042.pdf"'))
-  assert.ok(att.includes('Content-Disposition: attachment; filename="Invoice-HAL-0042.pdf"'))
-  const body = att.split('\r\n\r\n')[1].trim()
-  assert.ok(body.split('\r\n').every(l => l.length <= 76))
-  assert.deepEqual(decode(body), pdfBytes)
-  assert.ok(raw.endsWith('--B--'))
+  const req = buildSendRequest('ap@halavi.com', 'Invoice HAL-0042 — YVA Staffing', 'Hi Halavi,\nGracias — ñ',
+    [{ name: 'Invoice-HAL-0042.pdf', mimeType: 'application/pdf', base64: pdfBytes.toString('base64') }], ['accounting@halavi.com', 'owner@halavi.com'])
+  assert.deepEqual(req.to, ['ap@halavi.com'])
+  assert.deepEqual(req.cc, ['accounting@halavi.com', 'owner@halavi.com'])
+  assert.equal(req.subject, 'Invoice HAL-0042 — YVA Staffing')
+  assert.equal(req.text, 'Hi Halavi,\nGracias — ñ')
+  assert.equal(req.attachments.length, 1)
+  assert.equal(req.attachments[0].name, 'Invoice-HAL-0042.pdf')
+  assert.equal(req.attachments[0].contentType, 'application/pdf')
+  assert.deepEqual(Buffer.from(req.attachments[0].base64, 'base64'), pdfBytes)
 })
 
-test('Gmail raw message: no Cc header without cc; header injection removed everywhere', () => {
-  const plain = buildMimeMessage({ from: 'a@x.com', to: 'b@y.com', subject: 'Hi', body: 'x' })
-  assert.ok(!/\r\nCc:/.test(plain))
-  assert.ok(plain.includes('Content-Type: text/plain; charset=utf-8'))
-  const evil = buildMimeMessage({
-    from: 'a@x.com', to: 'b@y.com\r\nBcc: spy@evil.com', cc: ['c@z.com\nBcc: spy2@evil.com'],
-    subject: 'Hi\r\nBcc: spy3@evil.com', body: 'x',
-    attachments: [{ name: 'a"\r\nX-Evil: 1.pdf', mimeType: 'application/pdf\r\nX-Evil: 2', base64: 'AAAA' }], boundary: 'B',
-  })
-  const headerLines = evil.split('\r\n').filter(l => /^[A-Za-z-]+: /.test(l))
-  assert.ok(!headerLines.some(l => /^(Bcc|X-Evil):/i.test(l)), headerLines.join(' | '))
+test('send-email request: header injection removed from addresses, subject, file names and types', () => {
+  const req = buildSendRequest('b@y.com\r\nBcc: spy@evil.com', 'Hi\r\nBcc: spy3@evil.com', 'x',
+    [{ name: '../a"\r\nX-Evil: 1.pdf', mimeType: 'application/pdf\r\nX-Evil: 2', base64: 'AA\r\nAA' }], ['c@z.com\nBcc: spy2@evil.com'])
+  assert.ok(!req.subject.includes('\n') && !req.subject.includes('\r'))
+  assert.ok(req.to.every(a => !/[\r\n]/.test(a)) && req.cc.every(a => !/[\r\n]/.test(a)))
+  assert.ok(!/[\r\n"/]/.test(req.attachments[0].name))
+  assert.ok(!/[\r\n]/.test(req.attachments[0].contentType))
+  assert.equal(req.attachments[0].base64, 'AAAA')
   assert.equal(headerSafe('a\r\nb'), 'a b')
+  // text attachments are UTF-8 encoded
+  const t = buildSendRequest('a@x.com', 's', 'b', [{ name: 'n.txt', mimeType: 'text/plain', content: 'ñ' }])
+  assert.equal(Buffer.from(t.attachments[0].base64, 'base64').toString('utf8'), 'ñ')
 })
 
 test('mailto fallback carries the Cc (percent-encoded, never "+")', () => {

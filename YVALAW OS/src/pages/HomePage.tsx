@@ -138,8 +138,8 @@ export default function HomePage() {
     try {
       // Same email as Invoices → Remind: Cc the client's Invoice CC + billing contacts, invoice PDF attached
       const r = await sendReminderEmail(inv, settings, store.clients)
-      if (r.mode === 'failed') { setFlash({ tone: 'danger', text: `Reminder not sent: ${r.fallbackReason || 'Gmail could not send it.'}` }); return }
-      setFlash({ tone: 'success', text: r.mode === 'gmail' ? `Payment reminder sent to ${sentToLabel(r)}` : `Reminder for ${inv.number} opened in your mail app` })
+      if (r.mode === 'failed') { setFlash({ tone: 'danger', text: `Reminder not sent: ${r.fallbackReason || 'the company mailbox could not send it.'}` }); return }
+      setFlash({ tone: 'success', text: r.mode === 'outlook' ? `Payment reminder sent to ${sentToLabel(r)}` : `Reminder for ${inv.number} opened in your mail app` })
       const cId = inv.clientId || store.clients.find(c => c.name === inv.clientName)?.id
       if (cId) void logComm(cId, `Payment reminder sent for Invoice ${inv.number}`, 'email')
     } catch (e) {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { sendEmail } from '../../services/gmail'
+import { sendEmail } from '../../services/email'
 import { loadEmployees, loadUserRoles, upsertUserRole, type UserRoleRow } from '../../services/storage'
 import { linkStaffProfile } from '../../services/staffProfiles'
 import type { Employee } from '../../data/types'
@@ -61,7 +61,7 @@ export default function TeamAccessTab({ users, setUsers, meId, notify }: {
       setInviteMsg({ type: 'ok', text: `Invite sent to ${inviteEmail.trim()}` })
       setInviteEmail('')
     } catch {
-      setInviteMsg({ type: 'err', text: 'Failed to send invite. Make sure Gmail is connected.' })
+      setInviteMsg({ type: 'err', text: 'Failed to send invite. Check Settings → Integrations → Email sending.' })
     }
     setInviteSending(false)
   }

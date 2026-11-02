@@ -237,14 +237,8 @@ export type AppSettings = {
   invoiceEmailTemplate?: string
   statementEmailTemplate?: string
   reminderEmailTemplate?: string
-  // Gmail OAuth integration
-  // NOTE: gmailClientSecret must only live in Netlify env vars (GMAIL_CLIENT_SECRET).
-  // It must never be stored in the settings table or sent to the browser.
-  gmailClientId?: string
-  gmailAccessToken?: string
-  gmailRefreshToken?: string
-  gmailTokenExpiry?: number  // unix ms
-  gmailEmail?: string
+  // Email goes out from the company Outlook mailbox (server-side, netlify/functions/_lib/outlook.cjs).
+  // The old gmail_* settings columns are no longer read or written (migrate-outlook-email.sql blanks the tokens).
 }
 
 export type TaskStatus = 'todo' | 'in-progress' | 'done'
@@ -383,7 +377,7 @@ export type PaymentAttemptStatus =
   | 'requires_payment_method'
   | 'canceled'
 
-export type PaymentAttemptSource = 'portal' | 'autopay'
+export type PaymentAttemptSource = 'portal' | 'autopay' | 'pay_link'
 
 export type PaymentAttempt = {
   id: string
