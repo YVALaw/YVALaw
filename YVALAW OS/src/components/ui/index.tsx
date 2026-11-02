@@ -1,6 +1,6 @@
 // Redesign (2026-11) UI kit. Every screen builds from these + the classes in src/styles/ds.css.
 // Keep components presentational: data loading stays in pages/services.
-import { useEffect, useRef, useState, type ReactNode, type KeyboardEvent } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { Ic, P } from '../Icon'
 import { initials } from '../../utils/format'
@@ -320,32 +320,51 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
 
 export type MenuItem = { label: ReactNode; onClick: () => void; icon?: string; danger?: boolean; hidden?: boolean; disabled?: boolean } | 'sep'
 /** ⋯ or "Label ▾" dropdown; destructive items go here, never next to the primary button */
+/** ⋯ menu. The list is drawn over the page (portal, fixed position) so a table or card with overflow hidden can't cut it
+ *  off; it opens below the button, or above it when there isn't room, and closes on scroll / resize / Esc / click outside. */
 export function Menu({ items, label = 'More actions', trigger, align = 'right', buttonClass = 'btn btn--icon' }: { items: MenuItem[]; label?: string; trigger?: ReactNode; align?: 'left' | 'right'; buttonClass?: string }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<CSSProperties>({ visibility: 'hidden' })
   useEffect(() => {
     if (!open) return
-    const close = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
+    const close = (e: MouseEvent) => { const t = e.target as Node; if (!ref.current?.contains(t) && !listRef.current?.contains(t)) setOpen(false) }
     const key = (e: globalThis.KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    const away = (e: Event) => { if (!listRef.current?.contains(e.target as Node)) setOpen(false) }
     document.addEventListener('mousedown', close)
     window.addEventListener('keydown', key)
-    return () => { document.removeEventListener('mousedown', close); window.removeEventListener('keydown', key) }
+    window.addEventListener('scroll', away, true)
+    window.addEventListener('resize', away)
+    return () => { document.removeEventListener('mousedown', close); window.removeEventListener('keydown', key); window.removeEventListener('scroll', away, true); window.removeEventListener('resize', away) }
   }, [open])
+  useLayoutEffect(() => {
+    if (!open || !ref.current || !listRef.current) return
+    const b = ref.current.getBoundingClientRect()
+    const h = listRef.current.offsetHeight, w = listRef.current.offsetWidth
+    const gap = 6, vw = window.innerWidth, vh = window.innerHeight
+    const below = vh - b.bottom - gap >= h || b.top - gap < h
+    const top = below ? Math.min(b.bottom + gap, vh - h - 8) : b.top - gap - h
+    const left = align === 'right' ? Math.max(8, Math.min(b.right - w, vw - w - 8)) : Math.max(8, Math.min(b.left, vw - w - 8))
+    setPos({ position: 'fixed', top: Math.max(8, top), left })
+  }, [open, align])
   const visible = items.filter(i => i === 'sep' || !i.hidden)
   if (!visible.some(i => i !== 'sep')) return null
   return (
     <div className="menu-wrap" ref={ref}>
-      <button type="button" className={buttonClass} aria-haspopup="menu" aria-expanded={open} aria-label={trigger ? undefined : label} onClick={e => { e.stopPropagation(); setOpen(o => !o) }}>
+      <button type="button" className={buttonClass} aria-haspopup="menu" aria-expanded={open} aria-label={trigger ? undefined : label}
+        onClick={e => { e.stopPropagation(); setPos({ position: 'fixed', top: 0, left: 0, visibility: 'hidden' }); setOpen(o => !o) }}>
         {trigger ?? <Ic d={P.more} size={18} stroke={2.6} />}
       </button>
-      {open && (
-        <div className="menu" role="menu" style={{ top: 'calc(100% + 6px)', [align]: 0 }}>
+      {open && createPortal(
+        <div className="menu menu--floating" role="menu" ref={listRef} style={pos} onMouseDown={e => e.stopPropagation()}>
           {visible.map((it, i) => it === 'sep'
             ? <div key={i} className="menu__sep" />
             : <button key={i} type="button" role="menuitem" disabled={it.disabled} className={cx('menu__item', it.danger && 'menu__item--danger')} onClick={e => { e.stopPropagation(); setOpen(false); it.onClick() }}>
                 {it.icon && <Ic d={it.icon} />}{it.label}
               </button>)}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )

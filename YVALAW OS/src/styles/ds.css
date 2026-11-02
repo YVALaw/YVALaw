@@ -304,6 +304,7 @@ button.kpi-cell:hover { background: var(--surface-2); }
 .menu__item--danger, .menu__item--danger:hover { color: var(--danger-text); }
 .menu__sep { height: 1px; background: var(--head-line); margin: 4px 6px; }
 .menu-wrap { position: relative; display: inline-flex; }
+.menu--floating { z-index: 95; max-height: calc(100dvh - 16px); overflow-y: auto; }
 .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 71; background: var(--surface); border-radius: 22px 22px 0 0; padding: 10px 16px calc(24px + env(safe-area-inset-bottom)); box-shadow: 0 -12px 32px rgba(16, 24, 40, .2); display: flex; flex-direction: column; max-height: 88dvh; overflow-y: auto; animation: ds-sheet-up .2s ease-out; }
 .sheet__grab { align-self: center; width: 36px; height: 4px; border-radius: 2px; background: var(--border-strong); margin-bottom: 12px; flex-shrink: 0; }
 @keyframes ds-slide-in { from { transform: translateX(24px); opacity: .6; } to { transform: none; opacity: 1; } }
