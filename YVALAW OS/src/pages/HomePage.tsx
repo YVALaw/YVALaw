@@ -2,6 +2,7 @@
 // This week (money cycle), lead pipeline, who is tracking now and the 6-month billed chart.
 // All numbers come from real data; the calculations are the ones the old dashboard used (reportsService).
 import { useEffect, useMemo, useState } from 'react'
+import { LIVE_UPDATES_ON } from '../lib/liveConfig'
 import { useNavigate } from 'react-router-dom'
 import { useRole, usePermission } from '../context/RoleContext'
 import { can, isStaff } from '../lib/roles'
@@ -91,7 +92,7 @@ export default function HomePage() {
     const run = () => { void loadTrackingNow().then(ids => { if (alive) setTracking(ids) }) }
     run()
     // "Working now" is live: re-checked every minute, but only while the window is on screen
-    const t = window.setInterval(() => { if (document.visibilityState === 'visible') run() }, 60_000)
+    const t = window.setInterval(() => { if (document.visibilityState === 'visible') run() }, LIVE_UPDATES_ON ? 60_000 : 300_000)
     return () => { alive = false; window.clearInterval(t) }
   }, [canTracker])
 

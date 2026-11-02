@@ -6,12 +6,15 @@
 // Before the SQL script has run there are no numbers: reads are simply kept 1 minute, as before.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { LIVE_UPDATES_ON } from '../lib/liveConfig'
 import { applyVersions, checkForChanges, onTeamChange, pageChanged, registerVersionSource, setLiveConnected, type VersionRow } from '../lib/readCache'
 
 let started = false
 
 export function startLiveUpdates() {
-  if (started || typeof window === 'undefined') return
+  // Paused (VITE_LIVE_UPDATES not 'on', lib/liveConfig.ts): no Realtime connection, no change checks — reads are
+  // simply kept 1 minute and re-read when a page opens after that
+  if (started || typeof window === 'undefined' || !LIVE_UPDATES_ON) return
   started = true
   registerVersionSource(async () => {
     const { data, error } = await supabase.from('data_versions').select('table_name,version')

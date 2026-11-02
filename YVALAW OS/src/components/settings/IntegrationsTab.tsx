@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { LIVE_UPDATES_ON } from '../../lib/liveConfig'
 import StripeStatusCard from './StripeStatusCard'
 import { supabase } from '../../lib/supabase'
 import { sendOutlookMessage } from '../../services/email'
@@ -135,6 +136,24 @@ export default function IntegrationsTab({ email, recheck, notify, crisp }: {
 
       {/* ── Stripe ── */}
       <StripeStatusCard />
+
+      {/* ── Live updates (lib/liveConfig.ts) ── */}
+      <section className="set-int" aria-label="Live updates">
+        <div className="set-int__head">
+          <span className="set-int__name"><Ic d={P.refresh} /> Live updates</span>
+          {LIVE_UPDATES_ON ? <Status tone="ok">On</Status> : <Status tone="off">Paused</Status>}
+        </div>
+        <span className="set-int__desc">
+          {LIVE_UPDATES_ON
+            ? 'Changes your team makes appear right away, and new notifications are pushed to the bell.'
+            : 'Paused to keep the database quiet while one person uses YVA OS. Pages show the latest data when you open them; the bell checks every 10 minutes and when you come back to the window.'}
+        </span>
+        <span className="set-hint">
+          {LIVE_UPDATES_ON
+            ? <>To pause: Netlify → Environment variables → set <code>VITE_LIVE_UPDATES</code> to <code>off</code> → redeploy.</>
+            : <>When your team starts using YVA OS: Netlify → Environment variables → add <code>VITE_LIVE_UPDATES</code> = <code>on</code> → redeploy.</>}
+        </span>
+      </section>
 
       {/* ── Calendly ── */}
       <section className="set-int" aria-label="Calendly">
