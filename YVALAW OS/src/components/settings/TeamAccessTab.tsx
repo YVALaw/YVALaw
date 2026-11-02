@@ -1,11 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { sendEmail } from '../../services/gmail'
-import { loadUserRoles, upsertUserRole, type UserRoleRow } from '../../services/storage'
-import { ROLE_LABELS, ROLE_OPTIONS, type UserRole } from '../../lib/roles'
+import { loadEmployees, loadUserRoles, upsertUserRole, type UserRoleRow } from '../../services/storage'
+import { linkStaffProfile } from '../../services/staffProfiles'
+import type { Employee } from '../../data/types'
+import { ROLE_LABELS, ROLE_OPTIONS, isStaff, type AppRole, type UserRole } from '../../lib/roles'
 import { Ic, P } from '../Icon'
 import { Banner, onEnter } from '../ui'
 import { dateMed, initials } from '../../utils/format'
 import PermissionsMatrix from '../PermissionsMatrix'
+import StaffProfileModal, { type StaffLogin } from '../StaffProfileModal'
 
 const SIGNUP_PATH = '/os/xDdasQwd24zaQ'
 type Row = UserRoleRow & { created_at?: string }
@@ -22,6 +26,28 @@ export default function TeamAccessTab({ users, setUsers, meId, notify }: {
   const [inviteMsg, setInviteMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [copied, setCopied] = useState(false)
   const signupUrl = `${window.location.origin}${SIGNUP_PATH}`
+  const navigate = useNavigate()
+  // Staff profiles: the employee record linked to each login (null = still loading)
+  const [employees, setEmployees] = useState<Employee[] | null>(null)
+  const [creating, setCreating] = useState<StaffLogin | null>(null)
+  const [linking, setLinking] = useState<string | null>(null)
+  useEffect(() => {
+    let alive = true
+    void loadEmployees().then(list => { if (alive) setEmployees(list) }).catch(() => { if (alive) setEmployees([]) })
+    return () => { alive = false }
+  }, [])
+
+  async function linkExisting(u: Row, emp: Employee) {
+    setLinking(u.user_id)
+    try {
+      await linkStaffProfile(emp.id, u.user_id, meId)
+      setEmployees(prev => (prev ?? []).map(e => e.id === emp.id ? { ...e, userId: u.user_id } : e))
+      notify('success', `${u.email || 'This login'} is now linked to ${emp.name}'s profile.`)
+    } catch (e) {
+      notify('danger', `Could not link ${u.email || 'this login'} to ${emp.name}: ${(e as Error).message}`)
+    }
+    setLinking(null)
+  }
 
   async function sendInvite() {
     if (!inviteEmail.trim()) return
@@ -82,6 +108,9 @@ export default function TeamAccessTab({ users, setUsers, meId, notify }: {
         ) : sorted.map(u => {
           const isPending = u.role === 'pending'
           const isMe = u.user_id === meId
+          const profile = employees?.find(e => e.userId && String(e.userId) === u.user_id) ?? null
+          const sameEmail = !profile && u.email ? employees?.find(e => !e.userId && e.email && e.email.toLowerCase() === u.email.toLowerCase()) ?? null : null
+          const showProfile = !isPending && isStaff(u.role as AppRole)
           const sub = isPending
             ? `Waiting for a role${u.created_at ? ` · signed up ${dateMed(u.created_at)}` : ''}`
             : isMe ? 'You' : ROLE_LABELS[u.role as UserRole] ?? u.role
@@ -91,6 +120,22 @@ export default function TeamAccessTab({ users, setUsers, meId, notify }: {
               <div className="set-user__main">
                 <span className="set-user__email">{u.email || '—'}</span>
                 <span className={`set-user__sub${isPending ? ' set-user__sub--warn' : ''}`}>{sub}</span>
+                {showProfile && employees !== null && (
+                  <span className="set-user__profile" data-profile={profile ? 'linked' : sameEmail ? 'match' : 'none'}>
+                    {profile ? (
+                      <>
+                        <span className="set-user__pname">Profile: {profile.name}{profile.employeeNumber ? <> · <span className="mono">{profile.employeeNumber}</span></> : null}</span>
+                        <button type="button" className="link" onClick={() => navigate(`/employees/${profile.id}`)}>Open profile</button>
+                      </>
+                    ) : (
+                      <>
+                        <span className="set-user__pname set-user__pname--none">No profile yet</span>
+                        {sameEmail && <button type="button" className="link" disabled={linking === u.user_id} onClick={() => void linkExisting(u, sameEmail)}>{linking === u.user_id ? 'Linking…' : `Link to existing employee (${sameEmail.name})`}</button>}
+                        <button type="button" className="link" onClick={() => setCreating({ userId: u.user_id, email: u.email || '', role: u.role })}>Create profile</button>
+                      </>
+                    )}
+                  </span>
+                )}
               </div>
               <select className="select" aria-label={`Role for ${u.email || 'user'}`} value={u.role} onChange={e => void changeRole(u, e.target.value)}>
                 {isPending && <option value="pending" disabled>Pick a role…</option>}
@@ -100,6 +145,13 @@ export default function TeamAccessTab({ users, setUsers, meId, notify }: {
           )
         })}
       </section>
+
+      <StaffProfileModal login={creating} meId={meId} onClose={() => setCreating(null)} onCreated={(emp, existed) => {
+        const who = creating?.email || 'this login'
+        setCreating(null)
+        notify('success', existed ? `${who} already had a profile (${emp.name}).` : `Profile created for ${emp.name}${emp.employeeNumber ? ` (${emp.employeeNumber})` : ''} and linked to ${who}.`)
+        navigate(`/employees/${emp.id}`)
+      }} />
 
       <PermissionsMatrix />
 

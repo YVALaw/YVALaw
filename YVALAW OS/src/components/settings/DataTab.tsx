@@ -6,6 +6,7 @@ import { Banner, Checkbox, Modal, Skel } from '../ui'
 import { clearAllData, exportBackup, importBackup } from './backup'
 import { scanInlineFiles, slimInlineFiles, type SlimScan } from '../../services/slimRecords'
 import { previewOldCrmImport, runOldCrmImport, type ImportPreview, type ImportProgress, type ImportResult } from '../../services/oldCrmImport'
+import { logAction } from '../../services/activityLog'
 
 type Stat = { label: string; count: number }
 
@@ -45,7 +46,7 @@ export default function DataTab({ isCeo, canImportLeads }: { isCeo: boolean; can
   async function doOldImport() {
     if (!oldPreview) return
     setOldError(null)
-    try { setOldResult(await runOldCrmImport(oldPreview, { copyFiles: copyOldFiles }, setOldProgress)) }
+    try { setOldResult(await runOldCrmImport(oldPreview, { copyFiles: copyOldFiles }, setOldProgress)); void logAction('import', 'Imported data from the old CRM') }
     catch (e) { setOldError((e as Error).message) }
     setOldProgress(null)
   }
@@ -76,13 +77,15 @@ export default function DataTab({ isCeo, canImportLeads }: { isCeo: boolean; can
 
   async function doExport() {
     setExporting(true); setExportError(null)
-    try { await exportBackup() } catch (e) { setExportError(`Export failed — ${e instanceof Error ? e.message : 'Unknown error'}`) }
+    try { await exportBackup(); void logAction('export', 'Downloaded a full backup') } catch (e) { setExportError(`Export failed — ${e instanceof Error ? e.message : 'Unknown error'}`) }
     setExporting(false)
   }
 
   async function doImport(file: File) {
     setImporting(true); setImportStatus(null)
-    setImportStatus(await importBackup(file))
+    const status = await importBackup(file)
+    setImportStatus(status)
+    void logAction('import', `Backup restore from ${file.name}`, { details: { result: status.slice(0, 200) } })
     setImporting(false)
   }
 
@@ -93,6 +96,7 @@ export default function DataTab({ isCeo, canImportLeads }: { isCeo: boolean; can
       setConfirmClear(false)
       if (!ok) { setClearError('Only the CEO can clear all data.'); return }
       setCleared(true)
+      void logAction('other', 'Cleared all data')
       setTimeout(() => setCleared(false), 4000)
     } catch (e) {
       setClearError(e instanceof Error ? e.message : 'Could not clear the data.')

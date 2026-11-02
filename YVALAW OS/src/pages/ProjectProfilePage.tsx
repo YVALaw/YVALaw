@@ -17,6 +17,7 @@ import TaskBoard, { mentionsIn, type TaskDraft } from '../components/ops/TaskBoa
 import ProjectExpenses, { type ExpenseDraft } from '../components/ops/ProjectExpenses'
 import { errText, hoursLabel, monthPrefix, monthShort, payShort, projectMonthHours, stageInfo, uid } from '../components/ops/opsUtils'
 import { dateMed, usd } from '../utils/format'
+import RecordSignature from '../components/RecordSignature'
 
 type TabKey = 'rates' | 'overview' | 'tasks' | 'expenses' | 'invoices' | 'contracts' | 'history'
 const TAB_KEYS: TabKey[] = ['rates', 'overview', 'tasks', 'expenses', 'invoices', 'contracts', 'history']
@@ -216,6 +217,7 @@ export default function ProjectProfilePage() {
         {can.viewInvoices(role) && <button type="button" className="btn btn--primary" onClick={() => navigate(`/invoice?create=invoice&project=${encodeURIComponent(projectNN.id)}`)}>New invoice</button>}
         <Menu label="More project actions" items={[{ label: 'Delete project', danger: true, icon: P.trash, onClick: () => setConfirmDelete(true) }]} />
       </>} />
+      <RecordSignature table="projects" recordId={projectNN.id} refreshKey={projectNN} />
 
       {flash && <Banner tone={flash.tone} onClose={() => setFlash(null)}>{flash.text}</Banner>}
 

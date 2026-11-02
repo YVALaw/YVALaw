@@ -12,9 +12,8 @@ import {
   type HomeSignals,
 } from '../services/reportsService'
 import { findMissingRates } from '../components/MissingRates'
-import { sendEmail } from '../services/gmail'
 import { logComm } from '../services/storage'
-import { applyInvoiceTemplate, DEFAULT_REMINDER_EMAIL } from '../services/invoiceEmail'
+import { sendReminderEmail, sentToLabel } from '../services/invoiceEmail'
 import { addDays, DEFAULT_TZ, localParts, mondayOf, zonedMidnight } from '../utils/moneyRules'
 import { fmtHoursHM } from '../utils/money'
 import { usd, usdShort, dop, hmText, dateShort, weekdayDate } from '../utils/format'
@@ -136,11 +135,10 @@ export default function HomePage() {
     if (!inv.clientEmail) { setFlash({ tone: 'danger', text: `${inv.number} has no client email. Add one on the invoice, then send the reminder.` }); return }
     setBusy(inv.id)
     try {
-      const subject = `Payment Reminder — Invoice ${inv.number} — ${settings.companyName || 'YVA Staffing'}`
-      const body = applyInvoiceTemplate(settings.reminderEmailTemplate || DEFAULT_REMINDER_EMAIL, inv, settings)
-      const r = await sendEmail(inv.clientEmail, subject, body)
+      // Same email as Invoices → Remind: Cc the client's Invoice CC + billing contacts, invoice PDF attached
+      const r = await sendReminderEmail(inv, settings, store.clients)
       if (r.mode === 'failed') { setFlash({ tone: 'danger', text: `Reminder not sent: ${r.fallbackReason || 'Gmail could not send it.'}` }); return }
-      setFlash({ tone: 'success', text: r.mode === 'gmail' ? `Payment reminder sent to ${inv.clientEmail}` : `Reminder for ${inv.number} opened in your mail app` })
+      setFlash({ tone: 'success', text: r.mode === 'gmail' ? `Payment reminder sent to ${sentToLabel(r)}` : `Reminder for ${inv.number} opened in your mail app` })
       const cId = inv.clientId || store.clients.find(c => c.name === inv.clientName)?.id
       if (cId) void logComm(cId, `Payment reminder sent for Invoice ${inv.number}`, 'email')
     } catch (e) {

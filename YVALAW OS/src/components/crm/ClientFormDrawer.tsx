@@ -4,6 +4,8 @@ import type { Client, Tag } from '../../data/types'
 import { TagInput } from '../TagInput'
 import { Banner, Drawer, Field } from '../ui'
 import { Ic, P } from '../Icon'
+import { emailListForSave, formatEmailList, parseEmailList } from '../../utils/emailList'
+import { ccColumnExists } from '../../services/storage'
 
 export const CLIENT_STAGES: { key: string; label: string }[] = [
   { key: 'lead', label: 'Lead' }, { key: 'prospect', label: 'Prospect' }, { key: 'active', label: 'Active' }, { key: 'paused', label: 'Paused' }, { key: 'churned', label: 'Churned' },
@@ -14,11 +16,11 @@ const TERMS = ['On receipt', 'Net 7', 'Net 15', 'Net 30']
 
 type LinkEntry = { label: string; url: string }
 export type ClientFormData = {
-  name: string; company: string; email: string; phone: string; address: string
+  name: string; company: string; email: string; ccEmails: string; phone: string; address: string
   timezone: string; defaultRate: string; paymentTerms: string; tags: string[]
   notes: string; status: string; contractEnd: string; links: LinkEntry[]
 }
-const EMPTY: ClientFormData = { name: '', company: '', email: '', phone: '', address: '', timezone: '', defaultRate: '', paymentTerms: '', tags: [], notes: '', status: 'active', contractEnd: '', links: [] }
+const EMPTY: ClientFormData = { name: '', company: '', email: '', ccEmails: '', phone: '', address: '', timezone: '', defaultRate: '', paymentTerms: '', tags: [], notes: '', status: 'active', contractEnd: '', links: [] }
 
 /** Ensure tags field is always string[] regardless of how it's stored in DB */
 export function normTags(v: unknown): string[] {
@@ -29,7 +31,7 @@ export function normTags(v: unknown): string[] {
 }
 function fromClient(c: Client): ClientFormData {
   return {
-    name: c.name, company: c.company ?? '', email: c.email ?? '', phone: c.phone ?? '', address: c.address ?? '',
+    name: c.name, company: c.company ?? '', email: c.email ?? '', ccEmails: formatEmailList(c.ccEmails), phone: c.phone ?? '', address: c.address ?? '',
     timezone: c.timezone ?? '', defaultRate: c.defaultRate != null ? String(c.defaultRate) : '', paymentTerms: c.paymentTerms ?? '',
     tags: normTags(c.tags), notes: c.notes ?? '', status: c.status ?? 'active', contractEnd: c.contractEnd ?? '', links: c.links ?? [],
   }
@@ -38,6 +40,7 @@ function fromClient(c: Client): ClientFormData {
 export function toClientPatch(form: ClientFormData): Partial<Client> {
   return {
     name: form.name, company: form.company || undefined, email: form.email || undefined,
+    ccEmails: emailListForSave(form.ccEmails),
     phone: form.phone || undefined, address: form.address || undefined, timezone: form.timezone || undefined,
     defaultRate: form.defaultRate ? Number(form.defaultRate) : undefined,
     paymentTerms: form.paymentTerms || undefined, tags: form.tags.length > 0 ? form.tags : undefined,
@@ -55,6 +58,9 @@ export default function ClientFormDrawer({ open, client, allTags, onTagCreated, 
   const [linkUrl, setLinkUrl] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [ccReady, setCcReady] = useState(true)
+  useEffect(() => { if (open) void ccColumnExists('clients').then(setCcReady) }, [open])
+  const ccCheck = parseEmailList(form.ccEmails)
   useEffect(() => { if (open) { setForm(client ? fromClient(client) : { ...EMPTY }); setLinkLabel(''); setLinkUrl(''); setError(null) } }, [open, client?.id])   // eslint-disable-line react-hooks/exhaustive-deps
   const set = (patch: Partial<ClientFormData>) => setForm(f => ({ ...f, ...patch }))
   function addLink() {
@@ -63,6 +69,7 @@ export default function ClientFormDrawer({ open, client, allTags, onTagCreated, 
   }
   async function save() {
     if (!form.name.trim() || saving) return
+    if (ccCheck.invalid.length) { setError(`Invoice CC: ${ccCheck.invalid.join(', ')} ${ccCheck.invalid.length === 1 ? "doesn't look like an email address" : "don't look like email addresses"}.`); return }
     setSaving(true); setError(null)
     try { await onSave(toClientPatch(form)); onClose() } catch (e) { setError(`Could not save: ${(e as Error).message}`) } finally { setSaving(false) }
   }
@@ -87,6 +94,11 @@ export default function ClientFormDrawer({ open, client, allTags, onTagCreated, 
           <Field label="Default rate ($/hr)"><input aria-label="Default rate" className="input" type="number" inputMode="decimal" value={form.defaultRate} onChange={e => set({ defaultRate: e.target.value })} placeholder="8.50" /></Field>
           <Field label="Payment terms"><select aria-label="Payment terms" className="select" value={form.paymentTerms} onChange={e => set({ paymentTerms: e.target.value })}>
             <option value="">— Not set —</option>{TERMS.map(t => <option key={t} value={t}>{t}</option>)}{form.paymentTerms && !TERMS.includes(form.paymentTerms) && <option value={form.paymentTerms}>{form.paymentTerms}</option>}</select></Field>
+          <Field label="Invoice CC" full
+            error={ccCheck.invalid.length ? `Not an email address: ${ccCheck.invalid.join(', ')}` : undefined}
+            hint={ccReady ? 'Copied (Cc) on invoices and payment reminders — e.g. the person who pays. Separate several with commas.' : 'Needs a database update first: run supabase/migrate-cc-emails.sql in Supabase.'}>
+            <input aria-label="Invoice CC" className="input" type="text" inputMode="email" autoComplete="off" disabled={!ccReady} value={form.ccEmails} onChange={e => set({ ccEmails: e.target.value })} placeholder="accounting@client.com, owner@client.com" />
+          </Field>
           <Field label="Contract end date"><input aria-label="Contract end date" className="input" type="date" value={form.contractEnd} onChange={e => set({ contractEnd: e.target.value })} /></Field>
           <Field label="Billing address" full><input aria-label="Billing address" className="input" value={form.address} onChange={e => set({ address: e.target.value })} placeholder="123 Main St, City, State" /></Field>
         </div>

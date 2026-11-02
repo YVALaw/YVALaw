@@ -11,7 +11,7 @@ import { can } from '../lib/roles'
 import { Ic, P } from '../components/Icon'
 import { Banner, Drawer, EmptyState, Modal, Menu, PageHeader, Pill, SearchInput, Segmented, Skel, useIsMobile } from '../components/ui'
 import EmployeeStatements from '../components/people/EmployeeStatements'
-import { EMPTY_EMPLOYEE_FORM, EmployeeFields, STATUS_OPTIONS, employeeToForm, formToEmployee, type EmployeeFormData } from '../components/people/EmployeeForm'
+import { EMPTY_EMPLOYEE_FORM, EmployeeFields, STATUS_OPTIONS, employeeFormError, employeeToForm, formToEmployee, type EmployeeFormData } from '../components/people/EmployeeForm'
 import { AttachmentList } from '../components/people/attachments'
 import { PersonAvatar, employeeStatusTone, payScheduleOf, placementOf, projectsOf, upcomingAnniversary } from '../components/people/common'
 import { TIME_STATUS, loadTimeActivity, timeStatusOf } from '../components/people/teamStatus'
@@ -110,6 +110,7 @@ export default function EmployeesPage() {
 
   async function saveForm() {
     if (!form.name.trim() || saving) return
+    if (employeeFormError(form)) return          // the field shows which entries aren't email addresses
     setSaving(true)
     const payload = formToEmployee(form, { schedule: canSchedule })
     let ok = false
@@ -328,7 +329,7 @@ export default function EmployeesPage() {
         footer={<>
           <span className="spacer" />
           <button type="button" className="btn" onClick={() => setModal(null)}>Cancel</button>
-          <button type="button" className="btn btn--primary" onClick={() => void saveForm()} disabled={!form.name.trim() || saving}>{saving ? 'Saving…' : modal === 'add' ? 'Add employee' : 'Save changes'}</button>
+          <button type="button" className="btn btn--primary" onClick={() => void saveForm()} disabled={!form.name.trim() || saving || !!employeeFormError(form)}>{saving ? 'Saving…' : modal === 'add' ? 'Add employee' : 'Save changes'}</button>
         </>}>
         <EmployeeFields form={form} setForm={setForm} pay={showPayRates} schedule={canSchedule} />
         {canAssign && (

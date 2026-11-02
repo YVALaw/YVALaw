@@ -15,6 +15,8 @@ import { Banner, Field, Menu, Modal } from './ui'
 import { printInvoice } from '../utils/invoiceHtml'
 import { hoursToHM, loadTrackerEntriesForProject } from '../services/trackerStorage'
 import { isItemLine, makeItemLine, qtyText } from '../utils/invoiceLines'
+import { clientRecipients } from '../services/emailRecipients'
+import { useClientRecipients } from './EmailRecipients'
 
 function projectPrefix(name: string): string {
   return name.split(/\s+/).map(w => w[0] || '').join('').toUpperCase().slice(0, 5)
@@ -205,6 +207,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
   const dates = useMemo(() => generateDateRange(billingStart, billingEnd), [billingStart, billingEnd])
 
   const selectedClient  = clients.find(c => c.id === clientId)
+  const recipients = useClientRecipients(selectedClient)
   const selectedProject = projects.find(p => p.id === projectId)
   const projectEmployees = selectedProject?.employeeIds?.length
     ? employees.filter(e => selectedProject.employeeIds!.includes(e.id))
@@ -475,12 +478,15 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
 
       if (editInvoice) {
         // Update existing invoice
+        // Who gets it is fixed on the invoice when it's saved (client Invoice CC + billing contacts)
+        const cc = selectedClient ? (await clientRecipients(selectedClient)).cc : (editInvoice.clientCcEmails ?? [])
         const inv: Invoice = {
           ...editInvoice,
           date,
           dueDate:       dueDate || undefined,
           clientName:    selectedClient?.name    || editInvoice.clientName || '',
           clientEmail:   selectedClient?.email   || editInvoice.clientEmail || '',
+          clientCcEmails: cc.length ? cc : undefined,
           clientAddress: selectedClient?.address || editInvoice.clientAddress || '',
           billingStart:  billingStart || undefined,
           billingEnd:    billingEnd   || undefined,
@@ -518,6 +524,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
         await saveInvoiceCounter(counter + 1)
       }
 
+      const { cc } = await clientRecipients(selectedClient)
       const inv: Invoice = {
         id:            uid(),
         number:        invNumber,
@@ -525,6 +532,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
         dueDate:       dueDate || undefined,
         clientName:    selectedClient?.name    || '',
         clientEmail:   selectedClient?.email   || '',
+        clientCcEmails: cc.length ? cc : undefined,
         clientAddress: selectedClient?.address || '',
         billingStart:  billingStart || undefined,
         billingEnd:    billingEnd   || undefined,
@@ -625,7 +633,12 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
               <Field label="Invoice date"><input className="input" type="date" aria-label="Invoice date" value={date} onChange={e => setDate(e.target.value)} /></Field>
               <Field label="Due date"><input className="input" type="date" aria-label="Due date" value={dueDate} onChange={e => setDueDate(e.target.value)} /></Field>
               <Field label="Terms"><input className="input fin-readonly" readOnly tabIndex={-1} value={selectedClient?.paymentTerms || '—'} /></Field>
-              <Field label="Send to"><input className="input fin-readonly" readOnly tabIndex={-1} value={selectedClient?.email || (selectedClient ? 'No email on file' : '—')} /></Field>
+              <Field label="Send to"><input className="input fin-readonly" aria-label="Send to" readOnly tabIndex={-1} value={selectedClient?.email || (selectedClient ? 'No email on file' : '—')} /></Field>
+              {selectedClient?.email && (
+                <Field label="Cc" full hint="From the client's Invoice CC and contacts marked “Gets invoices”. Change them on the client's page.">
+                  <input className="input fin-readonly" aria-label="Cc" readOnly tabIndex={-1} value={recipients ? (recipients.cc.join(', ') || 'No one') : 'Loading…'} />
+                </Field>
+              )}
             </div>
             {billingStart && billingEnd && dates.length === 0 && <Banner tone="danger">Invalid date range.</Banner>}
           </section>

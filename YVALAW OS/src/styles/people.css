@@ -117,6 +117,8 @@
 .ppl-file-pick { max-width: 220px; position: relative; }
 .ppl-file-pick__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ppl-history--inline { max-width: 900px; }
+.ppl-activity { max-width: 1000px; }
+.ppl-activity .card__head { flex-wrap: wrap; gap: 4px 12px; }
 
 /* Files (attachments) */
 .ppl-files { display: flex; flex-direction: column; gap: 8px; }

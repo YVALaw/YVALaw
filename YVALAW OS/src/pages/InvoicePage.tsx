@@ -19,9 +19,12 @@ import {
 import { loadPayments } from '../services/payments'
 import { formatMoney } from '../utils/money'
 import { buildInvoiceHTML, printInvoice as printInvoiceUtil } from '../utils/invoiceHtml'
-import { sendInvoiceEmail, sendReminderEmail } from '../services/invoiceEmail'
+import { sendInvoiceEmail, sendReminderEmail, sentToLabel } from '../services/invoiceEmail'
+import { clientRecipients } from '../services/emailRecipients'
+import { RecipientsHint, useClientRecipients, useInvoiceRecipients } from '../components/EmailRecipients'
 import { dateShort } from '../utils/format'
 import { localParts } from '../utils/moneyRules'
+import RecordSignature from '../components/RecordSignature'
 
 type InvoiceStatus = 'draft' | 'sent' | 'viewed' | 'paid' | 'overdue' | 'partial'
 type Tab = 'all' | InvoiceStatus | 'recurring'
@@ -99,6 +102,8 @@ export default function InvoicePage() {
   const [previewInv, setPreviewInv] = useState<Invoice | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
 
+  const quickRecipients = useClientRecipients(quickModal ? clients.find(c => c.name === form.clientName) : null)
+  const previewRecipients = useInvoiceRecipients(previewInv, clients)
   const ok = (text: string) => setBanner({ tone: 'success', text })
   const fail = (text: string) => setBanner({ tone: 'danger', text })
 
@@ -165,22 +170,22 @@ export default function InvoicePage() {
     }
     setBusy(`send-${inv.id}`)
     try {
-      const r = await sendInvoiceEmail(inv, settings)
+      const r = await sendInvoiceEmail(inv, settings, clients)
       if (r.mode === 'failed') { fail(`${inv.number} was not sent: ${r.fallbackReason}`); return }
-      const msg = r.mode === 'gmail' ? `${inv.number} sent to ${inv.clientEmail}.` : `${inv.number} opened in your email app for ${inv.clientEmail} and marked as sent.`
+      const msg = r.mode === 'gmail' ? `${inv.number} sent to ${sentToLabel(r)} with the PDF attached.` : `${inv.number} opened in your email app for ${sentToLabel(r)} and marked as sent — attach the downloaded PDF.`
       if (await persist(markSent(), msg) && cId) void logComm(cId, `Invoice ${inv.number} emailed (${formatMoney(amountOf(inv))})`, 'email')
     } finally { setBusy(null) }
   }
   async function emailAgain(inv: Invoice) {
-    const r = await sendInvoiceEmail(inv, settings)
+    const r = await sendInvoiceEmail(inv, settings, clients)
     if (r.mode === 'failed') { fail(`${inv.number} was not sent: ${r.fallbackReason}`); return }
-    ok(`Invoice ${inv.number} emailed to ${inv.clientEmail}.`)
+    ok(r.mode === 'gmail' ? `Invoice ${inv.number} emailed to ${sentToLabel(r)}.` : `Invoice ${inv.number} opened in your email app for ${sentToLabel(r)} — attach the downloaded PDF.`)
     const cId = clientIdOf(inv); if (cId) void logComm(cId, `Invoice ${inv.number} emailed (${formatMoney(amountOf(inv))})`, 'email')
   }
   async function remind(inv: Invoice) {
-    const r = await sendReminderEmail(inv, settings)
+    const r = await sendReminderEmail(inv, settings, clients)
     if (r.mode === 'failed') { fail(`Reminder for ${inv.number} was not sent: ${r.fallbackReason}`); return }
-    ok(`Payment reminder sent to ${inv.clientEmail}.`)
+    ok(r.mode === 'gmail' ? `Payment reminder sent to ${sentToLabel(r)}.` : `Reminder for ${inv.number} opened in your email app for ${sentToLabel(r)}.`)
     const cId = clientIdOf(inv); if (cId) void logComm(cId, `Payment reminder sent for Invoice ${inv.number}`, 'email')
   }
   async function remindAll() {
@@ -188,7 +193,7 @@ export default function InvoicePage() {
     for (const inv of invoices.filter(i => ['overdue', 'sent', 'partial'].includes(statusOf(i)) && i.clientEmail)) {
       if (seen.has(inv.clientEmail!)) continue
       seen.add(inv.clientEmail!)
-      const r = await sendReminderEmail(inv, settings)
+      const r = await sendReminderEmail(inv, settings, clients)
       if (r.mode === 'failed') { fail(`Stopped after ${seen.size - 1} reminder${seen.size === 2 ? '' : 's'}: ${r.fallbackReason}`); return }
       const cId = clientIdOf(inv); if (cId) void logComm(cId, `Payment reminder sent for Invoice ${inv.number}`, 'email')
     }
@@ -207,9 +212,10 @@ export default function InvoicePage() {
     const counter = await loadInvoiceCounter()
     const client = clients.find(c => c.name === form.clientName)
     const proj = allProjects.find(p => p.id === quickProjectId)
+    const { cc } = await clientRecipients(client)
     const inv: Invoice = {
       id: uid(), number: `INV-${String(counter).padStart(3, '0')}`, date: form.date, dueDate: form.dueDate || undefined,
-      clientName: form.clientName, clientEmail: client?.email, projectId: proj?.id || null, projectName: proj?.name || undefined,
+      clientName: form.clientName, clientEmail: client?.email, clientCcEmails: cc.length ? cc : undefined, projectId: proj?.id || null, projectName: proj?.name || undefined,
       subtotal: parseFloat(form.subtotal) || 0, notes: form.notes || undefined, status: 'sent', items: [],
       statusHistory: [{ status: 'sent', changedAt: Date.now() }], createdAt: Date.now(), updatedAt: Date.now(),
     }
@@ -217,9 +223,9 @@ export default function InvoicePage() {
     if (!await persist([inv, ...invoices], `${inv.number} created.`)) return
     void saveInvoiceCounter(counter + 1)
     if (inv.clientEmail) {
-      const r = await sendInvoiceEmail(inv, settings)
+      const r = await sendInvoiceEmail(inv, settings, clients)
       if (r.mode === 'failed') { setBanner({ tone: 'warning', text: `${inv.number} was created but not emailed: ${r.fallbackReason}` }); return }
-      ok(`${inv.number} created and emailed to ${inv.clientEmail}.`)
+      ok(r.mode === 'gmail' ? `${inv.number} created and emailed to ${sentToLabel(r)}.` : `${inv.number} created and opened in your email app for ${sentToLabel(r)}.`)
       if (client?.id) void logComm(client.id, `Invoice ${inv.number} emailed (${formatMoney(inv.subtotal || 0)})`, 'email')
     } else if (client?.id) {
       void logComm(client.id, `Invoice ${inv.number} created (${formatMoney(inv.subtotal || 0)})`, 'system')
@@ -517,7 +523,7 @@ export default function InvoicePage() {
           <button type="button" className="btn btn--primary" onClick={() => void saveQuick()} disabled={!form.clientName || !form.subtotal}>Create</button>
         </>}>
         <div className="form-grid form-grid--2">
-          <Field label="Client *" full>
+          <Field label="Client *" full hint={quickRecipients ? <RecipientsHint bare recipients={quickRecipients} /> : undefined}>
             <select className="select" aria-label="Client" value={form.clientName} onChange={e => setForm({ ...form, clientName: e.target.value })}>
               <option value="">— Select client —</option>
               {clients.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
@@ -586,6 +592,8 @@ export default function InvoicePage() {
           {!mobile && <button type="button" className="btn" onClick={() => { const inv = previewInv; setPreviewInv(null); openEditInvoice(inv) }}>Edit</button>}
           <button type="button" className="btn btn--primary" onClick={() => printInvoice(previewInv)}><Ic d={P.printer} size={15} /> Print / PDF</button>
         </> : undefined}>
+        {previewInv && statusOf(previewInv) !== 'paid' && <RecipientsHint recipients={previewRecipients} prefix="Invoice emails go to" className="fin-preview__to" />}
+        {previewInv && <RecordSignature table="invoices" recordId={previewInv.id} />}
         {previewInv && <iframe className="fin-preview" srcDoc={buildInvoiceHTML(previewInv, htmlOpts(0))} sandbox="" title="Invoice preview" />}
       </Modal>
 

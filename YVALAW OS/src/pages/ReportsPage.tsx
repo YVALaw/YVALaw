@@ -18,6 +18,7 @@ import { useRole } from '../context/RoleContext'
 import { can, type AppRole } from '../lib/roles'
 import { Banner, Card, Dot, KpiStrip, Modal, PageHeader, Pill, SearchInput, Segmented, Skel, useIsMobile, type Kpi } from '../components/ui'
 import { dateShort } from '../utils/format'
+import { logAction } from '../services/activityLog'
 
 /* ══ Shared helpers ═══════════════════════════════════════════════════ */
 
@@ -527,8 +528,8 @@ function InvoiceHistory({ store, owner, usdToDop, openInvoice }: { store: DataSn
         <button type="button" className="btn btn--sm" onClick={() => { setHFrom(month.from); setHTo(month.to) }}>This month</button>
         <button type="button" className="btn btn--sm" onClick={() => { setHFrom(`${y}-01-01`); setHTo(`${y}-12-31`) }}>This year</button>
         <button type="button" className="btn btn--sm btn--ghost" onClick={() => { setHFrom(''); setHTo(''); setHClient(''); setHProject(''); setHStatus('') }}>Clear</button>
-        <button type="button" className="btn btn--sm" onClick={() => downloadCSV('invoice-history.csv', invoiceHistoryCsvRows(rows))}>Export CSV</button>
-        {owner && <button type="button" className="btn btn--sm" onClick={() => downloadCSV('payroll-export.csv', payrollCsvRows(rows, store.employees, usdToDop))}>Payroll CSV</button>}
+        <button type="button" className="btn btn--sm" onClick={() => { downloadCSV('invoice-history.csv', invoiceHistoryCsvRows(rows)); void logAction('export', `Exported invoice history CSV (${rows.length} invoices)`) }}>Export CSV</button>
+        {owner && <button type="button" className="btn btn--sm" onClick={() => { downloadCSV('payroll-export.csv', payrollCsvRows(rows, store.employees, usdToDop)); void logAction('export', `Exported payroll CSV (${rows.length} invoices)`, { table: 'payroll_runs' }) }}>Payroll CSV</button>}
       </div>
     }>
       <div className="home-filters">

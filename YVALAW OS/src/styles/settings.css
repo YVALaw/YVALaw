@@ -142,6 +142,23 @@
 .set-hist__empty { padding: 28px 20px; font-size: 14px; color: var(--muted); text-align: center; }
 .set-hist__error { margin: 12px 20px 0; }
 .set-hist__skel { padding: 14px 20px; display: flex; flex-direction: column; gap: 14px; }
+.set-hist-row__rec { font-weight: 600; overflow-wrap: anywhere; }
+.set-hist-row--event .set-hist-row__table { background: #fef9c3; color: #854d0e; }
+.set-hist__more { padding: 12px 20px; font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--row-line); }
+/* person activity (employee profile → Activity): the list sits inside a card */
+.set-hist--person .set-hist__filters { padding: 12px 20px; }
+
+/* ── Record signature ("Created by … · Last changed by …") ─────────────── */
+.set-sign { margin: 0; display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 12.5px; color: var(--muted); }
+.set-sign strong { font-weight: 600; color: var(--text-2); }
+.set-sign__part { overflow-wrap: anywhere; }
+.modal-x .set-sign { margin-bottom: 10px; }
+
+/* ── Team access: staff profile line ──────────────────────────────────── */
+.set-user__profile { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; margin-top: 3px; font-size: 12.5px; }
+.set-user__pname { color: var(--text-2); overflow-wrap: anywhere; }
+.set-user__pname--none { color: var(--muted); }
+.set-user__profile .link { font-size: 12.5px; }
 
 /* ── Data ──────────────────────────────────────────────────────────────── */
 .set-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
@@ -173,6 +190,8 @@
   .set-hist-row__when { width: auto; }
   .set-hist-row__what { min-width: 100%; order: 3; }
   .set-hist-row__who { order: 4; }
+  .set-hist--person .set-hist__filters, .set-hist__more { padding-left: 16px; padding-right: 16px; }
+  .set-user__profile .link { min-height: 32px; }
   .set-rate-pair { grid-template-columns: 1fr; }
   .set-data-row .btn { width: 100%; }
   /* permissions: one block per permission, the 4 roles as labelled boxes underneath */

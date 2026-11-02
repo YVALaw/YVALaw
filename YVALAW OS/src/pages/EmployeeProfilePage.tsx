@@ -5,6 +5,8 @@ import EmployeePayRates from '../components/EmployeePayRates'
 import EmployeePayoutMethod from '../components/EmployeePayoutMethod'
 import EmployeeDocuments from '../components/EmployeeDocuments'
 import RecordHistory from '../components/RecordHistory'
+import RecordSignature from '../components/RecordSignature'
+import HistoryList from '../components/HistoryList'
 import type { Attachment, Client, Employee, Invoice, Project, TimeEntry } from '../data/types'
 import { loadSnapshot, saveEmployees, saveProjects, loadTimeEntries } from '../services/storage'
 import { isOpenProject, withEmployeeOn, projectIdsOf } from '../components/people/ProjectAssign'
@@ -24,8 +26,8 @@ import { useEmployeeWeekStats } from '../components/people/weekStats'
 
 function uid() { return crypto.randomUUID() }
 
-type Tab = 'overview' | 'pay' | 'time' | 'docs' | 'history'
-const TABS: Tab[] = ['overview', 'pay', 'time', 'docs', 'history']
+type Tab = 'overview' | 'pay' | 'time' | 'docs' | 'activity' | 'history'
+const TABS: Tab[] = ['overview', 'pay', 'time', 'docs', 'activity', 'history']
 
 export default function EmployeeProfilePage() {
   const { id } = useParams<{ id: string }>()
@@ -91,6 +93,8 @@ export default function EmployeeProfilePage() {
     )
   }
   if (!emp) {
+    // A stale "my profile" link (the record was deleted) must not keep pointing here
+    try { if (id && sessionStorage.getItem('linkedEmployeeId') === id) sessionStorage.removeItem('linkedEmployeeId') } catch { /* private mode */ }
     return (
       <div className="page">
         <EmptyState action={<button type="button" className="btn" onClick={() => navigate('/employees')}>← Back to Team</button>}>Employee not found.</EmptyState>
@@ -382,6 +386,7 @@ export default function EmployeeProfilePage() {
           <div className="ppl-prof-head__text">
             <h1 className="page-title">{empNN.name}</h1>
             <span className="page-sub">{empNN.employeeNumber && <><span className="mono t-gold">{empNN.employeeNumber}</span>{subParts.length ? ' · ' : ''}</>}{subParts.join(' · ')}</span>
+            <RecordSignature table="employees" recordId={empNN.id} refreshKey={empNN} />
             <div className="row row--wrap ppl-pills">
               <Pill tone={client ? 'info' : 'gold'}>{client ? 'Client project' : 'YVA team'}</Pill>
               <Pill tone={empNN.userId ? 'success' : 'neutral'}>{empNN.userId ? 'YVA Time login' : 'No YVA Time login'}</Pill>
@@ -416,6 +421,7 @@ export default function EmployeeProfilePage() {
         { value: 'pay', label: 'Pay & payout', hidden: !payTab },
         { value: 'time', label: 'YVA Time' },
         { value: 'docs', label: 'Documents', count: attachments.length || null },
+        { value: 'activity', label: 'Activity', hidden: !allowed('history.view') },
         { value: 'history', label: 'History', hidden: !allowed('history.view') },
       ]} />
 
@@ -423,6 +429,15 @@ export default function EmployeeProfilePage() {
       {tab === 'pay' && payTab && pay}
       {tab === 'time' && <YvaTimeLogin emp={empNN} onLinked={userId => setEmployeesState(prev => prev.map(e => e.id === empNN.id ? { ...e, userId } : e))} onViewScreens={canScreens ? viewScreens : undefined} />}
       {tab === 'docs' && docs}
+      {tab === 'activity' && allowed('history.view') && (empNN.userId ? (
+        <section className="card ppl-activity">
+          <div className="card__head">
+            <h2 className="card__title">Activity</h2>
+            <span className="card__meta">Everything {first} did in YVA OS — newest first</span>
+          </div>
+          <HistoryList actorId={String(empNN.userId)} />
+        </section>
+      ) : <EmptyState>Not linked to a login — no activity to show.</EmptyState>)}
       {tab === 'history' && <RecordHistory inline table="employees" recordId={empNN.id} />}
 
       <Modal open={!!removeFrom} onClose={() => setRemoveFrom(null)} title={`Remove ${empNN.name} from ${removeFrom?.name ?? ''}?`}
