@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import RecordSignature from '../components/RecordSignature'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { uploadPhoto } from '../utils/photo'
 import ClientContacts from '../components/ClientContacts'
@@ -216,6 +217,7 @@ export default function ClientProfilePage() {
         </div>
       </div>
       {msg && <Banner tone={msg.ok ? 'success' : 'danger'} onClose={() => setMsg(null)}>{msg.text}</Banner>}
+      <RecordSignature table="clients" recordId={clientNN.id} refreshKey={clientNN} />
 
       <KpiStrip compact items={[
         { label: 'Revenue, all time', value: usd(totalRevenue, { cents: false }) },

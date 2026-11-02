@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { formatEmailList } from '../utils/emailList'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { uploadPhoto } from '../utils/photo'
 import EmployeePayRates from '../components/EmployeePayRates'
@@ -20,7 +21,7 @@ import EmployeeStatements from '../components/people/EmployeeStatements'
 import EmployeePayslips from '../components/people/EmployeePayslips'
 import YvaTimeLogin from '../components/people/YvaTimeLogin'
 import { AttachmentList } from '../components/people/attachments'
-import { EmployeeFields, employeeToForm, formToEmployee, EMPTY_EMPLOYEE_FORM, type EmployeeFormData } from '../components/people/EmployeeForm'
+import { EmployeeFields, employeeFormError, employeeToForm, formToEmployee, EMPTY_EMPLOYEE_FORM, type EmployeeFormData } from '../components/people/EmployeeForm'
 import { PersonAvatar, employeeStatusTone, firstName, hireDateLabel, payScheduleOf, placementOf, projectsOf, upcomingAnniversary } from '../components/people/common'
 import { useEmployeeWeekStats } from '../components/people/weekStats'
 
@@ -132,6 +133,7 @@ export default function EmployeeProfilePage() {
 
   async function handleSave() {
     if (!form.name.trim() || saving) return
+    if (employeeFormError(form)) return   // e.g. an invalid Statement CC address (shown in red on the field)
     setSaving(true)
     const updated: Employee = { ...empNN, ...formToEmployee(form, { schedule: canSchedule }), status: form.status, photoUrl, attachments }
     const ok = await persistUpdate(updated, 'Profile saved.')
@@ -196,6 +198,7 @@ export default function EmployeeProfilePage() {
   const info: { k: string; v?: string | null; mono?: boolean }[] = [
     { k: 'Employee number', v: empNN.employeeNumber, mono: true },
     { k: 'Email', v: empNN.email },
+    { k: 'Statement CC', v: formatEmailList(empNN.ccEmails) || null },
     { k: 'Phone', v: empNN.phone },
     { k: 'Position', v: empNN.role },
     { k: 'Status', v: empNN.status || 'Active' },
