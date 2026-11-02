@@ -93,10 +93,6 @@ async function openLink(event) {
   const md = { invoiceId: inv.id, clientId: client?.id || inv.client_id || '', invoiceNumber: inv.number || '', source: 'pay_link' }
   const params = {
     mode: 'payment',
-    // Invoices are in USD and the webhook only applies USD payments: never let Stripe convert the price into the
-    // visitor's currency (Adaptive Pricing showed DOP to a visitor in the Dominican Republic). USD also keeps the
-    // US bank account (ACH) option, which Stripe hides for other currencies.
-    adaptive_pricing: { enabled: false },
     payment_method_types: ['card', 'us_bank_account'],
     payment_method_options: { us_bank_account: { verification_method: 'automatic' } },
     line_items: [{ quantity: 1, price_data: { currency: 'usd', unit_amount: cents, product_data: { name: `Invoice ${inv.number || ''}`.trim(), description: `${company}${client?.company || client?.name ? ` · ${client.company || client.name}` : ''}` } } }],
