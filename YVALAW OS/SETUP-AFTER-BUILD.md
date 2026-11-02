@@ -53,7 +53,9 @@ Same way as step 1, in this order (each is safe to run again):
    Outlook first (step 3 below); emails still go out before this script runs, just without the log and limits.
 10. `supabase/migrate-stripe-secure.sql` — safer online payments: each Stripe payment, refund and dispute is recorded
    exactly once, card/bank payments recorded by Stripe can't be edited or deleted by mistake, bank (ACH) and saved
-   payment methods. Run it **before** adding the new Stripe webhook events (step 3b).
+   payment methods. Once an invoice has recorded payments, its "amount paid" is always their total (changing the status
+   by hand can no longer make a paid invoice payable again). Run it **before** adding the new Stripe webhook events
+   (step 3b), and run it again whenever you re-run `migrate-step4-weekly-close.sql`.
 
 **Crisp chat (client portal → Messages):** make a free account at crisp.chat → Settings → Website settings →
 copy the **Website ID** → YVA OS → Settings → **Integrations** → Crisp → paste → Save. Clients then chat with
@@ -138,12 +140,13 @@ tries, 3 days apart). From YVA OS you can **refund** a card/bank payment (Invoic
    (`https://yvastaffing.agency/.netlify/functions/stripe-webhook`) → **Select events / Update details** → tick all of these
    and save:
    `payment_intent.succeeded`, `payment_intent.processing`, `payment_intent.payment_failed`, `payment_intent.requires_action`,
-   `payment_intent.canceled`, `charge.refunded`, `charge.dispute.created`, `charge.dispute.funds_withdrawn`,
+   `payment_intent.canceled`, `charge.refunded`, `charge.refund.updated`, `charge.dispute.created`, `charge.dispute.funds_withdrawn`,
    `charge.dispute.funds_reinstated`, `charge.dispute.closed`, `setup_intent.succeeded`, `payment_method.detached`,
    `payment_method.automatically_updated`, `payment_method.updated`
 4. YVA OS → Settings → Integrations → **Stripe** should say "Connected · Test mode" with no warnings.
-5. Give the new permission **Refund card/bank payments** (Settings → Team Access → Permissions) to whoever should be
-   able to refund. You (CEO) always have it.
+5. Permissions (Settings → Team Access → Permissions): **Refund card/bank payments** for whoever may refund (you, the
+   CEO, always can). **Send email from YVA OS**: CEO, Admin and Accounting can always send; give it (or "Send invoices")
+   to any recruiter / lead-gen person who needs to email from YVA OS.
 6. Try it with a test client portal login:
    - Pay an invoice with card `4242 4242 4242 4242` (any future date, any CVC) → the invoice turns Paid.
    - Pay another with **US bank account** → choose the test bank → the invoice shows "Bank payment on its way"; in test
@@ -157,7 +160,7 @@ tries, 3 days apart). From YVA OS you can **refund** a card/bank payment (Invoic
 2. **Settings → Payment methods** (live) → turn on **ACH Direct Debit** (cards are on by default).
 3. **Developers → API keys** (live) → copy the **Publishable key** (`pk_live_…`) and the **Secret key** (`sk_live_…`).
 4. **Developers → Webhooks** (live) → **Add endpoint** → `https://yvastaffing.agency/.netlify/functions/stripe-webhook`,
-   the same 14 events as above → save → copy its **Signing secret** (`whsec_…`).
+   the same 15 events as above → save → copy its **Signing secret** (`whsec_…`).
 5. Netlify → **Site configuration → Environment variables** → replace the three values with the live ones:
    `VITE_STRIPE_PUBLISHABLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` → **Deploys → Trigger deploy**.
 6. YVA OS → Settings → Integrations → Stripe must say **"Connected · Live"**. If one key is test and the other live it
