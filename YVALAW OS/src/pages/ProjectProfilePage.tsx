@@ -18,10 +18,10 @@ import ProjectExpenses, { type ExpenseDraft } from '../components/ops/ProjectExp
 import { errText, hoursLabel, monthPrefix, monthShort, payShort, projectMonthHours, stageInfo, uid } from '../components/ops/opsUtils'
 import { dateMed, usd } from '../utils/format'
 import RecordSignature from '../components/RecordSignature'
+import { useToast } from '../context/ToastContext'
 
 type TabKey = 'rates' | 'overview' | 'tasks' | 'expenses' | 'invoices' | 'contracts' | 'history'
 const TAB_KEYS: TabKey[] = ['rates', 'overview', 'tasks', 'expenses', 'invoices', 'contracts', 'history']
-type Flash = { tone: 'success' | 'danger'; text: string } | null
 const CONTRACT_TONE: Record<ContractStatus, 'neutral' | 'success' | 'partial' | 'danger'> = { draft: 'neutral', active: 'success', expired: 'partial', terminated: 'danger' }
 const EMPTY_CONTRACT = { title: '', status: 'draft' as ContractStatus, startDate: '', endDate: '', value: '', notes: '' }
 
@@ -56,7 +56,7 @@ export default function ProjectProfilePage() {
   const project = projects.find(p => p.id === id)
   const tabParam = params.get('tab') as TabKey | null
   const [tab, setTab] = useState<TabKey>(tabParam && TAB_KEYS.includes(tabParam) ? tabParam : 'rates')
-  const [flash, setFlash] = useState<Flash>(null)
+  const toast = useToast()
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState<ProjectFormState>(EMPTY_PROJECT_FORM)
   const [saving, setSaving] = useState(false)
@@ -113,8 +113,8 @@ export default function ProjectProfilePage() {
     const prev = projects
     const next = projects.map(p => (p.id === updated.id ? updated : p))
     setProjectsState(next)
-    try { await saveProjects(next); if (ok) setFlash({ tone: 'success', text: ok }); return true }
-    catch (e) { setProjectsState(prev); setFlash({ tone: 'danger', text: `Could not save: ${errText(e)}` }); return false }
+    try { await saveProjects(next); if (ok) toast.success(ok); return true }
+    catch (e) { setProjectsState(prev); toast.error(`Could not save: ${errText(e)}`); return false }
   }
   function openEdit() { setForm(formFromProject(projectNN)); setEditing(true) }
   async function handleSave() {
@@ -130,20 +130,20 @@ export default function ProjectProfilePage() {
     const next = projects.filter(p => p.id !== projectNN.id)
     setProjectsState(next)
     try { await saveProjects(next); navigate('/projects') }
-    catch (e) { setProjectsState(prev); setFlash({ tone: 'danger', text: `Could not delete: ${errText(e)}` }) }
+    catch (e) { setProjectsState(prev); toast.error(`Could not delete: ${errText(e)}`) }
   }
   async function handleTagCreated(tag: Tag) {
     const prev = allTags
     const next = [...allTags, tag]
     setAllTags(next)
-    try { await saveTags(next) } catch (e) { setAllTags(prev); setFlash({ tone: 'danger', text: `Could not save the tag: ${errText(e)}` }) }
+    try { await saveTags(next) } catch (e) { setAllTags(prev); toast.error(`Could not save the tag: ${errText(e)}`) }
   }
 
   // Tasks / expenses: the whole lists are kept so a save never treats other projects' rows as removed
   async function persistTasks(next: Task[]): Promise<boolean> {
     const prev = allTasks
     setAllTasks(next)
-    try { await saveTasks(next); return true } catch (e) { setAllTasks(prev); setFlash({ tone: 'danger', text: `Could not save tasks: ${errText(e)}` }); return false }
+    try { await saveTasks(next); return true } catch (e) { setAllTasks(prev); toast.error(`Could not save tasks: ${errText(e)}`); return false }
   }
   function addTask(status: TaskStatus, d: TaskDraft) {
     const mentions = mentionsIn(d.description, employees.map(e => e.name))
@@ -152,7 +152,7 @@ export default function ProjectProfilePage() {
   async function persistExpenses(next: Expense[]): Promise<boolean> {
     const prev = allExpenses
     setAllExpenses(next)
-    try { await saveExpenses(next); return true } catch (e) { setAllExpenses(prev); setFlash({ tone: 'danger', text: `Could not save expenses: ${errText(e)}` }); return false }
+    try { await saveExpenses(next); return true } catch (e) { setAllExpenses(prev); toast.error(`Could not save expenses: ${errText(e)}`); return false }
   }
   function addExpense(d: ExpenseDraft) {
     return persistExpenses([{ id: uid(), projectId: projectNN.id, description: d.description.trim(), amount: parseFloat(d.amount) || 0, date: d.date, category: d.category || undefined, recurring: d.recurring || undefined, createdAt: Date.now() }, ...allExpenses])
@@ -219,7 +219,6 @@ export default function ProjectProfilePage() {
       </>} />
       <RecordSignature table="projects" recordId={projectNN.id} refreshKey={projectNN} />
 
-      {flash && <Banner tone={flash.tone} onClose={() => setFlash(null)}>{flash.text}</Banner>}
 
       <KpiStrip compact items={[
         { label: 'Total billed', value: usd(totalBilled), note: `${projectInvoices.length} invoice${projectInvoices.length === 1 ? '' : 's'}` },

@@ -87,7 +87,6 @@
 .fin-builder__hours { overflow: hidden; }
 .fin-builder__hours .card__head { padding: 16px 20px; }
 .fin-builder__hours-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.fin-builder__msg { padding: 0 20px 12px; }
 .fin-grid-wrap { overflow-x: auto; overflow-y: hidden; border-top: 1px solid var(--head-line); }
 .fin-grid { width: 100%; border-collapse: collapse; font-size: 13.5px; min-width: 760px; }
 .fin-grid th { background: var(--surface-2); font-size: 12px; font-weight: 500; color: var(--muted); text-align: left; padding: 10px 6px; white-space: nowrap; }

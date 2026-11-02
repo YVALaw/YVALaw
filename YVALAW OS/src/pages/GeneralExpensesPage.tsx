@@ -10,6 +10,7 @@ import { dateShort } from '../utils/format'
 import { localParts } from '../utils/moneyRules'
 import { Banner, Checkbox, EmptyState, Field, Menu, Modal, PageHeader, Pill, Skel, useIsMobile } from '../components/ui'
 import { P } from '../components/Icon'
+import { useToast } from '../context/ToastContext'
 
 /** Expense + optional receipt (columns from supabase/migrate-redesign-finance.sql) */
 type Row = Expense & { receiptUrl?: string | null; receiptPath?: string | null }
@@ -29,7 +30,8 @@ export default function GeneralExpensesPage() {
   const [confirmDelete, setConfirmDelete] = useState<Row | null>(null)
   const [form, setForm] = useState<Form | null>(null)
   const [saving, setSaving] = useState(false)
-  const [banner, setBanner] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null)
+  const [setupNote, setSetupNote] = useState<string | null>(null)   // the receipt columns are missing: a setup step, stays as a banner
+  const toast = useToast()
   const fileFor = useRef<Row | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
@@ -49,17 +51,18 @@ export default function GeneralExpensesPage() {
   async function persist(next: Row[], okMsg: string): Promise<boolean> {
     const prev = expenses
     setExpenses(next)
-    try { await saveGeneralExpenses(next); setBanner({ tone: 'success', text: okMsg }); return true }
+    try { await saveGeneralExpenses(next); toast.success(okMsg); return true }
     catch (e) {
       setExpenses(prev)
       const m = (e as Error).message || ''
-      setBanner({ tone: 'danger', text: /receipt_(url|path)/.test(m) ? RECEIPT_SQL : `Not saved: ${m}` })
+      if (/receipt_(url|path)/.test(m)) setSetupNote(RECEIPT_SQL)
+      else toast.error(`Not saved: ${m}`)
       return false
     }
   }
   async function upload(file: File, expenseId: string): Promise<{ storageUrl: string; storagePath: string } | null> {
     try { return await uploadFile(file, `expenses/${expenseId}`) }
-    catch (e) { setBanner({ tone: 'danger', text: `The receipt could not be uploaded: ${(e as Error).message}` }); return null }
+    catch (e) { toast.error(`The receipt could not be uploaded: ${(e as Error).message}`); return null }
   }
 
   async function saveForm() {
@@ -143,7 +146,7 @@ export default function GeneralExpensesPage() {
     <div className="page">
       <PageHeader title="Expenses" sub="General business expenses. Project costs live on each project."
         actions={<button type="button" className="btn btn--primary" onClick={openAdd}>+ Add expense</button>} />
-      {banner && <Banner tone={banner.tone} onClose={() => setBanner(null)}>{banner.text}</Banner>}
+      {setupNote && <Banner tone="danger" onClose={() => setSetupNote(null)}>{setupNote}</Banner>}
       <input ref={fileInput} type="file" className="sr-only" aria-label="Receipt file" accept="image/*,application/pdf" onChange={e => void onReceiptChosen(e.target.files?.[0])} />
 
       <div className="fin-ex-top">

@@ -17,6 +17,7 @@ import { hoursToHM, loadTrackerEntriesForProject } from '../services/trackerStor
 import { isItemLine, makeItemLine, qtyText } from '../utils/invoiceLines'
 import { clientRecipients } from '../services/emailRecipients'
 import { useClientRecipients } from './EmailRecipients'
+import { useToast } from '../context/ToastContext'
 
 function projectPrefix(name: string): string {
   return name.split(/\s+/).map(w => w[0] || '').join('').toUpperCase().slice(0, 5)
@@ -201,8 +202,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
   const [saveTemplateModal, setSaveTemplateModal] = useState(false)
   const [templateName, setTemplateName] = useState('')
   const [loadTemplateModal, setLoadTemplateModal] = useState(false)
-  const [notice, setNotice] = useState<string | null>(null)
-  const [saveError, setSaveError] = useState<string | null>(null)
+  const toast = useToast()
 
   const dates = useMemo(() => generateDateRange(billingStart, billingEnd), [billingStart, billingEnd])
 
@@ -344,12 +344,13 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
   }
 
   // ── Import approved YVA Time hours into the daily grid ──
-  const [importMsg, setImportMsg] = useState<{ ok: boolean; text: string; label?: string } | null>(null)
+  const [importLabel, setImportLabel] = useState<string | null>(null)   // "✓ Imported 12:30 from YVA Time" on the button after an import
   async function importTrackerHours() {
     if (!projectId || dates.length === 0) return
     const entries = await loadTrackerEntriesForProject(projectId, dates[0], dates[dates.length - 1])
     if (entries.length === 0) {
-      setImportMsg({ ok: false, text: 'No approved YVA Time hours for this project in this period (approve them in Time Tracking → Approve).' })
+      setImportLabel(null)
+      toast.warning('No approved YVA Time hours for this project in this period (approve them in Time Tracking → Approve).')
       return
     }
     const byEmployee = new Map<string, { name: string; daily: Record<string, number> }>()
@@ -383,7 +384,8 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
       return next.length ? next : [emptyRow()]
     })
     const total = entries.reduce((s, e) => s + e.hours, 0)
-    setImportMsg({ ok: true, label: `✓ Imported ${hoursToHM(total)} from YVA Time`, text: `Imported ${hoursToHM(total)} (h:mm) of approved hours for ${byEmployee.size} team member${byEmployee.size === 1 ? '' : 's'}. Check the grid before creating the invoice.` })
+    setImportLabel(`✓ Imported ${hoursToHM(total)} from YVA Time`)
+    toast.success(`Imported ${hoursToHM(total)} (h:mm) of approved hours for ${byEmployee.size} team member${byEmployee.size === 1 ? '' : 's'}. Check the grid before creating the invoice.`)
   }
 
   function addRow() { setRows(prev => [...prev, emptyRow()]) }
@@ -417,7 +419,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
     setTemplates(next)
     setTemplateName('')
     setSaveTemplateModal(false)
-    setNotice(`Template "${t.name}" saved.`)
+    toast.success(`Template "${t.name}" saved.`)
   }
 
   function deleteTemplate(id: string) {
@@ -471,7 +473,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
 
   function createInvoice(send: boolean) {
     if (!selectedClient && !rows.some(r => r.employeeName)) return
-    setSaving(true); setSaveError(null)
+    setSaving(true)
     void (async () => {
      try {
       const items = buildItems()
@@ -553,7 +555,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
       onCreated(inv, send)
      } catch (e) {
       setSaving(false)
-      setSaveError(`The invoice was not saved: ${(e as Error).message}`)
+      toast.error(`The invoice was not saved: ${(e as Error).message}`)
      }
     })()
   }
@@ -608,8 +610,6 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
         {isDraftEdit && <button type="button" className="btn btn--primary" disabled={!canSave} title={saveHint} onClick={() => createInvoice(true)}>Save &amp; send</button>}
       </div>
 
-      {saveError && <Banner tone="danger" onClose={() => setSaveError(null)}>{saveError}</Banner>}
-      {notice && <Banner tone="success" onClose={() => setNotice(null)}>{notice}</Banner>}
 
       <div className="fin-builder__grid">
         <div className="fin-builder__main">
@@ -653,9 +653,8 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
               </div>
               <button type="button" className="btn btn--sm btn--soft-gold" disabled={!canImport}
                 title={canImport ? 'Fills the grid with approved hours for this project and period' : 'Pick a project and a billing period first'}
-                onClick={() => void importTrackerHours()}>{importMsg?.label ?? 'Import YVA Time hours'}</button>
+                onClick={() => void importTrackerHours()}>{importLabel ?? 'Import YVA Time hours'}</button>
             </div>
-            {importMsg && <div className="fin-builder__msg"><Banner tone={importMsg.ok ? 'success' : 'warning'} onClose={() => setImportMsg(null)}>{importMsg.text}</Banner></div>}
 
             <div className="fin-grid-wrap">
               {dates.length > 0 ? (

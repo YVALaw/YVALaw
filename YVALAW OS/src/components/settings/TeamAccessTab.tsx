@@ -6,10 +6,11 @@ import { linkStaffProfile } from '../../services/staffProfiles'
 import type { Employee } from '../../data/types'
 import { ROLE_LABELS, ROLE_OPTIONS, isStaff, type AppRole, type UserRole } from '../../lib/roles'
 import { Ic, P } from '../Icon'
-import { Banner, onEnter } from '../ui'
+import { onEnter } from '../ui'
 import { dateMed, initials } from '../../utils/format'
 import PermissionsMatrix from '../PermissionsMatrix'
 import StaffProfileModal, { type StaffLogin } from '../StaffProfileModal'
+import { useToast } from '../../context/ToastContext'
 
 const SIGNUP_PATH = '/os/xDdasQwd24zaQ'
 type Row = UserRoleRow & { created_at?: string }
@@ -23,7 +24,7 @@ export default function TeamAccessTab({ users, setUsers, meId, notify }: {
 }) {
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteSending, setInviteSending] = useState(false)
-  const [inviteMsg, setInviteMsg] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const toast = useToast()
   const [copied, setCopied] = useState(false)
   const signupUrl = `${window.location.origin}${SIGNUP_PATH}`
   const navigate = useNavigate()
@@ -52,16 +53,15 @@ export default function TeamAccessTab({ users, setUsers, meId, notify }: {
   async function sendInvite() {
     if (!inviteEmail.trim()) return
     setInviteSending(true)
-    setInviteMsg(null)
     const subject = `You've been invited to YVA OS`
     const body = `Hi,\n\nYou've been invited to join YVA OS — the internal operations platform.\n\nClick the link below to create your account:\n${signupUrl}\n\nOnce you sign up, your account will be active and an admin can assign your role.\n\nWelcome to the team!\n\n— YVA Staffing`
     try {
       const r = await sendEmail(inviteEmail.trim(), subject, body)
       if (r?.mode === 'failed') throw new Error(r.fallbackReason || 'not sent')
-      setInviteMsg({ type: 'ok', text: `Invite sent to ${inviteEmail.trim()}` })
+      toast.success(`Invite sent to ${inviteEmail.trim()}`)
       setInviteEmail('')
     } catch {
-      setInviteMsg({ type: 'err', text: 'Failed to send invite. Check Settings → Integrations → Email sending.' })
+      toast.error('Failed to send invite. Check Settings → Integrations → Email sending.')
     }
     setInviteSending(false)
   }
@@ -167,7 +167,6 @@ export default function TeamAccessTab({ users, setUsers, meId, notify }: {
             <Ic d={P.send} size={14} /> {inviteSending ? 'Sending…' : 'Send invite'}
           </button>
         </div>
-        {inviteMsg && <Banner tone={inviteMsg.type === 'ok' ? 'success' : 'danger'}>{inviteMsg.text}</Banner>}
         <div className="set-link-box">
           <span>Signup link</span>
           <span className="set-code">{signupUrl}</span>

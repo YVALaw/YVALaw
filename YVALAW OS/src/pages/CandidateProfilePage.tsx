@@ -9,6 +9,7 @@ import { Banner, Card, EmptyState, Field, Menu, Modal, Pill, Skel } from '../com
 import { AttachmentList } from '../components/people/attachments'
 import { OnboardingChecklist } from '../components/people/hire'
 import { PersonAvatar } from '../components/people/common'
+import { useToast } from '../context/ToastContext'
 
 function uid() { return crypto.randomUUID() }
 
@@ -34,9 +35,9 @@ export default function CandidateProfilePage() {
   const navigate = useNavigate()
 
   const [candidates, setCandidatesState] = useState<Candidate[] | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
-  useEffect(() => { loadCandidates().then(setCandidatesState).catch(e => { setError(`Could not load: ${(e as Error).message}`); setCandidatesState([]) }) }, [])
+  const [loadError, setLoadError] = useState<string | null>(null)   // could not load: stays as a banner
+  const toast = useToast()
+  useEffect(() => { loadCandidates().then(setCandidatesState).catch(e => { setLoadError(`Could not load: ${(e as Error).message}`); setCandidatesState([]) }) }, [])
   const candidate = (candidates ?? []).find(c => c.id === id)
 
   const [editing, setEditing] = useState(false)
@@ -64,9 +65,9 @@ export default function CandidateProfilePage() {
   async function persistUpdate(updated: Candidate, ok?: string) {
     const before = candidates
     const next = (candidates ?? []).map(c => c.id === updated.id ? updated : c)
-    setCandidatesState(next); setError(null)
-    try { await saveCandidates(next); if (ok) setNotice(ok); return true }
-    catch (e) { setCandidatesState(before); setError(`Could not save: ${(e as Error).message}`); return false }
+    setCandidatesState(next)
+    try { await saveCandidates(next); if (ok) toast.success(ok); return true }
+    catch (e) { setCandidatesState(before); toast.error(`Could not save: ${(e as Error).message}`); return false }
   }
 
   async function handleSave() {
@@ -87,7 +88,7 @@ export default function CandidateProfilePage() {
     const next = (candidates ?? []).filter(c => c.id !== candidateNN.id)
     setCandidatesState(next)
     try { await saveCandidates(next); navigate('/candidates') }
-    catch (e) { setCandidatesState(before); setError(`Could not delete: ${(e as Error).message}`) }
+    catch (e) { setCandidatesState(before); toast.error(`Could not delete: ${(e as Error).message}`) }
   }
 
   function moveStage(stage: CandidateStage) {
@@ -138,8 +139,7 @@ export default function CandidateProfilePage() {
   return (
     <div className="page ppl-profile">
       <button type="button" className="back-link" onClick={() => navigate('/candidates')}><Ic d={P.chevL} size={15} />Candidates</button>
-      {notice && <Banner onClose={() => setNotice(null)}>{notice}</Banner>}
-      {error && <Banner tone="danger" onClose={() => setError(null)}>{error}</Banner>}
+      {loadError && <Banner tone="danger" onClose={() => setLoadError(null)}>{loadError}</Banner>}
 
       <div className="ppl-prof-head">
         <div className="ppl-prof-head__who">

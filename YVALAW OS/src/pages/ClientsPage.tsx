@@ -8,12 +8,13 @@ import { loadPortalStatuses, outstandingOf, revenueOf, sendClientReminder, PORTA
 import { loadTags, saveTags } from '../services/tagStorage'
 import { TagBadge } from '../components/TagBadge'
 import { useRole } from '../context/RoleContext'
-import { Banner, Menu, Modal, PageHeader, Pill, SearchInput, Segmented, Skel, Field, onEnter, useIsMobile } from '../components/ui'
+import { Menu, Modal, PageHeader, Pill, SearchInput, Segmented, Skel, Field, onEnter, useIsMobile } from '../components/ui'
 import ClientFormDrawer, { CLIENT_STAGES, avatarTone, normTags } from '../components/crm/ClientFormDrawer'
 import ClientActivityModal from '../components/crm/ClientActivityModal'
 import { loadViews, storeViews, type SavedView } from '../components/crm/savedViews'
 import { recipientsLabel } from '../utils/emailList'
 import { initials, usd, usdShort } from '../utils/format'
+import { useToast } from '../context/ToastContext'
 
 type ViewMode = 'list' | 'pipeline'
 type BaseTab = 'all' | 'active' | 'attention' | 'autopay'
@@ -55,8 +56,7 @@ export default function ClientsPage() {
   const [activityClient, setActivityClient] = useState<Client | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Client | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const toast = useToast()
 
   useEffect(() => {
     void loadSnapshot().then(snap => { setClients(snap.clients); setInvoices(snap.invoices); setProjects(snap.projects); setLoaded(true) })
@@ -72,9 +72,9 @@ export default function ClientsPage() {
   /** Optimistic update → await the save → roll back with a message if it fails */
   async function persist(next: Client[], okText?: string) {
     const prev = clients
-    setClients(next); setError(null)
-    try { await saveClients(next); if (okText) setNotice(okText) }
-    catch (e) { setClients(prev); setError(`Could not save: ${(e as Error).message}`); throw e }
+    setClients(next)
+    try { await saveClients(next); if (okText) toast.success(okText) }
+    catch (e) { setClients(prev); toast.error(`Could not save: ${(e as Error).message}`); throw e }
   }
   async function saveForm(patch: Partial<Client>) {
     const editing = form?.client
@@ -87,16 +87,15 @@ export default function ClientsPage() {
     await persist(clients.map(x => (x.id === id ? { ...x, status: stage } : x))).catch(() => {})
   }
   async function remind(c: Client) {
-    setError(null)
     try {
       const r = await sendClientReminder(c, invoices)
       if (!r) return
-      if (r.result.mode === 'outlook') setNotice(`Reminder sent to ${recipientsLabel(r.to, r.cc)} for ${usd(r.total)} (${r.count} invoice${r.count === 1 ? '' : 's'}).`)
-      else if (r.result.mode === 'mailto') setNotice(`Reminder for ${usd(r.total)} opened in your email app.`)
-      else setError(`Reminder not sent: ${r.result.fallbackReason ?? 'the company mailbox could not send it.'}`)
-    } catch (e) { setError(`Reminder not sent: ${(e as Error).message}`) }
+      if (r.result.mode === 'outlook') toast.success(`Reminder sent to ${recipientsLabel(r.to, r.cc)} for ${usd(r.total)} (${r.count} invoice${r.count === 1 ? '' : 's'}).`)
+      else if (r.result.mode === 'mailto') toast.success(`Reminder for ${usd(r.total)} opened in your email app.`)
+      else toast.error(`Reminder not sent: ${r.result.fallbackReason ?? 'the company mailbox could not send it.'}`)
+    } catch (e) { toast.error(`Reminder not sent: ${(e as Error).message}`) }
   }
-  function handleTagCreated(tag: Tag) { const next = [...allTags, tag]; setAllTags(next); void saveTags(next).catch(e => setError(`Tag not saved: ${(e as Error).message}`)) }
+  function handleTagCreated(tag: Tag) { const next = [...allTags, tag]; setAllTags(next); void saveTags(next).catch(e => toast.error(`Tag not saved: ${(e as Error).message}`)) }
   const tagColor = (label: string) => allTags.find(t => t.label === label)?.color ?? '#3b82f6'
 
   // Derived rows
@@ -124,8 +123,8 @@ export default function ClientsPage() {
     const name = (naming || '').trim(); if (!name) return
     const v: SavedView<ViewFilters> = { id: crypto.randomUUID(), name, filters: { tab, q: search } }
     const next = [...views, v]
-    if (!storeViews('clients', userId, next)) { setError('This browser would not save the view (private window or storage full).'); return }
-    setViews(next); setSavedId(v.id); setNaming(null); setNotice(`View "${name}" saved. It only shows for you, on this browser.`)
+    if (!storeViews('clients', userId, next)) { toast.error('This browser would not save the view (private window or storage full).'); return }
+    setViews(next); setSavedId(v.id); setNaming(null); toast.success(`View "${name}" saved. It only shows for you, on this browser.`)
   }
   function deleteView(id: string) {
     const next = views.filter(v => v.id !== id)
@@ -155,8 +154,6 @@ export default function ClientsPage() {
           <button type="button" className="btn btn--primary" onClick={() => setForm({ client: null })}>+ Add client</button>
         </>}
       />
-      {error && <Banner tone="danger" onClose={() => setError(null)}>{error}</Banner>}
-      {notice && <Banner tone="success" onClose={() => setNotice(null)}>{notice}</Banner>}
 
       {view === 'list' && <>
         <div className="tabs crm-views" role="tablist" aria-label="Saved views">

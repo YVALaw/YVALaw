@@ -14,6 +14,7 @@ import { Banner, Field, PageHeader, Skel } from '../components/ui'
 import { Ic, P } from '../components/Icon'
 import { STAFF_KINDS } from '../lib/notifications'
 import { can } from '../lib/roles'
+import { useToast } from '../context/ToastContext'
 
 type InfoDolarBhdResponse = {
   provider: string
@@ -101,10 +102,8 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState<AppSettings | null>(null)
   const [form, setForm] = useState<Form>(toForm({ usdToDop: 0 }))
   const [saving, setSaving] = useState<string | null>(null)
-  const [banner, setBanner] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null)
-  const bannerTimer = useRef<number>()
+  const toast = useToast()
   const [fetchingRate, setFetchingRate] = useState(false)
-  const [fetchMsg, setFetchMsg] = useState<string | null>(null)
   const [rateSourceMeta, setRateSourceMeta] = useState<InfoDolarBhdResponse | null>(null)
   const [notifPerm, setNotifPerm] = useState<NotificationPermission>(typeof Notification !== 'undefined' ? Notification.permission : 'default')
   const [userRoles, setUserRoles] = useState<(UserRoleRow & { created_at?: string })[] | null>(null)
@@ -121,8 +120,6 @@ export default function SettingsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, isCeo])
 
-  useEffect(() => () => window.clearTimeout(bannerTimer.current), [])
-
   // Phones: the tab row scrolls sideways — keep the open tab in view (also when opened from a link)
   const navRef = useRef<HTMLElement>(null)
   useEffect(() => {
@@ -132,9 +129,7 @@ export default function SettingsPage() {
   }, [activeTab, TABS.length])
 
   function notify(tone: 'success' | 'danger', text: string) {
-    window.clearTimeout(bannerTimer.current)
-    setBanner({ tone, text })
-    if (tone === 'success') bannerTimer.current = window.setTimeout(() => setBanner(null), 4000)
+    if (tone === 'success') toast.success(text); else toast.error(text)
   }
 
   function setTab(id: SettingsTab) {
@@ -194,20 +189,19 @@ export default function SettingsPage() {
 
   async function handleFetchRate() {
     setFetchingRate(true)
-    setFetchMsg(null)
     let payload: InfoDolarBhdResponse | null = null
     try {
       const res = await fetch('/.netlify/functions/infodolar-bhd')
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         setFetchingRate(false)
-        setFetchMsg(data?.error || 'Could not auto-fetch from InfoDolar BHD.')
+        toast.error(data?.error || 'Could not auto-fetch from InfoDolar BHD.')
         return
       }
       payload = data as InfoDolarBhdResponse
     } catch {
       setFetchingRate(false)
-      setFetchMsg('Could not auto-fetch from InfoDolar BHD. Try again or enter the rate manually.')
+      toast.error('Could not auto-fetch from InfoDolar BHD. Try again or enter the rate manually.')
       return
     }
     setFetchingRate(false)
@@ -215,10 +209,10 @@ export default function SettingsPage() {
       setForm(f => ({ ...f, usdToDop: String(payload!.sell) }))
       setRateSourceMeta(payload)
       if (await save({ usdToDop: payload.sell }, 'rate', 'Exchange rate saved.')) {
-        setFetchMsg(`Rate updated from ${payload.entity} via ${payload.provider}: RD$${payload.sell} / $1 USD`)
+        toast.success(`Rate updated from ${payload.entity} via ${payload.provider}: RD$${payload.sell} / $1 USD`)
       }
     } else {
-      setFetchMsg('Could not auto-fetch from InfoDolar BHD. Try again or enter the rate manually.')
+      toast.error('Could not auto-fetch from InfoDolar BHD. Try again or enter the rate manually.')
     }
   }
 
@@ -267,7 +261,6 @@ export default function SettingsPage() {
   return (
     <div className="page">
       <PageHeader title="Settings" sub="Company, access, integrations and notifications" />
-      {banner && <Banner tone={banner.tone} onClose={() => setBanner(null)}>{banner.text}</Banner>}
 
       <div className="set-layout">
         <nav ref={navRef} className="set-nav" aria-label="Settings sections" role="tablist">
@@ -420,7 +413,6 @@ export default function SettingsPage() {
                 </button>
                 {saveRow(['usdToDop'], 'rate', 'Save rate')}
               </div>
-              {fetchMsg && <Banner tone={fetchMsg.startsWith('Could') ? 'danger' : 'success'}>{fetchMsg}</Banner>}
               {rateSourceMeta && (
                 <span className="set-hint">
                   Source: <strong>{rateSourceMeta.entity}</strong> via {rateSourceMeta.provider}

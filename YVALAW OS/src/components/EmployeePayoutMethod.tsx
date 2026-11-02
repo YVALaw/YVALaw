@@ -3,6 +3,7 @@ import { usePermission } from '../context/RoleContext'
 import { DR_BANKS, loadPayoutMethods, savePayoutMethod, type PayoutMethod } from '../services/payroll'
 import { Card, Field } from './ui'
 import { Ic, P } from './Icon'
+import { useToast } from '../context/ToastContext'
 
 const empty = (id: string): PayoutMethod => ({ employee_id: id, method: 'bank', bank_name: 'BHD', account_type: 'savings', account_number: '', holder_name: '', holder_id: '', paypal_email: '', currency: 'DOP' })
 const tail = (v: string | null | undefined, n = 4) => (v ? `•• ${v.replace(/\s/g, '').slice(-n)}` : '—')
@@ -16,7 +17,8 @@ export default function EmployeePayoutMethod({ employeeId, employeeName }: { emp
   const [editing, setEditing] = useState(false)
   const [reveal, setReveal] = useState(false)
   const [form, setForm] = useState<PayoutMethod>(empty(employeeId))
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)   // only "could not load" (save results are toasts)
+  const toast = useToast()
   const [loaded, setLoaded] = useState(false)
   const [saving, setSaving] = useState(false)
   // bank.manage can read too (DB policy). Permissions arrive after the first render for non-CEO roles, so re-run then.
@@ -38,8 +40,8 @@ export default function EmployeePayoutMethod({ employeeId, employeeName }: { emp
     try {
       const row = { ...form, holder_name: form.holder_name || employeeName, account_number: form.method === 'bank' ? form.account_number?.replace(/\s/g, '') || null : null,
         paypal_email: form.method === 'paypal' ? form.paypal_email : null, bank_name: form.method === 'bank' ? form.bank_name : null }
-      await savePayoutMethod(row); setP(row); setEditing(false); setReveal(false); setMsg({ ok: true, text: 'Saved' })
-    } catch (e) { setMsg({ ok: false, text: (e as Error).message }) }
+      await savePayoutMethod(row); setP(row); setEditing(false); setReveal(false); toast.success('Payout method saved.')
+    } catch (e) { toast.error((e as Error).message) }
     finally { setSaving(false) }
   }
   const set = (patch: Partial<PayoutMethod>) => setForm(f => ({ ...f, ...patch }))

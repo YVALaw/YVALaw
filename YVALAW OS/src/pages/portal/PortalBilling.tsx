@@ -21,6 +21,7 @@ import { Banner, Menu, Pill, Tabs } from '../../components/ui'
 import { Ic, P } from '../../components/Icon'
 import { usePortal, InvoicePill, PortalSkeleton, isUnpaid, invoiceBalance, oldestUnpaid } from '../../components/PortalSection'
 import { dateMed, dateShort } from '../../utils/format'
+import { useToast } from '../../context/ToastContext'
 
 type Filter = 'all' | 'unpaid' | 'paid'
 
@@ -57,7 +58,7 @@ export default function PortalBilling() {
   const [billingSettings, setBillingSettings] = useState<PortalBillingSettings>({ autoPayEnabled: false })
   const [paymentAttempts, setPaymentAttempts] = useState<PaymentAttempt[]>([])
   const [autoPaySaving,   setAutoPaySaving]   = useState(false)
-  const [autoPayMsg,      setAutoPayMsg]      = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useToast()
   const [addingMethod,    setAddingMethod]    = useState(false)
 
   useEffect(() => {
@@ -91,15 +92,14 @@ export default function PortalBilling() {
   async function setAutoPay(enabled: boolean) {
     if (!clientId) return
     setAutoPaySaving(true)
-    setAutoPayMsg(null)
     try {
       await savePortalAutoPaySettings({ clientId, enabled })
       setBillingSettings(prev => enabled
         ? { ...prev, autoPayEnabled: true }
         : { ...prev, autoPayEnabled: false, autoPayDisabledAt: new Date().toISOString() })
-      setAutoPayMsg({ ok: true, text: enabled ? 'AutoPay is now enabled.' : 'AutoPay is off.' })
+      toast.success(enabled ? 'AutoPay is now enabled.' : 'AutoPay is off.')
     } catch (err) {
-      setAutoPayMsg({ ok: false, text: err instanceof Error ? err.message : enabled ? 'Could not enable AutoPay.' : 'Could not turn off AutoPay.' })
+      toast.error(err instanceof Error ? err.message : enabled ? 'Could not enable AutoPay.' : 'Could not turn off AutoPay.')
     } finally {
       setAutoPaySaving(false)
     }
@@ -108,13 +108,12 @@ export default function PortalBilling() {
   async function removeCard() {
     if (!clientId || !confirm('Remove this saved payment method? AutoPay will be turned off.')) return
     setAutoPaySaving(true)
-    setAutoPayMsg(null)
     try {
       await removePortalSavedCard(clientId)
       setBillingSettings({ autoPayEnabled: false })
-      setAutoPayMsg({ ok: true, text: 'Payment method removed. It can no longer be charged.' })
+      toast.success('Payment method removed. It can no longer be charged.')
     } catch (err) {
-      setAutoPayMsg({ ok: false, text: err instanceof Error ? err.message : 'Could not remove the payment method.' })
+      toast.error(err instanceof Error ? err.message : 'Could not remove the payment method.')
     } finally {
       setAutoPaySaving(false)
     }
@@ -141,7 +140,6 @@ export default function PortalBilling() {
         {unpaidList.length > 0 ? ` · ${unpaidList.length} unpaid` : ' · all paid'}
       </p>
 
-      {autoPayMsg && <Banner tone={autoPayMsg.ok ? 'success' : 'danger'} onClose={() => setAutoPayMsg(null)}>{autoPayMsg.text}</Banner>}
 
       <div className="por-grid por-grid--2">
         <section className="card por-card por-balance">
@@ -282,7 +280,7 @@ export default function PortalBilling() {
           onSaved={r => {
             setAddingMethod(false)
             setBillingSettings(prev => ({ ...(r.method ? settingsFromMethod(prev, r.method) : prev), autoPayEnabled: r.autoPayEnabled || prev.autoPayEnabled }))
-            setAutoPayMsg({ ok: true, text: r.autoPayEnabled ? 'Payment method saved and AutoPay is on.' : 'Payment method saved.' })
+            toast.success(r.autoPayEnabled ? 'Payment method saved and AutoPay is on.' : 'Payment method saved.')
           }} />
       )}
     </div>

@@ -1,4 +1,6 @@
 /privacy-policy  /privacy-policy.html  200
 /sms-terms  /sms-terms.html  200
 /blog-post.html  slug=:slug  /blog/:slug/  301!
+# A missing YVA OS file (old version) is a real 404, not the start page — the app then reloads itself
+/os/assets/*  /os/404.txt  404
 /os/*  /os/index.html  200

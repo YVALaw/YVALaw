@@ -20,6 +20,7 @@ import MyPayslips from './MyPayslips'
 import MyHours, { addDays, mondayOf } from './MyHours'
 import MyAdjustments from './MyAdjustments'
 import ManualTime, { manualTargets } from './ManualTime'
+import { useToast } from '../../context/ToastContext'
 
 export type MyEmployee = { id: string; name: string; employeeNumber: string | null; email: string | null; phone: string | null; role: string | null; timezone: string | null
   defaultShiftStart: string | null; defaultShiftEnd: string | null; photoUrl: string | null; worksFor: 'client' | 'yva'; manualTimeAllowed: boolean }
@@ -198,7 +199,9 @@ export function MeRequests({ e, projects, lang }: { e: MyEmployee; projects: MyP
   const [manual, setManual] = useState<ManualRequest[]>([])
   const [form, setForm] = useState({ kind: 'vacation', start: today, end: today, halfDay: false, note: '' })
   // kind = a dictionary key (follows the language switch); text = a server message
-  const [msg, setMsg] = useState<{ ok: boolean; key?: 'sent' | 'badDates' | 'tooLong' | 'tooOld'; text?: string } | null>(null)
+  // Form / load problems stay next to the form; "sent" and failed cancels are toasts
+  const [msg, setMsg] = useState<{ ok: boolean; key?: 'badDates' | 'tooLong' | 'tooOld'; text?: string } | null>(null)
+  const toast = useToast()
   const [busy, setBusy] = useState(false)
   const load = () => {
     void loadTimeOff().then(r => { setList(r.rows); if (r.error) setMsg({ ok: false, text: r.error }) })
@@ -210,10 +213,10 @@ export function MeRequests({ e, projects, lang }: { e: MyEmployee; projects: MyP
     if (daysBetween(form.start, form.end) > 60) { setMsg({ ok: false, key: 'tooLong' }); return }
     if (form.start < oldestStart) { setMsg({ ok: false, key: 'tooOld' }); return }
     setBusy(true); setMsg(null)
-    try { await requestTimeOff(form); setMsg({ ok: true, key: 'sent' }); setForm(f => ({ ...f, note: '' })); load() } catch (err) { setMsg({ ok: false, text: (err as Error).message }) }
+    try { await requestTimeOff(form); toast.success(t.sent); setForm(f => ({ ...f, note: '' })); load() } catch (err) { setMsg({ ok: false, text: (err as Error).message }) }
     setBusy(false)
   }
-  const fail = (err: unknown) => setMsg({ ok: false, text: (err as Error).message })
+  const fail = (err: unknown) => { toast.error((err as Error).message) }
   const targets = manualTargets(projects, e.worksFor === 'yva')
   const clock = (ms: number) => new Date(ms).toLocaleTimeString(locale(lang), { hour: 'numeric', minute: '2-digit' })
   const rows: Row[] = [
@@ -235,7 +238,7 @@ export function MeRequests({ e, projects, lang }: { e: MyEmployee; projects: MyP
 
   return (
     <div className="mw-stack">
-      {msg && <Banner tone={msg.ok ? 'success' : 'danger'} onClose={() => setMsg(null)}>{msg.key ? t[msg.key] : msg.text}</Banner>}
+      {msg && <Banner tone="danger" onClose={() => setMsg(null)}>{msg.key ? t[msg.key] : msg.text}</Banner>}
       <Section title={t.askOff} sub={t.askOffSub}>
         <div className="mw-pad mw-form-wrap">
           <div className="mw-form mw-form--two">
@@ -359,6 +362,7 @@ export function MeDocuments({ lang }: { lang: Lang }) {
   const t = DICT[lang].docs
   const [docs, setDocs] = useState<EmployeeDocument[] | null>(null)
   const [err, setErr] = useState<string | null>(null)
+  const toast = useToast()
   useEffect(() => { void loadEmployeeDocuments().then(r => { setDocs(r.rows); if (r.error) setErr(r.error) }) }, [])
   return (
     <Section title={DICT[lang].nav.documents} id="documents">
@@ -372,7 +376,7 @@ export function MeDocuments({ lang }: { lang: Lang }) {
             <span className="mw-row__title">{d.title}</span>
             <span className="mw-row__meta">{t.categories[d.category]} · {new Date(d.created_at).toLocaleDateString(locale(lang))}</span>
           </div>
-          <button type="button" className="btn mw-row__btn" onClick={() => void openEmployeeDocument(d).catch(x => setErr(x.message))}>{t.download}</button>
+          <button type="button" className="btn mw-row__btn" onClick={() => void openEmployeeDocument(d).catch(x => toast.error(x.message))}>{t.download}</button>
         </div>
       ))}
     </Section>

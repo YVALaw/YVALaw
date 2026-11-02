@@ -9,6 +9,7 @@ import { Banner, EmptyState, Field, Menu, Modal, PageHeader, Pill, Skel, Tabs } 
 import { P } from '../components/Icon'
 import { PersonAvatar } from '../components/people/common'
 import { ago } from '../utils/format'
+import { useToast } from '../context/ToastContext'
 
 const KIND: Record<TimeOffRequest['kind'], string> = { vacation: 'Vacation', sick: 'Sick', personal: 'Personal', other: 'Other' }
 const day = (d: string) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
@@ -29,8 +30,8 @@ export default function ApprovalsPage() {
   const [recent, setRecent] = useState<TimeOffRequest[]>([])
   const [manual, setManual] = useState<ManualRequest[]>([])
   const [manualDone, setManualDone] = useState<ManualRequest[]>([])
-  const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)   // could not load: stays as a banner
+  const toast = useToast()
   const [tab, setTab] = useState<'off' | 'missing'>('off')
   const [decide, setDecide] = useState<Decide | null>(null)
   const [note, setNote] = useState('')
@@ -38,7 +39,7 @@ export default function ApprovalsPage() {
 
   async function load() {
     const [p, r] = await Promise.all([loadTimeOff({ status: 'pending' }), loadTimeOff()])
-    setTimeOff(p.rows.sort((a, b) => a.start_date.localeCompare(b.start_date))); setError(p.error)
+    setTimeOff(p.rows.sort((a, b) => a.start_date.localeCompare(b.start_date))); setLoadError(p.error)
     setRecent(r.rows.filter(x => x.status !== 'pending').slice(0, 15))
     if (canManual) {
       const all = await loadManualRequests()
@@ -52,13 +53,13 @@ export default function ApprovalsPage() {
   const team = (id: string) => { const e = employees.find(x => x.id === id); return e ? (e.worksFor === 'yva' ? 'YVA team' : 'Client team') : '' }
 
   async function run(d: Decide, withNote: string) {
-    setBusy(d.r.id); setError(null)
+    setBusy(d.r.id)
     try {
       if (d.kind === 'off') await decideTimeOff(d.r.id, d.approve, withNote)
       else await decideRequest(d.r.id, d.approve, withNote || undefined)
-      setNotice(`${d.approve ? 'Approved' : 'Rejected'} — ${name(d.kind === 'off' ? d.r.employee_id : d.r.employeeId)} is notified.`)
+      toast.success(`${d.approve ? 'Approved' : 'Rejected'} — ${name(d.kind === 'off' ? d.r.employee_id : d.r.employeeId)} is notified.`)
       await load()
-    } catch (e) { setError((e as Error).message) }
+    } catch (e) { toast.error((e as Error).message) }
     finally { setBusy(null) }
   }
   function openDecide(d: Decide) { setNote(''); setDecide(d) }
@@ -76,8 +77,7 @@ export default function ApprovalsPage() {
   return (
     <div className="page">
       <PageHeader title="Approvals" sub="Requests from My workspace. People see your decision and note right away." />
-      {notice && <Banner onClose={() => setNotice(null)}>{notice}</Banner>}
-      {error && <Banner tone="danger" onClose={() => setError(null)}>{error}</Banner>}
+      {loadError && <Banner tone="danger" onClose={() => setLoadError(null)}>{loadError}</Banner>}
       <Tabs label="Request type" value={tab} onChange={setTab} tabs={[
         { value: 'off', label: 'Time off', count: timeOff?.length ?? null },
         { value: 'missing', label: 'Missing time', count: manual.length, hidden: !canManual },

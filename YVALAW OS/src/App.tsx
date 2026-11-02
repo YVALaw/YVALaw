@@ -3,6 +3,7 @@ import { signOutAndForgetDevice } from './services/notifications'
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
+import ErrorBoundary from './components/ErrorBoundary'
 import { IconZap } from './components/Icon'
 import Shell from './components/Shell'
 import { lazyPage, preloadPages, rarePage } from './lib/lazyPage'
@@ -56,11 +57,31 @@ const ConnectAppPage = rarePage(() => import('./pages/ConnectAppPage'))
 
 // ── Shared loading screen ────────────────────────────────────────────────────
 
+/** Sign out on this device without needing the server (works even when the database isn't answering) */
+async function forgetSignInOnThisDevice() {
+  await Promise.race([supabase.auth.signOut({ scope: 'local' }).catch(() => {}), new Promise(r => setTimeout(r, 2000))])
+  try { for (const k of Object.keys(localStorage)) if (/^sb-.*-auth-token/.test(k)) localStorage.removeItem(k) } catch { /* ignore */ }
+  window.location.assign(`${import.meta.env.BASE_URL}login`)
+}
+
+/** Full-screen loader. If it lasts more than 12 s something is wrong (no connection, the database not answering, an
+ *  old version open): say so and offer Reload / Sign out instead of spinning forever. */
 function LoadingScreen() {
+  const [slow, setSlow] = useState(false)
+  useEffect(() => { const t = window.setTimeout(() => setSlow(true), 12_000); return () => window.clearTimeout(t) }, [])
   return (
     <div className="loading-screen">
       <div className="loading-spinner" />
       <div className="loading-text">Loading YVA OS…</div>
+      {slow && (
+        <div className="loading-slow" role="alert">
+          <p>This is taking longer than usual. Check your internet connection, then reload. If it keeps happening, the database may be busy — try again in a few minutes.</p>
+          <div className="loading-slow__actions">
+            <button type="button" className="btn btn--primary" onClick={() => window.location.reload()}>Reload</button>
+            <button type="button" className="btn" onClick={() => void forgetSignInOnThisDevice()}>Sign out</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -310,6 +331,7 @@ export default function App() {
 
   return (
     <ToastProvider>
+      <ErrorBoundary>
       <Suspense fallback={<LoadingScreen />}>
       <Routes>
         {/* ── Public: no auth needed ── */}
@@ -334,6 +356,7 @@ export default function App() {
         } />
       </Routes>
       </Suspense>
+      </ErrorBoundary>
     </ToastProvider>
   )
 }

@@ -14,13 +14,14 @@ import { can } from '../lib/roles'
 import { usePermission, useRole } from '../context/RoleContext'
 import { clientHealth, HEALTH_TONE } from '../utils/clientHealth'
 import { TagBadge } from '../components/TagBadge'
-import { Banner, KpiStrip, Menu, Modal, PageHeader, Pill, Skel, Tabs, type Tone } from '../components/ui'
+import { KpiStrip, Menu, Modal, PageHeader, Pill, Skel, Tabs, type Tone } from '../components/ui'
 import { Ic, P } from '../components/Icon'
 import ClientFormDrawer, { CLIENT_STAGES, avatarTone, normTags } from '../components/crm/ClientFormDrawer'
 import { BillingTab, CommsTab, ContractsTab, DocumentsTab } from '../components/crm/ClientProfileTabs'
 import { formatEmailList, recipientsLabel } from '../utils/emailList'
 import { useClientRecipients } from '../components/EmailRecipients'
 import { dateMed, dateShort, initials, usd } from '../utils/format'
+import { useToast } from '../context/ToastContext'
 
 type TabKey = 'overview' | 'billing' | 'comms' | 'contracts' | 'docs' | 'history'
 const TAB_KEYS: TabKey[] = ['overview', 'billing', 'comms', 'contracts', 'docs', 'history']
@@ -49,7 +50,7 @@ export default function ClientProfilePage() {
   const [editing, setEditing] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [inviteLoading, setInviteLoading] = useState<'email' | 'link' | null>(null)
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const toast = useToast()
   const photoInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -103,27 +104,27 @@ export default function ClientProfilePage() {
     const prev = clients
     const next = clients.map(c => (c.id === updated.id ? updated : c))
     setClients(next)
-    try { await saveClients(next) } catch (e) { setClients(prev); setMsg({ ok: false, text: `Could not save: ${(e as Error).message}` }); throw e }
+    try { await saveClients(next) } catch (e) { setClients(prev); toast.error(`Could not save: ${(e as Error).message}`); throw e }
   }
   function handlePhotoUpload(file: File) {
-    if (!file.type.startsWith('image/')) { setMsg({ ok: false, text: 'Please select an image file.' }); return }
-    if (file.size > 5 * 1024 * 1024) { setMsg({ ok: false, text: 'Image too large (max 5 MB).' }); return }
+    if (!file.type.startsWith('image/')) { toast.error('Please select an image file.'); return }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Image too large (max 5 MB).'); return }
     // Stored as a small file in Storage; the record keeps only the link (utils/photo.ts)
     void uploadPhoto(file, `photos/clients/${clientNN.id}`)
-      .then(url => persistUpdate({ ...clientNN, photoUrl: url }).then(() => setMsg({ ok: true, text: 'Photo updated.' })))
-      .catch(e => setMsg({ ok: false, text: `Could not upload the photo: ${(e as Error).message}` }))
+      .then(url => persistUpdate({ ...clientNN, photoUrl: url }).then(() => toast.success('Photo updated.')))
+      .catch(e => toast.error(`Could not upload the photo: ${(e as Error).message}`))
   }
   async function handleDelete() {
     const prev = clients
     const next = clients.filter(c => c.id !== clientNN.id)
     setClients(next)
-    try { await saveClients(next); navigate('/clients') } catch (e) { setClients(prev); setConfirmDelete(false); setMsg({ ok: false, text: `Could not delete: ${(e as Error).message}` }) }
+    try { await saveClients(next); navigate('/clients') } catch (e) { setClients(prev); setConfirmDelete(false); toast.error(`Could not delete: ${(e as Error).message}`) }
   }
   async function sendPortalInvite(mode: 'email' | 'link') {
-    if (!clientNN.email) { setMsg({ ok: false, text: 'Add an email address to this client before inviting.' }); return }
-    setInviteLoading(mode); setMsg(null)
+    if (!clientNN.email) { toast.error('Add an email address to this client before inviting.'); return }
+    setInviteLoading(mode)
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { setInviteLoading(null); setMsg({ ok: false, text: 'You must be logged in.' }); return }
+    if (!session) { setInviteLoading(null); toast.error('You must be logged in.'); return }
     try {
       const res = await fetch('/.netlify/functions/invite-client', {
         method: 'POST',
@@ -131,28 +132,28 @@ export default function ClientProfilePage() {
         body: JSON.stringify({ clientId: clientNN.id, email: clientNN.email, mode, redirectTo: `${APP_URL}portal/set-password` }),
       })
       const data = await res.json()
-      if (!res.ok) { setMsg({ ok: false, text: data.error || 'Failed to send invitation.' }); return }
+      if (!res.ok) { toast.error(data.error || 'Failed to send invitation.'); return }
       if (mode === 'link') {
         const inviteLink = data.inviteLink as string | undefined
-        if (!inviteLink) { setMsg({ ok: false, text: 'Invite was created but no link was returned.' }); return }
-        try { await navigator.clipboard.writeText(inviteLink); setMsg({ ok: true, text: `Invite link copied for ${clientNN.email}. You can paste it into your own email or message.` }) }
-        catch { window.prompt('Copy this portal invite link:', inviteLink); setMsg({ ok: true, text: `Invite link created for ${clientNN.email}.` }) }
+        if (!inviteLink) { toast.error('Invite was created but no link was returned.'); return }
+        try { await navigator.clipboard.writeText(inviteLink); toast.success(`Invite link copied for ${clientNN.email}. You can paste it into your own email or message.`) }
+        catch { window.prompt('Copy this portal invite link:', inviteLink); toast.success(`Invite link created for ${clientNN.email}.`) }
       } else {
         // Email mode: Supabase sends the invite email automatically with the correct redirect.
-        setMsg({ ok: true, text: `Invitation email sent to ${clientNN.email}` })
+        toast.success(`Invitation email sent to ${clientNN.email}`)
       }
     } catch {
-      setMsg({ ok: false, text: 'Network error — could not create invitation.' })
+      toast.error('Network error — could not create invitation.')
     } finally { setInviteLoading(null) }
   }
   async function sendReminder() {
     try {
       const r = await sendClientReminder(clientNN, invoices)
       if (!r) return
-      if (r.result.mode === 'outlook') setMsg({ ok: true, text: `Reminder sent to ${recipientsLabel(r.to, r.cc)} for ${usd(r.total)} (${r.count} invoice${r.count === 1 ? '' : 's'}).` })
-      else if (r.result.mode === 'mailto') setMsg({ ok: true, text: `Reminder for ${usd(r.total)} opened in your email app.` })
-      else setMsg({ ok: false, text: `Reminder not sent: ${r.result.fallbackReason ?? 'the company mailbox could not send it.'}` })
-    } catch (e) { setMsg({ ok: false, text: `Reminder not sent: ${(e as Error).message}` }) }
+      if (r.result.mode === 'outlook') toast.success(`Reminder sent to ${recipientsLabel(r.to, r.cc)} for ${usd(r.total)} (${r.count} invoice${r.count === 1 ? '' : 's'}).`)
+      else if (r.result.mode === 'mailto') toast.success(`Reminder for ${usd(r.total)} opened in your email app.`)
+      else toast.error(`Reminder not sent: ${r.result.fallbackReason ?? 'the company mailbox could not send it.'}`)
+    } catch (e) { toast.error(`Reminder not sent: ${(e as Error).message}`) }
   }
   function handleTagCreated(tag: Tag) { const next = [...allTags, tag]; setAllTags(next); void saveTags(next).catch(() => {}) }
   const tagColor = (label: string) => allTags.find(t => t.label === label)?.color ?? '#3b82f6'
@@ -216,7 +217,6 @@ export default function ClientProfilePage() {
           ]} />
         </div>
       </div>
-      {msg && <Banner tone={msg.ok ? 'success' : 'danger'} onClose={() => setMsg(null)}>{msg.text}</Banner>}
       <RecordSignature table="clients" recordId={clientNN.id} refreshKey={clientNN} />
 
       <KpiStrip compact items={[
@@ -269,7 +269,7 @@ export default function ClientProfilePage() {
       {tab === 'history' && allowed('history.view') && <section className="card card--pad crm-narrow"><HistoryList table="clients" recordId={clientNN.id} limit={50} /></section>}
 
       <ClientFormDrawer open={editing} client={clientNN} allTags={allTags} onTagCreated={handleTagCreated} onClose={() => setEditing(false)}
-        onSave={async patch => { await persistUpdate({ ...clientNN, ...patch }); setMsg({ ok: true, text: 'Client saved.' }) }} />
+        onSave={async patch => { await persistUpdate({ ...clientNN, ...patch }); toast.success('Client saved.') }} />
       <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)} title={`Delete ${clientNN.name}?`} sub="This cannot be undone."
         footer={<><button type="button" className="btn" onClick={() => setConfirmDelete(false)}>Cancel</button><button type="button" className="btn btn--danger" onClick={() => void handleDelete()}>Delete</button></>} />
     </div>

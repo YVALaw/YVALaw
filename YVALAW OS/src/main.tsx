@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { watchFunctionWrites } from './lib/readCache'
+import { reloadForNewVersion } from './lib/lazyPage'
 import './styles.css'
 import './styles/ds.css'
 import './styles/shell.css'
@@ -17,6 +18,9 @@ import './styles/me.css'
 
 // Server functions that change data clear the shared reads (lib/readCache.ts)
 watchFunctionWrites()
+
+// A window opened before a new version went live can't load the old version's files: reload once (lib/lazyPage.ts)
+window.addEventListener('vite:preloadError', e => { if (reloadForNewVersion()) e.preventDefault() })
 
 // Notifications service worker (push + tapping a notification). No page caching.
 if ('serviceWorker' in navigator && import.meta.env.PROD) {

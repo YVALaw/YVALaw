@@ -12,6 +12,7 @@ import ApproveTime from './time/ApproveTime'
 import ScheduleReport from './time/ScheduleReport'
 import { Banner, Checkbox, Drawer, EmptyState, Field, KpiStrip, Menu, Modal, PageHeader, Pill, Segmented, Skel, Tabs, useIsMobile } from '../components/ui'
 import { dateMed, hmClock } from '../utils/format'
+import { useToast } from '../context/ToastContext'
 
 function uid() { return crypto.randomUUID() }
 function getToday() { return new Date().toISOString().slice(0, 10) }
@@ -75,7 +76,7 @@ export default function TimeTrackingPage() {
   const [form,      setForm]      = useState<FormState>(blankForm(null, ''))
   const [saving,    setSaving]    = useState(false)
   const [panelError, setPanelError] = useState<string | null>(null)
-  const [flash,     setFlash]     = useState<{ tone: 'success' | 'danger'; text: string } | null>(null)
+  const toast = useToast()
 
   // Delete confirm
   const [confirmDelete, setConfirmDelete] = useState<TimeEntry | null>(null)
@@ -232,7 +233,7 @@ export default function TimeTrackingPage() {
     setSaving(true); setPanelError(null)
     try {
       await upsertTimeEntry(entry)
-      setFlash({ tone: 'success', text: `${existing ? 'Saved' : 'Logged'} ${fmtHours(hoursNum)} for ${entry.employeeName} on ${dateMed(entry.date)}.` })
+      toast.success(`${existing ? 'Saved' : 'Logged'} ${fmtHours(hoursNum)} for ${entry.employeeName} on ${dateMed(entry.date)}.`)
       closePanel()
     } catch (err) {
       setEntries(prev)
@@ -245,8 +246,8 @@ export default function TimeTrackingPage() {
     if (entry.source === 'tracker') return
     const prev = entries
     setEntries(entries.filter(e => e.id !== entry.id))
-    try { await deleteTimeEntry(entry.id); setFlash({ tone: 'success', text: 'Time entry deleted.' }) }
-    catch (err) { setEntries(prev); setFlash({ tone: 'danger', text: `Could not delete: ${(err as Error).message}` }) }
+    try { await deleteTimeEntry(entry.id); toast.success('Time entry deleted.') }
+    catch (err) { setEntries(prev); toast.error(`Could not delete: ${(err as Error).message}`) }
   }
 
   const hasFilters = filterFrom || filterTo || filterEmployee || filterProject || filterBillable !== 'all'
@@ -359,7 +360,6 @@ export default function TimeTrackingPage() {
         ]} />
       )}
 
-      {flash && tab === 'log' && <Banner tone={flash.tone} onClose={() => setFlash(null)}>{flash.text}</Banner>}
 
       {tab === 'live' ? <LiveBoard />
         : tab === 'approve' ? <ApproveTime onChanged={() => void loadApproveCount()} />

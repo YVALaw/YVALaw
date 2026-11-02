@@ -24,6 +24,7 @@ import {
   CandidatePipelineCard, HiringProjectsCard, ContractsCard, RetentionRiskCard,
   type AttnItem, type DrillKind, type Stage,
 } from './ReportsPage'
+import { useToast } from '../context/ToastContext'
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
 const money = (n: number) => usd(n, { cents: false })
@@ -48,7 +49,7 @@ export default function HomePage() {
   const prev = useMemo(() => previousRange(period, range), [period, range])
   const prevComputed = useMemo(() => computeReports(store, prev.range), [store, prev.range])
   const [drill, setDrill] = useState<DrillKind | null>(null)
-  const [flash, setFlash] = useState<{ tone: 'success' | 'danger'; text: string } | null>(null)
+  const toast = useToast()
   const [busy, setBusy] = useState<string | null>(null)
   const today = todayIso()
   const cycle = upcomingCycle(today)
@@ -132,18 +133,17 @@ export default function HomePage() {
 
   // ── Payment reminder (same email + activity entry as Invoices → Remind) ──
   async function remind(inv: Invoice) {
-    setFlash(null)
-    if (!inv.clientEmail) { setFlash({ tone: 'danger', text: `${inv.number} has no client email. Add one on the invoice, then send the reminder.` }); return }
+    if (!inv.clientEmail) { toast.error(`${inv.number} has no client email. Add one on the invoice, then send the reminder.`); return }
     setBusy(inv.id)
     try {
       // Same email as Invoices → Remind: Cc the client's Invoice CC + billing contacts, invoice PDF attached
       const r = await sendReminderEmail(inv, settings, store.clients)
-      if (r.mode === 'failed') { setFlash({ tone: 'danger', text: `Reminder not sent: ${r.fallbackReason || 'the company mailbox could not send it.'}` }); return }
-      setFlash({ tone: 'success', text: r.mode === 'outlook' ? `Payment reminder sent to ${sentToLabel(r)}` : `Reminder for ${inv.number} opened in your mail app` })
+      if (r.mode === 'failed') { toast.error(`Reminder not sent: ${r.fallbackReason || 'the company mailbox could not send it.'}`); return }
+      toast.success(r.mode === 'outlook' ? `Payment reminder sent to ${sentToLabel(r)}` : `Reminder for ${inv.number} opened in your mail app`)
       const cId = inv.clientId || store.clients.find(c => c.name === inv.clientName)?.id
       if (cId) void logComm(cId, `Payment reminder sent for Invoice ${inv.number}`, 'email')
     } catch (e) {
-      setFlash({ tone: 'danger', text: `Reminder not sent: ${(e as Error).message}` })
+      toast.error(`Reminder not sent: ${(e as Error).message}`)
     } finally { setBusy(null) }
   }
 
@@ -328,7 +328,6 @@ export default function HomePage() {
         sub={<>{weekdayDate(new Date())}{loaded && <> · {attention.length === 0 ? 'nothing needs you' : `${plural(attention.length, 'thing')} need${attention.length === 1 ? 's' : ''} you`}</>}</>}
         actions={showPeriod ? <PeriodControl period={period} onPeriod={setPeriod} custom={custom} onCustom={setCustom} /> : undefined} />
 
-      {flash && <Banner tone={flash.tone} onClose={() => setFlash(null)}>{flash.text}</Banner>}
       {data.loadError && <Banner tone="danger">Couldn't load the dashboard data: {data.loadError}</Banner>}
 
       {loaded

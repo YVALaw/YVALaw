@@ -3,6 +3,7 @@ import { createManualRequest } from '../../services/trackerStorage'
 import { WORK_TYPES } from '../../lib/yvaTime'
 import { Banner, Field } from '../../components/ui'
 import { DICT, type Lang } from './i18n'
+import { useToast } from '../../context/ToastContext'
 
 export type ManualTarget = { key: string; label: string; projectId: string | null; workType: string | null }
 type Project = { id: string; name: string; clientName: string | null }
@@ -37,8 +38,9 @@ export default function ManualTime({ employeeId, isYva, projects, lang = 'en', o
   const [target, setTarget] = useState(targets[0]?.key ?? '')
   const [reason, setReason] = useState('')
   const [busy, setBusy]     = useState(false)
-  // Validation messages are stored as keys so they follow the language switch
+  // Validation messages are stored as keys so they follow the language switch (they stay next to the form; "sent" is a toast)
   const [msg,  setMsg]      = useState<{ ok: boolean; key?: keyof typeof tr; text?: string } | null>(null)
+  const toast = useToast()
 
   async function submit() {
     const t = targets.find(x => x.key === target)
@@ -53,7 +55,7 @@ export default function ManualTime({ employeeId, isYva, projects, lang = 'en', o
     try {
       await createManualRequest({ employeeId, projectId: t.projectId, workType: t.workType, startsAt, endsAt, reason: reason.trim() })
       setReason('')
-      setMsg({ ok: true, key: 'sent' })
+      toast.success(String(tr.sent), onSeeRequests ? { action: { label: `${tr.seeRequests} →`, onClick: onSeeRequests } } : undefined)
       onSent?.()
     } catch (e) {
       setMsg({ ok: false, text: (e as Error).message })
@@ -64,8 +66,7 @@ export default function ManualTime({ employeeId, isYva, projects, lang = 'en', o
   return (
     <div className="mw-form-wrap">
       {msg && (
-        <Banner tone={msg.ok ? 'success' : 'danger'} onClose={() => setMsg(null)}
-          action={msg.ok && onSeeRequests ? <button type="button" className="link" onClick={onSeeRequests}>{tr.seeRequests} →</button> : undefined}>
+        <Banner tone="danger" onClose={() => setMsg(null)}>
           {msg.key ? String(tr[msg.key]) : msg.text}
         </Banner>
       )}

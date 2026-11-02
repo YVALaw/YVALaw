@@ -3,6 +3,7 @@ import { createPayLink, deletePayment, loadInvoicePaidState, loadPayments, PAYME
 import { usePermission, useRole } from '../context/RoleContext'
 import { localParts } from '../utils/moneyRules'
 import { Banner, Field, Modal, Pill } from './ui'
+import { useToast } from '../context/ToastContext'
 
 type Inv = { id: string; number: string; subtotal?: number; amountPaid?: number; clientId?: string | null; clientName?: string }
 const usd = (n: number) => n.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
@@ -16,7 +17,7 @@ export default function RecordPaymentModal({ invoice, onClose, onChanged }: { in
   const [list, setList] = useState<ClientPayment[]>([])
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [done, setDone] = useState<string | null>(null)
+  const toast = useToast()
   const total = Number(invoice.subtotal) || 0
   const paid = list.reduce((s, p) => s + p.amount, 0)
   // invoices.amount_paid read fresh from the database (its trigger moves it with every payment row, and it also holds
@@ -46,12 +47,12 @@ export default function RecordPaymentModal({ invoice, onClose, onChanged }: { in
   async function save() {
     const amount = Number(form.amount.replace(',', '.'))
     if (!(amount > 0)) { setError('Enter the amount received.'); return }
-    setSaving(true); setError(null); setDone(null)
+    setSaving(true); setError(null)
     try {
       await recordPayment({ invoiceId: invoice.id, clientId: invoice.clientId, paidOn: form.paidOn, amount, method: form.method, reference: form.reference, note: form.note })
       setForm(f => ({ ...f, amount: '', reference: '', note: '' }))
       await load(); await refreshInvoice()
-      setDone(`Payment of ${usd(amount)} recorded. The invoice status follows automatically.`)
+      toast.success(`Payment of ${usd(amount)} recorded. The invoice status follows automatically.`)
     } catch (e) { setError((e as Error).message) }
     setSaving(false)
   }
@@ -65,11 +66,11 @@ export default function RecordPaymentModal({ invoice, onClose, onChanged }: { in
     const amount = Number(refunding.amount.replace(',', '.'))
     if (!(amount > 0) || amount > refunding.max + 0.001) { setError(`Enter an amount between $0.01 and ${usd(refunding.max)}.`); return }
     if (!window.confirm(`Refund ${usd(amount)} to the client's card / bank account through Stripe? This can't be undone.`)) return
-    setRefunding(r => r && { ...r, busy: true }); setError(null); setDone(null)
+    setRefunding(r => r && { ...r, busy: true }); setError(null)
     try {
       const r = await refundStripePayment(refunding.id, amount)
       setRefunding(null)
-      setDone(`Refund of ${usd(r.amount)} sent${r.status === 'pending' ? ' (bank refunds take a few days)' : ''}. The invoice balance updates as soon as Stripe confirms it.`)
+      toast.success(`Refund of ${usd(r.amount)} sent${r.status === 'pending' ? ' (bank refunds take a few days)' : ''}. The invoice balance updates as soon as Stripe confirms it.`)
       window.setTimeout(() => { void load(); void refreshInvoice() }, 4000)
     } catch (e) { setError((e as Error).message); setRefunding(r => r && { ...r, busy: false }) }
   }
@@ -101,7 +102,6 @@ export default function RecordPaymentModal({ invoice, onClose, onChanged }: { in
         <div className="fin-pay-sum__cell"><span className="info__label">Balance</span><span className={`fin-strong num ${balance ? 't-warning' : 't-success'}`}>{usd(balance)}</span></div>
       </div>
       {error && <Banner tone="danger">{error}</Banner>}
-      {done && <Banner tone="success">{done}</Banner>}
       {list.length > 0 && (
         <div className="fin-pay-list">
           {list.map(p => (
