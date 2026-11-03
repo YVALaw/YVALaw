@@ -21,6 +21,7 @@ import { can, type AppRole } from '../lib/roles'
 import { Banner, Card, Dot, KpiStrip, Modal, PageHeader, Pill, SearchInput, Segmented, Skel, useIsMobile, type Kpi } from '../components/ui'
 import { dateShort } from '../utils/format'
 import { logAction } from '../services/activityLog'
+import { isMultiProject, projectShares } from '../utils/invoiceProjects'
 
 /* ══ Shared helpers ═══════════════════════════════════════════════════ */
 
@@ -557,7 +558,8 @@ function InvoiceHistory({ store, owner, usdToDop, openInvoice }: { store: DataSn
   const [hStatus, setHStatus] = useState('')
   const [hFrom, setHFrom] = useState('')
   const [hTo, setHTo] = useState('')
-  const allProjects = useMemo(() => [...new Set(store.invoices.map(i => i.projectName || '').filter(Boolean))], [store.invoices])
+  // Every project an invoice covers (multi-project invoices list each of theirs)
+  const allProjects = useMemo(() => [...new Set(store.invoices.flatMap(i => [i.projectName || '', ...(isMultiProject(i) ? projectShares(i, id => store.projects.find(p => p.id === id)?.name).map(sh => sh.projectName) : [])]).filter(Boolean))], [store.invoices, store.projects])
   const rows = useMemo(() => filterInvoiceHistory(store.invoices, { client: hClient, project: hProject, status: hStatus, from: hFrom, to: hTo }), [store.invoices, hClient, hProject, hStatus, hFrom, hTo])
   const total = rows.reduce((s, i) => s + (Number(i.subtotal) || 0), 0)
   const y = new Date().getFullYear()

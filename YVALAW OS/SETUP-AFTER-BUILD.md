@@ -33,7 +33,7 @@ If you ever re-run the YVA Time phase 2 script, run `migrate-step4-weekly-close.
 **Netlify → Forms:** if you have an email notification on the `lead-backup` form, add one for the new
 `application-backup` form too (careers applications when EmailJS is blocked). They also land in YVA OS → Candidates.
 
-## 2b. After the redesign (November) is live — 12 more small scripts
+## 2b. After the redesign (November) is live — 13 more small scripts
 
 Same way as step 1, in this order (each is safe to run again):
 1. `supabase/migrate-redesign-portal.sql` — "Request more staff" saves how many people and which project
@@ -64,6 +64,8 @@ Same way as step 1, in this order (each is safe to run again):
    function does it at 12:30 am, the Expenses page also catches up when you open it) and **Stripe fees** in Reports
    ("Card & bank fees", "Received after fees"). Afterwards press **Fill missing fees** in Reports once for Stripe
    payments made before this script.
+13. `supabase/migrate-invoice-multiproject.sql` — one invoice can cover several projects of the same client (the list of
+   projects is saved with the invoice; before it runs such invoices still work, each line keeps its project).
 
 **Crisp chat (client portal → Messages):** make a free account at crisp.chat → Settings → Website settings →
 copy the **Website ID** → YVA OS → Settings → **Integrations** → Crisp → paste → Save. Clients then chat with

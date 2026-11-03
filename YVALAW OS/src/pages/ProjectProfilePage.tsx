@@ -19,6 +19,7 @@ import { errText, hoursLabel, monthPrefix, monthShort, payShort, projectMonthHou
 import { dateMed, usd } from '../utils/format'
 import RecordSignature from '../components/RecordSignature'
 import { useToast } from '../context/ToastContext'
+import { invoiceCoversProject, isMultiProject, projectShareOf } from '../utils/invoiceProjects'
 
 type TabKey = 'rates' | 'overview' | 'tasks' | 'expenses' | 'invoices' | 'contracts' | 'history'
 const TAB_KEYS: TabKey[] = ['rates', 'overview', 'tasks', 'expenses', 'invoices', 'contracts', 'history']
@@ -96,10 +97,12 @@ export default function ProjectProfilePage() {
   // project is guaranteed non-null here (early return above handles null case)
   const projectNN = project!
   const client = clients.find(c => c.id === projectNN.clientId) ?? null
-  const projectInvoices = invoices.filter(inv => inv.projectId === projectNN.id || inv.projectName === projectNN.name)
+  // Invoices that bill this project — also multi-project invoices of the client, counted only for this project's lines
+  const projectInvoices = invoices.filter(inv => invoiceCoversProject(inv, projectNN))
     .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
-  const totalBilled = projectInvoices.reduce((s, inv) => s + (Number(inv.subtotal) || 0), 0)
-  const billedMonth = projectInvoices.filter(inv => String(inv.date || '').startsWith(monthPrefix())).reduce((s, inv) => s + (Number(inv.subtotal) || 0), 0)
+  const billedHere = (inv: Invoice) => projectShareOf(inv, projectNN)?.amount ?? 0
+  const totalBilled = projectInvoices.reduce((s, inv) => s + billedHere(inv), 0)
+  const billedMonth = projectInvoices.filter(inv => String(inv.date || '').startsWith(monthPrefix())).reduce((s, inv) => s + billedHere(inv), 0)
   const tasks = allTasks.filter(t => t.projectId === projectNN.id)
   const expenses = allExpenses.filter(e => e.projectId === projectNN.id)
   const totalExpenses = expenses.reduce((s, e) => s + e.amount, 0)
@@ -321,7 +324,8 @@ export default function ProjectProfilePage() {
         <div className="mcards">
           {projectInvoices.map(inv => (
             <Link key={inv.id} to={`/invoice?open=${inv.id}`} className="mcard ops-row-link">
-              <div className="mcard__top"><span className="mcard__title mono">{inv.number}</span><span className="num">{usd(Number(inv.subtotal) || 0)}</span></div>
+              <div className="mcard__top"><span className="mcard__title mono">{inv.number}</span><span className="num">{usd(billedHere(inv))}</span></div>
+              {isMultiProject(inv) && <span className="mcard__meta">This project's part of {usd(Number(inv.subtotal) || 0)} (several projects)</span>}
               <div className="row row--between"><span className="mcard__meta">{dateMed(inv.date)}</span><Pill status={inv.status || 'draft'} /></div>
             </Link>
           ))}
@@ -337,7 +341,8 @@ export default function ProjectProfilePage() {
                   <td className="muted">{dateMed(inv.date)}</td>
                   <td className="muted">{dateMed(inv.dueDate)}</td>
                   <td><Pill status={inv.status || 'draft'} /></td>
-                  <td className="t-num">{usd(Number(inv.subtotal) || 0)}</td>
+                  <td className="t-num">{usd(billedHere(inv))}
+                    {isMultiProject(inv) && <span className="t-sub">of {usd(Number(inv.subtotal) || 0)} · several projects</span>}</td>
                 </tr>
               ))}
             </tbody>

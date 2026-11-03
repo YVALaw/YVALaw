@@ -2,6 +2,7 @@ import { cachedRead } from '../lib/readCache'
 import type { DataSnapshot, Invoice, InvoiceItem } from '../data/types'
 import { payrollFromInvoiceItem } from '../utils/payroll'
 import { hourLines } from '../utils/invoiceLines'
+import { projectShares } from '../utils/invoiceProjects'
 import { supabase } from '../lib/supabase'
 import { loadLeads, type Lead } from './crm'
 import { loadTrackerBlocks, loadManualRequests, type TrackerBlock, type ManualRequest } from './trackerStorage'
@@ -147,15 +148,6 @@ function safeItems(inv: Invoice): InvoiceItem[] {
   return hourLines(inv.items)
 }
 
-function sumHours(items: InvoiceItem[]): number {
-  let total = 0
-  for (const it of items) {
-    const h = Number(it.hoursTotal ?? 0)
-    if (Number.isFinite(h)) total += h
-  }
-  return total
-}
-
 function monthBucket(d: Date): string {
   const year = d.getFullYear()
   const month = String(d.getMonth() + 1).padStart(2, '0')
@@ -176,6 +168,9 @@ export function computeReports(store: DataSnapshot, range: DateRange): ReportsRe
 
   const byClient  = new Map<string, { total: number; count: number }>()
   const byProject = new Map<string, { total: number; count: number; hours: number }>()
+  // Multi-project invoices are split by line between their projects (utils/invoiceProjects.ts); one project = whole invoice
+  const projName = (id: string) => store.projects.find(p => p.id === id)?.name
+  const sharesOf = (inv: Invoice) => projectShares(inv, projName)
   const trend     = new Map<string, number>()
 
   // Employee performance (range-scoped)
@@ -190,16 +185,17 @@ export function computeReports(store: DataSnapshot, range: DateRange): ReportsRe
     else unpaidCount += 1
 
     const clientName  = (inv.clientName  || 'Unknown client').trim()  || 'Unknown client'
-    const projectName = (inv.projectName || 'No project').trim() || 'No project'
-
     const c = byClient.get(clientName) || { total: 0, count: 0 }
     c.total += subtotal; c.count += 1
     byClient.set(clientName, c)
 
-    const p = byProject.get(projectName) || { total: 0, count: 0, hours: 0 }
-    p.total += subtotal; p.count += 1
-    p.hours += sumHours(safeItems(inv))
-    byProject.set(projectName, p)
+    for (const sh of sharesOf(inv)) {
+      const projectName = (sh.projectName || 'No project').trim() || 'No project'
+      const p = byProject.get(projectName) || { total: 0, count: 0, hours: 0 }
+      p.total += sh.amount; p.count += 1
+      p.hours += sh.hours
+      byProject.set(projectName, p)
+    }
 
     const d = getInvoiceEffectiveDate(inv)
     if (d) trend.set(monthBucket(d), (trend.get(monthBucket(d)) || 0) + subtotal)
@@ -246,7 +242,7 @@ export function computeReports(store: DataSnapshot, range: DateRange): ReportsRe
     const c = atClient.get(name)!
     c.invoices += 1
     c.total    += safeSubtotal(inv)
-    if (inv.projectName) c.projects.add(inv.projectName)
+    for (const sh of sharesOf(inv)) if (sh.projectName) c.projects.add(sh.projectName)
     const d = getInvoiceEffectiveDate(inv)
     if (d) { const ds = isoDay(d); if (!c.lastDate || ds > c.lastDate) c.lastDate = ds }
   }
@@ -256,13 +252,13 @@ export function computeReports(store: DataSnapshot, range: DateRange): ReportsRe
 
   // All-time project analytics
   const atProject = new Map<string, { client: string; invoices: number; total: number; hours: number; lastDate: string }>()
-  for (const inv of store.invoices) {
-    const name = (inv.projectName || 'No project').trim()
+  for (const inv of store.invoices) for (const sh of sharesOf(inv)) {
+    const name = (sh.projectName || 'No project').trim()
     if (!atProject.has(name)) atProject.set(name, { client: inv.clientName || '', invoices: 0, total: 0, hours: 0, lastDate: '' })
     const p = atProject.get(name)!
     p.invoices += 1
-    p.total    += safeSubtotal(inv)
-    p.hours    += sumHours(safeItems(inv))
+    p.total    += sh.amount
+    p.hours    += sh.hours
     const d = getInvoiceEffectiveDate(inv)
     if (d) { const ds = isoDay(d); if (!p.lastDate || ds > p.lastDate) p.lastDate = ds }
   }
@@ -478,7 +474,7 @@ export type HistoryFilter = { client: string; project: string; status: string; f
 export function filterInvoiceHistory(invoices: Invoice[], opts: HistoryFilter): Invoice[] {
   return invoices.filter(inv => {
     if (opts.client && !(inv.clientName || '').toLowerCase().includes(opts.client.toLowerCase())) return false
-    if (opts.project && inv.projectName !== opts.project) return false
+    if (opts.project && inv.projectName !== opts.project && !projectShares(inv).some(sh => sh.projectName === opts.project)) return false
     if (opts.status && (inv.status || 'draft') !== opts.status) return false
     const d = invoiceDay(inv)
     if (opts.from && d < opts.from) return false
@@ -490,7 +486,8 @@ export const invoiceHours = (inv: Invoice) => safeItems(inv).reduce((s, it) => s
 
 export function invoiceHistoryCsvRows(rows: Invoice[]): string[][] {
   const headers = ['Invoice #', 'Date', 'Due Date', 'Client', 'Project', 'Status', 'Amount (USD)', 'Hours']
-  return [headers, ...rows.map(inv => [inv.number || '', inv.date || '', inv.dueDate || '', inv.clientName || '', inv.projectName || '', inv.status || '', String(Number(inv.subtotal) || 0), String(invoiceHours(inv))])]
+  const projects = (inv: Invoice) => { const sh = projectShares(inv); return sh.length > 1 ? sh.map(x => x.projectName).filter(Boolean).join(' + ') : inv.projectName || '' }
+  return [headers, ...rows.map(inv => [inv.number || '', inv.date || '', inv.dueDate || '', inv.clientName || '', projects(inv), inv.status || '', String(Number(inv.subtotal) || 0), String(invoiceHours(inv))])]
 }
 
 export function payrollCsvRows(rows: Invoice[], employees: DataSnapshot['employees'], dopRate: number): string[][] {

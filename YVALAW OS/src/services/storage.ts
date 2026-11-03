@@ -171,7 +171,13 @@ async function loadInvoicesNow(): Promise<Invoice[]> {
 }
 export async function saveInvoices(invoices: Invoice[]): Promise<void> {
   const keepCc = await ccColumnReady('invoices', invoices.some(i => i.clientCcEmails?.length))
-  const rows = keepCc ? invoices : invoices.map(i => { const row = { ...i }; delete row.clientCcEmails; return row })
+  // Multi-project invoices list their projects in project_ids (migrate-invoice-multiproject.sql). Before that SQL
+  // runs the list is left out of the save — each line still carries its project, so nothing is lost.
+  const keepProjects = invoices.some(i => i.projectIds?.length) ? await columnExists('invoices', 'project_ids') : true
+  const rows = keepCc && keepProjects ? invoices : invoices.map(i => {
+    if ((keepCc || !i.clientCcEmails) && (keepProjects || !i.projectIds)) return i
+    const row = { ...i }; if (!keepCc) delete row.clientCcEmails; if (!keepProjects) delete row.projectIds; return row
+  })
   invalidateSnapshotCache(); return syncAll('invoices', rows)
 }
 
@@ -182,15 +188,19 @@ const columnChecks = new Map<string, Promise<boolean>>()
 /** Does the database have this CC column yet? false only when it answers "no such column" (SQL not run);
  *  a network error counts as yes, so the save goes ahead and reports its own error. Asked once per session. */
 export function ccColumnExists(table: keyof typeof CC_COLUMN): Promise<boolean> {
-  const column = CC_COLUMN[table]
-  let check = columnChecks.get(table)
+  return columnExists(table, CC_COLUMN[table])
+}
+/** Does the database have this column yet? (same rules as ccColumnExists) */
+export function columnExists(table: string, column: string): Promise<boolean> {
+  const key = `${table}.${column}`
+  let check = columnChecks.get(key)
   if (!check) {
     check = Promise.resolve(supabase.from(table).select(column).limit(1)).then(
       ({ error }) => !(error && (error.code === '42703' || error.code === 'PGRST204' || /column .* does not exist|could not find .* column/i.test(error.message))),
       () => true,
     )
-    columnChecks.set(table, check)
-    void check.then(ok => { if (ok) return; columnChecks.delete(table) })   // asked again next time (the SQL may have just run)
+    columnChecks.set(key, check)
+    void check.then(ok => { if (ok) return; columnChecks.delete(key) })   // asked again next time (the SQL may have just run)
   }
   return check
 }
@@ -286,6 +296,14 @@ export async function saveInvoiceTemplates(templates: InvoiceTemplate[]): Promis
 export async function loadInvoiceCounter(): Promise<number> {
   const { data } = await supabase.from('counters').select('value').eq('key', 'invoice').single()
   return (data as { value: number } | null)?.value ?? 1
+}
+/** Next per-client number (HAL-0007) from the database — what weekly-close invoices use. Used for invoices that
+ *  cover several projects of one client. null = not allowed (needs weekly_close.manage) or the function is missing;
+ *  the caller then numbers it under the main project as before. */
+export async function nextClientInvoiceNumber(clientId: string): Promise<string | null> {
+  const { data, error } = await supabase.rpc('next_client_invoice_number', { p_client: clientId })
+  if (error || typeof data !== 'string' || !data) return null
+  return data
 }
 /** The counter for display in the snapshot only (kept a minute, so pages don't wait on it) */
 const loadInvoiceCounterForDisplay = () => cachedRead('counter:invoice:display', loadInvoiceCounter, LIST_MS)
