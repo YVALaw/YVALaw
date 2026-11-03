@@ -76,6 +76,8 @@ export default function TeamAccessTab({ users, setUsers, meId, notify }: {
 
   async function changeRole(u: Row, newRole: string) {
     if (!users) return
+    // Only staff and pending sign-ups get a staff role here (a client or employee login must never become staff by accident)
+    if (u.role !== 'pending' && !isStaff(u.role as AppRole)) return
     const before = users
     setUsers(users.map(r => r.user_id === u.user_id ? { ...r, role: newRole } : r))
     try {
@@ -157,10 +159,15 @@ export default function TeamAccessTab({ users, setUsers, meId, notify }: {
                   </span>
                 )}
               </div>
-              <select className="select" aria-label={`Role for ${u.email || 'user'}`} value={u.role} onChange={e => void changeRole(u, e.target.value)}>
-                {isPending && <option value="pending" disabled>Pick a role…</option>}
-                {ROLE_OPTIONS.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-              </select>
+              {isPending || isStaff(u.role as AppRole) ? (
+                <select className="select" aria-label={`Role for ${u.email || 'user'}`} value={u.role} onChange={e => void changeRole(u, e.target.value)}>
+                  {isPending && <option value="pending" disabled>Pick a role…</option>}
+                  {ROLE_OPTIONS.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                </select>
+              ) : (
+                // Client portal / YVA Time logins are managed from the client or employee page — never turned into staff here
+                <span className="set-user__fixed" title="Managed from the client or employee page">{u.role === 'client' ? 'Client portal login' : u.role === 'employee' ? 'Employee (YVA Time) login' : u.role}</span>
+              )}
               {!isMe && (isPending || isStaff(u.role as AppRole)) && (
                 <Menu label={`Actions for ${u.email || 'user'}`} buttonClass="btn btn--icon btn--ghost set-user__menu"
                   items={[{ label: isPending ? 'Delete sign-up' : 'Delete login', icon: P.trash, danger: true, onClick: () => setRemoving(u) }]} />

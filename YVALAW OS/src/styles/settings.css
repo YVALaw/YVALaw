@@ -336,3 +336,4 @@
   .set-wr__section { flex-direction: column; gap: 0; }
   .set-wr__section-hint { padding-left: 28px; }
 }
+.set-user__fixed { font-size: 13px; color: var(--muted); white-space: nowrap; }
