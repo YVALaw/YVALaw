@@ -1,4 +1,17 @@
-// Small CSV reader (quoted fields, commas and line breaks inside quotes, "" escapes, BOM).
+// Small CSV reader (quoted fields, commas and line breaks inside quotes, "" escapes, BOM) and writer (toCsv).
+
+/** A cell that a spreadsheet would run as a formula (=, +, @, or - before text) gets a leading ' — numbers like
+ *  "-12.50" stay numbers */
+function safeCell(v: unknown): string {
+  const s = v == null ? '' : String(v)
+  return /^[=+@\t\r]/.test(s) || /^-(?![\d.])/.test(s) ? `'${s}` : s
+}
+
+/** Rows → CSV text: every cell quoted ("" inside), CRLF line ends, a BOM so Excel reads accents (é, ñ) correctly */
+export function toCsv(rows: unknown[][]): string {
+  return '﻿' + rows.map(r => r.map(c => `"${safeCell(c).replace(/"/g, '""')}"`).join(',')).join('\r\n')
+}
+
 export function parseCsv(text: string): string[][] {
   const rows: string[][] = []
   let row: string[] = [], field = '', quoted = false

@@ -15,6 +15,7 @@ import ProjectExpenses, { type ExpenseDraft } from '../components/ops/ProjectExp
 import { STAGES, errText, hoursLabel, matchesFilter, monthShort, payShort, projectMonthHours, stageInfo, stageOf, uid, type ProjectFilter, type ProjectStage } from '../components/ops/opsUtils'
 import { usd } from '../utils/format'
 import { useToast } from '../context/ToastContext'
+import { projectShareOf } from '../utils/invoiceProjects'
 
 type ViewMode = 'cards' | 'kanban'
 
@@ -113,7 +114,8 @@ export default function ProjectsPage() {
   }
 
   const clientOf = (p: Project) => clients.find(c => c.id === p.clientId) ?? null
-  const billedOf = (p: Project) => invoices.filter(inv => inv.projectId === p.id || inv.projectName === p.name).reduce((s, inv) => s + (Number(inv.subtotal) || 0), 0)
+  // Multi-project invoices count only this project's lines (utils/invoiceProjects.ts) — never twice
+  const billedOf = (p: Project) => invoices.reduce((s, inv) => s + (projectShareOf(inv, p)?.amount ?? 0), 0)
   const expensesOf = (p: Project) => allExpenses.filter(e => e.projectId === p.id)
   const membersOf = (p: Project) => (p.employeeIds ?? []).map(id => employees.find(e => e.id === id)).filter((e): e is Employee => !!e)
   const missing = rates ? findMissingRates(projects, employees, clients, rates) : []

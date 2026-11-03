@@ -35,6 +35,21 @@ export async function deletePayment(id: string): Promise<void> {
   if (error) throw new Error(error.message)
 }
 
+/** Which of these invoices have any payment row (bulk delete keeps those). One small read: invoice_id only, in
+ *  chunks of 100 ids. No payments table yet (SQL not run) → none; any other error throws (the caller stops). */
+export async function invoiceIdsWithPayments(ids: string[]): Promise<Set<string>> {
+  const out = new Set<string>()
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data, error } = await supabase.from('client_payments').select('invoice_id').in('invoice_id', ids.slice(i, i + 100))
+    if (error) {
+      if (error.code === '42P01' || error.code === 'PGRST205') return out
+      throw new Error(`Could not check payments: ${error.message}`)
+    }
+    for (const r of data || []) out.add(String((r as { invoice_id: string }).invoice_id))
+  }
+  return out
+}
+
 /** The invoice's amount paid + status after payments changed (the database computed them) */
 export async function loadInvoicePaidState(invoiceId: string): Promise<{ amountPaid: number; status: string } | null> {
   const { data } = await supabase.from('invoices').select('amount_paid,status').eq('id', invoiceId).maybeSingle()

@@ -7,8 +7,9 @@ import {
   loadInvoiceCounter, loadInvoices, loadSettings,
   loadSnapshot, saveInvoiceCounter, saveInvoices,
   loadProjects, saveProjects,
-  loadInvoiceTemplates, saveInvoiceTemplates,
+  loadInvoiceTemplates, saveInvoiceTemplates, nextClientInvoiceNumber,
 } from '../services/storage'
+import { clientNumberPreview, invoiceProjectIds } from '../utils/invoiceProjects'
 import { computePayrollBreakdown, computePremiumAdjustedAmount, employeePremiumConfig } from '../utils/payroll'
 import { Ic, P } from './Icon'
 import { Banner, Field, Menu, Modal } from './ui'
@@ -78,6 +79,8 @@ type BuilderRow = {
   shiftStart: string
   shiftEnd: string
   daily: Record<string, string>
+  /** Multi-project invoices: the row's project when it isn't the main one ('' / missing = main project) */
+  projectId?: string
 }
 
 function rowHours(row: BuilderRow, dates: string[]): number {
@@ -133,6 +136,8 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
 
   const [clientId,     setClientId]     = useState('')
   const [projectId,    setProjectId]    = useState(initialProjectId || '')
+  /** Other projects of the same client on this invoice (each employee row picks one); empty = single project as always */
+  const [extraProjectIds, setExtraProjectIds] = useState<string[]>([])
 
   // Once projects load, auto-set clientId from initialProjectId
   useEffect(() => {
@@ -153,6 +158,9 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
     setBillingEnd(editInvoice.billingEnd || '')
     setNotes(editInvoice.notes || '')
     if (editInvoice.projectId) setProjectId(editInvoice.projectId)
+    const main = editInvoice.projectId || ''
+    const extras = invoiceProjectIds(editInvoice).filter(id => id !== main)
+    if (extras.length > 0) setExtraProjectIds(extras)
     const client = clients.find(c => c.name === editInvoice.clientName)
     if (client) setClientId(client.id)
     const lines = editInvoice.items || []
@@ -171,6 +179,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
         shiftStart: it.shiftStart || '',
         shiftEnd: it.shiftEnd || '',
         daily: it.daily ? { ...it.daily } : {},
+        projectId: it.projectId && it.projectId !== main ? it.projectId : '',
       })))
     }
   }, [clients.length, editInvoice])
@@ -182,6 +191,9 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
     // Auto-select first project linked to this client
     const clientProjects = projects.filter(p => p.clientId === newClientId)
     setProjectId(clientProjects.length > 0 ? clientProjects[0].id : '')
+    // Other projects belonged to the old client: back to a single-project invoice
+    setExtraProjectIds([])
+    setRows(prev => prev.some(r => r.projectId) ? prev.map(r => ({ ...r, projectId: '' })) : prev)
     // Auto-fill due date from payment terms (e.g. "Net 30" → +30 days)
     if (!dueDate) {
       const client = clients.find(c => c.id === newClientId)
@@ -209,9 +221,35 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
   const selectedClient  = clients.find(c => c.id === clientId)
   const recipients = useClientRecipients(selectedClient)
   const selectedProject = projects.find(p => p.id === projectId)
-  const projectEmployees = selectedProject?.employeeIds?.length
-    ? employees.filter(e => selectedProject.employeeIds!.includes(e.id))
+  const multiProject = extraProjectIds.length > 0 && !!selectedProject
+  /** The row's project: its own (multi-project invoice) or the main one */
+  const rowProject = (row: BuilderRow) => (row.projectId && projects.find(p => p.id === row.projectId)) || selectedProject
+  const employeesOf = (proj: Project | undefined) => proj?.employeeIds?.length
+    ? employees.filter(e => proj.employeeIds!.includes(e.id))
     : employees
+  /** Main project change: a project can't be both main and "other" */
+  function changeMainProject(id: string) {
+    setProjectId(id)
+    if (extraProjectIds.includes(id)) {
+      setExtraProjectIds(prev => prev.filter(x => x !== id))
+      setRows(prev => prev.map(r => r.projectId === id ? { ...r, projectId: '' } : r))
+    }
+  }
+  function addExtraProject(id: string) {
+    if (!id || id === projectId || extraProjectIds.includes(id)) return
+    setExtraProjectIds(prev => [...prev, id])
+  }
+  function removeExtraProject(id: string) {
+    setExtraProjectIds(prev => prev.filter(x => x !== id))
+    setRows(prev => prev.map(r => r.projectId === id ? { ...r, projectId: '' } : r))   // its rows go back to the main project
+  }
+  function changeRowProject(row: BuilderRow, id: string) {
+    const proj = projects.find(p => p.id === (id || projectId))
+    const emp = employees.find(e => e.id === row.employeeId) || employees.find(e => e.name === row.employeeName)
+    if (!emp) { updateRow(row._id, { projectId: id }); return }
+    const r = ratesFor(emp, proj)   // the bill rate and position can differ per project
+    updateRow(row._id, { projectId: id, rate: r.bill.rate ? String(r.bill.rate) : row.rate, position: r.position || row.position })
+  }
 
   function nextProjectInvoiceSeq(project: Project, allInvoices: Invoice[]): number {
     const maxExisting = allInvoices.reduce((max, invoice) => {
@@ -224,11 +262,12 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
     return Math.max(project.nextInvoiceSeq ?? 1, 1)
   }
 
-  /** Bill rate (client) and pay rate (employee) for this person on the selected project — two chains that never cross */
-  function ratesFor(emp: Employee | undefined) {
+  /** Bill rate (client) and pay rate (employee) for this person on the project (the row's, else the main one) —
+   *  two chains that never cross */
+  function ratesFor(emp: Employee | undefined, proj: Project | undefined = selectedProject) {
     return resolveRates({
       employee: emp ? rateEmployee(emp) : null,
-      project: selectedProject ? rateProject(selectedProject) : null,
+      project: proj ? rateProject(proj) : null,
       client: selectedClient ? rateClient(selectedClient) : null,
       rates: placementRates,
       day: billingStart || localParts(Date.now()).date,
@@ -239,7 +278,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
   function rowEmployee(row: BuilderRow) {
     const emp = employees.find(e => e.id === row.employeeId) || employees.find(e => e.name === row.employeeName)
     if (!emp) return emp
-    const pay = ratesFor(emp).pay.rate
+    const pay = ratesFor(emp, rowProject(row)).pay.rate
     return pay ? { ...emp, payRate: pay } : emp
   }
 
@@ -330,9 +369,10 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
 
   function handleEmpSelect(rowId: string, name: string) {
     const emp = employees.find(e => e.name === name)
+    const row = rows.find(r => r._id === rowId)
     // Client bill rate: placement → project → client default. Never the employee's pay rate
     // (that would invoice the client at cost); empty = type one in.
-    const r = ratesFor(emp)
+    const r = ratesFor(emp, row ? rowProject(row) : selectedProject)
     updateRow(rowId, {
       employeeId: emp?.id,
       employeeName: name,
@@ -347,32 +387,43 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
   const [importLabel, setImportLabel] = useState<string | null>(null)   // "✓ Imported 12:30 from YVA Time" on the button after an import
   async function importTrackerHours() {
     if (!projectId || dates.length === 0) return
-    const entries = await loadTrackerEntriesForProject(projectId, dates[0], dates[dates.length - 1])
+    // One read per project on the invoice (just the main one for a single-project invoice)
+    const projectList = [projectId, ...(multiProject ? extraProjectIds : [])]
+    const loaded = await Promise.all(projectList.map(pid => loadTrackerEntriesForProject(pid, dates[0], dates[dates.length - 1]).then(list => list.map(e => ({ ...e, projectId: pid })))))
+    const entries = loaded.flat()
     if (entries.length === 0) {
       setImportLabel(null)
-      toast.warning('No approved YVA Time hours for this project in this period (approve them in Time Tracking → Approve).')
+      toast.warning(multiProject
+        ? 'No approved YVA Time hours for these projects in this period (approve them in Time Tracking → Approve).'
+        : 'No approved YVA Time hours for this project in this period (approve them in Time Tracking → Approve).')
       return
     }
-    const byEmployee = new Map<string, { name: string; daily: Record<string, number> }>()
+    // Rows are per person and project ('' = the main project)
+    const rowKey = (r: BuilderRow) => `${r.employeeId}|${r.projectId || ''}`
+    const byRow = new Map<string, { employeeId: string; projectId: string; name: string; daily: Record<string, number> }>()
     for (const e of entries) {
-      const g = byEmployee.get(e.employeeId) ?? { name: e.employeeName, daily: {} }
+      const pid = e.projectId === projectId ? '' : e.projectId
+      const k = `${e.employeeId}|${pid}`
+      const g = byRow.get(k) ?? { employeeId: e.employeeId, projectId: pid, name: e.employeeName, daily: {} }
       g.daily[e.date] = (g.daily[e.date] ?? 0) + e.hours
-      byEmployee.set(e.employeeId, g)
+      byRow.set(k, g)
     }
-    const overwrites = rows.some(r => r.employeeId && byEmployee.has(r.employeeId) &&
-      Object.keys(byEmployee.get(r.employeeId)!.daily).some(d => (r.daily[d] || '').trim() !== ''))
+    const overwrites = rows.some(r => r.employeeId && byRow.has(rowKey(r)) &&
+      Object.keys(byRow.get(rowKey(r))!.daily).some(d => (r.daily[d] || '').trim() !== ''))
     if (overwrites && !window.confirm('Some of these days already have hours typed in. Replace them with the approved YVA Time hours?')) return
 
     setRows(prev => {
       const next = prev.filter(r => r.employeeId || r.employeeName.trim())
-      for (const [employeeId, g] of byEmployee) {
-        let row = next.find(r => r.employeeId === employeeId)
+      for (const [k, g] of byRow) {
+        let row = next.find(r => r.employeeId && rowKey(r) === k)
         if (!row) {
-          const emp = employees.find(e => e.id === employeeId)
+          const emp = employees.find(e => e.id === g.employeeId)
+          const r = ratesFor(emp, projects.find(p => p.id === (g.projectId || projectId)))
           row = {
-            ...emptyRow(), employeeId, employeeName: emp?.name ?? g.name, position: ratesFor(emp).position,
-            rate: ratesFor(emp).bill.rate ? String(ratesFor(emp).bill.rate) : '',
+            ...emptyRow(), employeeId: g.employeeId, employeeName: emp?.name ?? g.name, position: r.position,
+            rate: r.bill.rate ? String(r.bill.rate) : '',
             shiftStart: emp?.defaultShiftStart || '', shiftEnd: emp?.defaultShiftEnd || '',
+            ...(g.projectId ? { projectId: g.projectId } : {}),
           }
           next.push(row)
         }
@@ -384,8 +435,10 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
       return next.length ? next : [emptyRow()]
     })
     const total = entries.reduce((s, e) => s + e.hours, 0)
+    const people = new Set(entries.map(e => e.employeeId)).size
+    const projCount = new Set(entries.map(e => e.projectId)).size
     setImportLabel(`✓ Imported ${hoursToHM(total)} from YVA Time`)
-    toast.success(`Imported ${hoursToHM(total)} (h:mm) of approved hours for ${byEmployee.size} team member${byEmployee.size === 1 ? '' : 's'}. Check the grid before creating the invoice.`)
+    toast.success(`Imported ${hoursToHM(total)} (h:mm) of approved hours for ${people} team member${people === 1 ? '' : 's'}${multiProject ? ` on ${projCount} project${projCount === 1 ? '' : 's'}` : ''}. Check the grid before creating the invoice.`)
   }
 
   function addRow() { setRows(prev => [...prev, emptyRow()]) }
@@ -394,10 +447,13 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
   function loadTemplate(t: InvoiceTemplate) {
     setClientId(t.clientId ?? '')
     setProjectId(t.projectId ?? '')
+    // Rows on other projects of the client come back as a multi-project invoice
+    const known = new Set(projects.filter(p => !t.clientId || p.clientId === t.clientId).map(p => p.id))
+    setExtraProjectIds([...new Set(t.rows.map(r => r.projectId || '').filter(id => id && id !== t.projectId && known.has(id)))])
     setBillingStart(t.billingStart ?? '')
     setBillingEnd(t.billingEnd ?? '')
     setNotes(t.notes ?? '')
-    setRows(t.rows.map(r => ({ ...emptyRow(), ...r, _id: uid() })))
+    setRows(t.rows.map(r => ({ ...emptyRow(), ...r, projectId: r.projectId && r.projectId !== t.projectId && known.has(r.projectId) ? r.projectId : '', _id: uid() })))
     setLoadTemplateModal(false)
   }
 
@@ -411,7 +467,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
       billingStart: billingStart || undefined,
       billingEnd: billingEnd || undefined,
       notes: notes || undefined,
-      rows: rows.map(({ _id: _, ...rest }) => rest),
+      rows: rows.map(({ _id: _, projectId: rowProj, ...rest }) => (multiProject && rowProj ? { ...rest, projectId: rowProj } : rest)),
       createdAt: Date.now(),
     }
     const next = [t, ...templates]
@@ -441,7 +497,10 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
         .map(r => {
           const employee = employees.find(e => e.id === r.employeeId) || employees.find(e => e.name === r.employeeName)
           const totals = rowComp(r, dates)
+          const proj = rowProject(r)
           return {
+            // Only multi-project invoices tag each line with its project (single-project lines stay as they always were)
+            ...(multiProject && proj ? { projectId: proj.id, projectName: proj.name } : {}),
             employeeId: employee?.id,
             employeeName: r.employeeName,
             position:     r.position || undefined,
@@ -460,13 +519,22 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
         })
   }
 
+  /** Every project the lines use, main first — saved as project_ids when there's more than one */
+  function usedProjectIds(items: InvoiceItem[]): string[] | null {
+    if (!multiProject || !selectedProject) return null
+    const ids = [selectedProject.id]
+    for (const it of items) if (it.projectId && !ids.includes(it.projectId)) ids.push(it.projectId)
+    return ids.length > 1 ? ids : null
+  }
+
   /** Preview PDF of what's on screen — nothing is saved */
   function previewPdf() {
+    const items = buildItems()
     const inv: Invoice = {
       id: editInvoice?.id || 'preview', number: editInvoice?.number || nextNumberLabel || 'DRAFT', date, dueDate: dueDate || undefined,
       clientName: selectedClient?.name || editInvoice?.clientName || '', clientEmail: selectedClient?.email || '', clientAddress: selectedClient?.address || '',
       billingStart: billingStart || undefined, billingEnd: billingEnd || undefined, projectId: selectedProject?.id || null, projectName: selectedProject?.name || '',
-      status: editInvoice?.status || 'draft', subtotal: grandTotal, notes: notes || undefined, items: buildItems(),
+      status: editInvoice?.status || 'draft', subtotal: grandTotal, notes: notes || undefined, items, projectIds: usedProjectIds(items),
     }
     printInvoice(inv, { rate: 0, companyName: settings.companyName, companyAddress: settings.companyAddress, companyEmail: settings.companyEmail, companyPhone: settings.companyPhone })
   }
@@ -477,6 +545,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
     void (async () => {
      try {
       const items = buildItems()
+      const projectIds = usedProjectIds(items)
 
       if (editInvoice) {
         // Update existing invoice
@@ -494,6 +563,8 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
           billingEnd:    billingEnd   || undefined,
           projectId:     selectedProject?.id   ?? editInvoice.projectId ?? null,
           projectName:   selectedProject?.name ?? editInvoice.projectName ?? '',
+          // null clears an earlier list when the invoice went back to one project
+          projectIds:    projectIds ?? (editInvoice.projectIds ? null : undefined),
           subtotal:      grandTotal,
           notes:         notes || undefined,
           items,
@@ -506,9 +577,12 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
         return
       }
 
-      // Create new invoice
-      let invNumber: string
-      if (selectedProject) {
+      // Create new invoice. Several projects of one client = a client-level invoice: numbered per client (HAL-0007,
+      // like weekly close) when the database allows it, otherwise under the main project as before.
+      let invNumber: string | null = projectIds && selectedClient ? await nextClientInvoiceNumber(selectedClient.id) : null
+      if (invNumber) {
+        // numbered by the database (next_client_invoice_number)
+      } else if (selectedProject) {
         const existingInvoices = await loadInvoices()
         const allProjects = await loadProjects()
         const projIdx = allProjects.findIndex(p => p.id === selectedProject.id)
@@ -540,6 +614,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
         billingEnd:    billingEnd   || undefined,
         projectId:     selectedProject?.id   || null,
         projectName:   selectedProject?.name || '',
+        ...(projectIds ? { projectIds, clientId: selectedClient?.id || null } : {}),
         status:        'draft',
         subtotal:      grandTotal,
         notes:         notes || undefined,
@@ -560,8 +635,14 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
     })()
   }
 
-  const nextNumberLabel = editInvoice?.number
+  const clientNumbering = selectedClient as (Client & { invoicePrefix?: string | null; nextInvoiceSeq?: number | null }) | undefined
+  const clientLevelLabel = multiProject && clientNumbering
+    ? clientNumberPreview(clientNumbering.invoicePrefix, clientNumbering.nextInvoiceSeq, invoices.map(i => i.number))
+    : null
+  const nextNumberLabel = editInvoice?.number || clientLevelLabel
     || (selectedProject ? `${projectPrefix(selectedProject.name)}${String(nextProjectInvoiceSeq(selectedProject, invoices)).padStart(4, '0')}` : '')
+  const otherClientProjects = clientId ? projects.filter(p => p.clientId === clientId && p.id !== projectId) : []
+  const addableProjects = otherClientProjects.filter(p => !extraProjectIds.includes(p.id))
   const totalHours = rows.reduce((s, r) => s + rowComp(r, dates).hours, 0)
   const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   const canSave = !saving && grandTotal !== 0 && !!clientId
@@ -574,10 +655,22 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
     return <button type="button" className="btn btn--ghost btn--icon btn--sm fin-builder__remove" aria-label={`Remove ${row.employeeName || 'row'}`} onClick={() => removeRow(row._id)}><Ic d={P.trash} size={15} /></button>
   }
   function employeeSelect(row: BuilderRow) {
+    const list = employeesOf(rowProject(row))
     return (
       <select className="select select--sm" aria-label="Employee" value={row.employeeName} onChange={e => handleEmpSelect(row._id, e.target.value)}>
         <option value="">— Select —</option>
-        {projectEmployees.map(e => <option key={e.id} value={e.name}>{e.name}</option>)}
+        {list.map(e => <option key={e.id} value={e.name}>{e.name}</option>)}
+        {multiProject && row.employeeName && !list.some(e => e.name === row.employeeName) && <option value={row.employeeName}>{row.employeeName}</option>}
+      </select>
+    )
+  }
+  /** Multi-project invoices: which project this row bills */
+  function rowProjectSelect(row: BuilderRow) {
+    if (!multiProject || !selectedProject) return null
+    return (
+      <select className="select select--sm fin-grid__proj" aria-label={`Project for ${row.employeeName || 'row'}`} value={row.projectId || ''} onChange={e => changeRowProject(row, e.target.value)}>
+        <option value="">{selectedProject.name}</option>
+        {extraProjectIds.map(id => { const p = projects.find(x => x.id === id); return p ? <option key={id} value={id}>{p.name}</option> : null })}
       </select>
     )
   }
@@ -622,8 +715,8 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
                   {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </Field>
-              <Field label="Project">
-                <select className="select" aria-label="Project" value={projectId} onChange={e => setProjectId(e.target.value)}>
+              <Field label={multiProject ? 'Main project' : 'Project'}>
+                <select className="select" aria-label="Project" value={projectId} onChange={e => changeMainProject(e.target.value)}>
                   <option value="">— No project —</option>
                   {projects.filter(p => !clientId || p.clientId === clientId).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
@@ -634,6 +727,30 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
               <Field label="Due date"><input className="input" type="date" aria-label="Due date" value={dueDate} onChange={e => setDueDate(e.target.value)} /></Field>
               <Field label="Terms"><input className="input fin-readonly" readOnly tabIndex={-1} value={selectedClient?.paymentTerms || '—'} /></Field>
               <Field label="Send to"><input className="input fin-readonly" aria-label="Send to" readOnly tabIndex={-1} value={selectedClient?.email || (selectedClient ? 'No email on file' : '—')} /></Field>
+              {selectedProject && (otherClientProjects.length > 0 || extraProjectIds.length > 0) && (
+                <Field label="Other projects of this client" full
+                  hint={multiProject
+                    ? `Each employee row picks its project. The invoice is listed under ${selectedProject.name}, numbered per client, and the PDF groups the lines by project.`
+                    : 'Optional: bill several projects of this client on one invoice.'}>
+                  <div className="fin-builder__projects">
+                    {extraProjectIds.map(id => {
+                      const p = projects.find(x => x.id === id)
+                      return (
+                        <span key={id} className="chip chip--sm chip--on fin-proj-chip">
+                          {p?.name || 'Project'}
+                          <button type="button" className="fin-proj-chip__x" aria-label={`Remove project ${p?.name || ''}`} onClick={() => removeExtraProject(id)}>×</button>
+                        </span>
+                      )
+                    })}
+                    {addableProjects.length > 0 && (
+                      <select className="select select--sm fin-builder__addproj" aria-label="Add another project" value="" onChange={e => addExtraProject(e.target.value)}>
+                        <option value="">+ Add another project of this client</option>
+                        {addableProjects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
+                    )}
+                  </div>
+                </Field>
+              )}
               {selectedClient?.email && (
                 <Field label="Cc" full hint="From the client's Invoice CC and contacts marked “Gets invoices”. Change them on the client's page.">
                   <input className="input fin-readonly" aria-label="Cc" readOnly tabIndex={-1} value={recipients ? (recipients.cc.join(', ') || 'No one') : 'Loading…'} />
@@ -652,7 +769,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
                   : 'Total hours per person. Set a billing start and end for a day-by-day grid.'}</span>
               </div>
               <button type="button" className="btn btn--sm btn--soft-gold" disabled={!canImport}
-                title={canImport ? 'Fills the grid with approved hours for this project and period' : 'Pick a project and a billing period first'}
+                title={canImport ? (multiProject ? 'Fills the grid with approved hours for each project on this invoice and this period' : 'Fills the grid with approved hours for this project and period') : 'Pick a project and a billing period first'}
                 onClick={() => void importTrackerHours()}>{importLabel ?? 'Import YVA Time hours'}</button>
             </div>
 
@@ -677,6 +794,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
                           <td className="fin-grid__emp">
                             {employeeSelect(row)}
                             <input className="input input--sm fin-grid__pos" aria-label="Position" value={row.position} onChange={e => updateRow(row._id, { position: e.target.value })} placeholder="Position" />
+                            {rowProjectSelect(row)}
                           </td>
                           {dates.map(d => (
                             <td key={d} className="fin-grid__day">
@@ -703,7 +821,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
                       const comp = rowComp(row, dates)
                       return [
                         <tr key={row._id}>
-                          <td className="fin-grid__emp">{employeeSelect(row)}</td>
+                          <td className="fin-grid__emp">{employeeSelect(row)}{rowProjectSelect(row)}</td>
                           <td><input className="input input--sm" aria-label="Position" value={row.position} onChange={e => updateRow(row._id, { position: e.target.value })} placeholder="Role / position" /></td>
                           <td className="t-right"><input className="input input--sm fin-grid__rate" type="number" aria-label="Rate" value={row.rate} onChange={e => updateRow(row._id, { rate: e.target.value })} placeholder="0" /></td>
                           <td className="t-right"><input className="input input--sm fin-grid__rate mono" type="text" inputMode="decimal" aria-label="Total hours" value={row.hoursManual} onChange={e => updateRow(row._id, { hoursManual: e.target.value })} placeholder="0" /></td>

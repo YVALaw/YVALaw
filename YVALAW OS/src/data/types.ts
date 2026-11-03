@@ -118,6 +118,10 @@ export type InvoiceItem = {
    *  alone would leave the premium out. Set by the invoice builder and the old-CRM import. */
   billAmount?: number
   daily?: Record<string, string>
+  /** Multi-project invoices (utils/invoiceProjects.ts): the project this line belongs to. Missing = the invoice's
+   *  main project (every single-project invoice). */
+  projectId?: string
+  projectName?: string
 }
 
 export type EmployeePaymentRecord = {
@@ -140,6 +144,9 @@ export type Invoice = {
   billingEnd?: string
   projectId?: string | null
   projectName?: string
+  /** Every project the invoice covers when it spans several projects of one client (main project first);
+   *  null/missing = just `projectId`. Column `invoices.project_ids` (supabase/migrate-invoice-multiproject.sql). */
+  projectIds?: string[] | null
   status?: string
   subtotal?: number
   amountPaid?: number
@@ -183,6 +190,7 @@ export type InvoiceTemplate = {
     shiftStart?: string
     shiftEnd?: string
     daily: Record<string, string>
+    projectId?: string   // row on another project of the client (multi-project invoices)
   }[]
   createdAt: number
 }
