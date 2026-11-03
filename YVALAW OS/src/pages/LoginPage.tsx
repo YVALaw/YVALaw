@@ -4,6 +4,7 @@ import { APP_URL } from '../lib/appUrl'
 import AuthLayout from '../components/settings/AuthLayout'
 import { Banner, Checkbox, Field } from '../components/ui'
 import { useToast } from '../context/ToastContext'
+import { keepSignedInChoice, setKeepSignedIn } from '../lib/keepSignedIn'
 
 type ResetState = 'idle' | 'sending' | 'sent' | 'error'
 
@@ -29,7 +30,7 @@ function getLockoutRemaining(): number {
 export default function LoginPage() {
   const [email, setEmail]         = useState(() => localStorage.getItem(LAST_EMAIL_KEY) || '')
   const [password, setPassword]   = useState('')
-  const [rememberMe, setRememberMe] = useState(true)
+  const [rememberMe, setRememberMe] = useState(keepSignedInChoice)   // remembered on this device (lib/keepSignedIn.ts)
   const [loading, setLoading]     = useState(false)
   const [error, setError]         = useState<string | null>(null)
   const [lockRemaining, setLockRemaining] = useState(getLockoutRemaining())
@@ -53,6 +54,8 @@ export default function LoginPage() {
 
     setLoading(true)
     setError(null)
+    // Unticked: this sign-in ends when the browser / app is closed (checked at the next start, lib/keepSignedIn.ts)
+    setKeepSignedIn(rememberMe)
 
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     setLoading(false)
@@ -73,9 +76,6 @@ export default function LoginPage() {
 
     clearAttempts()
     localStorage.setItem(LAST_EMAIL_KEY, email)
-    if (!rememberMe) {
-      window.addEventListener('beforeunload', () => { void supabase.auth.signOut() }, { once: true })
-    }
   }
 
   async function handleForgotPassword() {
@@ -124,6 +124,8 @@ export default function LoginPage() {
             {resetState === 'sending' ? 'Sending…' : 'Forgot password?'}
           </button>
         </div>
+
+        {!rememberMe && <span className="set-hint set-auth__keep-hint">You'll be signed out when you close the browser or the app. Other open YVA OS tabs stay signed in until the last one closes.</span>}
 
         {resetMsg && <Banner tone="danger">{resetMsg}</Banner>}
         {lockRemaining > 0 && <Banner tone="danger">{lockText}</Banner>}
