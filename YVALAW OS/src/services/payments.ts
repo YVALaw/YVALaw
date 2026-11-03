@@ -3,14 +3,17 @@
 import { supabase } from '../lib/supabase'
 
 /** kind: payment (> 0) · refund / dispute (< 0, written by the Stripe webhook) */
-export type ClientPayment = { id: string; invoiceId: string; clientId: string | null; paidOn: string; amount: number; method: string; reference: string | null; note: string | null; source: string; kind: 'payment' | 'refund' | 'dispute'; stripeChargeId: string | null; createdAt: string }
+export type ClientPayment = { id: string; invoiceId: string; clientId: string | null; paidOn: string; amount: number; method: string; reference: string | null; note: string | null; source: string; kind: 'payment' | 'refund' | 'dispute'; stripeChargeId: string | null; createdAt: string
+  /** What Stripe kept / what reached the Stripe balance (migrate-expenses-recurring-fees.sql; null = not known yet or not Stripe) */
+  stripeFee: number | null; netAmount: number | null }
 export const PAYMENT_METHODS = [
   { value: 'wire', label: 'Wire transfer' }, { value: 'ach', label: 'ACH' }, { value: 'zelle', label: 'Zelle' }, { value: 'check', label: 'Check' },
   { value: 'card', label: 'Card' }, { value: 'paypal', label: 'PayPal' }, { value: 'cash', label: 'Cash' }, { value: 'other', label: 'Other' },
 ]
 const fromRow = (r: Record<string, unknown>): ClientPayment => ({ id: r.id as string, invoiceId: r.invoice_id as string, clientId: (r.client_id as string) ?? null,
   paidOn: r.paid_on as string, amount: Number(r.amount), method: r.method as string, reference: (r.reference as string) ?? null, note: (r.note as string) ?? null,
-  source: r.source as string, kind: ((r.kind as string) || 'payment') as ClientPayment['kind'], stripeChargeId: (r.stripe_charge_id as string) ?? null, createdAt: r.created_at as string })
+  source: r.source as string, kind: ((r.kind as string) || 'payment') as ClientPayment['kind'], stripeChargeId: (r.stripe_charge_id as string) ?? null, createdAt: r.created_at as string,
+  stripeFee: r.stripe_fee == null ? null : Number(r.stripe_fee), netAmount: r.net_amount == null ? null : Number(r.net_amount) })
 
 export async function loadPayments(filter: { invoiceId?: string; from?: string; to?: string } = {}): Promise<{ rows: ClientPayment[]; error: string | null }> {
   let q = supabase.from('client_payments').select('*').order('paid_on', { ascending: false })
@@ -61,6 +64,11 @@ export function refundableLeft(p: ClientPayment, all: ClientPayment[]): number {
 export function refundStripePayment(paymentId: string, amount?: number, reason?: string) {
   // A new id for every refund the person asks for (Stripe treats a repeat of the same id as the same refund)
   return callFunction<{ ok: boolean; refundId: string; status: string; amount: number }>('refund-payment', { paymentId, amount, reason, requestId: crypto.randomUUID() })
+}
+
+/** CEO: look up Stripe's fee for Stripe payments that don't have one yet (max 100 per click; stripe-fees function) */
+export function fillMissingStripeFees(range: { from?: string; to?: string } = {}) {
+  return callFunction<{ checked: number; filled: number; waiting: number; failed: number; missing: number | string }>('stripe-fees', range)
 }
 
 /** A "Pay now" link for an invoice (card or bank, no portal login); expires in 60 days */

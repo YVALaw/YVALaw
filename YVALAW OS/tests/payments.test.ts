@@ -85,6 +85,8 @@ function webhookBackend() {
   }
   fb.stripe = (method, path) => {
     if (path.startsWith('/payment_methods/')) return { id: path.split('/')[2], type: 'card', card: { brand: 'visa', last4: '4242', exp_month: 1, exp_year: 2031 } }
+    // Stripe fee lookup (charge + expanded balance transaction): 2.9% + 30¢ of the amount
+    if (method === 'GET' && path.startsWith('/charges/')) return { id: path.split('/')[2], object: 'charge', status: 'succeeded', balance_transaction: { id: 'txn_1', object: 'balance_transaction', currency: 'usd', fee: 2930, net: 97070 } }
     throw new Error(`unexpected stripe ${method} ${path}`)
   }
   return fb
@@ -117,6 +119,8 @@ test('webhook: a payment is recorded once as a client payment; the invoice is ne
     const pays = fb.table('client_payments')
     assert.equal(pays.length, 1)
     assert.deepEqual([pays[0].amount, pays[0].method, pays[0].kind, pays[0].external_ref, pays[0].stripe_charge_id], [400, 'card', 'payment', 'pi_1', 'ch_1'])
+    assert.deepEqual([pays[0].stripe_fee, pays[0].net_amount], [29.3, 970.7], "Stripe's fee recorded from the balance transaction")
+    assert.equal(fb.stripeCalls.filter(c => c.path.startsWith('/charges/ch_1')).length, 1, 'the retry did not look the fee up again')
     assert.equal(fb.restCalls.filter(c => c.method === 'PATCH' && c.path.startsWith('invoices')).length, 0, 'invoice status comes from the database trigger only')
     assert.ok(fb.table('stripe_events')[0].processed_at)
     assert.equal(fb.table('payment_attempts')[0].status, 'succeeded')

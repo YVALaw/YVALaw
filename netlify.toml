@@ -30,6 +30,10 @@
 [functions."weekly-reminder"]
   schedule = "23 * * * *"
 
+# YVA OS expenses: adds the copies of repeating expenses (rent, software…) due today, 12:30 am Dominican time
+[functions."expenses-recurring"]
+  schedule = "30 4 * * *"
+
 # Marketing-site blog: publishes scheduled posts (see the function for setup)
 [functions."publish-scheduled-posts"]
   schedule = "@hourly"

@@ -33,7 +33,7 @@ If you ever re-run the YVA Time phase 2 script, run `migrate-step4-weekly-close.
 **Netlify → Forms:** if you have an email notification on the `lead-backup` form, add one for the new
 `application-backup` form too (careers applications when EmailJS is blocked). They also land in YVA OS → Candidates.
 
-## 2b. After the redesign (November) is live — 11 more small scripts
+## 2b. After the redesign (November) is live — 12 more small scripts
 
 Same way as step 1, in this order (each is safe to run again):
 1. `supabase/migrate-redesign-portal.sql` — "Request more staff" saves how many people and which project
@@ -59,6 +59,11 @@ Same way as step 1, in this order (each is safe to run again):
 11. `supabase/migrate-weekly-reminder.sql` — the weekly reminder email (day, time, who gets it, what it contains).
    Then set it up in **Settings → Notifications → Weekly reminder email**: switch it on, pick the day and time
    (Dominican Republic time), add who gets it (empty = your CEO login), Save — and press **Email me a test now** to see it.
+12. `supabase/migrate-expenses-recurring-fees.sql` (after item 10) — **repeating expenses** (rent, software…: Finance →
+   Expenses → Add expense → *Repeats: every month*, they then add themselves; the new daily `expenses-recurring`
+   function does it at 12:30 am, the Expenses page also catches up when you open it) and **Stripe fees** in Reports
+   ("Card & bank fees", "Received after fees"). Afterwards press **Fill missing fees** in Reports once for Stripe
+   payments made before this script.
 
 **Crisp chat (client portal → Messages):** make a free account at crisp.chat → Settings → Website settings →
 copy the **Website ID** → YVA OS → Settings → **Integrations** → Crisp → paste → Save. Clients then chat with
@@ -145,7 +150,8 @@ tries, 3 days apart). From YVA OS you can **refund** a card/bank payment (Invoic
    `payment_intent.succeeded`, `payment_intent.processing`, `payment_intent.payment_failed`, `payment_intent.requires_action`,
    `payment_intent.canceled`, `charge.refunded`, `charge.refund.updated`, `charge.dispute.created`, `charge.dispute.funds_withdrawn`,
    `charge.dispute.funds_reinstated`, `charge.dispute.closed`, `setup_intent.succeeded`, `payment_method.detached`,
-   `payment_method.automatically_updated`, `payment_method.updated`
+   `payment_method.automatically_updated`, `payment_method.updated`, and (recommended — it fills in the Stripe fee of
+   bank payments once Stripe knows it) `charge.updated`
 4. YVA OS → Settings → Integrations → **Stripe** should say "Connected · Test mode" with no warnings.
 5. Permissions (Settings → Team Access → Permissions): **Refund card/bank payments** for whoever may refund (you, the
    CEO, always can). **Send email from YVA OS**: CEO, Admin and Accounting can always send; give it (or "Send invoices")
@@ -163,7 +169,7 @@ tries, 3 days apart). From YVA OS you can **refund** a card/bank payment (Invoic
 2. **Settings → Payment methods** (live) → turn on **ACH Direct Debit** (cards are on by default).
 3. **Developers → API keys** (live) → copy the **Publishable key** (`pk_live_…`) and the **Secret key** (`sk_live_…`).
 4. **Developers → Webhooks** (live) → **Add endpoint** → `https://yvastaffing.agency/.netlify/functions/stripe-webhook`,
-   the same 15 events as above → save → copy its **Signing secret** (`whsec_…`).
+   the same 16 events as above → save → copy its **Signing secret** (`whsec_…`).
 5. Netlify → **Site configuration → Environment variables** → replace the three values with the live ones:
    `VITE_STRIPE_PUBLISHABLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` → **Deploys → Trigger deploy**.
 6. YVA OS → Settings → Integrations → Stripe must say **"Connected · Live"**. If one key is test and the other live it

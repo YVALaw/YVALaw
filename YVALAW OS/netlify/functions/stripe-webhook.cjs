@@ -16,6 +16,10 @@
  *   charge.dispute.created / funds_withdrawn / funds_reinstated / closed
  *   setup_intent.succeeded
  *   payment_method.detached / payment_method.automatically_updated / payment_method.updated
+ *   charge.updated (optional — fills a bank payment's Stripe fee once Stripe knows it)
+ *
+ * Stripe fees: each payment row gets stripe_fee / net_amount from the charge's balance transaction
+ * (_lib/stripeFees.cjs). A fee lookup never fails the event — it logs and leaves the fee empty for later.
  *
  * Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_SECRET_KEY
  */
@@ -24,6 +28,7 @@ const { rest, enc } = require('./_lib/supa.cjs')
 const { stripe, keyMode } = require('./_lib/stripe.cjs')
 const P = require('./_lib/payments.cjs')
 const { notifyPermission } = require('./_lib/notify.cjs')
+const F = require('./_lib/stripeFees.cjs')
 
 const SIGNATURE_TOLERANCE_SECONDS = 300
 const BUSINESS_TZ = 'America/Santo_Domingo'
@@ -174,6 +179,13 @@ async function onSucceeded(pi) {
     paid_on: todayInBusiness(), note: LABEL[source], created_by: null,
   })
   await attemptFromPI(pi, 'succeeded', { payment_method_type: type, failure_reason: null, client_id: md.clientId || inv.client_id || undefined })
+  // What Stripe kept (never fails the event; a retry only looks it up again while it is still empty)
+  if (cents > 0) {
+    const charge = typeof pi.latest_charge === 'string' ? pi.latest_charge : null
+    const ref = { external_ref: pi.id, stripe_charge_id: charge }
+    const opts = { chargeId: charge, paymentIntentId: pi.id }
+    await (isNew ? F.fillFee(ref, opts) : F.fillFeeIfMissing(ref, opts))
+  }
   if (isNew && cents > balanceBefore) {
     await tell('payment_problem', `Invoice ${inv.number} overpaid by ${usd(cents - Math.max(0, balanceBefore))}`,
       `Stripe collected ${usd(cents)} but only ${usd(Math.max(0, balanceBefore))} was owed (another payment arrived first). Refund the difference in YVA OS → Invoices → Payments, or keep it as credit.`)
@@ -247,6 +259,7 @@ async function onCanceled(pi) {
 async function onRefunded(chargeId, paymentIntentId) {
   const pay = await findPayment({ chargeId, paymentIntentId })
   if (!pay) return 'not ours'
+  await F.fillFeeIfMissing(pay, { chargeId })   // refunds don't return the fee: make sure it's known
   const list = await stripe('GET', `/refunds?charge=${enc(chargeId)}&limit=100`)
   let added = 0
   for (const r of list.data || []) {
@@ -297,6 +310,15 @@ async function onDispute(type, d) {
   return 'ignored'
 }
 
+/** A charge changed — for bank payments this is when Stripe attaches the balance transaction (the fee). */
+async function onChargeUpdated(ch) {
+  if (!ch?.id || ch.status !== 'succeeded' || !ch.balance_transaction) return 'ignored'
+  const pay = await findPayment({ chargeId: ch.id, paymentIntentId: typeof ch.payment_intent === 'string' ? ch.payment_intent : null }).catch(() => null)
+  if (!pay) return 'not ours'
+  const r = await F.fillFeeIfMissing(pay, { bt: typeof ch.balance_transaction === 'object' ? ch.balance_transaction : null, chargeId: ch.id })
+  return `fee ${r}`
+}
+
 // ── Saved methods ────────────────────────────────────────────────────────────
 async function onSetupSucceeded(si) {
   const md = si.metadata || {}
@@ -336,6 +358,8 @@ async function handle(type, obj) {
     case 'refund.created':
     case 'refund.updated':
     case 'refund.failed':                  return typeof obj.charge === 'string' ? onRefunded(obj.charge, typeof obj.payment_intent === 'string' ? obj.payment_intent : null) : 'ignored'
+    case 'charge.updated':
+    case 'charge.succeeded':               return onChargeUpdated(obj)
     case 'charge.dispute.created':
     case 'charge.dispute.funds_withdrawn':
     case 'charge.dispute.funds_reinstated':

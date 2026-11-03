@@ -93,6 +93,13 @@ export type Expense = {
   date: string
   category?: string
   recurring?: boolean
+  /** Repeating expense (supabase/migrate-expenses-recurring-fees.sql, utils/recurringExpenses.ts): set on the series'
+   *  first entry; copies carry seriesId + seriesPeriod */
+  recurrence?: 'weekly' | 'monthly' | 'yearly' | null
+  recurrenceEnd?: string | null
+  recurrenceThrough?: string | null
+  seriesId?: string | null
+  seriesPeriod?: string | null
   createdAt: number
 }
 
