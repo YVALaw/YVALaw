@@ -52,11 +52,11 @@ test('CSV export: the agreed columns, money to the cent, multi-project names, sa
   assert.deepEqual(rows[1], ['HAL-0007', 'Halavi, "Law"', 'Intake + Demand', '2026-10-26 – 2026-11-01', '2026-11-02', '2026-11-09', 'Partial', '2520.00', '1260.00', '1260.00'])
   assert.deepEqual(rows[2].slice(6), ['Paid', '90.00', '90.00', '0.00'])   // paid without an amount recorded → paid in full
   const text = toCsv(rows)
-  assert.ok(text.startsWith('﻿"Number","Client"'))
+  assert.ok(text.startsWith('﻿Number,Client,'))
   const back = parseCsv(text)
   assert.equal(back[1][1], 'Halavi, "Law"')
   assert.equal(back[2][1], `'=HYPERLINK("x")`)   // a formula is never run by a spreadsheet
-  assert.equal(parseCsv(toCsv([['-12.50', '-x', '+1']]))[0].join('|'), `-12.50|'-x|'+1`)
+  assert.equal(parseCsv(toCsv([['-12.50', '-x', '+1']]))[0].join('|'), `-12.50|'-x|+1`)   // plain numbers / phone numbers stay as they are
 })
 
 test('zip: CRC-32 check value and a readable stored archive', () => {
