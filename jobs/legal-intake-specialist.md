@@ -1,8 +1,8 @@
 ---
 title: Legal Intake Specialist
-date: 2026-03-20T09:00:00.000Z
-status: Open
+status: Closed
 featured: true
+date: 2026-03-20T09:00:00.000Z
 location: Remote
 schedule: Full / Part-time
 icon: phone
