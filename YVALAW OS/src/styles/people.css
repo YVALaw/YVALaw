@@ -75,6 +75,15 @@
 .ppl-lane__name { font-size: 14px; font-weight: 600; }
 .ppl-lane__meta { font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ppl-lane__chips { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 2px; }
+/* Board drag & drop (2026-11): drag a person card to another project lane or Unassigned; ⋯ → Move to project… */
+.ppl-lane__row:focus-visible { outline: 2px solid var(--navy); outline-offset: -2px; }
+.ppl-lane__row[draggable="true"] { cursor: grab; }
+.ppl-lane__row--dragging { opacity: .45; }
+.ppl-lane--over { outline: 2px dashed var(--navy); outline-offset: 2px; background: var(--surface-2); }
+.ppl-lane__menu { flex-shrink: 0; align-self: center; }
+.ppl-lane__menu .btn--xs { width: 28px; padding: 0; }
+.ppl-lane__empty { padding: 14px 20px; border-top: 1px solid var(--row-line); font-size: 12.5px; color: var(--soft); }
+.ppl-assign-hint { margin: 0; font-size: 13px; }
 .ppl-cap-cards .list-row:first-child { border-top: 1px solid var(--row-line); }
 .ppl-cap-num { display: flex; flex-direction: column; align-items: flex-end; font-size: 13px; font-weight: 600; }
 .ppl-cap-num .muted { font-weight: 400; font-size: 12px; }
@@ -210,6 +219,8 @@ th.ppl-day span { display: block; color: var(--soft); font-weight: 400; }
 @media (max-width: 759px) {
   .ppl-filterbar .search-input { width: 100%; flex: 1 1 100%; }
   .ppl-filterbar__status { flex: 1; }
+  .ppl-filterbar__export { flex: 1; }
+  .ppl-lane__menu .btn--xs { width: 40px; height: 40px; }
   .ppl-filterbar .seg { flex: 1 1 100%; }
   .ppl-filterbar .seg__opt { flex: 1; }
   .page-actions .seg { flex: 1 1 100%; }

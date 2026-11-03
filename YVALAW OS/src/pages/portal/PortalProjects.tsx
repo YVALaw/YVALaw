@@ -12,13 +12,18 @@ import type { Client, Employee, Invoice, Project, TimeEntry } from '../../data/t
 import { Pill } from '../../components/ui'
 import { usePortal, PersonAvatar, PortalSkeleton, hoursText, sumHours, monthKey, isUnpaid, invoiceBalance } from '../../components/PortalSection'
 import { dateMed } from '../../utils/format'
+import { invoiceCoversProject, projectFraction } from '../../utils/invoiceProjects'
 
+/** An invoice covering several of the client's projects counts here only for this project's part (by line);
+ *  paid and outstanding are split in the same proportion, so the cards never add up to more than the invoices */
 function projectInvoiceStats(invoices: Invoice[], projectId: string, ym: string) {
-  const projInvs    = invoices.filter(inv => inv.projectId === projectId)
-  const totalBilled = projInvs.reduce((s, inv) => s + (Number(inv.subtotal) || 0), 0)
-  const totalPaid   = projInvs.reduce((s, inv) => s + (Number(inv.amountPaid) || 0), 0)
-  const outstanding = projInvs.filter(isUnpaid).reduce((s, inv) => s + invoiceBalance(inv), 0)
-  const monthBilled = projInvs.filter(inv => (inv.billingStart ?? inv.date ?? '').startsWith(ym)).reduce((s, inv) => s + (Number(inv.subtotal) || 0), 0)
+  const ref = { id: projectId }
+  const projInvs    = invoices.filter(inv => invoiceCoversProject(inv, ref))
+  const part        = (inv: Invoice) => projectFraction(inv, ref)
+  const totalBilled = projInvs.reduce((s, inv) => s + (Number(inv.subtotal) || 0) * part(inv), 0)
+  const totalPaid   = projInvs.reduce((s, inv) => s + (Number(inv.amountPaid) || 0) * part(inv), 0)
+  const outstanding = projInvs.filter(isUnpaid).reduce((s, inv) => s + invoiceBalance(inv) * part(inv), 0)
+  const monthBilled = projInvs.filter(inv => (inv.billingStart ?? inv.date ?? '').startsWith(ym)).reduce((s, inv) => s + (Number(inv.subtotal) || 0) * part(inv), 0)
   return { totalBilled, totalPaid, outstanding, monthBilled, count: projInvs.length }
 }
 

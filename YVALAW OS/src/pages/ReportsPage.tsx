@@ -12,13 +12,16 @@ import {
 } from '../services/reportsService'
 import { formatMoney, fmtHoursHM } from '../utils/money'
 import { loadSettings, loadGeneralExpenses, loadCandidates } from '../services/storage'
-import { loadPayments, type ClientPayment } from '../services/payments'
+import { fillMissingStripeFees, loadPayments, type ClientPayment } from '../services/payments'
+import { feeSummary } from '../utils/stripeFees'
+import { useToast } from '../context/ToastContext'
 import type { AppSettings, Candidate, DataSnapshot, Expense, Invoice } from '../data/types'
 import { useRole } from '../context/RoleContext'
 import { can, type AppRole } from '../lib/roles'
 import { Banner, Card, Dot, KpiStrip, Modal, PageHeader, Pill, SearchInput, Segmented, Skel, useIsMobile, type Kpi } from '../components/ui'
 import { dateShort } from '../utils/format'
 import { logAction } from '../services/activityLog'
+import { isMultiProject, projectShares } from '../utils/invoiceProjects'
 
 /* ══ Shared helpers ═══════════════════════════════════════════════════ */
 
@@ -48,6 +51,7 @@ export function useReportsData(role: AppRole, range: DateRange) {
   const [generalExpenses, setGeneralExpenses] = useState<Expense[]>([])
   const [candidates, setCandidates] = useState<Candidate[]>([])
   const [payments, setPayments] = useState<ClientPayment[] | null | undefined>(undefined)
+  const [paymentsTick, setPaymentsTick] = useState(0)
 
   useEffect(() => {
     void loadSettings().then(setSettings).catch(() => {})
@@ -65,10 +69,11 @@ export function useReportsData(role: AppRole, range: DateRange) {
       .then(r => { if (alive) setPayments(r.error ? null : r.rows) })
       .catch(() => { if (alive) setPayments(null) })
     return () => { alive = false }
-  }, [range.from, range.to, isOwner])
+  }, [range.from, range.to, isOwner, paymentsTick])
 
   const collected = payments ? payments.reduce((x, p) => x + p.amount, 0) : payments
-  return { settings, store, loaded, loadError, generalExpenses, candidates, payments, collected }
+  const reloadPayments = () => setPaymentsTick(t => t + 1)
+  return { settings, store, loaded, loadError, generalExpenses, candidates, payments, collected, reloadPayments }
 }
 
 /** This month / Quarter / Custom (Custom reveals the from/to inputs) */
@@ -237,7 +242,7 @@ export function RetentionRiskCard({ store, onOpen }: { store: DataSnapshot; onOp
 
 /* ── KPI drill-down modal ─────────────────────────────────────────── */
 
-export type DrillKind = 'billed' | 'collected' | 'hours' | 'payroll' | 'expenses' | 'net' | 'paid' | 'unpaid' | 'topClient' | 'clients' | 'team' | 'outstanding' | 'overdue' | 'drafts'
+export type DrillKind = 'billed' | 'collected' | 'fees' | 'hours' | 'payroll' | 'expenses' | 'net' | 'paid' | 'unpaid' | 'topClient' | 'clients' | 'team' | 'outstanding' | 'overdue' | 'drafts'
 export type DrillCtx = { store: DataSnapshot; computed: ReportsResult; range: DateRange; generalExpenses: Expense[]; payments: ClientPayment[] | null | undefined }
 type DItem = { label: string; sub?: string; right?: string; status?: string; nav?: string }
 
@@ -257,6 +262,17 @@ export function buildDrill(kind: DrillKind, ctx: DrillCtx): { title: string; ite
         const inv = byId.get(p.invoiceId)
         return { label: inv ? `${inv.number} — ${inv.clientName || '—'}` : 'Payment', sub: `${p.paidOn} · ${p.method}${p.reference ? ` · ${p.reference}` : ''}`, right: formatMoney(p.amount), nav: inv ? navInv(inv) : undefined }
       }) }
+    }
+    case 'fees': {
+      const byId = new Map(store.invoices.map(i => [i.id, i]))
+      const refunded = new Set((ctx.payments || []).filter(p => p.kind !== 'payment' && p.stripeChargeId).map(p => p.stripeChargeId))
+      return { title: 'Card & bank fees — Stripe payments', items: (ctx.payments || []).filter(p => p.source === 'stripe' && p.kind === 'payment')
+        .sort((a, b) => b.paidOn.localeCompare(a.paidOn)).map(p => {
+          const inv = byId.get(p.invoiceId)
+          return { label: inv ? `${inv.number} — ${inv.clientName || '—'}` : 'Stripe payment',
+            sub: `${p.paidOn} · ${p.method === 'ach' ? 'bank' : p.method} · ${formatMoney(p.amount)} paid${p.stripeChargeId && refunded.has(p.stripeChargeId) ? ' · refunded (fee not returned)' : ''}`,
+            right: p.stripeFee == null ? 'fee not known yet' : `${formatMoney(p.stripeFee)} fee`, nav: inv ? navInv(inv) : undefined }
+        }) }
     }
     case 'hours': return { title: 'Hours — by employee', items: [...computed.employeePerformance].sort((a, b) => b.hours - a.hours).map(e => ({ label: e.name, sub: plural(e.invoiceCount, 'invoice'), right: fmtHoursHM(e.hours) })) }
     case 'payroll': return { title: 'Est. payroll — by employee', items: [...computed.employeePerformance].filter(e => e.payroll > 0).sort((a, b) => b.payroll - a.payroll).map(e => ({ label: e.name, sub: `${fmtHoursHM(e.hours)} billed`, right: formatMoney(e.payroll) })) }
@@ -363,7 +379,26 @@ function CeoReports({ store, computed, navigate, openInvoice, role, data, range,
 }) {
   const owner = can.viewOwnerStats(role)
   const [drill, setDrill] = useState<DrillKind | null>(null)
+  const [filling, setFilling] = useState(false)
+  const toast = useToast()
   const today = todayIso()
+  // Stripe fees in the period (only shown when the period has Stripe payments)
+  const fees = owner && data.payments ? feeSummary(data.payments) : null
+  const showFees = !!fees && fees.stripePayments > 0
+  async function fillFees() {
+    setFilling(true)
+    try {
+      const r = await fillMissingStripeFees({ from: range.from || undefined, to: range.to || undefined })
+      const left = Number(r.missing) || (r.missing ? 100 : 0)
+      if (r.filled > 0) toast.success(`Filled ${plural(r.filled, 'fee')} from Stripe.${left ? ` ${r.missing} still without a fee${r.waiting ? ' (Stripe hasn\'t settled some bank payments yet)' : ''}.` : ''}`)
+      else if (r.waiting > 0) toast.info('Stripe hasn\'t worked out these fees yet (bank payments take a few days). Try again later.')
+      else if (r.failed > 0) toast.error('Stripe didn\'t answer for these payments. Try again in a minute.')
+      else toast.info('No missing fees.')
+      data.reloadPayments()
+    } catch (e) {
+      toast.error(`Fees not filled: ${(e as Error).message}`)
+    } finally { setFilling(false) }
+  }
   const topClient = computed.byClient[0] ?? null
   const { total: totalExpenses } = expensesInRange(data.generalExpenses, range.from, range.to)
   const netAfterExpenses = computed.totalNetEarnings - totalExpenses
@@ -371,6 +406,8 @@ function CeoReports({ store, computed, navigate, openInvoice, role, data, range,
   const kpis: (Kpi | false)[] = [
     owner && { label: 'Total billed', value: formatMoney(computed.totalBilled), note: plural(computed.invoiceCount, 'invoice'), onClick: () => setDrill('billed') },
     owner && data.collected !== null && { label: 'Collected', value: data.collected === undefined ? '…' : formatMoney(data.collected), note: 'payments received', tone: 'success', onClick: () => setDrill('collected') },
+    showFees && { label: 'Card & bank fees', value: formatMoney(fees!.fees), note: fees!.missing ? `${fees!.missing} not known yet` : 'kept by Stripe', tone: fees!.missing ? 'warning' : undefined, onClick: () => setDrill('fees') },
+    showFees && { label: 'Received after fees', value: formatMoney(fees!.received), note: 'collected − fees', onClick: () => setDrill('fees') },
     { label: 'Total hours', value: fmtHoursHM(computed.totalHours), note: plural(computed.employeePerformance.length, 'person', 'people'), onClick: () => setDrill('hours') },
     owner && { label: 'Est. payroll', value: formatMoney(computed.totalPayroll), onClick: () => setDrill('payroll') },
     { label: 'Business expenses', value: formatMoney(totalExpenses), onClick: () => setDrill('expenses') },
@@ -393,6 +430,11 @@ function CeoReports({ store, computed, navigate, openInvoice, role, data, range,
         actions={<PeriodControl period={period} onPeriod={setPeriod} custom={custom} onCustom={setCustom} />} />
       <LoadState loaded={data.loaded} loadError={data.loadError} />
       {data.loaded && <KpiStrip items={kpis.filter(Boolean) as Kpi[]} />}
+      {data.loaded && showFees && (fees!.missing > 0
+        ? <Banner tone="info" action={<button type="button" className="btn btn--sm" disabled={filling} onClick={() => void fillFees()}>{filling ? 'Filling…' : 'Fill missing fees'}</button>}>
+            {plural(fees!.missing, 'Stripe payment')} in this period {fees!.missing === 1 ? "doesn't" : "don't"} show {fees!.missing === 1 ? 'its' : 'their'} fee yet, so card & bank fees may be higher. Stripe keeps its fee; refunds don't return it.
+          </Banner>
+        : <p className="home-fee-hint">Card & bank fees: Stripe keeps its fee from each payment; refunds don't return it.</p>)}
 
       {owner && (
         <div className="grid-auto">
@@ -516,7 +558,8 @@ function InvoiceHistory({ store, owner, usdToDop, openInvoice }: { store: DataSn
   const [hStatus, setHStatus] = useState('')
   const [hFrom, setHFrom] = useState('')
   const [hTo, setHTo] = useState('')
-  const allProjects = useMemo(() => [...new Set(store.invoices.map(i => i.projectName || '').filter(Boolean))], [store.invoices])
+  // Every project an invoice covers (multi-project invoices list each of theirs)
+  const allProjects = useMemo(() => [...new Set(store.invoices.flatMap(i => [i.projectName || '', ...(isMultiProject(i) ? projectShares(i, id => store.projects.find(p => p.id === id)?.name).map(sh => sh.projectName) : [])]).filter(Boolean))], [store.invoices, store.projects])
   const rows = useMemo(() => filterInvoiceHistory(store.invoices, { client: hClient, project: hProject, status: hStatus, from: hFrom, to: hTo }), [store.invoices, hClient, hProject, hStatus, hFrom, hTo])
   const total = rows.reduce((s, i) => s + (Number(i.subtotal) || 0), 0)
   const y = new Date().getFullYear()

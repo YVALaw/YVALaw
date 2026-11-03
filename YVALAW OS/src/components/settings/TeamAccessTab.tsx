@@ -6,11 +6,12 @@ import { linkStaffProfile } from '../../services/staffProfiles'
 import type { Employee } from '../../data/types'
 import { ROLE_LABELS, ROLE_OPTIONS, isStaff, type AppRole, type UserRole } from '../../lib/roles'
 import { Ic, P } from '../Icon'
-import { onEnter } from '../ui'
+import { Menu, Modal, onEnter } from '../ui'
 import { dateMed, initials } from '../../utils/format'
 import PermissionsMatrix from '../PermissionsMatrix'
 import StaffProfileModal, { type StaffLogin } from '../StaffProfileModal'
 import { useToast } from '../../context/ToastContext'
+import { deleteStaffLogin } from '../../services/staffLogins'
 
 const SIGNUP_PATH = '/os/xDdasQwd24zaQ'
 type Row = UserRoleRow & { created_at?: string }
@@ -32,6 +33,9 @@ export default function TeamAccessTab({ users, setUsers, meId, notify }: {
   const [employees, setEmployees] = useState<Employee[] | null>(null)
   const [creating, setCreating] = useState<StaffLogin | null>(null)
   const [linking, setLinking] = useState<string | null>(null)
+  // "Delete login" (⋯ menu): the row being confirmed, and whether the request is running
+  const [removing, setRemoving] = useState<Row | null>(null)
+  const [deleting, setDeleting] = useState(false)
   useEffect(() => {
     let alive = true
     void loadEmployees().then(list => { if (alive) setEmployees(list) }).catch(() => { if (alive) setEmployees([]) })
@@ -72,6 +76,8 @@ export default function TeamAccessTab({ users, setUsers, meId, notify }: {
 
   async function changeRole(u: Row, newRole: string) {
     if (!users) return
+    // Only staff and pending sign-ups get a staff role here (a client or employee login must never become staff by accident)
+    if (u.role !== 'pending' && !isStaff(u.role as AppRole)) return
     const before = users
     setUsers(users.map(r => r.user_id === u.user_id ? { ...r, role: newRole } : r))
     try {
@@ -85,6 +91,22 @@ export default function TeamAccessTab({ users, setUsers, meId, notify }: {
       setUsers(before)
       notify('danger', `Could not change the role for ${u.email || 'this user'}. Try again.`)
     }
+  }
+
+  async function confirmDelete() {
+    const u = removing
+    if (!u || !users) return
+    setDeleting(true)
+    try {
+      const r = await deleteStaffLogin(u.user_id)
+      setUsers(users.filter(x => x.user_id !== u.user_id))
+      setEmployees(prev => prev ? prev.map(e => e.userId && String(e.userId) === u.user_id ? { ...e, userId: undefined } : e) : prev)
+      toast.success(`Deleted the login of ${r.email || u.email || 'this person'}.${r.unlinkedEmployee ? ` ${r.unlinkedEmployee}'s profile and history are kept.` : ' Their history is kept.'}`)
+      setRemoving(null)
+    } catch (e) {
+      toast.error((e as Error).message)
+    }
+    setDeleting(false)
   }
 
   const sorted = users ? [...users].sort((a, b) => Number(b.role === 'pending') - Number(a.role === 'pending')) : null
@@ -137,14 +159,47 @@ export default function TeamAccessTab({ users, setUsers, meId, notify }: {
                   </span>
                 )}
               </div>
-              <select className="select" aria-label={`Role for ${u.email || 'user'}`} value={u.role} onChange={e => void changeRole(u, e.target.value)}>
-                {isPending && <option value="pending" disabled>Pick a role…</option>}
-                {ROLE_OPTIONS.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-              </select>
+              {isPending || isStaff(u.role as AppRole) ? (
+                <select className="select" aria-label={`Role for ${u.email || 'user'}`} value={u.role} onChange={e => void changeRole(u, e.target.value)}>
+                  {isPending && <option value="pending" disabled>Pick a role…</option>}
+                  {ROLE_OPTIONS.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+                </select>
+              ) : (
+                // Client portal / YVA Time logins are managed from the client or employee page — never turned into staff here
+                <span className="set-user__fixed" title="Managed from the client or employee page">{u.role === 'client' ? 'Client portal login' : u.role === 'employee' ? 'Employee (YVA Time) login' : u.role}</span>
+              )}
+              {!isMe && (isPending || isStaff(u.role as AppRole)) && (
+                <Menu label={`Actions for ${u.email || 'user'}`} buttonClass="btn btn--icon btn--ghost set-user__menu"
+                  items={[{ label: isPending ? 'Delete sign-up' : 'Delete login', icon: P.trash, danger: true, onClick: () => setRemoving(u) }]} />
+              )}
             </div>
           )
         })}
       </section>
+
+      <Modal open={!!removing} onClose={() => { if (!deleting) setRemoving(null) }}
+        title={`Delete ${removing?.email || 'this person'}'s login?`}
+        sub={removing ? (removing.role === 'pending' ? 'New sign-up waiting for a role' : ROLE_LABELS[removing.role as UserRole] ?? removing.role) : undefined}
+        footer={<>
+          <button type="button" className="btn" disabled={deleting} onClick={() => setRemoving(null)}>Cancel</button>
+          <button type="button" className="btn btn--danger" disabled={deleting} onClick={() => void confirmDelete()}>
+            <Ic d={P.trash} size={14} /> {deleting ? 'Deleting…' : 'Delete login'}
+          </button>
+        </>}>
+        {removing && (() => {
+          const profile = employees?.find(e => e.userId && String(e.userId) === removing.user_id)
+          return (
+            <div className="set-del">
+              <p className="set-del__lead"><strong>{removing.email || 'This person'}</strong> will no longer be able to sign in to YVA OS. This can't be undone — to give them access again, send a new invite.</p>
+              <ul className="set-del__list">
+                <li>Their sign-in and role are removed, and they get no more notification emails or phone alerts.</li>
+                <li>{profile ? <>Their staff profile <strong>{profile.name}</strong> is kept (unlinked from this login).</> : 'No staff profile is linked to this login.'}</li>
+                <li>Everything they did stays in the change history, and this deletion is recorded there too.</li>
+              </ul>
+            </div>
+          )
+        })()}
+      </Modal>
 
       <StaffProfileModal login={creating} meId={meId} onClose={() => setCreating(null)} onCreated={(emp, existed) => {
         const who = creating?.email || 'this login'

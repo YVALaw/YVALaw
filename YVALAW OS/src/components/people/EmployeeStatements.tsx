@@ -183,14 +183,15 @@ export default function EmployeeStatements({ emp, invoices, onInvoicesChange, ti
 
   const byProject = new Map<string, { hours: number; earned: number }>()
   for (const inv of empInvoices) {
-    const projName = inv.projectName || 'No project'
-    const pp = byProject.get(projName) || { hours: 0, earned: 0 }
     for (const it of getEmployeeInvoiceItems(emp, inv)) {
+      // a line of a multi-project invoice names its own project; otherwise the invoice's project
+      const projName = it.projectName || inv.projectName || 'No project'
+      const pp = byProject.get(projName) || { hours: 0, earned: 0 }
       const payroll = payrollFromInvoiceItem(it, emp)
       pp.hours += payroll.totalHours
       pp.earned += payroll.totalPay
+      byProject.set(projName, pp)
     }
-    byProject.set(projName, pp)
   }
   const projectTotals = Array.from(byProject.entries()).map(([name, pp]) => ({ name, ...pp }))
   const nothing = empInvoices.length === 0 && empTracked.length === 0

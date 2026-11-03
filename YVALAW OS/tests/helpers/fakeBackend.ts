@@ -112,8 +112,9 @@ export class FakeBackend {
       const items = ([] as Row[]).concat(body)
       const key = u.searchParams.get('on_conflict') || this.uniques[name]
       const out: Row[] = []
+      const keys = key ? key.split(',') : []   // on_conflict may name several columns (a composite unique key)
       for (const it of items) {
-        const clash = key && it[key] != null && rows.find(r => String(r[key]) === String(it[key]))
+        const clash = keys.length > 0 && keys.every(k => it[k] != null) && rows.find(r => keys.every(k => String(r[k]) === String(it[k])))
         if (clash) {
           if (prefer.includes('ignore-duplicates')) continue
           return this.res(409, { message: `duplicate key value violates unique constraint (${key})` })

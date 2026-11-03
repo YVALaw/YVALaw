@@ -170,6 +170,11 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 
 ## Things Completed
 
+### Session 15 (YVA OS: Stripe live, Outlook, remaining features — 2026-11-03)
+- Stripe live and tested (card, US bank account/ACH, pay links in invoice emails, saved methods + AutoPay, refunds); pay links are always USD (Adaptive Pricing off). Email moved from Gmail to one Outlook company mailbox (Microsoft Graph). Action results show as small pop-ups at the right that disappear after 4 seconds.
+- Supabase Free/Nano ran out of Disk IO (app stuck loading): live updates are paused by default (`VITE_LIVE_UPDATES=on` turns them back on), reads are cached 1 minute, slow-load screen.
+- Final batch: invoice bulk actions (status, email, PDFs as zip, CSV) + one invoice covering several projects of a client; repeating expenses + Stripe fees in Reports; weekly reminder email; delete staff login; keep me signed in; client quick actions; Team CSV; drag people between project columns; Ctrl+K search. 3 SQL scripts: `YVALAW OS/SETUP-AFTER-BUILD.md` §2b items 11–13. Details in `YVALAW OS/CLAUDE.md`.
+
 ### Session 14 (YVA OS full UI/UX redesign — `YVALAW OS/REDESIGN.md`)
 - Owner's mockup implemented across the staff OS (floating dock, hubs, search, Create menu, new Home + Reports), client portal and My workspace; every existing feature kept, plus saved views, bulk invoice status, expense receipts, scheduled announcements, estimate → invoice, project-aware new invoice. 3 small SQL scripts (`YVALAW OS/SETUP-AFTER-BUILD.md` §2b). Careers page uses contact@ and saves applications to YVA OS first.
 

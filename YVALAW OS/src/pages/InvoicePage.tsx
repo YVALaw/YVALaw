@@ -1,6 +1,8 @@
 // Finance → Invoices (redesign 2026-11, design_handoff_yva_os_redesign/designs/Invoices.dc.html).
 // List with status tabs + saved views, contextual row actions, bulk status, project grouping,
 // Recurring tab, the invoice builder as a full page (blocked on phones), Quick invoice, Record payment.
+// Bulk actions on the selection (2026-11): status, Email, Download PDFs (.zip), Export CSV, Delete — utils/invoiceBulk.ts.
+// Multi-project invoices sit under their main project with a "+1 project" tag (utils/invoiceProjects.ts).
 import { useStickyView } from '../lib/stickyView'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -16,15 +18,22 @@ import {
   loadInvoices, saveInvoices, loadInvoiceCounter, saveInvoiceCounter, loadSnapshot, loadSettings,
   loadRecurringInvoices, saveRecurringInvoices, logComm,
 } from '../services/storage'
-import { createPayLink, loadInvoicePaidState, loadPayments } from '../services/payments'
+import { createPayLink, invoiceIdsWithPayments, loadInvoicePaidState, loadPayments } from '../services/payments'
 import { formatMoney } from '../utils/money'
 import { buildInvoiceHTML, printInvoice as printInvoiceUtil } from '../utils/invoiceHtml'
-import { sendInvoiceEmail, sendReminderEmail, sentToLabel } from '../services/invoiceEmail'
+import { invoicePdf, sendInvoiceEmail, sendReminderEmail, sentToLabel } from '../services/invoiceEmail'
+import { downloadAttachment, loadEmailStatus } from '../services/email'
+import { logAction } from '../services/activityLog'
+import { toCsv } from '../utils/csv'
+import { base64ToBytes, makeZip } from '../utils/zip'
+import { bulkDeletePlan, bulkEmailPlan, deleteSummary, emailSummary, invoiceCsvRows } from '../utils/invoiceBulk'
+import { extraProjectCount, invoiceCoversProject, projectNamesLabel } from '../utils/invoiceProjects'
 import { clientRecipients } from '../services/emailRecipients'
 import { RecipientsHint, useClientRecipients, useInvoiceRecipients } from '../components/EmailRecipients'
 import { dateShort } from '../utils/format'
 import { localParts } from '../utils/moneyRules'
 import RecordSignature from '../components/RecordSignature'
+import { soleRunningProject } from '../utils/clientQuickActions'
 import { useToast } from '../context/ToastContext'
 
 type InvoiceStatus = 'draft' | 'sent' | 'viewed' | 'paid' | 'overdue' | 'partial'
@@ -41,6 +50,14 @@ const statusOf = (i: Invoice): InvoiceStatus => ((i.status || 'draft').toLowerCa
 const amountOf = (i: Invoice) => Number(i.subtotal) || 0
 const balanceOf = (i: Invoice) => (statusOf(i) === 'paid' ? 0 : Math.max(0, Math.round((amountOf(i) - (Number(i.amountPaid) || 0)) * 100) / 100))
 const uid = () => crypto.randomUUID()
+/** Save a file the browser made (CSV, zip) */
+function downloadBlob(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = name
+  document.body.appendChild(a); a.click(); document.body.removeChild(a)
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
 const label = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 function periodLabel(inv: Invoice): string {
@@ -92,6 +109,7 @@ export default function InvoicePage() {
   // Builder (full page) + overlays
   const [builderOpen, setBuilderOpen] = useState(false)
   const [builderProjectId, setBuilderProjectId] = useState<string | undefined>()
+  const [builderClientId, setBuilderClientId] = useState<string | undefined>()
   const [editingInvoice, setEditingInvoice] = useState<Invoice | undefined>()
   const [payingInv, setPayingInv] = useState<Invoice | null>(null)
   const [pickPayment, setPickPayment] = useState(false)
@@ -105,6 +123,10 @@ export default function InvoicePage() {
   const [confirmDelete, setConfirmDelete] = useState<Invoice | null>(null)
   const [previewInv, setPreviewInv] = useState<Invoice | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  // Bulk actions: a running one shows its progress in the selection bar
+  const [bulkRun, setBulkRun] = useState<{ label: string; done: number; total: number } | null>(null)
+  const [bulkEmailOpen, setBulkEmailOpen] = useState(false)
+  const [bulkDelete, setBulkDelete] = useState<{ remove: Invoice[]; paid: Invoice[] } | null>(null)
 
   const quickRecipients = useClientRecipients(quickModal ? clients.find(c => c.name === form.clientName) : null)
   const previewRecipients = useInvoiceRecipients(previewInv, clients)
@@ -121,12 +143,17 @@ export default function InvoicePage() {
     void loadPayments({ from: `${today.slice(0, 8)}01`, to: today }).then(r => setCollected(r.error ? null : r.rows.reduce((s, p) => s + p.amount, 0)))
   }, [])
 
-  // Deep links: ?create=invoice | ?create=payment | ?open=<id> | ?edit=<id> | ?q=<text> (Reports)
+  // Deep links: ?create=invoice[&project=<id> | &client=<id>] | ?create=payment | ?open=<id> | ?edit=<id> | ?q=<text> (Reports)
+  // client=<id> (Clients → New invoice): starts on the client's only running project, else on the client (builder asks)
   useEffect(() => {
     if (loading) return
     const create = params.get('create'), open = params.get('open'), edit = params.get('edit'), q = params.get('q')
     if (!create && !open && !edit && !q) return
-    if (create === 'invoice') openBuilder(params.get('project') || undefined)
+    if (create === 'invoice') {
+      const project = params.get('project'), client = params.get('client')
+      const sole = !project && client ? soleRunningProject(allProjects, client) : null
+      openBuilder(project || sole?.id || undefined, !project && !sole && client ? client : undefined)
+    }
     if (create === 'payment') { setPickQ(''); setPickPayment(true) }
     if (open) { const inv = invoices.find(i => i.id === open); if (inv) setPreviewInv(inv); else fail('That invoice was not found — it may have been deleted.') }
     if (edit) { const inv = invoices.find(i => i.id === edit); if (inv) openEditInvoice(inv) }
@@ -150,12 +177,12 @@ export default function InvoicePage() {
   const printInvoice = (inv: Invoice) => printInvoiceUtil(inv, htmlOpts(0))
 
   // ── Builder ─────────────────────────────────────────────────────────────
-  function openBuilder(projectId?: string) { setEditingInvoice(undefined); setBuilderProjectId(projectId); setBuilderOpen(true); window.scrollTo?.(0, 0) }
-  function openEditInvoice(inv: Invoice) { setEditingInvoice(inv); setBuilderProjectId(inv.projectId || undefined); setBuilderOpen(true); window.scrollTo?.(0, 0) }
+  function openBuilder(projectId?: string, clientId?: string) { setEditingInvoice(undefined); setBuilderProjectId(projectId); setBuilderClientId(clientId); setBuilderOpen(true); window.scrollTo?.(0, 0) }
+  function openEditInvoice(inv: Invoice) { setEditingInvoice(inv); setBuilderProjectId(inv.projectId || undefined); setBuilderClientId(undefined); setBuilderOpen(true); window.scrollTo?.(0, 0) }
   async function closeBuilder(inv?: Invoice, send = false) {
     const fresh = await loadInvoices()
     setInvoices(fresh)
-    setBuilderOpen(false); setBuilderProjectId(undefined); setEditingInvoice(undefined)
+    setBuilderOpen(false); setBuilderProjectId(undefined); setBuilderClientId(undefined); setEditingInvoice(undefined)
     if (!inv) return
     const saved = fresh.find(i => i.id === inv.id) ?? inv
     if (send) await sendDraft(saved, fresh)
@@ -279,12 +306,111 @@ export default function InvoicePage() {
   }
   async function doDelete(inv: Invoice) { setConfirmDelete(null); await persist(invoices.filter(i => i.id !== inv.id), `${inv.number} deleted.`) }
 
+  // ── Bulk actions on the selection ───────────────────────────────────────
+  const selectedList = invoices.filter(i => selected.has(i.id))
+  const emailPlan = bulkEmailPlan(selectedList)
+  const stamp = () => localParts(Date.now()).date
+
+  /** Email each selected invoice (PDF attached) one at a time. Drafts and invoices without an email are skipped. */
+  async function runBulkEmail() {
+    setBulkEmailOpen(false)
+    const { send, drafts, noEmail } = bulkEmailPlan(invoices.filter(i => selected.has(i.id)))
+    if (send.length === 0) { toast.warning(emailSummary({ sent: 0, noEmail: noEmail.length, drafts: drafts.length, failed: 0 })); return }
+    // Like weekly close "Send all": many emails need the company mailbox (no mail-app window per invoice)
+    const status = await loadEmailStatus().catch(() => null)
+    if (!status?.configured) {
+      toast.error('Emailing several invoices needs Outlook email set up (Settings → Integrations → Email sending). Until then, email them one at a time from each row\'s ⋯ menu.')
+      return
+    }
+    let sent = 0, failed = 0, notReached = 0
+    let reason = ''
+    for (let n = 0; n < send.length; n++) {
+      const inv = send[n]
+      setBulkRun({ label: 'Emailing', done: n, total: send.length })
+      const r = await sendInvoiceEmail(inv, settings, clients).catch(e => ({ mode: 'failed' as const, fallbackReason: (e as Error).message }))
+      if (r.mode === 'outlook') {
+        sent++
+        const cId = clientIdOf(inv); if (cId) void logComm(cId, `Invoice ${inv.number} emailed (${formatMoney(amountOf(inv))})`, 'email')
+        continue
+      }
+      // Email stopped working mid-run (or the mail app took over): stop instead of failing / prompting once per invoice
+      if (r.mode === 'mailto') sent++
+      else { failed++; reason = r.fallbackReason || '' }
+      notReached = send.length - n - 1
+      break
+    }
+    setBulkRun(null)
+    const text = emailSummary({ sent, noEmail: noEmail.length, drafts: drafts.length, failed, notReached }) + (reason ? ` — ${reason}` : '')
+    if (failed || notReached || noEmail.length || drafts.length) toast.warning(text); else toast.success(text)
+  }
+
+  /** One PDF per selected invoice (client-facing, never DOP); several → one .zip */
+  async function runBulkPdf() {
+    const list = invoices.filter(i => selected.has(i.id))
+    if (list.length === 0) return
+    const files: { name: string; data: Uint8Array }[] = []
+    const failedNums: string[] = []
+    let single: Awaited<ReturnType<typeof invoicePdf>> | null = null
+    for (let n = 0; n < list.length; n++) {
+      setBulkRun({ label: 'Making PDF', done: n, total: list.length })
+      try {
+        const pdf = await invoicePdf(list[n], settings)
+        if (list.length === 1) single = pdf
+        else files.push({ name: pdf.name, data: base64ToBytes(pdf.base64 || '') })
+      } catch { failedNums.push(list[n].number) }
+    }
+    setBulkRun(null)
+    if (single) downloadAttachment(single)
+    else if (files.length) downloadBlob(new Blob([makeZip(files) as BlobPart], { type: 'application/zip' }), `invoices-${stamp()}.zip`)
+    const made = single ? 1 : files.length
+    if (made) void logAction('export', `Downloaded ${made} invoice PDF${made === 1 ? '' : 's'}${made > 1 ? ' (zip)' : ''}`, { details: { invoices: list.filter(i => !failedNums.includes(i.number)).map(i => i.number) } })
+    if (failedNums.length) toast.warning(`${made} PDF${made === 1 ? '' : 's'} downloaded · ${failedNums.length} could not be made (${failedNums.join(', ')})`)
+    else toast.success(made === 1 ? `${list[0].number}.pdf downloaded.` : `${made} PDFs downloaded in one .zip file.`)
+  }
+
+  /** Spreadsheet of the selected invoices */
+  function runBulkCsv() {
+    const order = new Map(shown.map((i, n) => [i.id, n]))   // the order on screen
+    const list = invoices.filter(i => selected.has(i.id)).sort((a, b) => (order.get(a.id) ?? 1e9) - (order.get(b.id) ?? 1e9))
+    if (list.length === 0) return
+    downloadBlob(new Blob([toCsv(invoiceCsvRows(list, projectsText))], { type: 'text/csv;charset=utf-8' }), `invoices-${stamp()}.csv`)
+    void logAction('export', `Exported ${list.length} invoice${list.length === 1 ? '' : 's'} to CSV`)
+    toast.success(`${list.length} invoice${list.length === 1 ? '' : 's'} exported to CSV.`)
+  }
+
+  /** Delete: first find which selected invoices have recorded payments (those are kept), then confirm */
+  async function askBulkDelete() {
+    const list = invoices.filter(i => selected.has(i.id))
+    setBulkRun({ label: 'Checking payments', done: 0, total: list.length })
+    try {
+      const paidIds = await invoiceIdsWithPayments(list.map(i => i.id))
+      setBulkDelete(bulkDeletePlan(list, paidIds))
+    } catch (e) { fail((e as Error).message) }
+    finally { setBulkRun(null) }
+  }
+  async function runBulkDelete() {
+    const plan = bulkDelete
+    setBulkDelete(null)
+    if (!plan || plan.remove.length === 0) return
+    const gone = new Set(plan.remove.map(i => i.id))
+    // Same path as deleting one invoice (whole-list save → the change history records each deletion)
+    const ok = await persist(invoices.filter(i => !gone.has(i.id)))
+    if (!ok) return
+    setSelected(new Set(plan.paid.map(i => i.id)))
+    const text = deleteSummary(plan.remove.length, plan.paid)
+    if (plan.paid.length) toast.warning(text); else toast.success(text)
+  }
+
   // ── Filtering ───────────────────────────────────────────────────────────
   const today = localParts(Date.now()).date
   const pastDue = (i: Invoice) => !!i.dueDate && i.dueDate < today && UNPAID.includes(statusOf(i))
+  const projectName = (id: string) => allProjects.find(p => p.id === id)?.name
+  const projectsText = (inv: Invoice) => extraProjectCount(inv) > 0 ? projectNamesLabel(inv, projectName) : (inv.projectName || '')
+  const filterProject = allProjects.find(p => p.id === projectFilter)
   const base = invoices.filter(inv =>
-    `${inv.number} ${inv.clientName} ${inv.projectName}`.toLowerCase().includes(search.toLowerCase()) &&
-    (!projectFilter || (projectFilter === '__none__' ? !inv.projectId && !inv.projectName : inv.projectId === projectFilter || allProjects.find(p => p.id === projectFilter)?.name === inv.projectName)))
+    `${inv.number} ${inv.clientName} ${projectsText(inv)}`.toLowerCase().includes(search.toLowerCase()) &&
+    (!projectFilter || (projectFilter === '__none__' ? !inv.projectId && !inv.projectName
+      : inv.projectId === projectFilter || (!!filterProject && invoiceCoversProject(inv, filterProject)))))
   const shown = tab === 'all' || tab === 'recurring' ? base : base.filter(i => statusOf(i) === tab)
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: base.length }
@@ -370,7 +496,7 @@ export default function InvoicePage() {
         )}
         {/* Kept mounted (only hidden) on phone widths: resizing a window or turning a tablet must not wipe a half-built invoice */}
         <div hidden={mobile}>
-          <InvoiceBuilder onCreated={(inv, send) => void closeBuilder(inv, send)} onCancel={() => void closeBuilder()} initialProjectId={builderProjectId} editInvoice={editingInvoice} />
+          <InvoiceBuilder onCreated={(inv, send) => void closeBuilder(inv, send)} onCancel={() => void closeBuilder()} initialProjectId={builderProjectId} initialClientId={builderClientId} editInvoice={editingInvoice} />
         </div>
       </div>
     )
@@ -383,6 +509,11 @@ export default function InvoicePage() {
       {statusOf(inv) === 'partial' && inv.amountPaid != null && <span className="fin-status__paid">{formatMoney(inv.amountPaid)} paid</span>}
     </span>
   )
+  /** "+1 project" on invoices that cover more than their main project (names on hover) */
+  const projectTag = (inv: Invoice) => {
+    const n = extraProjectCount(inv)
+    return n > 0 ? <span className="fin-tag-proj" title={projectNamesLabel(inv, projectName, ', ')}>+{n} project{n === 1 ? '' : 's'}</span> : null
+  }
   const row = (inv: Invoice) => {
     const bal = balanceOf(inv)
     const late = statusOf(inv) === 'overdue' || pastDue(inv)
@@ -393,7 +524,7 @@ export default function InvoicePage() {
           <button type="button" className="fin-num mono" onClick={() => setPreviewInv(inv)}>{inv.number}</button>
           {inv.autoGenerated && <span className="fin-tag-wc">Weekly close</span>}
         </td>
-        <td><span className="t-strong">{inv.clientName || '—'}</span><span className="t-sub">{inv.projectName || 'No project'}</span></td>
+        <td><span className="t-strong">{inv.clientName || '—'}</span><span className="t-sub">{inv.projectName || 'No project'}{projectTag(inv)}</span></td>
         <td className="muted">{periodLabel(inv)}</td>
         <td className={late ? 't-danger' : 'muted'}>{inv.dueDate ? dateShort(inv.dueDate) : '—'}</td>
         <td>{statusCell(inv)}</td>
@@ -410,11 +541,12 @@ export default function InvoicePage() {
     )
   }
   const card = (inv: Invoice) => (
-    <div key={inv.id} className="mcard">
+    <div key={inv.id} className={`mcard${selected.has(inv.id) ? ' fin-mcard--sel' : ''}`}>
       <div className="mcard__top">
+        <span className="fin-mcard-check"><Checkbox ariaLabel={`Select ${inv.number}`} checked={selected.has(inv.id)} onChange={() => toggleSel(inv.id)} /></span>
         <div className="fin-mcard-main">
           <span className="mcard__title">{inv.clientName || '—'}</span>
-          <span className="mcard__meta"><span className="mono">{inv.number}</span> · due {inv.dueDate ? dateShort(inv.dueDate) : '—'}{inv.autoGenerated ? ' · Weekly close' : ''}</span>
+          <span className="mcard__meta"><span className="mono">{inv.number}</span> · due {inv.dueDate ? dateShort(inv.dueDate) : '—'}{inv.autoGenerated ? ' · Weekly close' : ''}{projectTag(inv)}</span>
         </div>
         <div className="fin-mcard-right"><span className="fin-strong num">{formatMoney(amountOf(inv))}</span>{statusCell(inv)}</div>
       </div>
@@ -497,17 +629,34 @@ export default function InvoicePage() {
               <option value="__none__">No project</option>
             </select>
             <Segmented<Grouping> label="Group invoices" value={grouping} onChange={setGrouping} options={[{ value: 'project', label: 'By project' }, { value: 'list', label: 'List' }]} />
-            {selected.size > 0 && (
-              <div className="fin-bulk" role="region" aria-label="Bulk status">
-                <span className="fin-bulk__count">{selected.size} selected</span>
-                <select className="select select--sm" aria-label="New status" value={bulkStatus} onChange={e => setBulkStatus(e.target.value as InvoiceStatus)}>
-                  {STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
-                </select>
-                <button type="button" className="btn btn--sm btn--primary" onClick={() => void applyBulk()}>Apply to selected</button>
-                <button type="button" className="btn btn--sm btn--ghost" onClick={() => setSelected(new Set())}>Clear</button>
-              </div>
+            {mobile && shown.length > 0 && selected.size === 0 && (
+              <button type="button" className="btn btn--sm btn--ghost fin-select-all" onClick={() => setSelected(new Set(shown.map(i => i.id)))}>Select all</button>
             )}
           </div>
+          {selected.size > 0 && (
+            <div className="fin-bulk" role="region" aria-label="Selected invoices">
+              <div className="fin-bulk__head">
+                <span className="fin-bulk__count">{selected.size} selected</span>
+                {bulkRun
+                  ? <span className="fin-bulk__progress" role="status">{bulkRun.label} {Math.min(bulkRun.done + 1, bulkRun.total)} of {bulkRun.total}…</span>
+                  : <button type="button" className="btn btn--sm btn--ghost" onClick={() => setSelected(new Set())}>Clear</button>}
+              </div>
+              <div className="fin-bulk__status">
+                <select className="select select--sm" aria-label="New status" value={bulkStatus} disabled={!!bulkRun} onChange={e => setBulkStatus(e.target.value as InvoiceStatus)}>
+                  {STATUSES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                </select>
+                <button type="button" className="btn btn--sm btn--primary" disabled={!!bulkRun} onClick={() => void applyBulk()}>Apply to selected</button>
+              </div>
+              <div className="fin-bulk__acts">
+                <button type="button" className="btn btn--sm" disabled={!!bulkRun} onClick={() => setBulkEmailOpen(true)}><Ic d={P.mail} size={14} /> Email</button>
+                <button type="button" className="btn btn--sm" disabled={!!bulkRun} onClick={() => void runBulkPdf()}><Ic d={P.printer} size={14} /> Download PDFs</button>
+                <button type="button" className="btn btn--sm" disabled={!!bulkRun} onClick={runBulkCsv}><Ic d={P.file} size={14} /> Export CSV</button>
+                <Menu label="More actions for the selected invoices" buttonClass="btn btn--icon btn--sm" items={[
+                  { label: `Delete ${selected.size} invoice${selected.size === 1 ? '' : 's'}…`, icon: P.trash, danger: true, onClick: () => { if (!bulkRun) void askBulkDelete() } },
+                ]} />
+              </div>
+            </div>
+          )}
 
           {loading ? (
             <div className="table-card fin-skel">{[0, 1, 2, 3, 4].map(i => <div key={i} className="fin-skel__row"><Skel w={110} /><Skel w="30%" /><Skel w={90} /><Skel w={70} /><Skel w={90} /></div>)}</div>
@@ -595,6 +744,36 @@ export default function InvoicePage() {
           <button type="button" className="btn" onClick={() => setConfirmDelete(null)}>Cancel</button>
           <button type="button" className="btn btn--danger" onClick={() => confirmDelete && void doDelete(confirmDelete)}>Delete</button>
         </>} />
+
+      {/* Bulk: email the selected invoices */}
+      <Modal open={bulkEmailOpen} onClose={() => setBulkEmailOpen(false)} title={`Email ${emailPlan.send.length} invoice${emailPlan.send.length === 1 ? '' : 's'}?`}
+        sub="Each client gets their invoice PDF from the company mailbox (with their Cc list), one at a time."
+        footer={<>
+          <button type="button" className="btn" onClick={() => setBulkEmailOpen(false)}>Cancel</button>
+          <button type="button" className="btn btn--primary" disabled={emailPlan.send.length === 0} onClick={() => void runBulkEmail()}>Email {emailPlan.send.length}</button>
+        </>}>
+        <div className="fin-bulk-list">
+          {emailPlan.send.length > 0 && <p><span className="t-strong">Will be emailed:</span> <span className="mono">{emailPlan.send.map(i => i.number).join(', ')}</span></p>}
+          {emailPlan.drafts.length > 0 && <p className="muted">Skipped — drafts (use Send, which also marks them sent): <span className="mono">{emailPlan.drafts.map(i => i.number).join(', ')}</span></p>}
+          {emailPlan.noEmail.length > 0 && <p className="muted">Skipped — no client email on file: <span className="mono">{emailPlan.noEmail.map(i => i.number).join(', ')}</span></p>}
+        </div>
+      </Modal>
+
+      {/* Bulk: delete the selected invoices (those with recorded payments are kept) */}
+      <Modal open={!!bulkDelete} onClose={() => setBulkDelete(null)}
+        title={bulkDelete && bulkDelete.remove.length > 0 ? `Delete ${bulkDelete.remove.length} invoice${bulkDelete.remove.length === 1 ? '' : 's'}?` : 'Nothing to delete'}
+        sub={bulkDelete && bulkDelete.remove.length > 0 ? 'This cannot be undone. The change history keeps a record of each deleted invoice.' : undefined}
+        footer={<>
+          <button type="button" className="btn" onClick={() => setBulkDelete(null)}>{bulkDelete?.remove.length ? 'Cancel' : 'Close'}</button>
+          {!!bulkDelete?.remove.length && <button type="button" className="btn btn--danger" onClick={() => void runBulkDelete()}>Delete {bulkDelete.remove.length}</button>}
+        </>}>
+        {bulkDelete && (
+          <div className="fin-bulk-list">
+            {bulkDelete.remove.length > 0 && <p><span className="t-strong">Will be deleted:</span> <span className="mono">{bulkDelete.remove.map(i => i.number).join(', ')}</span></p>}
+            {bulkDelete.paid.length > 0 && <p className="muted">Kept — they have recorded payments (delete the payments first if they were a mistake): <span className="mono">{bulkDelete.paid.map(i => i.number).join(', ')}</span></p>}
+          </div>
+        )}
+      </Modal>
 
       {/* Record payment: pick an open invoice (Create menu → Record payment) */}
       <Modal open={pickPayment} onClose={() => setPickPayment(false)} title="Record payment" sub="Pick the invoice the payment is for.">

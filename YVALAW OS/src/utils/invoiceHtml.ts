@@ -8,6 +8,7 @@ import type { Invoice } from '../data/types'
 import { escapeHtml as esc } from './html'
 import { formatMoney } from './money'
 import { isItemLine, lineAmount, lineMoney, qtyText } from './invoiceLines'
+import { linesByProject } from './invoiceProjects'
 
 export interface InvoiceHtmlOptions {
   rate?:           number   // USD→DOP rate; 0 = omit DOP line (always 0 for portal)
@@ -68,6 +69,17 @@ function itemRowHtml(it: NonNullable<Invoice['items']>[number], span: number): s
     '<td style="text-align:right;white-space:nowrap"><strong>' + esc(lineMoney(lineAmount(it))) + '</strong></td></tr>'
 }
 
+/** Lines that span several projects get a header row per project (name + that project's amount); one project → no headers */
+function groupedRows(inv: Invoice, span: number, row: (it: NonNullable<Invoice['items']>[number]) => string): string {
+  const groups = linesByProject(inv)
+  if (groups.length <= 1) return (inv.items || []).map(row).join('')
+  return groups.map(g => {
+    const amount = g.items.reduce((s, it) => s + lineAmount(it), 0)
+    return '<tr class="proj-row"><td colspan="' + span + '">' + esc(g.projectName || 'Project') + '</td>' +
+      '<td style="text-align:right;white-space:nowrap">' + esc(lineMoney(amount)) + '</td></tr>' + g.items.map(row).join('')
+  }).join('')
+}
+
 export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): string {
   const rate           = opts.rate           ?? 0
   const companyName    = opts.companyName    || DEFAULTS.companyName
@@ -80,6 +92,10 @@ export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): s
   const logoSrc        = companyLogoSrc(opts.logoUrl)
 
   const dop = dopLabel(Number(inv.subtotal) || 0, rate)
+  const projectGroups = linesByProject(inv)
+  const projectsLine = projectGroups.length > 1
+    ? `Projects: ${projectGroups.map(g => g.projectName).filter(Boolean).join(', ')}`
+    : inv.projectName ? `Project: ${inv.projectName}` : ''
 
   const dayAbbr = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']
   const hasDailyGrid = (inv.items || []).some(it => it.daily && Object.keys(it.daily).length > 0)
@@ -110,7 +126,7 @@ export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): s
       return '<th style="text-align:center;font-size:9px;padding:6px 2px;min-width:26px">' +
         dayAbbr[dt.getDay()] + '<br>' + (dt.getMonth() + 1) + '/' + dt.getDate() + '</th>'
     }).join('')
-    const bodyRows = (inv.items || []).map(it => {
+    const bodyRows = groupedRows(inv, allDates.length + 3, it => {
       if (isItemLine(it)) return itemRowHtml(it, allDates.length + 3)
       const dayCells = allDates.map(d => {
         const h = parseH(it.daily?.[d] || '')
@@ -123,7 +139,7 @@ export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): s
         '<td style="text-align:right;font-weight:700;white-space:nowrap">' + fmtHours(it.hoursTotal) + '</td>' +
         '<td style="text-align:right;white-space:nowrap">$' + esc(it.rate) + '/hr</td>' +
         '<td style="text-align:right;font-weight:700;white-space:nowrap">$' + lineAmount(it).toFixed(2) + '</td></tr>'
-    }).join('')
+    })
     const colSpan = allDates.length + 3
     itemsSection = `
     <div style="overflow-x:auto;margin-top:16px">
@@ -136,13 +152,13 @@ export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): s
     </div>
     ${dop ? `<div class="dop">${dop}</div>` : ''}`
   } else {
-    const bodyRows = (inv.items || []).map(it => isItemLine(it) ? itemRowHtml(it, 3) :
+    const bodyRows = groupedRows(inv, 3, it => isItemLine(it) ? itemRowHtml(it, 3) :
       '<tr><td><strong>' + esc(it.employeeName) + '</strong>' +
       (it.position ? '<br><span style="font-size:11px;color:#888">' + esc(it.position) + '</span>' : '') +
       '</td><td style="text-align:right">' + fmtHours(it.hoursTotal) + '</td>' +
       '<td style="text-align:right">$' + esc(it.rate) + '/hr</td>' +
       '<td style="text-align:right"><strong>$' + lineAmount(it).toFixed(2) + '</strong></td></tr>'
-    ).join('')
+    )
     itemsSection = `
     <table>
       <thead><tr><th>${firstCol}</th><th style="text-align:right">Hours</th><th style="text-align:right">Rate</th><th style="text-align:right">Amount</th></tr></thead>
@@ -168,6 +184,7 @@ export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): s
       table { width: 100%; border-collapse: collapse; margin-top: 16px; }
       th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #999; padding: 8px 10px; border-bottom: 2px solid #eee; }
       td { padding: 10px; border-bottom: 1px solid #eee; font-size: 13px; vertical-align: top; }
+      .proj-row td { background: #f6f7f9; font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #333; padding: 8px 10px; }
       .total-row { font-size: 16px; font-weight: 800; }
       .total-row td { border-top: 2px solid #111; border-bottom: none; padding-top: 14px; }
       .dop { font-size: 12px; color: #999; margin-top: 4px; }
@@ -205,7 +222,7 @@ export function buildInvoiceHTML(inv: Invoice, opts: InvoiceHtmlOptions = {}): s
         <div class="value">${esc(inv.date || '—')}</div>
         ${inv.dueDate     ? `<div style="font-size:13px;color:#c00"><strong>Due: ${esc(inv.dueDate)}</strong></div>` : ''}
         ${inv.billingStart ? `<div style="font-size:13px;color:#666">Period: ${esc(inv.billingStart)} – ${esc(inv.billingEnd || '')}</div>` : ''}
-        ${inv.projectName  ? `<div style="font-size:13px;color:#666">Project: ${esc(inv.projectName)}</div>` : ''}
+        ${projectsLine ? `<div style="font-size:13px;color:#666">${esc(projectsLine)}</div>` : ''}
       </div>
     </div>
     ${itemsSection}
