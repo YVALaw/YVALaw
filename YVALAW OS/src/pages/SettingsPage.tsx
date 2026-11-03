@@ -9,6 +9,7 @@ import HistoryList from '../components/HistoryList'
 import IntegrationsTab from '../components/settings/IntegrationsTab'
 import DataTab from '../components/settings/DataTab'
 import TeamAccessTab from '../components/settings/TeamAccessTab'
+import WeeklyReminderCard from '../components/settings/WeeklyReminderCard'
 import { useEmailStatus, type EmailStatusView } from '../components/settings/emailStatus'
 import { Banner, Field, PageHeader, Skel } from '../components/ui'
 import { Ic, P } from '../components/Icon'
@@ -439,6 +440,8 @@ export default function SettingsPage() {
                 </div>
                 <NotificationSettings kinds={STAFF_KINDS} />
               </section>
+              {/* CEO + Admin: they can change the settings row (and send the test) */}
+              {!roleLoading && (currentRole === 'ceo' || currentRole === 'admin') && <WeeklyReminderCard />}
               <section className="set-card" aria-label="Browser notifications">
                 <div className="set-card__head">
                   <div className="set-card__titles">
