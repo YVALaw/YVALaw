@@ -4,12 +4,16 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { uploadFile } from '../services/fileStorage'
 import type { Attachment, Client, Employee, Invoice, Project } from '../data/types'
 import { loadSnapshot, saveEmployees, saveProjects, loadEmployeeCounter, saveEmployeeCounter } from '../services/storage'
-import { ProjectPicker, projectIdsOf, withEmployeeOn } from '../components/people/ProjectAssign'
+import { ProjectPicker, isOpenProject, projectIdsOf, withEmployeeOn } from '../components/people/ProjectAssign'
+import { applyTeamDrop, dropChoices, type AssignMode } from '../utils/teamAssign'
+import { teamCsvFileName, teamCsvRows } from '../utils/teamCsv'
+import { downloadCsvFile } from '../utils/csv'
+import { logAction } from '../services/activityLog'
 import { formatMoney } from '../utils/money'
 import { usePermission, useRole } from '../context/RoleContext'
 import { can } from '../lib/roles'
 import { Ic, P } from '../components/Icon'
-import { Banner, Drawer, EmptyState, Modal, Menu, PageHeader, Pill, SearchInput, Segmented, Skel, useIsMobile } from '../components/ui'
+import { Banner, Drawer, EmptyState, Field, Modal, Menu, PageHeader, Pill, SearchInput, Segmented, Skel, onEnter, useIsMobile } from '../components/ui'
 import EmployeeStatements from '../components/people/EmployeeStatements'
 import { EMPTY_EMPLOYEE_FORM, EmployeeFields, STATUS_OPTIONS, employeeFormError, employeeToForm, formToEmployee, type EmployeeFormData } from '../components/people/EmployeeForm'
 import { AttachmentList } from '../components/people/attachments'
@@ -27,6 +31,9 @@ async function generateEmployeeNumber(): Promise<string> {
 }
 
 type Team = 'all' | 'client' | 'yva'
+/** Board drag & drop / ⋯ → Move to project…: who, from which lane (null = Unassigned), to where (undefined = pick one) */
+type AssignAsk = { emp: Employee; from: string | null; to: string | null | undefined; pick?: boolean }
+const NO_PROJECT = '__none__'
 type View = 'table' | 'projects' | 'capacity'
 const isYva = (e: Employee) => e.worksFor === 'yva'
 
@@ -72,6 +79,9 @@ export default function EmployeesPage() {
   const [saving, setSaving] = useState(false)
   const toast = useToast()
   const [loadError, setLoadError] = useState<string | null>(null)   // could not load: stays as a banner
+  const [drag, setDrag] = useState<{ empId: string; from: string | null } | null>(null)
+  const [overLane, setOverLane] = useState<string | null>(null)
+  const [assignAsk, setAssignAsk] = useState<AssignAsk | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Create menu deep link: /employees?create=1
@@ -131,6 +141,44 @@ export default function EmployeesPage() {
   async function doDelete(emp: Employee) {
     setConfirmDelete(null)
     await persist(employees.filter(e => e.id !== emp.id), `${emp.name} removed.`)
+  }
+
+  /* ── Team board: drag a person to another project lane (or Unassigned) / ⋯ → Move to project… ── */
+  const projectName = (id: string | null) => (id ? projects.find(p => p.id === id)?.name ?? 'that project' : 'Unassigned')
+  /** Only projects.employeeIds changes (placement rates untouched); optimistic, rolled back with a toast if the save fails */
+  async function assignTo(emp: Employee, from: string | null, to: string | null, mode: AssignMode) {
+    setAssignAsk(null)
+    const before = projects
+    const next = applyTeamDrop(before, emp.id, from, to, mode)
+    if (next.every((p, i) => p === before[i])) return
+    setProjects(next)
+    try {
+      await saveProjects(next)
+      toast.success(to === null ? `${emp.name} taken off ${projectName(from)}.` : mode === 'move' && from ? `${emp.name} moved to ${projectName(to)}.` : `${emp.name} added to ${projectName(to)}.`)
+    } catch (e) {
+      setProjects(before)
+      toast.error(`Not saved — ${emp.name} stays where they were: ${(e as Error).message}`)
+    }
+  }
+  function dropOn(to: string | null) {
+    const d = drag
+    setDrag(null); setOverLane(null)
+    if (!d || !canAssign) return
+    const emp = employees.find(e => e.id === d.empId)
+    if (!emp || d.from === to) return
+    const choices = dropChoices(projects, emp.id, d.from, to)
+    if (!choices) { if (to) toast.info(`${emp.name} is already on ${projectName(to)}.`); return }
+    if (choices.add && !choices.move) void assignTo(emp, d.from, to, 'add')   // from Unassigned: nothing to choose
+    else setAssignAsk({ emp, from: d.from, to })
+  }
+  function exportCsv() {
+    const rows = teamCsvRows(filtered, projects, clients, e => payScheduleOf(e, projects).label)
+    const file = teamCsvFileName()
+    try { downloadCsvFile(file, rows) } catch (e) { toast.error(`Export failed: ${(e as Error).message}`); return }
+    const n = filtered.length
+    void logAction('team_exported', `Exported the team list to CSV (${n} ${n === 1 ? 'person' : 'people'})`,
+      { table: 'employees', details: { count: n, team, status: filterStatus || 'all', search: search || null } })
+    toast.success(`Exported ${n} ${n === 1 ? 'person' : 'people'} to ${file}. Pay rates, bank details and notes are never included.`)
   }
 
   const counts = useMemo(() => ({ all: employees.length, client: employees.filter(e => !isYva(e)).length, yva: employees.filter(isYva).length }), [employees])
@@ -212,16 +260,23 @@ export default function EmployeesPage() {
     .filter(g => g.people.length > 0)
     .sort((a, b) => a.project.name.localeCompare(b.project.name))
   const unassigned = filtered.filter(e => !projects.some(p => (p.employeeIds || []).includes(e.id)))
-  const laneCard = (key: string, title: string, sub: string, people: Employee[], status?: string) => (
-    <section key={key} className="card ppl-lane">
+  const laneCard = (key: string, projectId: string | null, title: string, sub: string, people: Employee[], status?: string) => (
+    <section key={key} className={`card ppl-lane${drag && overLane === key && drag.from !== projectId ? ' ppl-lane--over' : ''}`} data-lane={key}
+      onDragOver={canAssign ? e => { if (!drag) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (overLane !== key) setOverLane(key) } : undefined}
+      onDragLeave={canAssign ? e => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOverLane(o => (o === key ? null : o)) } : undefined}
+      onDrop={canAssign ? e => { e.preventDefault(); dropOn(projectId) } : undefined}>
       <div className="card__head">
         <div><h2 className="card__title">{title}</h2><span className="card__meta">{sub}</span></div>
         {status && <Pill status={status} />}
       </div>
       {people.map(e => {
         const n = invoiceCount(e)
+        const open = () => navigate('/employees/' + e.id)
         return (
-          <button type="button" key={`${key}-${e.id}`} className="ppl-lane__row" onClick={() => navigate('/employees/' + e.id)}>
+          <div key={`${key}-${e.id}`} className={`ppl-lane__row${drag?.empId === e.id && drag.from === projectId ? ' ppl-lane__row--dragging' : ''}`} role="button" tabIndex={0}
+            draggable={canAssign} onClick={open} onKeyDown={onEnter(open)}
+            onDragStart={canAssign ? ev => { ev.dataTransfer.effectAllowed = 'copyMove'; ev.dataTransfer.setData('text/plain', e.name); setDrag({ empId: e.id, from: projectId }) } : undefined}
+            onDragEnd={canAssign ? () => { setDrag(null); setOverLane(null) } : undefined}>
             <PersonAvatar name={e.name} photo={e.photoUrl} size="sm" />
             <span className="ppl-lane__main">
               <span className="ppl-lane__name">{e.name}</span>
@@ -233,15 +288,24 @@ export default function EmployeesPage() {
               </span>
             </span>
             <Pill tone={employeeStatusTone(e.status)}>{e.status || 'Active'}</Pill>
-          </button>
+            {canAssign && (
+              <span className="ppl-lane__menu" onClick={ev => ev.stopPropagation()} onKeyDown={ev => ev.stopPropagation()}>
+                <Menu label={`Actions for ${e.name} in ${title}`} buttonClass="btn btn--icon btn--ghost btn--xs" items={[
+                  { label: 'Open profile', icon: P.user, onClick: open },
+                  { label: 'Move to project…', icon: P.projects, onClick: () => setAssignAsk({ emp: e, from: projectId, to: undefined, pick: true }) },
+                ]} />
+              </span>
+            )}
+          </div>
         )
       })}
+      {people.length === 0 && <div className="ppl-lane__empty">{projectId ? 'No one here.' : 'Drop someone here to take them off a project.'}</div>}
     </section>
   )
   const boardView = (
     <div className="ppl-board">
-      {groupedProjects.map(({ project, people }) => laneCard(project.id, project.name, `${people.length} employee${people.length !== 1 ? 's' : ''}`, people, project.status || 'Active'))}
-      {unassigned.length > 0 && laneCard('unassigned', 'Unassigned', `${unassigned.length} employee${unassigned.length !== 1 ? 's' : ''}`, unassigned)}
+      {groupedProjects.map(({ project, people }) => laneCard(project.id, project.id, project.name, `${people.length} employee${people.length !== 1 ? 's' : ''}`, people, project.status || 'Active'))}
+      {(unassigned.length > 0 || canAssign) && laneCard('unassigned', null, 'Unassigned', `${unassigned.length} employee${unassigned.length !== 1 ? 's' : ''}`, unassigned)}
     </div>
   )
 
@@ -290,6 +354,11 @@ export default function EmployeesPage() {
     </div>
   )
 
+  const ask = assignAsk
+  const askChoices = ask && ask.to !== undefined ? dropChoices(projects, ask.emp.id, ask.from, ask.to) : null
+  const moveTargets = ask ? projects.filter(p => isOpenProject(p) && p.id !== ask.from).sort((a, b) => a.name.localeCompare(b.name)) : []
+  const clientOf = (p: { clientId?: string | null }) => clients.find(c => c.id === p.clientId)?.name
+
   return (
     <div className="page">
       <PageHeader
@@ -309,6 +378,7 @@ export default function EmployeesPage() {
           {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
         <span className="spacer" />
+        <button type="button" className="btn btn--sm ppl-filterbar__export" onClick={exportCsv} disabled={!loaded || filtered.length === 0} title="Download the people in this list as a CSV file (no pay rates, bank details or notes)"><Ic d={P.download} size={14} />Export CSV</button>
         <Segmented label="View" value={view} onChange={setView} options={[{ value: 'projects', label: 'By project' }, { value: 'table', label: 'List' }, { value: 'capacity', label: 'Capacity' }]} />
       </div>
 
@@ -355,6 +425,30 @@ export default function EmployeesPage() {
         sub={statementsFor ? `${statementsFor.employeeNumber ? `${statementsFor.employeeNumber} · ` : ''}${statementsFor.payRate ? `$${statementsFor.payRate}/hr` : 'No pay rate set'}` : undefined}>
         {statementsFor && <EmployeeStatements emp={statementsFor} invoices={invoices} onInvoicesChange={setInvoices} />}
       </Drawer>
+
+      {/* Team board: drop on another lane / ⋯ → Move to project… */}
+      <Modal open={!!ask} onClose={() => setAssignAsk(null)}
+        title={!ask ? '' : ask.pick ? `Move ${ask.emp.name} to a project` : ask.to === null ? `Take ${ask.emp.name} off ${projectName(ask.from)}?` : `${ask.emp.name} → ${projectName(ask.to ?? null)}`}
+        sub={!ask ? undefined : `${ask.from ? `Now on ${projectName(ask.from)}.` : 'Not on a project now.'} Rates set for each project are kept.`}
+        footer={ask ? <>
+          <button type="button" className="btn" onClick={() => setAssignAsk(null)}>Cancel</button>
+          {askChoices?.add && <button type="button" className={`btn${askChoices.move ? '' : ' btn--primary'}`} onClick={() => void assignTo(ask.emp, ask.from, ask.to ?? null, 'add')}>{ask.from ? 'Also add to' : 'Add to'} {projectName(ask.to ?? null)}</button>}
+          {askChoices?.move && <button type="button" className="btn btn--primary" autoFocus onClick={() => void assignTo(ask.emp, ask.from, ask.to ?? null, 'move')}>Move to {projectName(ask.to ?? null)}</button>}
+          {askChoices?.remove && <button type="button" className="btn btn--primary" autoFocus onClick={() => void assignTo(ask.emp, ask.from, null, 'move')}>Take off {projectName(ask.from)}</button>}
+        </> : undefined}>
+        {ask?.pick && (
+          <Field label="Project">
+            <select className="select" aria-label="Move to project" value={ask.to === undefined ? '' : ask.to === null ? NO_PROJECT : ask.to}
+              onChange={ev => { const v = ev.target.value; setAssignAsk({ ...ask, to: v === '' ? undefined : v === NO_PROJECT ? null : v }) }}>
+              <option value="">Choose a project…</option>
+              {moveTargets.map(p => <option key={p.id} value={p.id}>{clientOf(p) ? `${p.name} — ${clientOf(p)}` : p.name}</option>)}
+              {ask.from && <option value={NO_PROJECT}>No project (take off {projectName(ask.from)})</option>}
+            </select>
+          </Field>
+        )}
+        {ask && ask.to !== undefined && !askChoices && <p className="muted">{ask.emp.name} is already on {projectName(ask.to)}.</p>}
+        {ask && askChoices?.move && askChoices.add && <p className="muted ppl-assign-hint"><b>Move</b> takes them off {projectName(ask.from)}; <b>Also add</b> keeps them on both.</p>}
+      </Modal>
 
       <Modal open={!!confirmDelete} onClose={() => setConfirmDelete(null)} title={`Remove ${confirmDelete?.name ?? 'team member'}?`} sub="This cannot be undone."
         footer={<><button type="button" className="btn" onClick={() => setConfirmDelete(null)}>Cancel</button><button type="button" className="btn btn--danger" onClick={() => confirmDelete && void doDelete(confirmDelete)}>Remove</button></>} />

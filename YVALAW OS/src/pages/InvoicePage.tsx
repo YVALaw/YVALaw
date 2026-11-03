@@ -25,6 +25,7 @@ import { RecipientsHint, useClientRecipients, useInvoiceRecipients } from '../co
 import { dateShort } from '../utils/format'
 import { localParts } from '../utils/moneyRules'
 import RecordSignature from '../components/RecordSignature'
+import { soleRunningProject } from '../utils/clientQuickActions'
 import { useToast } from '../context/ToastContext'
 
 type InvoiceStatus = 'draft' | 'sent' | 'viewed' | 'paid' | 'overdue' | 'partial'
@@ -92,6 +93,7 @@ export default function InvoicePage() {
   // Builder (full page) + overlays
   const [builderOpen, setBuilderOpen] = useState(false)
   const [builderProjectId, setBuilderProjectId] = useState<string | undefined>()
+  const [builderClientId, setBuilderClientId] = useState<string | undefined>()
   const [editingInvoice, setEditingInvoice] = useState<Invoice | undefined>()
   const [payingInv, setPayingInv] = useState<Invoice | null>(null)
   const [pickPayment, setPickPayment] = useState(false)
@@ -121,12 +123,17 @@ export default function InvoicePage() {
     void loadPayments({ from: `${today.slice(0, 8)}01`, to: today }).then(r => setCollected(r.error ? null : r.rows.reduce((s, p) => s + p.amount, 0)))
   }, [])
 
-  // Deep links: ?create=invoice | ?create=payment | ?open=<id> | ?edit=<id> | ?q=<text> (Reports)
+  // Deep links: ?create=invoice[&project=<id> | &client=<id>] | ?create=payment | ?open=<id> | ?edit=<id> | ?q=<text> (Reports)
+  // client=<id> (Clients → New invoice): starts on the client's only running project, else on the client (builder asks)
   useEffect(() => {
     if (loading) return
     const create = params.get('create'), open = params.get('open'), edit = params.get('edit'), q = params.get('q')
     if (!create && !open && !edit && !q) return
-    if (create === 'invoice') openBuilder(params.get('project') || undefined)
+    if (create === 'invoice') {
+      const project = params.get('project'), client = params.get('client')
+      const sole = !project && client ? soleRunningProject(allProjects, client) : null
+      openBuilder(project || sole?.id || undefined, !project && !sole && client ? client : undefined)
+    }
     if (create === 'payment') { setPickQ(''); setPickPayment(true) }
     if (open) { const inv = invoices.find(i => i.id === open); if (inv) setPreviewInv(inv); else fail('That invoice was not found — it may have been deleted.') }
     if (edit) { const inv = invoices.find(i => i.id === edit); if (inv) openEditInvoice(inv) }
@@ -150,12 +157,12 @@ export default function InvoicePage() {
   const printInvoice = (inv: Invoice) => printInvoiceUtil(inv, htmlOpts(0))
 
   // ── Builder ─────────────────────────────────────────────────────────────
-  function openBuilder(projectId?: string) { setEditingInvoice(undefined); setBuilderProjectId(projectId); setBuilderOpen(true); window.scrollTo?.(0, 0) }
-  function openEditInvoice(inv: Invoice) { setEditingInvoice(inv); setBuilderProjectId(inv.projectId || undefined); setBuilderOpen(true); window.scrollTo?.(0, 0) }
+  function openBuilder(projectId?: string, clientId?: string) { setEditingInvoice(undefined); setBuilderProjectId(projectId); setBuilderClientId(clientId); setBuilderOpen(true); window.scrollTo?.(0, 0) }
+  function openEditInvoice(inv: Invoice) { setEditingInvoice(inv); setBuilderProjectId(inv.projectId || undefined); setBuilderClientId(undefined); setBuilderOpen(true); window.scrollTo?.(0, 0) }
   async function closeBuilder(inv?: Invoice, send = false) {
     const fresh = await loadInvoices()
     setInvoices(fresh)
-    setBuilderOpen(false); setBuilderProjectId(undefined); setEditingInvoice(undefined)
+    setBuilderOpen(false); setBuilderProjectId(undefined); setBuilderClientId(undefined); setEditingInvoice(undefined)
     if (!inv) return
     const saved = fresh.find(i => i.id === inv.id) ?? inv
     if (send) await sendDraft(saved, fresh)
@@ -370,7 +377,7 @@ export default function InvoicePage() {
         )}
         {/* Kept mounted (only hidden) on phone widths: resizing a window or turning a tablet must not wipe a half-built invoice */}
         <div hidden={mobile}>
-          <InvoiceBuilder onCreated={(inv, send) => void closeBuilder(inv, send)} onCancel={() => void closeBuilder()} initialProjectId={builderProjectId} editInvoice={editingInvoice} />
+          <InvoiceBuilder onCreated={(inv, send) => void closeBuilder(inv, send)} onCancel={() => void closeBuilder()} initialProjectId={builderProjectId} initialClientId={builderClientId} editInvoice={editingInvoice} />
         </div>
       </div>
     )

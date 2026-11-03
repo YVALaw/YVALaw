@@ -105,10 +105,12 @@ type Props = {
   onCreated: (inv: Invoice, send: boolean) => void
   onCancel: () => void
   initialProjectId?: string
+  /** Start on this client (Clients → New invoice when the client has no single running project) */
+  initialClientId?: string
   editInvoice?: Invoice
 }
 
-export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, editInvoice }: Props) {
+export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, initialClientId, editInvoice }: Props) {
   const [employees, setEmployees] = useState<Employee[]>([])
   const [clients,   setClients]   = useState<Client[]>([])
   const [projects,  setProjects]  = useState<Project[]>([])
@@ -141,6 +143,13 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
       if (proj?.clientId) setClientId(proj.clientId)
     }
   }, [projects])
+  // …or from initialClientId: same as picking the client in the dropdown (project + due date from its terms)
+  const clientPreset = useRef(false)
+  useEffect(() => {
+    if (!initialClientId || initialProjectId || editInvoice || clientPreset.current || clients.length === 0) return
+    clientPreset.current = true
+    if (clients.some(c => c.id === initialClientId)) handleClientChange(initialClientId)
+  }, [clients, projects])   // eslint-disable-line react-hooks/exhaustive-deps
 
   // Populate all fields when editing an existing invoice
   const editLoaded = useRef(false)

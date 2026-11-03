@@ -56,3 +56,32 @@ export function csvToLeads(text: string, defaultSource = 'Imported from Netlify 
   }).filter(l => l.name || l.email)
   return { leads, columns: head.filter((_, i) => Object.values(idx).includes(i)) }
 }
+
+// ─── Writer ───────────────────────────────────────────────────────────────────
+
+// A cell that starts with = + - @ (or a tab / carriage return) is run as a formula by Excel / Sheets
+// ("CSV injection"). Those cells get a leading apostrophe — except plain numbers and phone numbers
+// ("+1 617 555 0188", "-12.5"), which can't call anything.
+const FORMULA_START = /^[=+\-@\t\r]/
+const NUMBER_OR_PHONE = /^[+-]?[\d\s().,-]+$/
+
+/** One cell: quoted when needed (comma, quote, line break, edge spaces), quotes doubled, formulas neutralised */
+export function csvCell(value: unknown): string {
+  let s = value == null ? '' : String(value)
+  if (FORMULA_START.test(s) && !NUMBER_OR_PHONE.test(s)) s = `'${s}`
+  return /[",\r\n]|^\s|\s$/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+
+/** Rows → CSV text (CRLF line ends). `bom` adds the byte-order mark so Excel reads accents (é, ñ) correctly. */
+export function toCsv(rows: readonly (readonly unknown[])[], { bom = true }: { bom?: boolean } = {}): string {
+  return (bom ? '﻿' : '') + rows.map(r => r.map(csvCell).join(',')).join('\r\n') + '\r\n'
+}
+
+/** Browser only: save rows as a .csv file */
+export function downloadCsvFile(filename: string, rows: readonly (readonly unknown[])[]): void {
+  const url = URL.createObjectURL(new Blob([toCsv(rows)], { type: 'text/csv;charset=utf-8' }))
+  const a = document.createElement('a')
+  a.href = url; a.download = filename
+  document.body.appendChild(a); a.click(); a.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+}

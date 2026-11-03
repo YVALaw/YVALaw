@@ -11,6 +11,7 @@ import { useRole } from '../context/RoleContext'
 import { Menu, Modal, PageHeader, Pill, SearchInput, Segmented, Skel, Field, onEnter, useIsMobile } from '../components/ui'
 import ClientFormDrawer, { CLIENT_STAGES, avatarTone, normTags } from '../components/crm/ClientFormDrawer'
 import ClientActivityModal from '../components/crm/ClientActivityModal'
+import { useClientQuickActions } from '../components/crm/ClientQuickActions'
 import { loadViews, storeViews, type SavedView } from '../components/crm/savedViews'
 import { recipientsLabel } from '../utils/emailList'
 import { initials, usd, usdShort } from '../utils/format'
@@ -57,6 +58,8 @@ export default function ClientsPage() {
   const [confirmDelete, setConfirmDelete] = useState<Client | null>(null)
   const [dragId, setDragId] = useState<string | null>(null)
   const toast = useToast()
+  // Email / Call / New invoice / Record payment / Copy pay link (payments update the outstanding column)
+  const quick = useClientQuickActions(invoices, (id, s) => setInvoices(list => list.map(i => (i.id === id ? { ...i, amountPaid: s.amountPaid, status: s.status } : i))))
 
   useEffect(() => {
     void loadSnapshot().then(snap => { setClients(snap.clients); setInvoices(snap.invoices); setProjects(snap.projects); setLoaded(true) })
@@ -131,6 +134,7 @@ export default function ClientsPage() {
     storeViews('clients', userId, next); setViews(next); if (savedId === id) setSavedId(null)
   }
   const rowMenu = (r: Row) => [
+    ...quick.menuItems(r.c),
     { label: 'Open profile', onClick: () => navigate(`/clients/${r.c.id}`) },
     { label: 'Activity log', onClick: () => setActivityClient(r.c) },
     { label: 'Send reminder', onClick: () => void remind(r.c), hidden: !(r.out > 0 && r.c.email) },
@@ -193,7 +197,7 @@ export default function ClientsPage() {
         ) : (
           <div className="table-card">
             <table className="table crm-clients-table">
-              <thead><tr><th>Client</th><th>Stage</th><th>Health</th><th>Projects</th><th className="t-right">Revenue</th><th className="t-right">Outstanding</th><th>Terms</th><th>Portal</th><th><span className="sr-only">Actions</span></th></tr></thead>
+              <thead><tr><th>Client</th><th>Stage</th><th>Health</th><th>Projects</th><th className="t-right">Revenue</th><th className="t-right">Outstanding</th><th>Terms</th><th>Portal</th><th className="crm-td-actions"><span className="sr-only">Actions</span></th></tr></thead>
               <tbody>
                 {listRows.map(r => {
                   const cn = contractNote(r.c)
@@ -216,7 +220,7 @@ export default function ClientsPage() {
                       <td className={`t-num crm-td-out ${r.out > 0 ? 't-danger' : 'soft'}`}>{r.out > 0 ? usd(r.out, { cents: false }) : '—'}</td>
                       <td className="muted">{r.c.paymentTerms || '—'}</td>
                       <td>{portalCell(r)}</td>
-                      <td className="t-actions" onClick={e => e.stopPropagation()}><Menu items={rowMenu(r)} label={`Actions for ${r.c.name}`} buttonClass="btn btn--icon btn--ghost btn--sm" /></td>
+                      <td className="t-actions crm-td-actions" onClick={e => e.stopPropagation()}><span className="crm-td-actions__in">{quick.inline(r.c)}<Menu items={rowMenu(r)} label={`Actions for ${r.c.name}`} buttonClass="btn btn--icon btn--ghost btn--sm" /></span></td>
                     </tr>
                   )
                 })}
@@ -250,6 +254,7 @@ export default function ClientsPage() {
 
       <ClientFormDrawer open={!!form} client={form?.client ?? null} allTags={allTags} onTagCreated={handleTagCreated} onClose={() => setForm(null)} onSave={saveForm} />
       <ClientActivityModal client={activityClient} onClose={() => setActivityClient(null)} />
+      {quick.overlays}
       <Modal open={!!confirmDelete} onClose={() => setConfirmDelete(null)} title={`Remove ${confirmDelete?.name ?? 'client'}?`} sub="This cannot be undone."
         footer={<><button type="button" className="btn" onClick={() => setConfirmDelete(null)}>Cancel</button><button type="button" className="btn btn--danger" onClick={() => confirmDelete && void doDelete(confirmDelete)}>Remove</button></>} />
       <Modal open={naming !== null} onClose={() => setNaming(null)} title="Save this view" sub={`Saves the "${BASE_TABS.find(t => t.key === tab)?.label}" filter${search ? ` and the search "${search}"` : ''}. Only you see it.`}

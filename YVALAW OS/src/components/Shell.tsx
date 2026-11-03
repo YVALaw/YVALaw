@@ -24,6 +24,9 @@ type Overlay = null | { kind: 'hub'; hub: HubKey; left: number } | { kind: 'sear
 type Result = { type: 'Page' | 'Client' | 'Employee' | 'Project' | 'Invoice' | 'Candidate' | 'Lead'; label: string; sub: string; to: string }
 
 const TYPE_CLASS: Record<Result['type'], string> = { Page: 'page', Client: 'client', Employee: 'employee', Project: 'project', Invoice: 'invoice', Candidate: 'candidate', Lead: 'lead' }
+// Search shortcut shown in the dock's "Jump to…" pill: ⌘K on Mac/iPad, Ctrl K elsewhere (both keys work everywhere)
+const IS_MAC = typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test((navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform || navigator.platform || navigator.userAgent)
+const SEARCH_SHORTCUT = IS_MAC ? '⌘K' : 'Ctrl K'
 
 export default function Shell({ children }: { children: ReactNode }) {
   const location = useLocation()
@@ -74,12 +77,17 @@ export default function Shell({ children }: { children: ReactNode }) {
     return () => { alive = false; window.clearTimeout(t) }
   }, [pageKeys, location.pathname])
 
-  // "/" opens search when not typing; Esc closes overlays
+  // Ctrl+K / ⌘K opens (or closes) search from anywhere, also while typing in a field; "/" opens it when not
+  // typing; Esc closes overlays
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = (e.target as HTMLElement | null)?.tagName
       const typing = t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT' || (e.target as HTMLElement | null)?.isContentEditable
       if (e.key === 'Escape') setOverlay(null)
+      else if ((e.key === 'k' || e.key === 'K') && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey) {
+        e.preventDefault()
+        setOverlay(o => (o?.kind === 'search' ? null : { kind: 'search' }))
+      }
       else if (e.key === '/' && !typing && !e.metaKey && !e.ctrlKey) { e.preventDefault(); setOverlay({ kind: 'search' }) }
     }
     window.addEventListener('keydown', onKey)
@@ -249,7 +257,7 @@ export default function Shell({ children }: { children: ReactNode }) {
             </button>
           ))}
           <span className="dock__sep" />
-          <button type="button" className="dock__search" onClick={() => setOverlay({ kind: 'search' })}><Ic d={P.search} size={15} stroke={2} /><span className="dock__search-text">Jump to…</span><span className="mono">/</span></button>
+          <button type="button" className="dock__search" onClick={() => setOverlay({ kind: 'search' })} title={`Search (${SEARCH_SHORTCUT} or /)`} aria-keyshortcuts={IS_MAC ? 'Meta+K /' : 'Control+K /'}><Ic d={P.search} size={15} stroke={2} /><span className="dock__search-text">Jump to…</span><kbd className="mono dock__kbd">{SEARCH_SHORTCUT}</kbd></button>
           {createItems.length > 0 && <button type="button" className="dock__create" aria-label="Create" aria-expanded={overlay?.kind === 'create'} onClick={() => setOverlay(overlay?.kind === 'create' ? null : { kind: 'create' })}><Ic d={P.plus} size={18} stroke={2.4} /></button>}
         </nav>
       )}

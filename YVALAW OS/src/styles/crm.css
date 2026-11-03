@@ -97,9 +97,17 @@
 .crm-saved-tab__x:hover { color: var(--danger-text); }
 .crm-save-view.tab { color: var(--gold-text); font-size: 13px; }
 .crm-save-view.tab:hover { color: var(--gold-text-hover); }
-.crm-clients-table { min-width: 1010px; }
+.crm-clients-table { min-width: 1120px; }
 .crm-clients-table td { padding-top: 10px; padding-bottom: 10px; height: 60px; }
 .crm-clients-table td:last-child, .crm-clients-table th:last-child { width: 48px; padding-left: 4px; }
+.crm-clients-table td.crm-td-actions, .crm-clients-table th.crm-td-actions { width: 160px; }
+.crm-td-actions__in { display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
+/* Quick actions (Email · Call · New invoice) in the desktop list rows */
+.crm-quick { display: inline-flex; align-items: center; gap: 2px; }
+.crm-quick .btn--icon { color: var(--muted); }
+.crm-quick .btn--icon:hover:not(:disabled) { color: var(--text); }
+.crm-quick .btn--icon:disabled { opacity: .35; cursor: default; }
+.crm-compose__body { min-height: 180px; resize: vertical; }
 .crm-client-cell { display: flex; align-items: center; gap: 12px; min-width: 0; max-width: 340px; }
 .crm-client-cell__text { display: flex; flex-direction: column; min-width: 0; }
 .crm-client-cell__name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
