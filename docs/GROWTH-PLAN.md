@@ -26,6 +26,25 @@ security setup, the Supabase project and client names.
 
 > This file lives in `docs/`, which the fix also hides. Until the fix is live, don't merge this file into `main`.
 
+### 0b. Stop fake leads (Day 1–2)
+
+On 2026-11-04 a fake lead arrived ("Joseph", service "contract review", Source "Website"). No form offers that
+service, and real forms always send the page name. A bot posted straight to `/.netlify/functions/lead-intake`
+with a made-up `Origin` header, which the current check can't tell apart from the real site.
+
+- [ ] **You:** free Cloudflare account → **Turnstile** → add a widget for `yvastaffing.agency` (mode "Managed" /
+      invisible). Send Claude the **site key**; it's public, so it's OK in chat. Put the **secret key** only in
+      Netlify → Environment variables as `TURNSTILE_SECRET_KEY`. Never paste it in chat.
+- [ ] **Claude:** add Turnstile to every booking form (home + 7 landing pages), the checklist form and the careers
+      application form. `lead-intake` / `application-intake` must verify the token on the server and refuse
+      without it. Keep the honeypot and rate limits. If Turnstile itself is down, the EmailJS / Netlify Forms
+      backup still delivers, so no real lead is lost.
+- [ ] **Claude:** lead panel in YVA OS: show the page (Source), the ad details (UTM / gclid / fbclid) and a
+      **"Not from a website form"** warning when the source or service isn't one the forms send.
+      A "Mark as spam" action that deletes the lead and logs it.
+- [ ] **Claude:** test on the Netlify preview: a real submission works on every form, and a direct post without a
+      token is refused.
+
 ---
 
 ## 1. Quick setup (You, about 1 hour, this week)
@@ -155,7 +174,7 @@ To build (Claude):
 
 | When | You | Claude |
 |---|---|---|
-| **Wed Nov 4** | Approve the security fix (0). Bing + Search Console + key events (1). | Security fix (0), test on preview. |
+| **Wed Nov 4** | Approve the security fix (0). Turnstile account + keys (0b). Bing + Search Console + key events (1). | Security fix (0), test on preview. Fake-lead protection + lead panel (0b). |
 | **Thu–Fri Nov 5–6** | Send case study info (2). Analytics screenshot with Hostname. | Role pages + practice-area pages (3). WhatsApp button (5). |
 | **Week of Nov 9** | Google Business Profile, Clutch (6). Review the new pages. | Pricing guide, comparison pages, company facts / llms.txt, IndexNow (3). Case studies + logos bar (2). |
 | **Week of Nov 16** | Ask clients for reviews. LinkedIn page. Decide pilot-offer terms. | Permissions + signatures in YVA OS (8). First 2 blog posts (4). |
@@ -167,3 +186,4 @@ To build (Claude):
 
 ## Log
 - 2026-11-03: Plan written. Live check found internal files downloadable from the site (section 0).
+- 2026-11-04: Fake lead ("contract review", Source "Website") came in by direct post to lead-intake; added 0b (Turnstile + lead panel).
