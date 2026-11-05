@@ -1,5 +1,6 @@
 // Finance → Payroll: the Friday payroll (PLAN.md Step 6; redesign 2026-11 → designs/Payroll.dc.html).
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import type { Employee } from '../data/types'
 import { loadEmployees, loadSettings } from '../services/storage'
 import { usePermission } from '../context/RoleContext'
@@ -42,6 +43,14 @@ export default function PayrollPage() {
   const today = localParts(Date.now()).date
   const [runs, setRuns] = useState<PayrollRun[]>([])
   const [payday, setPayday] = useState(friday(today))
+  // ?payday=YYYY-MM-DD (the Wednesday reminder, links): open that payday — also when this page is already open
+  const [params, setParams] = useSearchParams()
+  useEffect(() => {
+    const d = params.get('payday')
+    if (!d) return
+    if (/^\d{4}-\d{2}-\d{2}$/.test(d) && Number.isFinite(Date.parse(`${d}T12:00:00Z`))) setPayday(friday(d))
+    setParams({}, { replace: true })
+  }, [params])   // eslint-disable-line react-hooks/exhaustive-deps
   const [lines, setLines] = useState<PayrollLine[]>([])
   const [adjs, setAdjs] = useState<PayrollAdjustment[]>([])
   const [pending, setPending] = useState<PayrollAdjustment[]>([])

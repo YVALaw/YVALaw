@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import type { Employee, Project } from '../data/types'
 import { loadEmployees, loadProjects } from '../services/storage'
 import { usePermission, useRole } from '../context/RoleContext'
@@ -66,6 +67,22 @@ export default function ApprovalsPage() {
 
   const offItems = [...(timeOff ?? []), ...recent]
   const manualItems = [...manual, ...manualDone]
+
+  // ?open=<request id> (the time-off notification): switch to its tab, scroll to it and mark it — also when this
+  // page is already open. A request that's gone (cancelled and cleared, or older than the recent list) says so.
+  const [params, setParams] = useSearchParams()
+  const [focusId, setFocusId] = useState<string | null>(null)
+  useEffect(() => {
+    const id = params.get('open')
+    if (!id || timeOff === null) return
+    const inOff = offItems.some(r => r.id === id), inManual = manualItems.some(r => r.id === id)
+    if (inOff || inManual) {
+      setTab(inOff ? 'off' : 'missing'); setFocusId(id)
+      window.setTimeout(() => document.getElementById(`req-${id}`)?.scrollIntoView?.({ block: 'center', behavior: 'smooth' }), 50)
+    } else toast.warning("That request isn't here any more — it may have been cancelled, or it was decided a while ago.")
+    setParams({}, { replace: true })
+  }, [params, timeOff])   // eslint-disable-line react-hooks/exhaustive-deps
+  const reqClass = (id: string) => `card ppl-req${focusId === id ? ' ppl-req--focus' : ''}`
   const actions = (d: Decide, can: boolean) => can ? (
     <div className="ppl-req__actions">
       <Menu label="More approval options" buttonClass="btn btn--icon btn--ghost" items={[{ label: 'Approve with a note…', icon: P.message, onClick: () => openDecide({ ...d, approve: true }) }]} />
@@ -87,7 +104,7 @@ export default function ApprovalsPage() {
         {timeOff === null ? [0, 1, 2].map(i => <div key={i} className="card ppl-req"><Skel w={40} h={40} r={20} /><div className="stack ppl-grow"><Skel w={220} h={14} /><Skel w={300} h={12} /></div></div>)
           : tab === 'off' ? (
             offItems.length === 0 ? <EmptyState>No time-off requests waiting.</EmptyState> : offItems.map(r => (
-              <div key={r.id} className="card ppl-req">
+              <div key={r.id} id={`req-${r.id}`} className={reqClass(r.id)}>
                 <PersonAvatar name={name(r.employee_id)} size="md" />
                 <div className="ppl-req__main">
                   <span className="ppl-req__who">{name(r.employee_id)} <span className="ppl-req__what">· Time off · {KIND[r.kind]}</span></span>
@@ -100,7 +117,7 @@ export default function ApprovalsPage() {
             ))
           ) : (
             manualItems.length === 0 ? <EmptyState>No missing-time requests waiting.</EmptyState> : manualItems.map(r => (
-              <div key={r.id} className="card ppl-req">
+              <div key={r.id} id={`req-${r.id}`} className={reqClass(r.id)}>
                 <PersonAvatar name={name(r.employeeId)} size="md" />
                 <div className="ppl-req__main">
                   <span className="ppl-req__who">{name(r.employeeId)} <span className="ppl-req__what">· Missing time</span></span>

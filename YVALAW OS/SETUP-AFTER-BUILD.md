@@ -33,7 +33,7 @@ If you ever re-run the YVA Time phase 2 script, run `migrate-step4-weekly-close.
 **Netlify → Forms:** if you have an email notification on the `lead-backup` form, add one for the new
 `application-backup` form too (careers applications when EmailJS is blocked). They also land in YVA OS → Candidates.
 
-## 2b. After the redesign (November) is live — 13 more small scripts
+## 2b. After the redesign (November) is live — 14 more small scripts
 
 Same way as step 1, in this order (each is safe to run again):
 1. `supabase/migrate-redesign-portal.sql` — "Request more staff" saves how many people and which project
@@ -66,6 +66,12 @@ Same way as step 1, in this order (each is safe to run again):
    payments made before this script.
 13. `supabase/migrate-invoice-multiproject.sql` — one invoice can cover several projects of the same client (the list of
    projects is saved with the invoice; before it runs such invoices still work, each line keeps its project).
+
+14. `supabase/migrate-notification-links.sql` — the bell, phone and email notifications for **new leads**, **Stripe
+    payments/refunds/disputes** and **time-off requests** open that exact lead / invoice / request (the others —
+    new applicants, follow-ups, weekly close, payroll — already do, no script needed). It also lets the candidate page
+    list the emails sent to that candidate from YVA OS. Replaces three small functions; no tables change; safe to run
+    twice. The last lines it prints should all say `true`.
 
 **Crisp chat (client portal → Messages):** make a free account at crisp.chat → Settings → Website settings →
 copy the **Website ID** → YVA OS → Settings → **Integrations** → Crisp → paste → Save. Clients then chat with

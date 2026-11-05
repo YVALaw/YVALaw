@@ -51,7 +51,7 @@ exports.handler = async function handler(event) {
       await rest('candidates', { method: 'POST', body: { ...base, notes: [base.notes, linkedin && `LinkedIn: ${linkedin}`].filter(Boolean).join('\n') || null } })
     }
     const team = await rest('user_roles?role=in.(ceo,admin,recruiter)&select=user_id')
-    await notify(team.map(t => t.user_id), { kind: 'application_new', title: `New application: ${name}${role ? ` — ${role}` : ''}`, body: [clip(b.country, 80), clip(b.languages, 200)].filter(Boolean).join(' · ') || null, link: '/candidates' })
+    await notify(team.map(t => t.user_id), { kind: 'application_new', title: `New application: ${name}${role ? ` — ${role}` : ''}`, body: [clip(b.country, 80), clip(b.languages, 200)].filter(Boolean).join(' · ') || null, link: `/candidates/${encodeURIComponent(base.id)}` })
     try { await dispatchPending({ limit: 20 }) } catch { /* the 5-minute job catches it */ }
     return reply(200, { ok: true }, origin)
   } catch (e) {

@@ -1,7 +1,7 @@
 // Finance → Weekly close (PLAN.md Step 4; redesign 2026-11 → designs/Weekly Close.dc.html).
 // Review the week, fix time, approve, send. The week-close function prepares/approves; rows are read here (RLS weekly_close.manage).
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import type { AppSettings, Employee, Invoice, Project } from '../data/types'
 import { loadEmployees, loadProjects, loadSettings } from '../services/storage'
 import { usePermission } from '../context/RoleContext'
@@ -15,7 +15,7 @@ import {
   addAdjustment, callWeekClose, cancelAdjustment, lastFinishedWeek, loadAdjustments, loadWeekBlocks, loadWeekCloses, loadWeekInvoices,
   markInvoiceSent, moveToNextWeek, type Adjustment, type WeekBlock, type WeekClose, type WeekFlag,
 } from '../services/weeklyClose'
-import { addDays, DEFAULT_TZ, localParts } from '../utils/moneyRules'
+import { addDays, DEFAULT_TZ, localParts, mondayOf } from '../utils/moneyRules'
 import { hmClock, hmText as hm } from '../utils/format'
 import { useToast } from '../context/ToastContext'
 
@@ -41,6 +41,17 @@ export default function WeeklyClosePage() {
   const navigate = useNavigate()
   const [closes, setCloses] = useState<WeekClose[]>([])
   const [weekStart, setWeekStart] = useState(lastFinishedWeek())
+  // ?week=YYYY-MM-DD (the Monday notification, links): open that week — also when this page is already open
+  const [params, setParams] = useSearchParams()
+  useEffect(() => {
+    const w = params.get('week')
+    if (!w) return
+    if (/^\d{4}-\d{2}-\d{2}$/.test(w) && Number.isFinite(Date.parse(`${w}T12:00:00Z`))) {
+      const monday = mondayOf(w)
+      setWeekStart(monday > addDays(lastFinishedWeek(), 7) ? addDays(lastFinishedWeek(), 7) : monday)
+    }
+    setParams({}, { replace: true })
+  }, [params])   // eslint-disable-line react-hooks/exhaustive-deps
   const [loadError, setLoadError] = useState<string | null>(null)   // could not load: stays as a banner
   const [busy, setBusy] = useState<string | null>(null)
   const toast = useToast()

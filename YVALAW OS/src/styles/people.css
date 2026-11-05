@@ -161,6 +161,7 @@ th.ppl-day span { display: block; color: var(--soft); font-weight: 400; }
 /* ── Approvals ───────────────────────────────────────────────── */
 .ppl-reqs { display: flex; flex-direction: column; gap: 10px; max-width: 900px; }
 .ppl-req { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 16px 18px; }
+.ppl-req--focus { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.28); }
 .ppl-req .ppl-av { background: #eef0f3 !important; color: var(--text); width: 40px; height: 40px; font-size: 13px; }
 .ppl-req__main { flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 2px; }
 .ppl-req__who { font-size: 15px; font-weight: 600; }
@@ -258,3 +259,12 @@ th.ppl-day span { display: block; color: var(--soft); font-weight: 400; }
 .ppl-assign-row { display: flex; align-items: center; gap: 4px; }
 .ppl-assign-row .ppl-rowbtn { flex: 1; min-width: 0; }
 .ppl-assign-add { padding: 10px 14px 14px; display: flex; flex-direction: column; gap: 6px; }
+
+/* Emails sent to a candidate from YVA OS (CandidateEmail.tsx) */
+.ppl-cand-emails { display: flex; flex-direction: column; gap: 6px; }
+.ppl-cand-emails__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ppl-cand-emails__item { display: flex; align-items: flex-start; gap: 8px; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text-2); }
+.ppl-cand-emails__item svg { flex-shrink: 0; margin-top: 2px; }
+.ppl-cand-emails__text { display: flex; flex-direction: column; min-width: 0; }
+.ppl-cand-emails__subject { color: var(--text); font-weight: 500; overflow-wrap: anywhere; }
+.ppl-cand-emails__meta { font-size: 12.5px; color: var(--text-3, var(--text-2)); overflow-wrap: anywhere; }
