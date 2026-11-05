@@ -17,14 +17,14 @@ internal files from the live site. Checked 2026-11-03, all returned 200:
 No passwords or keys are in them (`.env` files are not deployed, keys live in Netlify), but they describe the
 security setup, the Supabase project and client names.
 
-- [ ] **Claude:** make those paths return "not found". Use a forced 404 rule in `_redirects` for `/YVALAW OS/*`,
+- [x] **Claude:** make those paths return "not found" (2026-11-05, forced 404 rules at the end of `netlify.toml`). Covers `/YVALAW OS/*`,
       `/YVA Time/*`, `/docs/*`, `/CLAUDE.md` and the build files (`build.js`, `build-images.js`, `dev-server.js`,
       `package*.json`, `serve.json`, `tailwind.config.js`).
       **Keep public:** `/content/prices.json`, `/posts/*`, `/jobs/*` and `/admin/*` (the website and the content editor use them).
       Check on the Netlify preview that the website, blog, careers, `/admin`, `/os` and the server functions all still work.
-- [ ] **You:** approve publishing the fix.
+- [x] **You:** approve publishing the fix.
 
-> This file lives in `docs/`, which the fix also hides. Until the fix is live, don't merge this file into `main`.
+> This file lives in `docs/`, which the fix also hides. It was briefly public on 2026-11-05 between two publishes (tracking fix first, then this fix).
 
 ### 0b. Stop fake leads (Day 1–2)
 
@@ -186,4 +186,5 @@ To build (Claude):
 
 ## Log
 - 2026-11-03: Plan written. Live check found internal files downloadable from the site (section 0).
+- 2026-11-05: Time Tracking "nobody tracking" fixed (server clock, YVALaw/YVALaw#19); internal files hidden from the live site (section 0).
 - 2026-11-04: Fake lead ("contract review", Source "Website") came in by direct post to lead-intake; added 0b (Turnstile + lead panel).

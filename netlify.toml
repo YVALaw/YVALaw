@@ -63,3 +63,73 @@
   to = "/.netlify/functions/pay-link"
   status = 200
   force = true
+
+# The site is published from the whole project folder (publish = "."), so these internal files were downloadable
+# from the live site: notes (CLAUDE.md, docs/), the YVA OS and YVA Time source, database scripts and build files.
+# They now answer "not found". The website, /admin, /os (the built app in os/), /content/prices.json, /posts and
+# /jobs stay public. Each folder rule is listed twice: with the space and with %20, so both spellings are covered.
+[[redirects]]
+  from = "/YVALAW OS/*"
+  to = "/os/404.txt"
+  status = 404
+  force = true
+[[redirects]]
+  from = "/YVALAW%20OS/*"
+  to = "/os/404.txt"
+  status = 404
+  force = true
+[[redirects]]
+  from = "/YVA Time/*"
+  to = "/os/404.txt"
+  status = 404
+  force = true
+[[redirects]]
+  from = "/YVA%20Time/*"
+  to = "/os/404.txt"
+  status = 404
+  force = true
+[[redirects]]
+  from = "/docs/*"
+  to = "/os/404.txt"
+  status = 404
+  force = true
+[[redirects]]
+  from = "/CLAUDE.md"
+  to = "/os/404.txt"
+  status = 404
+  force = true
+[[redirects]]
+  from = "/build.js"
+  to = "/os/404.txt"
+  status = 404
+  force = true
+[[redirects]]
+  from = "/build-images.js"
+  to = "/os/404.txt"
+  status = 404
+  force = true
+[[redirects]]
+  from = "/dev-server.js"
+  to = "/os/404.txt"
+  status = 404
+  force = true
+[[redirects]]
+  from = "/package.json"
+  to = "/os/404.txt"
+  status = 404
+  force = true
+[[redirects]]
+  from = "/package-lock.json"
+  to = "/os/404.txt"
+  status = 404
+  force = true
+[[redirects]]
+  from = "/serve.json"
+  to = "/os/404.txt"
+  status = 404
+  force = true
+[[redirects]]
+  from = "/tailwind.config.js"
+  to = "/os/404.txt"
+  status = 404
+  force = true
