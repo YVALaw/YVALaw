@@ -139,6 +139,8 @@
 .ops-live-row td { height: 58px; padding-top: 8px; padding-bottom: 8px; }
 .ops-live-person { display: flex; align-items: center; gap: 12px; }
 .ops-live-person .pill { margin-left: 4px; font-size: 11px; padding: 1px 6px; }
+.ops-live-name { color: inherit; text-decoration: none; }
+.ops-live-name:hover, .ops-live-name:focus-visible { text-decoration: underline; color: var(--primary, inherit); }
 .ops-dot-idle { width: 9px; height: 9px; background: var(--border-strong); margin: 0 1px; }
 .ops-live-today { font-size: 13px; font-weight: 600; }
 .ops-dot-wait { color: var(--warning-dot); }

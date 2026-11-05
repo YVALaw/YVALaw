@@ -6,16 +6,19 @@ import type { Employee, Project } from '../../data/types'
 import { loadEmployees, loadProjects } from '../../services/storage'
 import { blocksActivity, loadConnectedDevices, loadTrackerBlocks, type TrackerBlock } from '../../services/trackerStorage'
 import { Activity, Chips, EmptyState, Pill, Skel, useIsMobile } from '../../components/ui'
-import { ago, hmClock } from '../../utils/format'
+import { hmClock } from '../../utils/format'
+import { LIVE_MS, serverNow, syncServerClock } from '../../lib/serverClock'
 
 const DAY_MS = 86_400_000
-const LIVE_WINDOW_MS = 3 * 60_000     // the app uploads about once a minute while tracking
+const LIVE_WINDOW_MS = LIVE_MS       // the app uploads (and checks in) about once a minute
 const CONNECTED_WINDOW_MS = DAY_MS   // a computer counts as connected when it checked in within 24 h
 
 function startOfToday(): number { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime() }
 function dayInput(ms: number): string {
   const d = new Date(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
+/** "just now" / "2m ago" measured against the server clock */
+function sinceLabel(ms: number): string { const m = Math.floor(Math.max(0, ms) / 60_000); return m < 1 ? 'just now' : `${m}m ago` }
 function clock(ms: number): string { return new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) }
 
 type Row = { employee: Employee; seconds: number; activity: number | null; latest: TrackerBlock | null; tracking: boolean }
@@ -40,9 +43,11 @@ export default function LiveBoard() {
   useEffect(() => {
     let alive = true
     const load = async () => {
+      // Compared with the database's clock, not this computer's (a PC a few minutes fast showed nobody tracking)
+      await syncServerClock()
       const from = startOfToday()
-      const [rows, devs] = await Promise.all([loadTrackerBlocks(from, from + DAY_MS), loadConnectedDevices(Date.now() - CONNECTED_WINDOW_MS)])
-      if (alive) { setBlocks(rows); setDevices(devs); setLoadedAt(Date.now()) }
+      const [rows, devs] = await Promise.all([loadTrackerBlocks(from, from + DAY_MS), loadConnectedDevices(serverNow() - CONNECTED_WINDOW_MS)])
+      if (alive) { setBlocks(rows); setDevices(devs); setLoadedAt(serverNow()) }
     }
     void load()
     // live board: every minute while on screen, and at once when the window comes back
@@ -74,7 +79,8 @@ export default function LiveBoard() {
   const totalToday  = rows.reduce((s, r) => s + r.seconds, 0)
   const onlineNow   = devices ? devices.filter(d => loadedAt - d.lastSeenAt < LIVE_WINDOW_MS).length : 0
 
-  const state = (r: Row) => (r.tracking ? `Tracking · ${ago(r.latest!.updatedAt)}` : r.latest ? `Last active ${clock(r.latest.updatedAt)}` : 'Not today')
+  const state = (r: Row) => (r.tracking ? `Tracking · ${sinceLabel(loadedAt - r.latest!.updatedAt)}` : r.latest ? `Last active ${clock(r.latest.updatedAt)}` : 'Not today')
+  const person = (e: Employee, cls: string) => <Link to={`/employees/${e.id}`} className={`${cls} ops-live-name`}>{e.name}</Link>
   const working = (r: Row) => (r.latest ? (r.latest.projectId ? projectName(r.latest.projectId) : r.latest.workType ?? '—') : '—')
   const shotsLink = (r: Row) => showShots && r.employee.worksFor !== 'yva' && r.seconds > 0
     ? <Link to={`/time?tab=screens&employee=${r.employee.id}&day=${dayInput(Date.now())}`} className="btn btn--xs" aria-label="View screenshots">Screenshots</Link>
@@ -102,7 +108,7 @@ export default function LiveBoard() {
               <div className="mcard__top">
                 <div className="ops-live-person">
                   <span className={r.tracking ? 'dot dot--live' : 'dot ops-dot-idle'} aria-hidden />
-                  <div><div className="mcard__title">{r.employee.name}</div><div className="mcard__meta">{state(r)}</div></div>
+                  <div><div className="mcard__title">{person(r.employee, '')}</div><div className="mcard__meta">{state(r)}</div></div>
                 </div>
                 <span className="mono ops-live-today">{hmClock(r.seconds)}</span>
               </div>
@@ -129,7 +135,7 @@ export default function LiveBoard() {
                     <div className="ops-live-person">
                       <span className={r.tracking ? 'dot dot--live' : 'dot ops-dot-idle'} aria-label={r.tracking ? 'Tracking now' : 'Not tracking'} />
                       <div>
-                        <div className="t-strong">{r.employee.name} {team(r.employee)}</div>
+                        <div className="t-strong">{person(r.employee, '')} {team(r.employee)}</div>
                         <span className="t-sub">{state(r)}</span>
                       </div>
                     </div>

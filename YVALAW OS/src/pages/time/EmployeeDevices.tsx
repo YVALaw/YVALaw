@@ -3,10 +3,11 @@ import { useRole } from '../../context/RoleContext'
 import { can } from '../../lib/roles'
 import { disconnectDevice, loadDevices, type DesktopDevice } from '../../services/trackerStorage'
 import { Dot } from '../../components/ui'
+import { LIVE_MS, serverNow, syncServerClock } from '../../lib/serverClock'
 import { Ic, P } from '../../components/Icon'
 import { useToast } from '../../context/ToastContext'
 
-const ONLINE_MS = 5 * 60_000      // the app checks in about once a minute while signed in
+const ONLINE_MS = LIVE_MS         // the app checks in about once a minute while signed in — same window as Time Tracking
 
 function date(ms: number): string {
   return new Date(ms).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
@@ -19,7 +20,7 @@ export default function EmployeeDevices({ employeeId, firstName }: { employeeId:
   const [busy, setBusy] = useState<string | null>(null)
   const toast = useToast()
 
-  useEffect(() => { void loadDevices(employeeId).then(setDevices) }, [employeeId])
+  useEffect(() => { void syncServerClock().then(() => loadDevices(employeeId)).then(setDevices) }, [employeeId])
 
   async function disconnect(d: DesktopDevice) {
     if (!window.confirm(`Disconnect "${d.name}" from ${firstName}'s YVA Time?\n\nThe app on that computer signs out within a minute and can't save time any more. ${firstName} can sign in again with their YVA OS password (for example on a new computer).`)) return
@@ -34,7 +35,7 @@ export default function EmployeeDevices({ employeeId, firstName }: { employeeId:
   }
 
   if (!devices) return null
-  const now = Date.now()
+  const now = serverNow()
   return (
     <div className="ops-devices">
       <div className="section-label">Computers</div>
