@@ -168,6 +168,9 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 
 ---
 
+## Active plan
+**`docs/GROWTH-PLAN.md`** — the agreed to-do list from 2026-11-04 (security fix for files the site publishes, AI-search/SEO pages, case studies, leads, YVA OS permissions + signatures). Continue with the next unchecked item.
+
 ## Things Completed
 
 ### Session 15 (YVA OS: Stripe live, Outlook, remaining features — 2026-11-03)

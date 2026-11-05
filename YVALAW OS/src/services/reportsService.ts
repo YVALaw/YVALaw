@@ -1,4 +1,5 @@
 import { cachedRead } from '../lib/readCache'
+import { LIVE_MS, serverNowSynced } from '../lib/serverClock'
 import type { DataSnapshot, Invoice, InvoiceItem } from '../data/types'
 import { payrollFromInvoiceItem } from '../utils/payroll'
 import { hourLines } from '../utils/invoiceLines'
@@ -553,7 +554,7 @@ async function loadHomeSignalsNow(w: HomeSignalWants): Promise<HomeSignals> {
 /** Who is tracking right now: YVA Time uploads about once a minute, same 3-minute window as Time → Live */
 export async function loadTrackingNow(): Promise<string[] | null> {
   return quiet(async () => {
-    const since = new Date(Date.now() - 3 * 60_000).toISOString()
+    const since = new Date((await serverNowSynced()) - LIVE_MS).toISOString()
     const { data, error } = await supabase.from('tracker_blocks').select('employee_id').gte('updated_at', since).limit(500)
     if (error) throw error
     return [...new Set((data || []).map(r => (r as { employee_id: string }).employee_id))]

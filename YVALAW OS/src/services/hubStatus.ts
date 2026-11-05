@@ -2,6 +2,7 @@
 // gold dot on hubs where something needs action. Cheap queries only, each one allowed to fail
 // (RLS hides tables from roles that can't see them), cached for a minute.
 import { supabase } from '../lib/supabase'
+import { LIVE_MS, serverNowSynced } from '../lib/serverClock'
 import { countPendingStaffRequests } from './storage'
 import { addDays, localParts, mondayOf, DEFAULT_TZ } from '../utils/moneyRules'
 import { dateShort, usdShort } from '../utils/format'
@@ -100,7 +101,7 @@ async function computeHubStatus(keys: string[], k: string): Promise<HubStatus> {
       out.projects = { stat: `${active} active` }
     })(),
     has('time') && safe(async () => {
-      const since = new Date(Date.now() - 3 * 60_000).toISOString()
+      const since = new Date((await serverNowSynced()) - LIVE_MS).toISOString()
       const { data, error } = await supabase.from('tracker_blocks').select('employee_id').gte('updated_at', since).limit(500)
       if (error) throw error
       const n = new Set((data || []).map(r => (r as { employee_id: string }).employee_id)).size

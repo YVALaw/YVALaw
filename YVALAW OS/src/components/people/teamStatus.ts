@@ -2,6 +2,7 @@
 // Reads the same staff-readable tables the Live tab and the profile's Computers list use.
 import { supabase } from '../../lib/supabase'
 import type { Employee } from '../../data/types'
+import { LIVE_MS, serverNowSynced } from '../../lib/serverClock'
 
 export type TimeStatus = 'tracking' | 'connected' | 'signed_out' | 'invited' | 'none'
 export const TIME_STATUS: Record<TimeStatus, { label: string; tone: 'success' | 'muted' | 'warning' | 'off'; live?: boolean }> = {
@@ -12,10 +13,10 @@ export const TIME_STATUS: Record<TimeStatus, { label: string; tone: 'success' | 
   none:       { label: 'No login', tone: 'off' },
 }
 
-const LIVE_MS = 3 * 60_000   // same rule as Time Tracking → Live: a block updated in the last 3 minutes
+// Same rule as Time Tracking → Live: a block updated in the last 3 minutes by the server's clock (lib/serverClock.ts)
 
 export async function loadTimeActivity(): Promise<{ tracking: Set<string>; devices: Map<string, { active: number; total: number }> }> {
-  const since = new Date(Date.now() - LIVE_MS).toISOString()
+  const since = new Date((await serverNowSynced()) - LIVE_MS).toISOString()
   const [blocks, devs] = await Promise.all([
     supabase.from('tracker_blocks').select('employee_id,updated_at').gte('updated_at', since).limit(1000),
     supabase.from('desktop_devices').select('employee_id,signed_out_at,revoked_at').limit(2000),
