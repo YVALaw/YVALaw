@@ -92,13 +92,13 @@ BEGIN
     how := CASE NEW.method WHEN 'ach' THEN 'by bank (ACH)' ELSE 'by card' END;
     IF NEW.kind = 'payment' THEN
       PERFORM private.notify_permission('payments.record', 'payment_received',
-        'Payment received: $' || to_char(NEW.amount, 'FM999,999,990.00'), 'Paid ' || how || ' through Stripe.', '/invoice');
+        'Payment received: $' || to_char(NEW.amount, 'FM999,999,990.00'), 'Paid ' || how || ' through Stripe.', '/invoice?open=' || NEW.invoice_id::text);
     ELSIF NEW.kind = 'refund' THEN
       PERFORM private.notify_permission('payments.record', 'payment_refunded',
-        'Refund: $' || to_char(-NEW.amount, 'FM999,999,990.00'), 'A Stripe payment was refunded; the invoice balance was updated.', '/invoice');
+        'Refund: $' || to_char(-NEW.amount, 'FM999,999,990.00'), 'A Stripe payment was refunded; the invoice balance was updated.', '/invoice?open=' || NEW.invoice_id::text);
     ELSE
       PERFORM private.notify_permission('payments.record', 'payment_disputed',
-        'Dispute: $' || to_char(-NEW.amount, 'FM999,999,990.00') || ' taken back', 'The client''s bank took the money back while a dispute is open. Answer it in Stripe.', '/invoice');
+        'Dispute: $' || to_char(-NEW.amount, 'FM999,999,990.00') || ' taken back', 'The client''s bank took the money back while a dispute is open. Answer it in Stripe.', '/invoice?open=' || NEW.invoice_id::text);
     END IF;
   END IF;
   RETURN NULL;

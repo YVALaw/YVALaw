@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase'
 
 export type ActionKind =
   | 'invoice_emailed' | 'invoice_reminder' | 'invoice_pdf' | 'statement_emailed' | 'payslip_pdf'
-  | 'client_emailed' | 'signed_in' | 'export' | 'import' | 'team_exported' | 'other'
+  | 'client_emailed' | 'candidate_emailed' | 'signed_in' | 'export' | 'import' | 'team_exported' | 'other'
 
 /** Record an action. `table`/`recordId` point at the record it was about (shown on that record's history too). */
 export async function logAction(kind: ActionKind, label: string, opts: { table?: string; recordId?: string | null; details?: Record<string, unknown> } = {}): Promise<void> {

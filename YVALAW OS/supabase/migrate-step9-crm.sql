@@ -88,12 +88,12 @@ BEGIN
   IF TG_OP = 'INSERT' THEN
     PERFORM private.notify_permission('leads.manage', 'lead_new',
       'New lead: ' || NEW.name || coalesce(' (' || nullif(NEW.company, '') || ')', ''),
-      concat_ws(' · ', nullif(NEW.service, ''), nullif(NEW.source, ''), nullif(NEW.email, ''), nullif(NEW.phone, '')), '/leads');
+      concat_ws(' · ', nullif(NEW.service, ''), nullif(NEW.source, ''), nullif(NEW.email, ''), nullif(NEW.phone, '')), '/leads?open=' || NEW.id::text);
     IF NEW.owner_id IS NOT NULL AND NEW.owner_id IS DISTINCT FROM auth.uid() THEN
-      PERFORM private.notify_user(NEW.owner_id, 'lead_new', 'A lead was assigned to you: ' || NEW.name, NEW.service, '/leads');
+      PERFORM private.notify_user(NEW.owner_id, 'lead_new', 'A lead was assigned to you: ' || NEW.name, NEW.service, '/leads?open=' || NEW.id::text);
     END IF;
   ELSIF NEW.owner_id IS DISTINCT FROM OLD.owner_id AND NEW.owner_id IS NOT NULL AND NEW.owner_id IS DISTINCT FROM auth.uid() THEN
-    PERFORM private.notify_user(NEW.owner_id, 'lead_new', 'A lead was assigned to you: ' || NEW.name, NEW.service, '/leads');
+    PERFORM private.notify_user(NEW.owner_id, 'lead_new', 'A lead was assigned to you: ' || NEW.name, NEW.service, '/leads?open=' || NEW.id::text);
   END IF;
   RETURN NULL;
 END

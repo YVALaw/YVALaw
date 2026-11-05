@@ -11,13 +11,14 @@ const money = n => `$${Number(n || 0).toLocaleString('en-US', { minimumFractionD
 
 exports.handler = async function handler() {
   try {
-    const r = await prepareWeek(lastWeekStart())
+    const week = lastWeekStart()
+    const r = await prepareWeek(week)
     const s = r.summary
     await notifyPermission('weekly_close.manage', {
       kind: 'week_ready',
       title: `Weekly close: ${s.invoices} invoice${s.invoices === 1 ? '' : 's'} ready (${money(s.total)})${s.flags ? ` · ${s.flags} thing${s.flags === 1 ? '' : 's'} to check` : ''}`,
       body: `${s.label}. Payroll for these hours: ${money(s.payrollTotal)}. Review, approve and send in YVA OS → Weekly close.`,
-      link: '/weekly-close',
+      link: `/weekly-close?week=${week}`,   // opens that week, not today's
     })
     await dispatchPending()
     return { statusCode: 200, body: JSON.stringify(s) }

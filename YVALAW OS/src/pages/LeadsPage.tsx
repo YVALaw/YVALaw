@@ -80,19 +80,30 @@ export default function LeadsPage() {
     setImporting(false)
   }
   useEffect(() => {
-    void load().then(rows => {
-      // Deep links from the Create menu (?create=1) and search (?open=<id>)
-      const create = params.get('create'), openId = params.get('open')
-      if (create) { setConvert(null); setOpen(empty()) }
-      else if (openId) { const l = rows.find(x => x.id === openId); if (l) setOpen(l) }
-      if (create || openId) setParams({}, { replace: true })
-    })
+    void load()
     void loadStaff().then(setStaff)
   }, [])   // eslint-disable-line react-hooks/exhaustive-deps
+  // Deep links — the Create menu (?create=1), search and notifications (?open=<id>), the follow-up reminder
+  // (?due=today). Read whenever the address changes, so a notification opens its lead even while Leads is open.
+  const [dueOnly, setDueOnly] = useState(false)
+  useEffect(() => {
+    if (!loaded) return
+    const create = params.get('create'), openId = params.get('open'), due = params.get('due')
+    if (!create && !openId && !due) return
+    if (create) { setConvert(null); setOpen(empty()) }
+    else if (openId) {
+      const l = leads.find(x => x.id === openId)
+      if (l) { setConvert(null); setOpen(l) }
+      else toast.warning("That lead wasn't found — it may have been deleted, or it's assigned to someone else and you can't see it.")
+    }
+    if (due) { setDueOnly(true); setMine(false) }
+    setParams({}, { replace: true })
+  }, [loaded, params])   // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (open?.id) void loadActivities(open.id).then(setActs); else setActs([]) }, [open?.id])
 
   const shown = useMemo(() => leads.filter(l => (!mine || l.owner_id === userId) &&
-    (!search || [l.name, l.company, l.email, l.phone, l.service, l.source].some(v => (v || '').toLowerCase().includes(search.toLowerCase())))), [leads, mine, search, userId])
+    (!dueOnly || (!!l.next_follow_up && l.next_follow_up <= today && !closed(l.stage))) &&
+    (!search || [l.name, l.company, l.email, l.phone, l.service, l.source].some(v => (v || '').toLowerCase().includes(search.toLowerCase())))), [leads, mine, search, userId, dueOnly, today])
   const ownerEmail = (id: string | null) => staff.find(s => s.user_id === id)?.email
   const ownerLabel = (id: string | null) => ownerEmail(id)?.split('@')[0] ?? (id ? 'Someone' : 'Unassigned')
   const openList = shown.filter(l => !closed(l.stage))
@@ -184,6 +195,7 @@ export default function LeadsPage() {
         sub={`${openList.length} open · ${usdShort(openValue)}/mo in pipeline · website leads arrive here automatically`}
         actions={<>
           <SearchInput value={search} onChange={setSearch} placeholder="Search leads" width={mobile ? '100%' : 220} />
+          {dueOnly && <button type="button" className="chip chip--on" aria-label="Show all leads (stop showing only follow-ups due)" onClick={() => setDueOnly(false)}>Follow-ups due <Ic d={P.x} size={12} /></button>}
           {canAll && <Segmented label="Whose leads" value={mine ? 'mine' : 'all'} onChange={v => setMine(v === 'mine')} options={[{ value: 'all', label: 'All' }, { value: 'mine', label: 'Mine' }]} />}
           {canManage && <>
             <input ref={importInput} type="file" accept=".csv,text/csv" hidden onChange={e => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void importCsv(f) }} />

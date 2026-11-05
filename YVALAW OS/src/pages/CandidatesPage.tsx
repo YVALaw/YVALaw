@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { uploadFile } from '../services/fileStorage'
 import type { Attachment, Candidate, CandidateStage, Employee } from '../data/types'
 import { loadCandidates, saveCandidates } from '../services/storage'
@@ -13,6 +13,7 @@ import { HireModal, OnboardingModal, convertCandidateToEmployee, type HireDetail
 import { PersonAvatar } from '../components/people/common'
 import { ago } from '../utils/format'
 import { useToast } from '../context/ToastContext'
+import { CandidateEmailModal, CandidateEmails } from '../components/people/CandidateEmail'
 
 type Cand = Candidate & { staffRequestId?: string | null }
 
@@ -67,6 +68,18 @@ export default function CandidatesPage() {
   const list = candidates ?? []
   const cur = list.find(c => c.id === openId) ?? null
   useEffect(() => { setNotesDraft(cur?.notes ?? '') }, [cur?.id])   // eslint-disable-line react-hooks/exhaustive-deps
+  // Email from YVA OS (company mailbox) instead of the computer's mail app
+  const [emailFor, setEmailFor] = useState<Cand | null>(null)
+  const [emailsKey, setEmailsKey] = useState(0)
+  // ?open=<id> (search, links): open that candidate's panel — also when this page is already open
+  const [params, setParams] = useSearchParams()
+  useEffect(() => {
+    const id = params.get('open')
+    if (!id || candidates === null) return
+    if (candidates.some(c => c.id === id)) setOpenId(id)
+    else toast.warning("That candidate wasn't found — they may have been removed or hired (hired candidates move to Team).")
+    setParams({}, { replace: true })
+  }, [params, candidates])   // eslint-disable-line react-hooks/exhaustive-deps
 
   async function persist(next: Cand[], ok?: string) {
     const before = candidates
@@ -172,7 +185,7 @@ export default function CandidatesPage() {
     ...(isHttps(cur.resumeUrl) ? [{ key: 'resume', label: 'Resume', icon: P.link, href: cur.resumeUrl }] : []),
     ...(isHttps(cur.linkedinUrl) ? [{ key: 'li', label: 'LinkedIn', icon: P.link, href: cur.linkedinUrl }] : []),
     ...(digits(cur.phone) ? [{ key: 'wa', label: 'WhatsApp', icon: P.whatsapp, href: `https://wa.me/${digits(cur.phone)}` }, { key: 'tel', label: 'Call', icon: P.call, href: `tel:${cur.phone}` }] : []),
-    ...(cur.email ? [{ key: 'mail', label: 'Email', icon: P.mail, href: `mailto:${cur.email}` }] : []),
+    ...(cur.email ? [{ key: 'mail', label: 'Email', icon: P.mail, onClick: () => setEmailFor(cur) }] : []),
   ] as { key: string; label: string; icon: string; href?: string; onClick?: () => void }[] : []
 
   return (
@@ -234,9 +247,10 @@ export default function CandidatesPage() {
             <div className="ppl-linkrow">
               {contactLinks.map(l => l.href
                 ? <a key={l.key} className="btn btn--sm" href={l.href} target={l.href.startsWith('http') ? '_blank' : undefined} rel="noopener noreferrer"><Ic d={l.icon} size={14} />{l.label}</a>
-                : <button key={l.key} type="button" className="btn btn--sm ppl-linkrow__file" onClick={l.onClick}><Ic d={l.icon} size={14} /><span>{l.label}</span></button>)}
+                : <button key={l.key} type="button" className={`btn btn--sm${l.key === 'mail' ? '' : ' ppl-linkrow__file'}`} onClick={l.onClick}><Ic d={l.icon} size={14} /><span>{l.label}</span></button>)}
             </div>
           )}
+          <CandidateEmails candidateId={cur.id} refreshKey={emailsKey} />
           <Field label="Notes">
             <textarea className="textarea" rows={5} value={notesDraft} onChange={e => setNotesDraft(e.target.value)} placeholder="Interview notes, impressions…" />
           </Field>
@@ -249,6 +263,8 @@ export default function CandidatesPage() {
           <button type="button" className="link only-phone" onClick={() => navigate('/candidates/' + cur.id)}>Open full profile →</button>
         </>}
       </Drawer>
+
+      <CandidateEmailModal candidate={emailFor} onClose={() => setEmailFor(null)} onSent={() => setEmailsKey(k => k + 1)} />
 
       {/* Add candidate */}
       <Drawer open={adding} onClose={() => setAdding(false)} title="Add candidate" sub="Careers-page applications are added automatically."

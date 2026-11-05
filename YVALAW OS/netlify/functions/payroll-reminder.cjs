@@ -20,7 +20,7 @@ exports.handler = async function handler() {
       kind: 'payroll_due',
       title: `Payroll due ${label}: ${r.totals.people} ${r.totals.people === 1 ? 'person' : 'people'} · $${r.totals.netUsd.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
       body: `${r.flags.length ? `${r.flags.length} thing${r.flags.length === 1 ? '' : 's'} to check. ` : ''}Enter the exchange rate and mark people paid in YVA OS → Payroll.`,
-      link: '/payroll',
+      link: `/payroll?payday=${payday}`,   // opens this payday
     })
     await dispatchPending()
     return { statusCode: 200, body: JSON.stringify(r.totals) }

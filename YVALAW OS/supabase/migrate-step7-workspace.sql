@@ -72,7 +72,7 @@ BEGIN
   SELECT name, CASE WHEN user_id::text ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' THEN user_id::text::uuid END AS user_id INTO e FROM public.employees WHERE id::text = NEW.employee_id::text;
   IF TG_OP = 'INSERT' THEN
     PERFORM private.notify_permission('timeoff.approve', 'timeoff_request', coalesce(e.name, 'Someone') || ' asked for time off: ' || span,
-      initcap(NEW.kind) || coalesce(' — ' || NEW.note, ''), '/approvals');
+      initcap(NEW.kind) || coalesce(' — ' || NEW.note, ''), '/approvals?open=' || NEW.id::text);
   ELSIF NEW.status IS DISTINCT FROM OLD.status AND NEW.status IN ('approved', 'declined') THEN
     PERFORM private.notify_user(e.user_id, 'timeoff_decision',
       CASE WHEN NEW.status = 'approved' THEN 'Time off approved — Días libres aprobados: ' ELSE 'Time off declined — Días libres rechazados: ' END || span,

@@ -414,7 +414,7 @@ BEGIN
   END IF;
   IF TG_OP = 'INSERT' AND NEW.source = 'stripe' THEN
     PERFORM private.notify_permission('payments.record', 'payment_received',
-      'Payment received: $' || to_char(NEW.amount, 'FM999,999,990.00'), 'Paid by card in the client portal.', '/invoice');
+      'Payment received: $' || to_char(NEW.amount, 'FM999,999,990.00'), 'Paid by card in the client portal.', '/invoice?open=' || NEW.invoice_id::text);
   END IF;
   RETURN NULL;
 END

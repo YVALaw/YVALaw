@@ -10,6 +10,8 @@ import { AttachmentList } from '../components/people/attachments'
 import { OnboardingChecklist } from '../components/people/hire'
 import { PersonAvatar } from '../components/people/common'
 import { useToast } from '../context/ToastContext'
+import { CandidateEmailModal, CandidateEmails } from '../components/people/CandidateEmail'
+import { splitApplication } from '../utils/candidateApplication'
 
 function uid() { return crypto.randomUUID() }
 
@@ -23,6 +25,7 @@ const STAGES: { key: CandidateStage; label: string }[] = [
 ]
 const stageLabel = (s: CandidateStage) => STAGES.find(x => x.key === s)?.label ?? s
 const isHttps = (u?: string) => !!u && /^https?:\/\//i.test(u)
+const digits = (s?: string) => (s || '').replace(/\D/g, '')
 
 type Form = { name: string; email: string; phone: string; role: string; source: string; stage: CandidateStage; notes: string; resumeUrl: string; linkedinUrl: string; appliedAt: string }
 const toForm = (c: Candidate): Form => ({
@@ -51,12 +54,14 @@ export default function CandidateProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [checkedTasks, setCheckedTasks] = useState<Set<number>>(new Set())
+  const [emailing, setEmailing] = useState(false)
+  const [emailsKey, setEmailsKey] = useState(0)
 
   if (candidates === null) {
     return <div className="page"><Skel w={110} h={14} /><div className="ppl-prof-head"><Skel w={64} h={64} r={32} /><div className="stack"><Skel w={220} h={24} /><Skel w={160} h={14} /></div></div><div className="card card--pad stack"><Skel h={14} /><Skel h={14} w="70%" /></div></div>
   }
   if (!candidate) {
-    return <div className="page"><EmptyState action={<button type="button" className="btn" onClick={() => navigate('/candidates')}>← Back to Candidates</button>}>Candidate not found.</EmptyState></div>
+    return <div className="page"><EmptyState action={<button type="button" className="btn" onClick={() => navigate('/candidates')}>← Back to Candidates</button>}>This candidate wasn't found. They may have been removed, or hired — hired candidates move to People → Team.</EmptyState></div>
   }
 
   // candidate is guaranteed non-null here (early return above handles null case)
@@ -136,6 +141,10 @@ export default function CandidateProfilePage() {
     { k: 'LinkedIn', v: candidateNN.linkedinUrl, link: true },
   ]
 
+  // Careers-page answers (Country, Languages, Experience, Message) are shown as the application; the rest stays notes
+  const application = splitApplication(candidateNN.notes)
+  const phoneDigits = digits(candidateNN.phone)
+
   return (
     <div className="page ppl-profile">
       <button type="button" className="back-link" onClick={() => navigate('/candidates')}><Ic d={P.chevL} size={15} />Candidates</button>
@@ -168,6 +177,14 @@ export default function CandidateProfilePage() {
         </div>
       </div>
 
+      {!editing && (candidateNN.email || phoneDigits) && (
+        <div className="ppl-linkrow" aria-label="Contact">
+          {candidateNN.email && <button type="button" className="btn btn--sm" onClick={() => setEmailing(true)}><Ic d={P.mail} size={14} />Email</button>}
+          {phoneDigits && <a className="btn btn--sm" href={`https://wa.me/${phoneDigits}`} target="_blank" rel="noopener noreferrer"><Ic d={P.whatsapp} size={14} />WhatsApp</a>}
+          {phoneDigits && <a className="btn btn--sm" href={`tel:${candidateNN.phone}`}><Ic d={P.call} size={14} />Call</a>}
+        </div>
+      )}
+
       <div className="grid-auto ppl-tabgrid">
         <div className="stack stack--lg">
           <Card title="Candidate information">
@@ -197,9 +214,33 @@ export default function CandidateProfilePage() {
                       </div>
                     ))}
                   </div>
-                  {candidateNN.notes && <div className="info ppl-notes"><span className="info__label">Notes</span><span className="info__value ppl-prewrap">{candidateNN.notes}</span></div>}
+                  {application.rest && <div className="info ppl-notes"><span className="info__label">Notes</span><span className="info__value ppl-prewrap">{application.rest}</span></div>}
                 </>
               )}
+            </div>
+          </Card>
+          {!editing && application.fields.length > 0 && (
+            <Card title="Application" meta={[candidateNN.source, candidateNN.appliedAt && `applied ${candidateNN.appliedAt}`].filter(Boolean).join(' · ') || undefined}>
+              <div className="card__body">
+                <div className="info-grid">
+                  {application.fields.filter(f => f.label !== 'Message').map(f => (
+                    <div key={f.label} className="info"><span className="info__label">{f.label}</span>
+                      {f.label === 'LinkedIn' && isHttps(f.value)
+                        ? <a className="info__value ppl-link" href={f.value} target="_blank" rel="noopener noreferrer">{f.value}</a>
+                        : <span className="info__value">{f.value}</span>}
+                    </div>
+                  ))}
+                </div>
+                {application.fields.filter(f => f.label === 'Message').map(f => (
+                  <div key="msg" className="info ppl-notes"><span className="info__label">Message</span><span className="info__value ppl-prewrap">{f.value}</span></div>
+                ))}
+              </div>
+            </Card>
+          )}
+          <Card title="Emails" actions={candidateNN.email ? <button type="button" className="btn btn--sm" onClick={() => setEmailing(true)}><Ic d={P.mail} size={14} />Write email</button> : undefined}>
+            <div className="card__body">
+              <CandidateEmails candidateId={candidateNN.id} refreshKey={emailsKey} bare
+                empty={candidateNN.email ? 'No emails sent from YVA OS yet.' : 'Add an email address (Edit profile) to write to this candidate.'} />
             </div>
           </Card>
           <OpeningPicker candidateId={candidateNN.id} />
@@ -215,6 +256,8 @@ export default function CandidateProfilePage() {
           )}
         </div>
       </div>
+
+      <CandidateEmailModal candidate={emailing ? candidateNN : null} onClose={() => setEmailing(false)} onSent={() => setEmailsKey(k => k + 1)} />
 
       <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)} title={`Delete ${candidateNN.name}?`} sub="This cannot be undone."
         footer={<><button type="button" className="btn" onClick={() => setConfirmDelete(false)}>Cancel</button><button type="button" className="btn btn--danger" onClick={() => void handleDelete()}>Delete</button></>} />

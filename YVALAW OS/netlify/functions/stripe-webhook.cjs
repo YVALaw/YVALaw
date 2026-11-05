@@ -96,6 +96,8 @@ async function logActivity(clientId, note) {
   } catch (err) { console.warn('stripe-webhook: activity_log write skipped —', err.message) }
 }
 
+/** The invoice a Stripe notification is about opens straight from the bell / email / phone (InvoicePage ?open=) */
+const invoiceLink = id => (id ? `/invoice?open=${encodeURIComponent(id)}` : '/invoice')
 async function tell(kind, title, body, link = '/invoice') {
   try { await notifyPermission('payments.record', { kind, title, body, link }) } catch (err) { console.warn('stripe-webhook: notify skipped —', err.message) }
 }
@@ -160,7 +162,7 @@ async function onSucceeded(pi) {
   if (!md.invoiceId) return 'not ours'
   const cents = Number(pi.amount_received || 0)
   if (String(pi.currency).toLowerCase() !== 'usd') {
-    await tell('payment_problem', `Stripe payment in ${String(pi.currency).toUpperCase()} not applied`, `Payment ${pi.id} for invoice ${md.invoiceNumber || md.invoiceId} was not in USD. Check it in Stripe.`)
+    await tell('payment_problem', `Stripe payment in ${String(pi.currency).toUpperCase()} not applied`, `Payment ${pi.id} for invoice ${md.invoiceNumber || md.invoiceId} was not in USD. Check it in Stripe.`, invoiceLink(md.invoiceId))
     return 'wrong currency'
   }
   const inv = (await rest(`invoices?id=eq.${enc(md.invoiceId)}&select=id,number,client_id,client_name,subtotal,amount_paid,status&limit=1`))?.[0]
@@ -188,7 +190,7 @@ async function onSucceeded(pi) {
   }
   if (isNew && cents > balanceBefore) {
     await tell('payment_problem', `Invoice ${inv.number} overpaid by ${usd(cents - Math.max(0, balanceBefore))}`,
-      `Stripe collected ${usd(cents)} but only ${usd(Math.max(0, balanceBefore))} was owed (another payment arrived first). Refund the difference in YVA OS → Invoices → Payments, or keep it as credit.`)
+      `Stripe collected ${usd(cents)} but only ${usd(Math.max(0, balanceBefore))} was owed (another payment arrived first). Refund the difference in YVA OS → Invoices → Payments, or keep it as credit.`, invoiceLink(inv.id))
   }
   // Save the method for next time only when the payer asked for it, and only if they have none yet
   // (AutoPay never switches to another card or account on its own)
@@ -227,7 +229,7 @@ async function onFailed(pi) {
   const lastTry = source === 'autopay' && Number(md.try) >= P.AUTOPAY_MAX_TRIES
   if (source === 'autopay' || type === 'us_bank_account') {
     await tell('payment_failed', `${lastTry ? 'AutoPay stopped trying' : source === 'autopay' ? 'AutoPay failed' : 'Bank payment failed'}: invoice ${md.invoiceNumber || ''}`,
-      `${usd(pi.amount || 0)} — ${reason}${lastTry ? ` This was try ${md.try}; AutoPay won't charge this invoice again. Ask the client to update their payment method in the portal or send the invoice email with its Pay now link.` : ''}`)
+      `${usd(pi.amount || 0)} — ${reason}${lastTry ? ` This was try ${md.try}; AutoPay won't charge this invoice again. Ask the client to update their payment method in the portal or send the invoice email with its Pay now link.` : ''}`, invoiceLink(md.invoiceId))
   }
   await logActivity(md.clientId, `${LABEL[source]} failed for invoice ${md.invoiceNumber || ''} (${usd(pi.amount || 0)}). ${reason} Stripe: ${pi.id}`)
   return 'failed'
@@ -241,7 +243,7 @@ async function onRequiresAction(pi) {
     ? 'Waiting for the client to confirm two small test deposits in their bank account (Stripe emailed them the steps).'
     : 'The card needs the client to confirm the payment (bank security check).' })
   if (sourceOf(pi) === 'autopay') {
-    await tell('payment_failed', `AutoPay needs the client: invoice ${md.invoiceNumber || ''}`, 'Their bank asked them to confirm this charge. Send them the invoice email (it has a Pay now link) or ask them to pay in the portal.')
+    await tell('payment_failed', `AutoPay needs the client: invoice ${md.invoiceNumber || ''}`, 'Their bank asked them to confirm this charge. Send them the invoice email (it has a Pay now link) or ask them to pay in the portal.', invoiceLink(md.invoiceId))
   }
   return 'requires_action'
 }
@@ -286,7 +288,7 @@ async function onDispute(type, d) {
   const ref = `dispute:${d.id}`
   if (type === 'charge.dispute.created') {
     const due = d.evidence_details?.due_by ? new Date(d.evidence_details.due_by * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'soon'
-    await tell('payment_disputed', `Client disputed a payment (${usd(d.amount || 0)})`, `Reason: ${d.reason || 'not given'}. Send your evidence in Stripe → Disputes by ${due}.`)
+    await tell('payment_disputed', `Client disputed a payment (${usd(d.amount || 0)})`, `Reason: ${d.reason || 'not given'}. Send your evidence in Stripe → Disputes by ${due}.`, invoiceLink(pay.invoice_id))
     await logActivity(pay.client_id, `Client's bank opened a dispute for ${usd(d.amount || 0)} (${d.reason || 'no reason given'}). Stripe: ${d.id}`)
     return 'dispute noted'
   }
@@ -304,7 +306,7 @@ async function onDispute(type, d) {
     return 'dispute reinstated'
   }
   if (type === 'charge.dispute.closed') {
-    await tell('payment_disputed', `Dispute ${d.status === 'won' ? 'won' : d.status === 'lost' ? 'lost' : 'closed'} (${usd(d.amount || 0)})`, `Stripe dispute ${d.id} is ${d.status}.`)
+    await tell('payment_disputed', `Dispute ${d.status === 'won' ? 'won' : d.status === 'lost' ? 'lost' : 'closed'} (${usd(d.amount || 0)})`, `Stripe dispute ${d.id} is ${d.status}.`, invoiceLink(pay.invoice_id))
     return 'dispute closed'
   }
   return 'ignored'

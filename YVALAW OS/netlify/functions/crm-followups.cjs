@@ -20,9 +20,12 @@ exports.handler = async function handler() {
     if (!due.length) return { statusCode: 200, body: 'nothing due' }
     const managers = await usersWithPermission('leads.manage')
     const byUser = new Map()
-    for (const l of due) for (const u of (l.owner_id ? [l.owner_id] : managers)) byUser.set(u, [...(byUser.get(u) || []), l.name])
-    for (const [u, names] of byUser) {
-      await notify(u, { kind: 'followup_due', title: `${names.length} lead follow-up${names.length === 1 ? '' : 's'} due today`, body: names.slice(0, 8).join(', ') + (names.length > 8 ? '…' : ''), link: '/leads' })
+    for (const l of due) for (const u of (l.owner_id ? [l.owner_id] : managers)) byUser.set(u, [...(byUser.get(u) || []), l])
+    for (const [u, list] of byUser) {
+      const names = list.map(l => l.name)
+      // One lead → open it; several → the Leads board filtered to follow-ups due
+      const link = list.length === 1 ? `/leads?open=${encodeURIComponent(list[0].id)}` : '/leads?due=today'
+      await notify(u, { kind: 'followup_due', title: `${names.length} lead follow-up${names.length === 1 ? '' : 's'} due today`, body: names.slice(0, 8).join(', ') + (names.length > 8 ? '…' : ''), link })
     }
     await dispatchPending()
     return { statusCode: 200, body: JSON.stringify({ users: byUser.size, leads: due.length }) }

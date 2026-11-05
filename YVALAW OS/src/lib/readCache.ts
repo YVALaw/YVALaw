@@ -66,7 +66,7 @@ const MAX_KEPT = 400
 
 const isWrite = (method?: string) => { const m = (method || 'GET').toUpperCase(); return m !== 'GET' && m !== 'HEAD' && m !== 'OPTIONS' }
 /** Database functions that only read (they're called with POST, like writes). Every other function call clears. */
-const READ_ONLY_RPC = new Set(['placement_bill_rates', 'portal_chat_config', 'portal_invoices', 'log_action'])   // log_action only writes history
+const READ_ONLY_RPC = new Set(['placement_bill_rates', 'portal_chat_config', 'portal_invoices', 'log_action', 'record_emails'])   // log_action only writes history
 /** Tables whose reads must always be live */
 const NEVER_KEEP = new Set(['notifications', 'counters', 'desktop_link_codes', 'push_subscriptions', 'data_versions'])
 const urlOf = (input: RequestInfo | URL) => (typeof input === 'string' ? input : input instanceof URL ? input.href : input.url)

@@ -4,6 +4,7 @@ import { Ic, P } from './Icon'
 import { loadNotifications, markNotificationsRead, setAppBadge, type AppNotification } from '../services/notifications'
 import { supabase } from '../lib/supabase'
 import { LIVE_UPDATES_ON } from '../lib/liveConfig'
+import { notificationTarget } from '../lib/notificationTarget'
 
 function ago(ms: number, es: boolean): string {
   const m = Math.floor((Date.now() - ms) / 60000)
@@ -73,7 +74,9 @@ export default function NotificationBell({ lang = 'en', linkBase = '', onOpenCha
       setItems(list => list.map(x => (x.id === n.id ? { ...x, readAt: Date.now() } : x)))
       await markNotificationsRead([n.id]).catch(() => {})
     }
-    if (n.link) navigate(`${linkBase}${n.link}`)
+    // The exact record (older notifications only named the list page — notificationTarget finds the record)
+    const target = await notificationTarget(n)
+    if (target) navigate(`${linkBase}${target}`)
   }
   async function readAll() {
     setItems(list => list.map(x => ({ ...x, readAt: x.readAt ?? Date.now() })))

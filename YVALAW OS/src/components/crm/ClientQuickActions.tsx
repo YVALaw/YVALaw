@@ -3,24 +3,21 @@
 // open invoice) and Copy pay link (oldest open invoice; CEO/Admin/Accounting or invoices.send, only with Stripe on).
 // Desktop list rows get a small icon group; every view (list, phone cards, pipeline cards) gets the same items at
 // the top of its ⋯ menu. Pure picks live in utils/clientQuickActions.ts.
-import { useEffect, useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Client, Invoice } from '../../data/types'
 import { usePermission, useRole } from '../../context/RoleContext'
 import { canSeePage } from '../../lib/nav'
 import { useToast } from '../../context/ToastContext'
 import { Ic, P } from '../Icon'
-import { Banner, Field, Menu, Modal, useIsMobile, type MenuItem } from '../ui'
+import { Menu, useIsMobile, type MenuItem } from '../ui'
+import EmailComposeModal from '../EmailComposeModal'
 import RecordPaymentModal from '../RecordPaymentModal'
 import { createPayLink } from '../../services/payments'
-import { sendEmail } from '../../services/email'
 import { clientRecipients } from '../../services/emailRecipients'
-import { loadSettings, logComm } from '../../services/storage'
+import { logComm } from '../../services/storage'
 import { logAction } from '../../services/activityLog'
-import { formatEmailList, isEmail, parseEmailList, recipientsLabel } from '../../utils/emailList'
 import { oldestOpenInvoice, telHref } from '../../utils/clientQuickActions'
-
-const firstName = (name: string) => name.trim().split(/\s+/)[0] || name
 
 export function useClientQuickActions(invoices: Invoice[], onInvoicePaid: (id: string, s: { amountPaid: number; status: string }) => void) {
   const navigate = useNavigate()
@@ -99,60 +96,19 @@ export function useClientQuickActions(invoices: Invoice[], onInvoicePaid: (id: s
 
 /** Write an email to a client from the company mailbox. To = the client's email, Cc = Invoice CC + billing contacts. */
 export function ClientEmailModal({ client, onClose }: { client: Client | null; onClose: () => void }) {
-  const toast = useToast()
-  const [to, setTo] = useState('')
-  const [cc, setCc] = useState('')
-  const [subject, setSubject] = useState('')
-  const [body, setBody] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [sending, setSending] = useState(false)
-
-  useEffect(() => {
-    if (!client) return
-    let alive = true
-    setTo(client.email || ''); setCc(''); setSubject(''); setError(null); setSending(false)
-    setBody(`Hi ${firstName(client.name)},\n\n\n`)
-    void clientRecipients(client).then(r => { if (alive) { setTo(r.to); setCc(formatEmailList(r.cc)) } }).catch(() => {})
-    void loadSettings().then(s => { if (alive) setBody(b => (b === `Hi ${firstName(client.name)},\n\n\n` ? `${b}${s.emailSignature || s.companyName || 'YVA Staffing'}` : b)) }).catch(() => {})
-    return () => { alive = false }
-  }, [client])
-
-  async function send() {
-    if (!client || sending) return
-    const toAddr = to.trim()
-    const ccList = parseEmailList(cc)
-    if (!isEmail(toAddr)) { setError('Enter a valid email address in To.'); return }
-    if (ccList.invalid.length) { setError(`Not email addresses: ${ccList.invalid.join(', ')}`); return }
-    if (!subject.trim()) { setError('Add a subject.'); return }
-    if (!body.trim()) { setError('Write a message.'); return }
-    setSending(true); setError(null)
-    try {
-      const r = await sendEmail(toAddr, subject.trim(), body, { cc: ccList.emails })
-      if (r.mode === 'failed') { toast.error(`Email not sent: ${r.fallbackReason ?? 'the company mailbox could not send it.'}`); setSending(false); return }
-      const who = recipientsLabel(toAddr, ccList.emails.filter(e => e.toLowerCase() !== toAddr.toLowerCase()))
-      const viaApp = r.mode === 'mailto'
-      void logComm(client.id, `${viaApp ? 'Email opened in the mail app' : 'Email sent'}: "${subject.trim()}" — to ${who}`, 'email')
-      void logAction('client_emailed', `Emailed ${client.name}: "${subject.trim()}" to ${who}${viaApp ? ' (opened in the email app)' : ''}`,
-        { table: 'clients', recordId: client.id, details: { to: toAddr, cc: ccList.emails, subject: subject.trim(), via: r.mode } })
-      toast.success(viaApp ? 'Email opened in your email app.' : `Email sent to ${who}.`)
-      onClose()
-    } catch (e) { setError((e as Error).message); setSending(false) }
-  }
-
+  // Looked up once per client (the composer reads it when it opens)
+  const recipients = useMemo(() => (client ? clientRecipients(client) : []), [client])
   return (
-    <Modal open={!!client} onClose={onClose} title={`Email ${client?.name ?? ''}`} sub="Sent from the company mailbox. A copy is kept in its Sent Items and on the client's Communications."
-      footer={<>
-        <button type="button" className="btn" onClick={onClose}>Cancel</button>
-        <button type="button" className="btn btn--primary" disabled={sending} onClick={() => void send()}><Ic d={P.send} size={15} />{sending ? 'Sending…' : 'Send email'}</button>
-      </>}>
-      {error && <Banner tone="danger" onClose={() => setError(null)}>{error}</Banner>}
-      <div className="stack crm-compose">
-        <Field label="To"><input className="input" aria-label="To" type="email" value={to} onChange={e => setTo(e.target.value)} /></Field>
-        <Field label="Cc" hint="The client's Invoice CC and billing contacts. Separate addresses with commas."><input className="input" aria-label="Cc" value={cc} onChange={e => setCc(e.target.value)} placeholder="None" /></Field>
-        <Field label="Subject"><input className="input" aria-label="Subject" value={subject} onChange={e => setSubject(e.target.value)} autoFocus maxLength={300} /></Field>
-        <Field label="Message"><textarea className="textarea crm-compose__body" aria-label="Message" value={body} onChange={e => setBody(e.target.value)} rows={9} /></Field>
-      </div>
-    </Modal>
+    <EmailComposeModal open={!!client} onClose={onClose} title={`Email ${client?.name ?? ''}`}
+      sub="Sent from the company mailbox. A copy is kept in its Sent Items and on the client's Communications."
+      to={client?.email || ''} cc={recipients} greetName={client?.name ?? ''}
+      ccHint="The client's Invoice CC and billing contacts. Separate addresses with commas."
+      onSent={({ to, cc, subject, mode, who }) => {
+        if (!client) return
+        const viaApp = mode === 'mailto'
+        void logComm(client.id, `${viaApp ? 'Email opened in the mail app' : 'Email sent'}: "${subject}" — to ${who}`, 'email')
+        void logAction('client_emailed', `Emailed ${client.name}: "${subject}" to ${who}${viaApp ? ' (opened in the email app)' : ''}`,
+          { table: 'clients', recordId: client.id, details: { to, cc, subject, via: mode } })
+      }} />
   )
 }
-

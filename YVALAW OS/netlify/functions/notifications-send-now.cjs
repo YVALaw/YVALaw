@@ -18,7 +18,7 @@ exports.handler = async function handler(event) {
     let body = {}
     try { body = JSON.parse(event.body || '{}') } catch { /* empty */ }
     if (body.test) {
-      await notify(user.id, { kind: 'test', title: 'Test notification from YVA OS', body: 'If you can read this, notifications reach you here.', link: role === 'employee' ? '/me' : '/settings' })
+      await notify(user.id, { kind: 'test', title: 'Test notification from YVA OS', body: 'If you can read this, notifications reach you here.', link: role === 'employee' ? '/me?s=profile' : '/settings?tab=notifications' })
     }
     const r = await dispatchPending()
     return json(200, r)
