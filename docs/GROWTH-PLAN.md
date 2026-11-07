@@ -95,16 +95,16 @@ For each client (1–2 to start; Halavi Law, Top Law Assist and FoodNet PR are c
 The 7 ad landing pages stay as they are (hidden from search, for ads). New pages are written differently so they
 don't compete with the ads.
 
-- [ ] One page per **role**: Legal Intake, Legal Assistants, Demand Writing, Case Managers
+- [x] One page per **role**: Legal Intake, Legal Assistants, Demand Writing, Case Managers (2026-11-07)
       (what they do, a typical day, price from the Prices form, FAQ, book a call)
-- [ ] One page per **practice area**: Personal Injury, Employment Law, Workers' Comp
-- [ ] **Pricing guide:** "How much does a virtual legal assistant cost?" (in-house vs. freelancer vs. YVA, real numbers)
-- [ ] **Comparison pages:** "Virtual legal assistant vs. hiring in-house" and "How to choose a virtual legal staffing company"
-- [ ] **Company facts** for AI: an `llms.txt` file plus an "At a glance" box on About (who, where, roles, prices,
+- [x] One page per **practice area**: Personal Injury, Employment Law, Workers' Comp
+- [x] **Pricing guide:** "How much does a virtual legal assistant cost?" (in-house vs. freelancer vs. YVA, real numbers)
+- [x] **Comparison pages:** "Virtual legal assistant vs. hiring in-house" and "How to choose a virtual legal staffing company"
+- [x] **Company facts** for AI: `llms.txt` done (2026-11-07); "At a glance" box is on every new page. Still to do: the box on the home page About section — an "At a glance" box on About (who, where, roles, prices,
       languages, 72-hour onboarding, no contracts, clients served). Same wording everywhere.
-- [ ] Add the new pages to the sitemap, the menu/footer and the site's built-in business info (structured data)
+- [x] Add the new pages to the sitemap, the menu/footer and the site's built-in business info (structured data)
 - [ ] **Spanish versions** of the key pages (being bilingual is the main selling point)
-- [ ] Automatic "new page" notice to Bing on every deploy (IndexNow)
+- [x] Automatic "new page" notice to Bing on every deploy (IndexNow)
 
 ## 4. Blog (Claude drafts, You approve, 2 posts a month)
 
@@ -118,7 +118,7 @@ Titles are the questions people actually type into Google / ChatGPT. First ideas
 
 ## 5. Turning visitors into leads (Claude)
 
-- [ ] **WhatsApp button** (floating, every page; number from /admin → Contact & Hours)
+- [x] **WhatsApp button** (floating; built — appears once **you** add the number in /admin → Website Content → Contact & Hours)
 - [ ] **Live chat** on the website (Crisp, already used in the client portal)
 - [ ] **"Try 1 week" pilot offer** (You decide the terms first: price, what's included)
 - [ ] **Exit pop-up** offering the free checklist
@@ -186,5 +186,6 @@ To build (Claude):
 
 ## Log
 - 2026-11-03: Plan written. Live check found internal files downloadable from the site (section 0).
+- 2026-11-07: 10 new pages (4 roles, 3 practice areas, 3 guides), llms.txt, IndexNow, WhatsApp button (needs a number), /admin → Service & Guide Pages.
 - 2026-11-05: Time Tracking "nobody tracking" fixed (server clock, YVALaw/YVALaw#19); internal files hidden from the live site (section 0).
 - 2026-11-04: Fake lead ("contract review", Source "Website") came in by direct post to lead-intake; added 0b (Turnstile + lead panel).

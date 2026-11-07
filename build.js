@@ -289,6 +289,32 @@ function priceValue(expr) {
 // The home page's search data lists each service with its hourly price.
 const OFFER_SERVICE = { 'Legal Intake Specialist': 'intake', 'Legal Assistant': 'assistants', 'Demand Writing Specialist': 'demand', 'Virtual Case Manager': 'case' };
 
+// ── Service, practice-area and guide pages (content/pages/*.md → /<slug>/) ───────────────────────────
+// Written for search engines and AI assistants: one page per role and practice area plus buying guides.
+// Each .md has frontmatter (title, description, h1, kind service|practice|guide, service for the 4 roles,
+// nav_label, order) and a markdown body with price placeholders ({intake}, {month-case}, {price:save-4200-intake}…).
+// "## Frequently asked questions" + "### Question" blocks also become FAQPage data. Built after the blog pages.
+const pagesDir = path.join(__dirname, 'content', 'pages');
+const sitePages = fs.existsSync(pagesDir) ? fs.readdirSync(pagesDir).filter(f => f.endsWith('.md')).map(file => {
+  const raw = fs.readFileSync(path.join(pagesDir, file), 'utf8');
+  const fm = parseFrontmatter(raw);
+  if (!fm) throw new Error(`content/pages/${file} has no frontmatter`);
+  if (fm.draft === true) return null;
+  const slug = file.replace(/\.md$/, '');
+  if (!/^[a-z0-9-]+$/.test(slug)) throw new Error(`content/pages/${file}: use lowercase letters, numbers and dashes in the file name`);
+  for (const key of ['title', 'description', 'h1', 'kind']) if (!fm[key]) throw new Error(`content/pages/${file} needs "${key}"`);
+  if (!['service', 'practice', 'guide'].includes(fm.kind)) throw new Error(`content/pages/${file}: kind must be service, practice or guide`);
+  if (fm.service && !SERVICES.includes(fm.service)) throw new Error(`content/pages/${file}: unknown service "${fm.service}"`);
+  return { slug, file, title: fm.title, description: fm.description, h1: fm.h1, kind: fm.kind, service: fm.service || '',
+    navLabel: fm.nav_label || fm.h1, order: Number(fm.order) || 99, body: raw.replace(/^---[\s\S]*?\n---\s*\n/, '') };
+}).filter(Boolean).sort((a, b) => a.order - b.order || a.slug.localeCompare(b.slug)) : [];
+// {price:EXPR} = any price expression (same names as the CMS:price markers), on top of withPrice's placeholders
+const withPagePrice = text => withPrice(text).replace(/\{price:([a-z0-9+-]+)\}/g, (all, expr) => priceValue(expr));
+const footerLink = (href, label) => `<li><a href="${href}" class="text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex items-center gap-2"><i data-lucide="chevron-right" class="w-3 h-3"></i> ${label.replace(/&/g, '&amp;').replace(/</g, '&lt;')}</a></li>`;
+// Footer lists (index.html + blog-post.html, so blog posts and these pages link to each other)
+const serviceLinkItems = sitePages.filter(p => p.kind !== 'guide').map(p => footerLink(`/${p.slug}/`, p.navLabel));
+const guideLinkItems = sitePages.filter(p => p.kind === 'guide').map(p => footerLink(`/${p.slug}/`, p.navLabel));
+
 function fillPrices(source) {
   source = source.replace(/<!-- CMS:price:([a-z0-9+-]+) -->[\s\S]*?<!-- \/CMS:price:\1 -->/g, (all, expr) => {
     filledBlocks.add('price');
@@ -460,6 +486,13 @@ const statCards = stats.flatMap((stat, i) => {
 const contact = readContent('contact');
 const phone = String(contact.phone || '').trim();
 const whatsapp = String(contact.whatsapp || '').replace(/\D/g, '');
+// Floating WhatsApp button (home, blog, blog posts, service/guide pages) — only when a WhatsApp number is set in /admin
+const whatsappFloat = whatsapp ? [
+  `<a href="https://wa.me/${whatsapp}" target="_blank" rel="noopener" aria-label="Chat with us on WhatsApp" onclick="if (window.gtag) gtag('event', 'whatsapp_click', { event_category: 'contact' })"`,
+  '  class="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-[70] w-14 h-14 rounded-full bg-[#25D366] text-white shadow-xl flex items-center justify-center hover:scale-105 transition-transform">',
+  '  <i data-lucide="message-circle" class="w-7 h-7"></i>',
+  '</a>',
+] : [];
 const contactLink = (href, newTab) =>
   `<a href="${escapeHtml(href)}"${newTab ? ' target="_blank" rel="noopener"' : ''} class="flex items-start gap-3 text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors">`;
 const contactLinks = [
@@ -715,6 +748,9 @@ fs.readdirSync(__dirname).filter(file => file.endsWith('.html')).forEach(file =>
   html = fillBlock(html, 'contact-compact', compactContactItems);
   html = fillBlock(html, 'social', socialLinks);
   html = fillBlock(html, 'i18n', i18nLines);
+  html = fillBlock(html, 'service-links', serviceLinkItems);
+  html = fillBlock(html, 'guide-links', guideLinkItems);
+  html = fillBlock(html, 'whatsapp-float', whatsappFloat);
   html = fillInline(html, 'hours', escapeText(contact.hours_en));
   const page = file.replace(/\.html$/, '');
   if (page.startsWith('landing-') && fs.existsSync(path.join(contentDir, `${page}.json`))) {
@@ -741,7 +777,7 @@ fs.readdirSync(__dirname).filter(file => file.endsWith('.html')).forEach(file =>
   html = fillPrices(html);
   if (html !== before) fs.writeFileSync(filePath, html);
 });
-['testimonials', 'testimonial-dots', 'faq', 'faq-jsonld', 'stats', 'contact', 'contact-compact', 'social', 'i18n', 'hours', 'img', 'imgurl', 'imgpos', 'email', 'lp-testimonials', 'lp-faq', 'price', 'head-price',
+['testimonials', 'testimonial-dots', 'faq', 'faq-jsonld', 'stats', 'contact', 'contact-compact', 'social', 'i18n', 'service-links', 'guide-links', 'whatsapp-float', 'hours', 'img', 'imgurl', 'imgpos', 'email', 'lp-testimonials', 'lp-faq', 'price', 'head-price',
   'hero-badge', 'hero-h1', 'hero-h2', 'hero-cta', 'hero-count', 'hero-count-sub', 'hero-review', 'hero-review-name', 'hero-review-role'].forEach(name => {
   if (!filledBlocks.has(name)) throw new Error(`No page has the CMS:${name} markers — they were removed or renamed`);
 });
@@ -770,6 +806,9 @@ function formatDate(value) {
   if (Number.isNaN(d.getTime())) return '';
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
 }
+
+/** Tables scroll inside the article on phones (.prose .table-scroll in tailwind.src.css) */
+const wrapTables = html => html.replace(/<table>/g, '<div class="table-scroll"><table>').replace(/<\/table>/g, '</table></div>');
 
 function replaceBetween(source, startMarker, endMarker, replacement) {
   const start = source.indexOf(startMarker);
@@ -847,7 +886,7 @@ ${post.image ? `      <div id="post-image-wrap" class="mb-10 rounded-3xl overflo
 ` : ''}      <h1 id="post-title" class="text-4xl lg:text-5xl font-black text-[#1b1e2b] leading-tight tracking-tight mb-6">${escapeHtml(post.title)}</h1>
 ${post.description ? `      <p id="post-description" class="text-xl text-slate-500 font-medium leading-relaxed mb-10 pb-10 border-b border-slate-100">${escapeHtml(post.description)}</p>
 ` : ''}      <div id="post-body" class="prose">
-${marked.parse(withPrice(postBodies[post.slug]))}
+${wrapTables(marked.parse(withPrice(postBodies[post.slug])))}
       </div>
     </div>`;
 
@@ -873,6 +912,107 @@ ${marked.parse(withPrice(postBodies[post.slug]))}
 
 console.log(`Built blog/ — ${posts.length} static post page(s)`);
 
+// Service / practice / guide pages → /<slug>/index.html (same template as the blog posts)
+const plainText = md => String(md)
+  .replace(/<[^>]+>/g, ' ').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/[*_`>#|]/g, '')
+  .replace(/\s+/g, ' ').trim();
+function faqsOf(body) {
+  const start = body.search(/^##\s+Frequently asked questions\s*$/mi);
+  if (start === -1) return [];
+  const rest = body.slice(start).split('\n').slice(1).join('\n');
+  const section = rest.split(/^##\s+/m)[0].split(/<div class="post-cta">/)[0];
+  return section.split(/^###\s+/m).slice(1).map(block => {
+    const [q, ...a] = block.split('\n');
+    return { q: plainText(q), a: plainText(a.join('\n')) };
+  }).filter(f => f.q && f.a);
+}
+const KIND_CRUMB = { service: 'Services', practice: 'Practice areas', guide: 'Guides' };
+const SERVICE_NAME = { intake: 'Legal Intake Specialist', assistants: 'Legal Assistant', demand: 'Demand Writing Specialist', case: 'Virtual Case Manager' };
+const orgRef = { '@type': 'Organization', '@id': `${BASE_URL}/#organization`, name: 'YVA Law Staffing', url: `${BASE_URL}/` };
+const builtPageDirs = [];
+sitePages.forEach(page => {
+  const url = `${BASE_URL}/${page.slug}/`;
+  const body = withPagePrice(page.body);
+  const description = withPagePrice(page.description);
+  const faqs = faqsOf(body);
+  const related = sitePages.filter(p => p.slug !== page.slug)
+    .sort((a, b) => (a.kind === page.kind ? 0 : 1) - (b.kind === page.kind ? 0 : 1) || a.order - b.order).slice(0, 4);
+  const jsonLd = [
+    page.kind === 'guide'
+      ? { '@context': 'https://schema.org', '@type': 'Article', headline: page.h1, description, mainEntityOfPage: url,
+          image: `${BASE_URL}/assets/img/og-image.jpg`, author: orgRef, publisher: { ...orgRef, logo: { '@type': 'ImageObject', url: `${BASE_URL}/logo/img2.png` } } }
+      : { '@context': 'https://schema.org', '@type': 'Service', name: page.h1, description, url, provider: orgRef,
+          serviceType: page.service ? SERVICE_NAME[page.service] : 'Virtual legal staffing', areaServed: { '@type': 'Country', name: 'United States' },
+          availableLanguage: ['English', 'Spanish'],
+          ...(page.service ? { offers: { '@type': 'Offer', priceCurrency: 'USD', price: String(Number(prices[page.service])),
+            priceSpecification: { '@type': 'UnitPriceSpecification', price: String(Number(prices[page.service])), priceCurrency: 'USD', unitText: 'HOUR' } } } : {}) },
+    { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${BASE_URL}/` },
+      { '@type': 'ListItem', position: 2, name: KIND_CRUMB[page.kind], item: url },
+      { '@type': 'ListItem', position: 3, name: page.h1, item: url },
+    ].filter((x, i) => i !== 1) },
+    ...(faqs.length ? [{ '@context': 'https://schema.org', '@type': 'FAQPage',
+      mainEntity: faqs.map(f => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) }] : []),
+  ];
+  jsonLd[1].itemListElement.forEach((item, i) => { item.position = i + 1; });
+  const fullTitle = `${page.title} | YVA Law Staffing`;
+  const meta = `  <title>${escapeHtml(fullTitle)}</title>
+  <meta name="description" content="${escapeHtml(description)}">
+  <link rel="canonical" href="${url}">
+  <meta name="robots" content="index, follow, max-image-preview:large">
+  <meta property="og:type" content="${page.kind === 'guide' ? 'article' : 'website'}">
+  <meta property="og:title" content="${escapeHtml(page.h1)}">
+  <meta property="og:description" content="${escapeHtml(description)}">
+  <meta property="og:url" content="${url}">
+  <meta property="og:site_name" content="YVA Law Staffing">
+  <meta property="og:image" content="${BASE_URL}/assets/img/og-image.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${escapeHtml(page.h1)}">
+  <meta name="twitter:description" content="${escapeHtml(description)}">
+  <meta name="twitter:image" content="${BASE_URL}/assets/img/og-image.jpg">
+  <script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>`;
+  const relatedHtml = related.length ? `      <nav class="mt-14 pt-10 border-t border-slate-100" aria-label="Related pages">
+        <p class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Related</p>
+        <ul class="grid sm:grid-cols-2 gap-3">
+${related.map(r => `          <li><a href="/${r.slug}/" class="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 px-5 py-4 font-bold text-[#1b1e2b] hover:border-yellow-400 hover:bg-yellow-50 transition-colors"><span>${escapeHtml(r.h1)}</span><i data-lucide="arrow-right" class="w-4 h-4 flex-shrink-0 text-yellow-500"></i></a></li>`).join('\n')}
+        </ul>
+      </nav>
+` : '';
+  const content = `    <div id="post-content">
+      <p class="text-xs font-black text-yellow-600 uppercase tracking-widest mb-4">${escapeHtml(KIND_CRUMB[page.kind])}</p>
+      <h1 id="post-title" class="text-4xl lg:text-5xl font-black text-[#1b1e2b] leading-tight tracking-tight mb-6">${escapeHtml(page.h1)}</h1>
+      <div id="post-body" class="prose">
+${wrapTables(marked.parse(body))}
+      </div>
+${relatedHtml}    </div>`;
+  let html = template;
+  html = replaceBetween(html, '<!-- POST_META_START -->', '<!-- POST_META_END -->', meta);
+  html = replaceBetween(html, '<!-- POST_BODY_START -->', '<!-- POST_BODY_END -->', content);
+  html = replaceBetween(html, '// POST_SCRIPT_START', '// POST_SCRIPT_END', '');
+  html = html
+    .replace(/href="index\.html/g, 'href="/index.html')
+    .replace(/href="blog\.html"/g, 'href="/blog.html"')
+    .replace(/href="careers\.html"/g, 'href="/careers.html"')
+    .replace(/src="logo\//g, 'src="/logo/')
+    // "Back to Blog" → back to the services on the home page
+    .replace(/<a href="\/blog\.html"([^>]*)>(\s*<i data-lucide="arrow-left"[^>]*><\/i>) Back to Blog/, '<a href="/#service-pillars"$1>$2 All services')
+    // The blog link is highlighted in the template's menus/footer; on these pages nothing is "current"
+    .replace('<a href="/blog.html" class="text-yellow-500 border-b-2 border-yellow-400 pb-0.5">Blog</a>', '<a href="/blog.html" class="hover:text-yellow-500 transition-colors">Blog</a>')
+    .replace('<a href="/blog.html" class="flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-white/10 text-yellow-400 font-black text-sm uppercase tracking-widest">', '<a href="/blog.html" class="mobile-nav-link flex items-center gap-3 px-4 py-3.5 rounded-2xl text-white font-black text-sm uppercase tracking-widest hover:bg-white/10 hover:text-yellow-400 transition-all">')
+    .replace(/(href="\/blog\.html" class="[^"]*?)text-yellow-400 text-sm font-medium flex/g, '$1text-slate-400 text-sm font-medium hover:text-yellow-400 transition-colors flex')
+    .replace(/\s*<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/marked\/marked\.min\.js"><\/script>/, '')
+    .replace(/\s*<script src="https:\/\/cdnjs\.cloudflare\.com\/ajax\/libs\/dompurify\/[^"]+"><\/script>/, '');
+  if (/\{[a-z]+(?:-[a-z]+)?\}|\{price:/.test(html.replace(/<script[\s\S]*?<\/script>/g, ''))) {
+    throw new Error(`content/pages/${page.file}: a price placeholder was not recognised — use {intake}, {month-case}, {price:save-4200-intake}…`);
+  }
+  const dir = path.join(__dirname, page.slug);
+  if (fs.existsSync(dir) && !fs.existsSync(path.join(dir, 'index.html'))) throw new Error(`content/pages/${page.file}: a folder named "${page.slug}" already exists`);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'index.html'), html);
+  builtPageDirs.push(page.slug);
+});
+console.log(`Built ${builtPageDirs.length} service/guide page(s): ${builtPageDirs.join(', ')}`);
+
 // Generate sitemap.xml
 // All landing-*.html pages are paid-ad landing pages, intentionally noindex,
 // and therefore left out.
@@ -894,7 +1034,8 @@ const postPages = posts.map(post => ({
   lastmod: post.date ? new Date(post.date).toISOString().split('T')[0] : undefined
 }));
 
-const allPages = [...staticPages, ...postPages];
+const sitePageEntries = sitePages.map(p => ({ url: `/${p.slug}/`, changefreq: 'monthly', priority: p.kind === 'guide' ? '0.8' : '0.9' }));
+const allPages = [...staticPages, ...sitePageEntries, ...postPages];
 
 const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -907,6 +1048,59 @@ ${p.lastmod ? `    <lastmod>${p.lastmod}</lastmod>\n` : ''}    <changefreq>${p.c
 
 fs.writeFileSync(path.join(__dirname, 'sitemap.xml'), sitemap);
 console.log(`Built sitemap.xml — ${allPages.length} URL(s)`);
+
+// llms.txt — a plain summary for AI assistants (llmstxt.org): who YVA is, what it costs, and the pages that explain more.
+// Rebuilt on every deploy from the Prices form, Contact & Hours and content/pages, so it never goes stale.
+const statValue = label => (stats.find(st => String(st.label_en || '').toLowerCase() === label) || {}).value;
+const llms = [
+  '# YVA Law Staffing',
+  '',
+  `> Bilingual (English and Spanish) virtual legal staff for U.S. law firms: legal intake specialists, legal assistants, demand writers and case managers, billed hourly from ${startingPrice}/hr with no long-term contract. Staff are vetted and trained by YVA, work in U.S. time zones, and are based in the Dominican Republic and Latin America.`,
+  '',
+  '## Key facts',
+  '',
+  `- Rates (per hour): Legal Intake ${money(prices.intake)} · Legal Assistants ${money(prices.assistants)} · Demand Writing ${money(prices.demand)} · Case Managers ${money(prices.case)}. Full time = ${hoursPerMonth} hours a month (e.g. Legal Intake ${priceValue('month-intake')}/month).`,
+  '- Every assistant is fully bilingual in English and Spanish.',
+  '- Onboarding: ready within 72 business hours after the consultation call and match; YVA handles briefing and setup.',
+  '- Service agreement with no long-term lock-in; a replacement at no extra cost if the fit is not right.',
+  "- Works inside the firm's own tools (Clio, MyCase, HubSpot, Salesforce, Slack, Google Workspace and others); assistants work under attorney supervision and do not give legal advice.",
+  ...[['Founded', 'founded'], ['Law firms served', 'law firms served'], ['Assistants placed', 'assistants placed']]
+    .map(([label, key]) => statValue(key) ? `- ${label}: ${statValue(key)}` : null).filter(Boolean),
+  `- Contact: ${contactEmail} · ${contact.hours_en || ''} · book a free call at ${BASE_URL}/?contact=1`,
+  '',
+  '## Services',
+  '',
+  ...sitePages.filter(p => p.kind === 'service').map(p => `- [${p.h1}](${BASE_URL}/${p.slug}/): ${withPagePrice(p.description)}`),
+  '',
+  '## Practice areas',
+  '',
+  ...sitePages.filter(p => p.kind === 'practice').map(p => `- [${p.h1}](${BASE_URL}/${p.slug}/): ${withPagePrice(p.description)}`),
+  '',
+  '## Guides',
+  '',
+  ...sitePages.filter(p => p.kind === 'guide').map(p => `- [${p.h1}](${BASE_URL}/${p.slug}/): ${withPagePrice(p.description)}`),
+  `- [Legal Staffing Checklist](${BASE_URL}/checklist.html): free printable checklist for hiring legal support staff.`,
+  '',
+  '## Blog',
+  '',
+  ...posts.map(post => `- [${post.title}](${BASE_URL}/blog/${post.slug}/): ${post.description}`),
+  '',
+].join('\n');
+fs.writeFileSync(path.join(__dirname, 'llms.txt'), llms);
+console.log(`Built llms.txt — ${sitePages.length} page(s), ${posts.length} post(s)`);
+
+// IndexNow: tell Bing (and the other IndexNow engines; ChatGPT search uses Bing) about every page after a
+// production deploy, instead of waiting for them to crawl. The key file (<key>.txt) sits in the site root.
+const INDEXNOW_KEY = '7e4a077f14817ec6f1a7b56338a56cd1';
+if (process.env.CONTEXT === 'production' && process.env.INDEXNOW !== 'off') {
+  const urlList = allPages.map(p => `${BASE_URL}${p.url}`);
+  fetch('https://api.indexnow.org/indexnow', {
+    method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    body: JSON.stringify({ host: 'yvastaffing.agency', key: INDEXNOW_KEY, keyLocation: `${BASE_URL}/${INDEXNOW_KEY}.txt`, urlList }),
+    signal: AbortSignal.timeout(10000),
+  }).then(r => console.log(`IndexNow: sent ${urlList.length} URL(s) — ${r.status}`))
+    .catch(e => console.warn(`IndexNow: not sent (${e.message}) — the deploy is fine`));
+}
 
 // Compile Tailwind CSS (assets/css/tailwind.src.css -> assets/css/tailwind.css).
 // Pages link the compiled file instead of loading Tailwind's in-browser compiler,

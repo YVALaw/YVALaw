@@ -74,6 +74,73 @@ collections:
         editor_components: ["cta", "callout", "table", "image"]
         hint: "Use “Heading 2” for section titles and “Heading 3” for sub-sections. The + button adds a “Book a call” button, a highlight box, a table or an image. Prices: type {intake}, {assistants}, {demand} or {case} for that hourly rate, {month-intake} or {year-intake} (etc.) for the full-time cost per month or year, {hours} for hours a month and {price} for the starting rate. They show the current prices and follow the Prices form."
 
+  - name: "pages"
+    label: "Service & Guide Pages"
+    label_singular: "Page"
+    description: "The pages for each role (Legal Intake, Legal Assistants, Demand Writing, Case Managers), each practice area (Personal Injury, Employment Law, Workers' Comp) and the buying guides. They are written for Google and AI assistants such as ChatGPT. Changes go live about a minute after you click Publish."
+    folder: "content/pages"
+    create: true
+    slug: "{{slug}}"
+    preview_path: "{{slug}}/"
+    summary: "{{fields.draft | ternary('DRAFT · ', '')}}{{fields.h1}} · {{fields.kind}}"
+    sortable_fields:
+      - { field: "order", label: "Order", default_sort: "asc" }
+      - { field: "h1", label: "Heading" }
+    fields:
+      - label: "Heading"
+        name: "h1"
+        widget: "string"
+        hint: "The big title at the top of the page, e.g. “Bilingual Virtual Legal Intake Specialists”."
+      - label: "Google title"
+        name: "title"
+        widget: "string"
+        hint: "The title in Google results and the browser tab — about 50 characters, with the words people search for. “| YVA Law Staffing” is added automatically."
+      - label: "Summary"
+        name: "description"
+        widget: "text"
+        hint: "1 sentence (about 150 characters) shown under the title in Google and quoted by AI assistants. Prices can be placeholders like {intake} or {price}."
+      - label: "Type"
+        name: "kind"
+        widget: "select"
+        options:
+          - { label: "Service (one role)", value: "service" }
+          - { label: "Practice area", value: "practice" }
+          - { label: "Guide", value: "guide" }
+        hint: "Services and practice areas are listed under “Services” in the footer, guides under “Quick Links”."
+      - label: "Role (service pages only)"
+        name: "service"
+        widget: "select"
+        required: false
+        options:
+          - { label: "Legal Intake", value: "intake" }
+          - { label: "Legal Assistants", value: "assistants" }
+          - { label: "Demand Writing", value: "demand" }
+          - { label: "Case Managers", value: "case" }
+        hint: "Lets Google show that role's hourly price. Leave empty on practice-area pages and guides."
+      - label: "Short name"
+        name: "nav_label"
+        widget: "string"
+        hint: "The link text in the footer, e.g. “Legal Intake”."
+      - label: "Order"
+        name: "order"
+        widget: "number"
+        value_type: "int"
+        default: 20
+        hint: "Pages are listed in this order in the footer and “Related” links (1 first)."
+      - label: "Draft"
+        name: "draft"
+        widget: "boolean"
+        default: false
+        required: false
+        hint: "On = saved but not on the website."
+      - label: "Page"
+        name: "body"
+        widget: "markdown"
+        modes: ["rich_text"]
+        buttons: ["bold", "italic", "link", "heading-two", "heading-three", "quote", "bulleted-list", "numbered-list"]
+        editor_components: ["cta", "callout", "table"]
+        hint: "Start with 2–3 sentences that answer the page's question directly (AI assistants quote them). Use “Heading 2” for sections. A section called “Frequently asked questions” with each question as “Heading 3” becomes a FAQ in Google. Prices: {intake}, {assistants}, {demand}, {case}, {price}, {month-intake}, {year-intake}, {hours}, and savings like {price:save-4200-intake} / {price:savepct-4200-intake}."
+
   - name: "jobs"
     label: "Job Posts"
     label_singular: "Job Post"
