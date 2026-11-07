@@ -3,7 +3,7 @@
     "slug": "legal-intake-specialist",
     "title": "Legal Intake Specialist",
     "date": "2026-03-20T09:00:00.000Z",
-    "status": "Open",
+    "status": "Closed",
     "featured": true,
     "location": "Remote",
     "schedule": "Full / Part-time",
@@ -15,23 +15,6 @@
       "Communication"
     ],
     "body": "Support growing U.S. law firms by owning the intake experience from first contact through consultation booking."
-  },
-  {
-    "slug": "social-media-manager",
-    "title": "Social Media Manager",
-    "date": "2026-03-16T09:00:00.000Z",
-    "status": "Open",
-    "featured": true,
-    "location": "Remote",
-    "schedule": "Full / Part-time",
-    "icon": "share-2",
-    "description": "Manage social media presence for U.S. law firms and professional clients. Create content, schedule posts, engage audiences, and report on performance.",
-    "skills": [
-      "Content Creation",
-      "Instagram/LinkedIn",
-      "Analytics"
-    ],
-    "body": "Help client brands stay visible and credible online with consistent content and channel management."
   },
   {
     "slug": "demand-writer",
@@ -49,6 +32,23 @@
       "Detail-Oriented"
     ],
     "body": "Translate medical and case records into clear, persuasive demand packages for plaintiff-side law firms."
+  },
+  {
+    "slug": "social-media-manager",
+    "title": "Social Media Manager",
+    "date": "2026-03-16T09:00:00.000Z",
+    "status": "Closed",
+    "featured": true,
+    "location": "Remote",
+    "schedule": "Full / Part-time",
+    "icon": "share-2",
+    "description": "Manage social media presence for U.S. law firms and professional clients. Create content, schedule posts, engage audiences, and report on performance.",
+    "skills": [
+      "Content Creation",
+      "Instagram/LinkedIn",
+      "Analytics"
+    ],
+    "body": "Help client brands stay visible and credible online with consistent content and channel management."
   },
   {
     "slug": "legal-assistant",
