@@ -16,6 +16,7 @@ import { Banner, Field, Menu, Modal } from './ui'
 import { printInvoice } from '../utils/invoiceHtml'
 import { hoursToHM, loadTrackerEntriesForProject } from '../services/trackerStorage'
 import { isItemLine, makeItemLine, qtyText } from '../utils/invoiceLines'
+import { billingName, clientOfInvoice } from '../utils/billingName'
 import { clientRecipients } from '../services/emailRecipients'
 import { useClientRecipients } from './EmailRecipients'
 import { useToast } from '../context/ToastContext'
@@ -170,7 +171,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
     const main = editInvoice.projectId || ''
     const extras = invoiceProjectIds(editInvoice).filter(id => id !== main)
     if (extras.length > 0) setExtraProjectIds(extras)
-    const client = clients.find(c => c.name === editInvoice.clientName)
+    const client = clientOfInvoice(clients, editInvoice)
     if (client) setClientId(client.id)
     const lines = editInvoice.items || []
     // Item lines (kind 'item') go to their own list so saving keeps them; hours lines fill the grid as before
@@ -541,7 +542,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
     const items = buildItems()
     const inv: Invoice = {
       id: editInvoice?.id || 'preview', number: editInvoice?.number || nextNumberLabel || 'DRAFT', date, dueDate: dueDate || undefined,
-      clientName: selectedClient?.name || editInvoice?.clientName || '', clientEmail: selectedClient?.email || '', clientAddress: selectedClient?.address || '',
+      clientName: (selectedClient && billingName(selectedClient)) || editInvoice?.clientName || '', clientEmail: selectedClient?.email || '', clientAddress: selectedClient?.address || '',
       billingStart: billingStart || undefined, billingEnd: billingEnd || undefined, projectId: selectedProject?.id || null, projectName: selectedProject?.name || '',
       status: editInvoice?.status || 'draft', subtotal: grandTotal, notes: notes || undefined, items, projectIds: usedProjectIds(items),
     }
@@ -564,7 +565,8 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
           ...editInvoice,
           date,
           dueDate:       dueDate || undefined,
-          clientName:    selectedClient?.name    || editInvoice.clientName || '',
+          clientName:    (selectedClient && billingName(selectedClient)) || editInvoice.clientName || '',
+          clientId:      selectedClient?.id ?? editInvoice.clientId,
           clientEmail:   selectedClient?.email   || editInvoice.clientEmail || '',
           clientCcEmails: cc.length ? cc : undefined,
           clientAddress: selectedClient?.address || editInvoice.clientAddress || '',
@@ -615,7 +617,7 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
         number:        invNumber,
         date,
         dueDate:       dueDate || undefined,
-        clientName:    selectedClient?.name    || '',
+        clientName:    billingName(selectedClient),
         clientEmail:   selectedClient?.email   || '',
         clientCcEmails: cc.length ? cc : undefined,
         clientAddress: selectedClient?.address || '',
@@ -623,7 +625,9 @@ export default function InvoiceBuilder({ onCreated, onCancel, initialProjectId, 
         billingEnd:    billingEnd   || undefined,
         projectId:     selectedProject?.id   || null,
         projectName:   selectedProject?.name || '',
-        ...(projectIds ? { projectIds, clientId: selectedClient?.id || null } : {}),
+        ...(projectIds ? { projectIds } : {}),
+        // The client id ties the invoice to its client (portal, client page) now that the name on it may be the company
+        ...(selectedClient ? { clientId: selectedClient.id } : projectIds ? { clientId: null } : {}),
         status:        'draft',
         subtotal:      grandTotal,
         notes:         notes || undefined,

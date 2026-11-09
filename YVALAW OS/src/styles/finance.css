@@ -170,7 +170,21 @@
 .fin-approved:hover { border-color: #dcfce7; color: #166534; }
 
 .fin-wc-drafts { display: flex; flex-direction: column; }
-.fin-wc-inv { border-top: 1px solid var(--row-line); }
+/* Each draft is its own block with a coloured edge (colours repeat every 6), so it's clear where one ends */
+.fin-wc-inv { --inv-accent: #a16207; --inv-tint: rgba(250, 204, 21, 0.10); margin: 0 16px 12px; border: 1px solid var(--border); border-left: 4px solid var(--inv-accent); border-radius: 10px; overflow: hidden; background: var(--surface); }
+.fin-wc-drafts > .card__head + .fin-wc-inv, .fin-wc-drafts > .card-empty + .fin-wc-inv { margin-top: 4px; }
+.fin-wc-inv--c1 { --inv-accent: #2563eb; --inv-tint: rgba(37, 99, 235, 0.07); }
+.fin-wc-inv--c2 { --inv-accent: #0d9488; --inv-tint: rgba(13, 148, 136, 0.08); }
+.fin-wc-inv--c3 { --inv-accent: #7c3aed; --inv-tint: rgba(124, 58, 237, 0.07); }
+.fin-wc-inv--c4 { --inv-accent: #db2777; --inv-tint: rgba(219, 39, 119, 0.07); }
+.fin-wc-inv--c5 { --inv-accent: #16a34a; --inv-tint: rgba(22, 163, 74, 0.08); }
+.fin-wc-inv > .fin-wc-inv__row { background: var(--inv-tint); }
+.fin-wc-inv > .fin-wc-inv__row:hover { background: var(--inv-tint); filter: brightness(0.98); }
+.fin-wc-inv--open > .fin-wc-inv__detail { padding-top: 12px; }
+/* A summary number was clicked: outline its section for a moment */
+.fin-flash { box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.55); transition: box-shadow 0.3s ease; }
+.fin-flag__link { padding: 0; border: 0; background: none; font: inherit; color: var(--text); text-decoration: underline; text-decoration-color: var(--border-strong); cursor: pointer; }
+.fin-flag__link:hover { color: var(--gold, #a16207); text-decoration-color: currentColor; }
 .fin-wc-inv__row { width: 100%; display: grid; grid-template-columns: 22px minmax(0, 1.6fr) 130px 90px 110px 110px; gap: 12px; align-items: center; padding: 0 20px; min-height: 56px; border: 0; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; font-size: 13.5px; }
 .fin-wc-inv__row > svg { color: var(--soft); }
 .fin-wc-inv__row:hover { background: var(--surface-2); }

@@ -1,9 +1,9 @@
 // Finance → Weekly close (PLAN.md Step 4; redesign 2026-11 → designs/Weekly Close.dc.html).
 // Review the week, fix time, approve, send. The week-close function prepares/approves; rows are read here (RLS weekly_close.manage).
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import type { AppSettings, Employee, Invoice, Project } from '../data/types'
-import { loadEmployees, loadProjects, loadSettings } from '../services/storage'
+import type { AppSettings, Client, Employee, Invoice, Project } from '../data/types'
+import { loadClients, loadEmployees, loadProjects, loadSettings } from '../services/storage'
 import { usePermission } from '../context/RoleContext'
 import { invoiceHtmlFor, sendInvoiceEmail, sentToLabel } from '../services/invoiceEmail'
 import { loadEmailStatus } from '../services/email'
@@ -79,7 +79,8 @@ export default function WeeklyClosePage() {
     const [inv, b, a] = await Promise.all([c ? loadWeekInvoices(c.id) : Promise.resolve([]), loadWeekBlocks(weekStart), loadAdjustments(weekStart)])
     setInvoices(inv); setBlocks(b); setAdjustments(a); setLoaded(true)
   }
-  useEffect(() => { void loadEmployees().then(setEmployees); void loadProjects().then(setProjects); void loadSettings().then(setSettings) }, [])
+  const [clients, setClients] = useState<Client[]>([])
+  useEffect(() => { void loadEmployees().then(setEmployees); void loadProjects().then(setProjects); void loadSettings().then(setSettings); void loadClients().then(setClients).catch(() => {}) }, [])
   useEffect(() => { setPreviewData(null); setOpen(new Set()); void loadAll() }, [weekStart])   // eslint-disable-line react-hooks/exhaustive-deps
   // First draft opens by default (mockup), once per week
   useEffect(() => { if (invoices[0] && open.size === 0) setOpen(new Set([invoices[0].id])) }, [invoices])   // eslint-disable-line react-hooks/exhaustive-deps
@@ -166,6 +167,23 @@ export default function WeeklyClosePage() {
   const tz = DEFAULT_TZ
   const empName = (id: string) => employees.find(e => e.id === id)?.name ?? 'Unknown'
   const projName = (id: string | null) => (id ? projects.find(p => p.id === id)?.name ?? 'Project' : '')
+  // The summary numbers open their section: scroll to it and outline it for a moment
+  const draftsRef = useRef<HTMLElement>(null), flagsRef = useRef<HTMLElement>(null), payRef = useRef<HTMLElement>(null), timeRef = useRef<HTMLElement>(null)
+  const [flash, setFlash] = useState<string | null>(null)
+  function goTo(ref: React.RefObject<HTMLElement>, key: string) {
+    ref.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+    setFlash(key); window.setTimeout(() => setFlash(f => (f === key ? null : f)), 1600)
+  }
+  // Invoices are made out to the company (Weekly close engine, billingName); drafts prepared before that still carry
+  // the contact's name — show the company for them too
+  const invoiceName = (inv: Invoice) => {
+    const c = inv.clientId ? clients.find(x => x.id === inv.clientId) : undefined
+    return (c?.company || '').trim() || inv.clientName || '—'
+  }
+  const contactOf = (inv: Invoice) => {
+    const c = inv.clientId ? clients.find(x => x.id === inv.clientId) : undefined
+    return c && c.name && c.name !== invoiceName(inv) ? c.name : ''
+  }
   const grid = useMemo(() => {
     const m = new Map<string, Map<string, GridTarget>>()
     const row = (emp: string, projectId: string | null, workType: string | null) => {
@@ -237,7 +255,20 @@ export default function WeeklyClosePage() {
       default: return null
     }
   }
-  const flagMeta = (f: WeekFlag) => [f.employeeName && !f.message.includes(f.employeeName) ? f.employeeName : '', f.projectId ? projName(f.projectId) : f.workType || '', f.seconds ? hm(f.seconds) : ''].filter(Boolean).join(' · ')
+  // Who / which project / which days a flag is about — the person and project open their page
+  const dayLabel = (d: string) => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short', month: 'short', day: 'numeric' })
+  const flagMeta = (f: WeekFlag) => {
+    const parts: React.ReactNode[] = []
+    if (f.employeeId) parts.push(<button key="e" type="button" className="link fin-flag__link" onClick={() => navigate(`/employees/${f.employeeId}`)}>{f.employeeName || empName(f.employeeId)}</button>)
+    else if (f.employeeName && !f.message.includes(f.employeeName)) parts.push(f.employeeName)
+    if (f.projectId) parts.push(<button key="p" type="button" className="link fin-flag__link" onClick={() => navigate(`/projects/${f.projectId}`)}>{projName(f.projectId)}</button>)
+    else if (f.clientId) { const c = clients.find(x => x.id === f.clientId); if (c) parts.push(<button key="c" type="button" className="link fin-flag__link" onClick={() => navigate(`/clients/${c.id}`)}>{c.company || c.name}</button>) }
+    else if (f.workType) parts.push(f.workType)
+    const days = f.days?.length ? f.days : f.byDay ? Object.keys(f.byDay).sort() : []
+    if (days.length) parts.push(days.map(dayLabel).join(', '))
+    if (f.seconds) parts.push(hm(f.seconds))
+    return parts.length ? parts.flatMap((x, i) => (i ? [<span key={`s${i}`} aria-hidden> · </span>, x] : [x])) : null
+  }
 
   const invoiceStatus = (inv: Invoice) => {
     const st = (inv.status || 'draft').toLowerCase()
@@ -296,29 +327,29 @@ export default function WeeklyClosePage() {
       ) : (
         <>
           <KpiStrip compact items={[
-            { label: 'Hours', value: hm(s.billableSeconds || 0), note: `${s.people || 0} people tracked` },
-            { label: 'Draft invoices', value: String(isCurrent ? shown.length : drafts.length), note: `${s.invoices || 0} client${s.invoices === 1 ? '' : 's'}` },
-            { label: 'To bill', value: usd(s.total || 0) },
-            { label: 'Payroll preview', value: usd(s.payrollTotal || 0), note: "paid on each project's schedule" },
-            { label: 'Flags', value: <span className={close.flags.length ? 't-warning' : 't-success'}>{close.flags.length}</span>, note: 'flags never block anything' },
+            { label: 'Hours', value: hm(s.billableSeconds || 0), note: `${s.people || 0} people tracked`, onClick: () => { setShowTime(true); goTo(timeRef, 'time') } },
+            { label: 'Draft invoices', value: String(isCurrent ? shown.length : drafts.length), note: `${s.invoices || 0} client${s.invoices === 1 ? '' : 's'}`, onClick: () => { setOpen(new Set(shown.map(i => i.id))); goTo(draftsRef, 'drafts') } },
+            { label: 'To bill', value: usd(s.total || 0), onClick: () => { setOpen(new Set(shown.map(i => i.id))); goTo(draftsRef, 'drafts') } },
+            { label: 'Payroll preview', value: usd(s.payrollTotal || 0), note: "paid on each project's schedule", onClick: () => { setAllPay(true); goTo(payRef, 'pay') } },
+            { label: 'Flags', value: <span className={close.flags.length ? 't-warning' : 't-success'}>{close.flags.length}</span>, note: close.flags.length ? 'see what to check ↓' : 'nothing to check', onClick: () => goTo(flagsRef, 'flags') },
           ]} />
 
-          <section className="card fin-wc-drafts">
+          <section ref={draftsRef} className={`card fin-wc-drafts${flash === 'drafts' ? ' fin-flash' : ''}`}>
             <div className="card__head">
               <h2 className="card__title">{isCurrent ? 'Invoices so far' : 'Draft invoices'}</h2>
               {drafts.length > 0 && canSend && <button type="button" className="btn btn--sm" disabled={!!busy} onClick={() => void sendAll()}>{busy === 'send-all' ? 'Sending…' : `Send all ready (${drafts.length})`}</button>}
             </div>
             {shown.length === 0 && <div className="card-empty">No billable client time this week.</div>}
-            {shown.map(inv => {
+            {shown.map((inv, n) => {
               const items = inv.items || []
               const hours = items.reduce((x, it) => x + (Number(it.hoursTotal) || 0), 0)
               const isOpen = open.has(inv.id)
               const amount = Number(inv.subtotal) || 0
               return (
-                <div key={inv.id} className={`fin-wc-inv${isOpen ? ' fin-wc-inv--open' : ''}`} data-invoice={inv.number}>
+                <div key={inv.id} className={`fin-wc-inv fin-wc-inv--c${n % 6}${isOpen ? ' fin-wc-inv--open' : ''}`} data-invoice={inv.number}>
                   <button type="button" className="fin-wc-inv__row" aria-expanded={isOpen} onClick={() => setOpen(o => { const n = new Set(o); if (n.has(inv.id)) n.delete(inv.id); else n.add(inv.id); return n })}>
                     <Ic d={isOpen ? P.chevD : P.chevR} size={14} />
-                    <span className="fin-wc-inv__client"><span className="t-strong">{inv.clientName}</span><span className="t-sub">{inv.projectName ? `${inv.projectName} · ` : ''}{items.length} line{items.length === 1 ? '' : 's'}</span></span>
+                    <span className="fin-wc-inv__client"><span className="t-strong">{invoiceName(inv)}</span><span className="t-sub">{contactOf(inv) ? `Attn. ${contactOf(inv)} · ` : ''}{inv.projectName ? `${inv.projectName} · ` : ''}{items.length} line{items.length === 1 ? '' : 's'}</span></span>
                     <span className="fin-wc-inv__num mono">{inv.number}</span>
                     <span className="fin-wc-inv__hours">{hm(hours * 3600)}</span>
                     <span className="fin-wc-inv__amt num">{amount ? usd(amount) : 'Needs rate'}</span>
@@ -361,7 +392,7 @@ export default function WeeklyClosePage() {
           </section>
 
           <div className="fin-wc-grid">
-            <section className="card fin-wc-flags">
+            <section ref={flagsRef} className={`card fin-wc-flags${flash === 'flags' ? ' fin-flash' : ''}`} id="flags">
               <div className="card__head"><h2 className="card__title">Flags</h2><span className="card__meta">{close.flags.length} to check</span></div>
               {close.flags.length === 0 && <div className="card-empty">Nothing to check this week.</div>}
               {close.flags.map((f, i) => {
@@ -377,7 +408,7 @@ export default function WeeklyClosePage() {
               })}
             </section>
 
-            <section className="card fin-wc-pay">
+            <section ref={payRef} className={`card fin-wc-pay${flash === 'pay' ? ' fin-flash' : ''}`}>
               <div className="card__head fin-wc-pay__head"><h2 className="card__title">Payroll preview</h2><span className="card__meta">What these hours add to Friday's payroll</span></div>
               {payRows.length === 0 && <div className="card-empty">No pay for these hours.</div>}
               {payShown.map(p => (
@@ -397,7 +428,7 @@ export default function WeeklyClosePage() {
             </section>
           </div>
 
-          <section className="card fin-wc-time">
+          <section ref={timeRef} className={`card fin-wc-time${flash === 'time' ? ' fin-flash' : ''}`}>
             <div className="card__head">
               <div className="fin-wc-time__title"><h2 className="card__title">Time by person</h2>
                 <span className="card__meta">Tap a day to add or remove minutes, or move time to next week. Employees see every change with your note.</span></div>

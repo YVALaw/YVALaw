@@ -33,7 +33,7 @@ If you ever re-run the YVA Time phase 2 script, run `migrate-step4-weekly-close.
 **Netlify → Forms:** if you have an email notification on the `lead-backup` form, add one for the new
 `application-backup` form too (careers applications when EmailJS is blocked). They also land in YVA OS → Candidates.
 
-## 2b. After the redesign (November) is live — 14 more small scripts
+## 2b. After the redesign (November) is live — 15 more small scripts
 
 Same way as step 1, in this order (each is safe to run again):
 1. `supabase/migrate-redesign-portal.sql` — "Request more staff" saves how many people and which project
@@ -72,6 +72,15 @@ Same way as step 1, in this order (each is safe to run again):
     new applicants, follow-ups, weekly close, payroll — already do, no script needed). It also lets the candidate page
     list the emails sent to that candidate from YVA OS. Replaces three small functions; no tables change; safe to run
     twice. The last lines it prints should all say `true`.
+
+15. `supabase/migrate-invoice-names.sql` — weekly-close invoices are made out to the client's **company**
+    ("Company / legal name") instead of the contact person, and new invoice numbers start with the company's letters
+    (Top Law Assist → `TOP-0001` instead of `SEA-0001`). A prefix made from the contact's name is switched to the
+    company's only when no sent or paid invoice uses it yet. Afterwards: fill in "Company / legal name" on clients whose
+    name is a person, then press **Re-prepare** on Weekly close — the drafts get the company name and new numbers.
+    New invoices from the builder, Quick invoice and estimates use the company name too (no script needed for that).
+    The last lines show each client, who invoices are made out to, and its prefix. If you ever run
+    `migrate-step4-weekly-close.sql` again, run this one again after it (that script puts back the old numbering).
 
 **Crisp chat (client portal → Messages):** make a free account at crisp.chat → Settings → Website settings →
 copy the **Website ID** → YVA OS → Settings → **Integrations** → Crisp → paste → Save. Clients then chat with
