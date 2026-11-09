@@ -423,8 +423,9 @@ export function anniversaries<E extends { id: string; name: string; startYear?: 
     .map(e => ({ id: e.id, name: e.name, years: year - startOf(e) }))
 }
 
-function lastInvoiceDayFor(invoices: Invoice[], clientName: string): string {
-  return invoices.filter(inv => inv.clientName === clientName).map(invoiceDay).filter(Boolean).sort().pop() || ''
+/** An invoice belongs to a client by client_id first (weekly-close invoices are made out to the company name), else by name */
+function lastInvoiceDayFor(invoices: Invoice[], client: { id: string; name: string }): string {
+  return invoices.filter(inv => (inv.clientId ? inv.clientId === client.id : inv.clientName === client.name)).map(invoiceDay).filter(Boolean).sort().pop() || ''
 }
 
 /** Client retention watch: not invoiced in 60+ days. CEO view skips churned and never-invoiced clients;
@@ -432,7 +433,7 @@ function lastInvoiceDayFor(invoices: Invoice[], clientName: string): string {
 export function retentionWatch<C extends { id: string; name: string; status?: string }>(clients: C[], invoices: Invoice[], today: string, opts: { includeNeverInvoiced?: boolean } = {}) {
   const out: { client: C; lastDate: string; days: number | null }[] = []
   for (const c of clients) {
-    const last = lastInvoiceDayFor(invoices, c.name)
+    const last = lastInvoiceDayFor(invoices, c)
     if (!last) { if (opts.includeNeverInvoiced) out.push({ client: c, lastDate: '', days: null }); continue }
     if (!opts.includeNeverInvoiced && (c.status || '').toLowerCase() === 'churned') continue
     const days = daysBetween(last.slice(0, 10), today)

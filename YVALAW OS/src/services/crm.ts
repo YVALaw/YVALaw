@@ -6,6 +6,7 @@ import { clientRecipients } from './emailRecipients'
 import { invoicePdf } from './invoiceEmail'
 import { logAction } from './activityLog'
 import { recipientsLabel } from '../utils/emailList'
+import { billingName } from '../utils/billingName'
 import type { Client as Cli, Estimate, Invoice as Inv, Project } from '../data/types'
 import { itemLinesFromEstimate, itemLinesSubtotal } from '../utils/invoiceLines'
 
@@ -173,7 +174,7 @@ export async function createInvoiceFromEstimate(est: Estimate, client?: Cli, pro
   const notes = [`From estimate ${est.number}`, est.notes].filter(Boolean).join('\n')
   const today = new Date(); const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
   const { error } = await supabase.from('invoices').insert({
-    id, number, date, client_name: client?.name ?? est.clientName ?? null, client_email: client?.email ?? null, client_address: client?.address ?? null,
+    id, number, date, client_name: (client && billingName(client)) || est.clientName || null, client_email: client?.email ?? null, client_address: client?.address ?? null,
     client_id: client?.id ?? est.clientId ?? null, project_id: project?.id ?? est.projectId ?? null, project_name: project?.name ?? est.projectName ?? null,
     subtotal, notes, status: 'draft', items, status_history: [{ status: 'draft', changedAt: Date.now() }],
   })

@@ -16,6 +16,11 @@ const M = require('./money.cjs')
 const FLAG_ORDER = ['missing_rate', 'project_no_client', 'client_no_email', 'invoice_locked', 'late', 'manual_pending', 'no_time', 'over_50h', 'low_activity', 'outside_shift', 'missing_screenshots']
 const hmText = s => { const m = Math.round(Math.abs(s) / 60); return `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` }
 const hoursToHM = s => { const m = Math.round(s / 60); return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}` }
+/** The name an invoice is made out to: the client's company / legal name ("Company / legal name" on the client), else
+ *  the client's name. Clients often have a contact person as their name and the firm as the company. */
+function billingName(client) {
+  return String(client?.company || '').trim() || String(client?.name || '').trim() || 'Client'
+}
 async function optional(path) { try { return await rest(path) } catch (e) { if (e.status === 404 || e.status === 400) return []; throw e } }
 function termsDays(terms) {
   const t = String(terms || '').toLowerCase()
@@ -43,7 +48,8 @@ async function loadContext(weekStart) {
   const [employees, projects, clients, rates, blocks, adjustments, shots, manual, closeRows, timeOff] = await Promise.all([
     rest('employees?select=id,name,email,user_id,role,works_for,pay_rate,premium_enabled,premium_percent,premium_start_time,timezone,default_shift_start,default_shift_end,status'),
     rest('projects?select=id,name,client_id,rate,employee_ids,status'),
-    rest('clients?select=id,name,email,address,default_rate,payment_terms'),
+    // company + invoice_prefix: older databases may lack them — read without them then
+    rest('clients?select=id,name,company,email,address,default_rate,payment_terms,invoice_prefix').catch(e => { if (e.status === 400) return rest('clients?select=id,name,email,address,default_rate,payment_terms'); throw e }),
     optional('placement_rates?select=employee_id,project_id,position,bill_rate,pay_rate,effective_from'),
     restAll(`tracker_blocks?block_start=gte.${enc(from)}&block_start=lt.${enc(to)}&select=id,employee_id,block_start,project_id,work_type,seconds,active_seconds,first_offset,last_offset,status,created_at`),
     optional(`time_adjustments?day=gte.${weekStart}&day=lte.${weekEnd}&status=eq.applied&select=id,employee_id,project_id,work_type,day,seconds_delta,kind,note,created_at`),
@@ -141,7 +147,7 @@ function buildWeek(ctx) {
   for (const inv of invoices.values()) {
     inv.subtotal = M.round2(inv.subtotal)
     inv.items.sort((a, b) => a.employeeName.localeCompare(b.employeeName) || a.position.localeCompare(b.position))
-    if (!inv.client.email) flag({ kind: 'client_no_email', clientId: inv.client.id, message: `${inv.client.name} has no email — the invoice can't be emailed` })
+    if (!inv.client.email) flag({ kind: 'client_no_email', clientId: inv.client.id, message: `${billingName(inv.client)} has no email — the invoice can't be emailed` })
   }
 
   // ── People flags
@@ -248,7 +254,7 @@ async function previewWeek(weekStart, { now = Date.now() } = {}) {
     return days.length ? [{ ...f, days, message: f.message.replace(/no time on .*$/, `no time on ${days.map(d => new Date(`${d}T12:00:00Z`).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'short' })).join(', ')}`) }] : []
   })
   const invoices = built.invoices.map(inv => ({
-    clientName: inv.client.name, projectName: [...inv.projects].sort().join(', '), subtotal: inv.subtotal, seconds: inv.seconds,
+    clientName: billingName(inv.client), projectName: [...inv.projects].sort().join(', '), subtotal: inv.subtotal, seconds: inv.seconds,
     items: inv.items.map(({ projectId, ...it }) => it),
   }))
   const summary = {
@@ -282,9 +288,10 @@ async function prepareWeek(weekStart, { by = null, now = Date.now() } = {}) {
     const prev = existing.find(e => e.client_id === inv.client.id)
     const projectNames = [...inv.projects].sort()
     const projectIds = [...new Set(inv.items.map(i => i.projectId))]
+    const name = billingName(inv.client)
     const row = {
       date: invoiceDate, due_date: M.addDays(invoiceDate, termsDays(inv.client.payment_terms)),
-      client_name: inv.client.name, client_email: inv.client.email || null, client_address: inv.client.address || null,
+      client_name: name, client_email: inv.client.email || null, client_address: inv.client.address || null,
       billing_start: weekStart, billing_end: ctx.weekEnd,
       project_id: projectIds.length === 1 ? projectIds[0] : null, project_name: projectNames.join(', '),
       subtotal: inv.subtotal, notes: `Hours for the week of ${built.label}.`,
@@ -294,20 +301,25 @@ async function prepareWeek(weekStart, { by = null, now = Date.now() } = {}) {
     if (prev && prev.status && prev.status !== 'draft') {
       kept.add(prev.id)
       if (Math.abs(Number(prev.subtotal) - inv.subtotal) > 0.009) built.flags.push({ kind: 'invoice_locked', clientId: inv.client.id,
-        message: `${prev.number} (${inv.client.name}) was already sent — the hours now add up to $${inv.subtotal.toFixed(2)} instead of $${Number(prev.subtotal).toFixed(2)}` })
-      results.push({ id: prev.id, number: prev.number, clientName: inv.client.name, subtotal: Number(prev.subtotal), status: prev.status, locked: true })
+        message: `${prev.number} (${name}) was already sent — the hours now add up to $${inv.subtotal.toFixed(2)} instead of $${Number(prev.subtotal).toFixed(2)}` })
+      results.push({ id: prev.id, number: prev.number, clientName: name, subtotal: Number(prev.subtotal), status: prev.status, locked: true })
       continue
     }
     if (prev) {
       kept.add(prev.id)
-      await rest(`invoices?id=eq.${prev.id}`, { method: 'PATCH', body: { ...row, status: 'draft' } })
-      results.push({ id: prev.id, number: prev.number, clientName: inv.client.name, subtotal: inv.subtotal, status: 'draft' })
+      // A draft numbered with an older prefix (e.g. from the contact's name before the client's prefix was corrected)
+      // gets a number with the client's current prefix; sent invoices never change
+      const prefix = String(inv.client.invoice_prefix || '').trim().toUpperCase()
+      const number = prefix && !String(prev.number || '').toUpperCase().startsWith(`${prefix}-`)
+        ? await rpc('next_client_invoice_number', { p_client: inv.client.id }) : prev.number
+      await rest(`invoices?id=eq.${prev.id}`, { method: 'PATCH', body: { ...row, ...(number !== prev.number ? { number } : {}), status: 'draft' } })
+      results.push({ id: prev.id, number, clientName: name, subtotal: inv.subtotal, status: 'draft' })
     } else {
       const number = await rpc('next_client_invoice_number', { p_client: inv.client.id })
       const id = require('node:crypto').randomUUID()
       await rest('invoices', { method: 'POST', body: { id, number, status: 'draft', status_history: [{ status: 'draft', changedAt: now }], employee_payments: {}, ...row } })
       kept.add(id)
-      results.push({ id, number, clientName: inv.client.name, subtotal: inv.subtotal, status: 'draft' })
+      results.push({ id, number, clientName: name, subtotal: inv.subtotal, status: 'draft' })
     }
   }
   // Drafts of clients that no longer have hours this week
@@ -329,4 +341,4 @@ async function prepareWeek(weekStart, { by = null, now = Date.now() } = {}) {
   return { weekStart, weekEnd: ctx.weekEnd, closeId: close.id, summary, flags: built.flags, payroll: built.payroll, invoices: results }
 }
 
-module.exports = { prepareWeek, previewWeek, buildWeek, loadContext, lastWeekStart, termsDays, hoursToHM }
+module.exports = { prepareWeek, previewWeek, buildWeek, loadContext, lastWeekStart, termsDays, hoursToHM, billingName }

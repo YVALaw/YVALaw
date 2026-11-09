@@ -25,6 +25,7 @@ import { invoicePdf, sendInvoiceEmail, sendReminderEmail, sentToLabel } from '..
 import { downloadAttachment, loadEmailStatus } from '../services/email'
 import { logAction } from '../services/activityLog'
 import { toCsv } from '../utils/csv'
+import { billingName } from '../utils/billingName'
 import { base64ToBytes, makeZip } from '../utils/zip'
 import { bulkDeletePlan, bulkEmailPlan, deleteSummary, emailSummary, invoiceCsvRows } from '../utils/invoiceBulk'
 import { extraProjectCount, invoiceCoversProject, projectNamesLabel } from '../utils/invoiceProjects'
@@ -246,7 +247,7 @@ export default function InvoicePage() {
     const { cc } = await clientRecipients(client)
     const inv: Invoice = {
       id: uid(), number: `INV-${String(counter).padStart(3, '0')}`, date: form.date, dueDate: form.dueDate || undefined,
-      clientName: form.clientName, clientEmail: client?.email, clientCcEmails: cc.length ? cc : undefined, projectId: proj?.id || null, projectName: proj?.name || undefined,
+      clientName: (client && billingName(client)) || form.clientName, ...(client ? { clientId: client.id } : {}), clientEmail: client?.email, clientCcEmails: cc.length ? cc : undefined, projectId: proj?.id || null, projectName: proj?.name || undefined,
       subtotal: parseFloat(form.subtotal) || 0, notes: form.notes || undefined, status: 'sent', items: [],
       statusHistory: [{ status: 'sent', changedAt: Date.now() }], createdAt: Date.now(), updatedAt: Date.now(),
     }
