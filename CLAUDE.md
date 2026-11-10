@@ -65,7 +65,7 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 | Pricing | `#pricing` | 4 cards + comparison table |
 | How It Works | `#how-it-works` | 3 steps |
 | Testimonials | `#testimonials` | 4-slide carousel, auto-advances |
-| About | `#about` | Story, stats grid, founders toggle |
+| About | `#about` | Story, stats grid, **At a glance** facts box (`#at-a-glance`, EN/ES keys `glance*`, prices via CMS markers), founders toggle |
 | Footer | — | Quick links, services list, contact |
 
 ---
@@ -108,12 +108,15 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 - Language persisted to `localStorage('yva_lang')`.
 - **To add a new translatable string:** add `data-i18n="myKey"` to the element, then add `myKey` to both `en` and `es` objects in the translations block.
 
-### Lead Magnet Modal (`#lead-magnet-modal`)
-- Triggered by `openLeadMagnet()` — strip button between ROI calculator and How It Works.
-- Two-step: email + name capture form → success screen with link to `checklist.html`.
-- On submit: sends EmailJS notification to YVA (`template_8gftonr`) AND auto-reply to submitter (`template_9r6xtuw`) with checklist link.
-- GA event: `download_checklist` / `event_category: lead_magnet`.
-- **Note:** verify `template_9r6xtuw` uses `{{email}}` as To address and `{{name}}` for personalization in EmailJS dashboard.
+### Exit offer: free checklist (`assets/js/exit-offer.js`, 2026-11-10)
+- The old `#lead-magnet-modal` strip is gone. The checklist is now offered by a pop-up on index, blog, blog posts and the 10 service/guide pages (template `blog-post.html`); **not** on the ad landing pages, checklist or careers.
+- Desktop: mouse leaves through the top after ≥ 8 s. Phones: after 40 s and half the page read, as a bottom card. Once per 14 days (`localStorage yva_exit_offer`), never after a form was sent this visit (`sessionStorage yva_lead`) or while a modal/menu has `.open`. EN/ES from `yva_lang`. Plain CSS injected by the script (no Tailwind classes).
+- Name + email → `lead-intake` (source **Checklist pop-up**, service **Free checklist**, `utm.ref` = page) → opens `/checklist.html`. GA: `exit_offer_shown`, `download_checklist` (`event_category: lead_magnet`). `window.yvaShowExitOffer()` opens it (tests).
+
+### Fake-lead filter (2026-11-10)
+- `lead-intake` only saves leads whose `source` and `service` are ones our forms send — `YVALAW OS/netlify/functions/_lib/leadForms.cjs` (mirror `YVALAW OS/src/utils/leadForms.ts`). Anything else gets a fake "ok" and is dropped (logged in the Netlify function log); a real visitor's lead still arrives by EmailJS / Netlify Forms. **When you add a form, a source or a service option, add it to both lists** — `YVALAW OS/tests/leadForms.test.ts` scans index.html, landing-*.html and exit-offer.js and fails otherwise.
+- `lead-send.js` also sends `utm.ref` (the page or site the visitor came from). YVA OS → Leads shows "Form on / Came from / Ad / Click", a red **Not from a form** tag + warning on leads that match no form, and **Mark as spam** (deletes; the change history keeps a copy).
+- Still to do: Cloudflare Turnstile (needs the owner's keys) — see `docs/GROWTH-PLAN.md` §0b.
 
 ### Header / Navigation
 - `#navbar` is `sticky` at every width with a fixed height (64px phones, 80px desktop). On scroll it only gains a shadow (`.nav-scrolled`) — changing its height caused layout jumps.

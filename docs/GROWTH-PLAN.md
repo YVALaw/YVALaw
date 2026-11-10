@@ -39,9 +39,11 @@ with a made-up `Origin` header, which the current check can't tell apart from th
       application form. `lead-intake` / `application-intake` must verify the token on the server and refuse
       without it. Keep the honeypot and rate limits. If Turnstile itself is down, the EmailJS / Netlify Forms
       backup still delivers, so no real lead is lost.
-- [ ] **Claude:** lead panel in YVA OS: show the page (Source), the ad details (UTM / gclid / fbclid) and a
+- [x] **Claude:** lead panel in YVA OS: show the page (Source), the ad details (UTM / gclid / fbclid) and a
       **"Not from a website form"** warning when the source or service isn't one the forms send.
-      A "Mark as spam" action that deletes the lead and logs it.
+      A "Mark as spam" action that deletes the lead and logs it. (2026-11-10; also shows the page/site the visitor came from)
+- [x] **Claude:** first filter without Turnstile (2026-11-10): `lead-intake` drops leads whose page or service no form sends
+      (the "contract review" kind). Turnstile is still needed for bots that copy a real form's values.
 - [ ] **Claude:** test on the Netlify preview: a real submission works on every form, and a direct post without a
       token is refused.
 
@@ -100,8 +102,7 @@ don't compete with the ads.
 - [x] One page per **practice area**: Personal Injury, Employment Law, Workers' Comp
 - [x] **Pricing guide:** "How much does a virtual legal assistant cost?" (in-house vs. freelancer vs. YVA, real numbers)
 - [x] **Comparison pages:** "Virtual legal assistant vs. hiring in-house" and "How to choose a virtual legal staffing company"
-- [x] **Company facts** for AI: `llms.txt` done (2026-11-07); "At a glance" box is on every new page. Still to do: the box on the home page About section — an "At a glance" box on About (who, where, roles, prices,
-      languages, 72-hour onboarding, no contracts, clients served). Same wording everywhere.
+- [x] **Company facts** for AI: `llms.txt` done (2026-11-07); "At a glance" box on every new page and on the home page About section (2026-11-10, EN/ES).
 - [x] Add the new pages to the sitemap, the menu/footer and the site's built-in business info (structured data)
 - [ ] **Spanish versions** of the key pages (being bilingual is the main selling point)
 - [x] Automatic "new page" notice to Bing on every deploy (IndexNow)
@@ -109,8 +110,8 @@ don't compete with the ads.
 ## 4. Blog (Claude drafts, You approve, 2 posts a month)
 
 Titles are the questions people actually type into Google / ChatGPT. First ideas:
-- [ ] Can a virtual assistant handle legal intake for a PI firm?
-- [ ] Is it legal (and safe) to outsource intake / client communication for a law firm?
+- [~] Can a virtual assistant handle legal intake for a PI firm? (draft written 2026-11-10, **You** approve in /admin → switch Draft off)
+- [~] Is it legal (and safe) to outsource intake / client communication for a law firm? (draft written 2026-11-10, **You** approve)
 - [ ] Bilingual intake: how much business are English-only firms losing?
 - [ ] What does a legal case manager do, and when does a firm need one?
 - [ ] How long does it take to onboard a virtual legal assistant? (72-hour process)
@@ -121,10 +122,12 @@ Titles are the questions people actually type into Google / ChatGPT. First ideas
 - [x] **WhatsApp button** (floating; built — appears once **you** add the number in /admin → Website Content → Contact & Hours)
 - [ ] **Live chat** on the website (Crisp, already used in the client portal)
 - [ ] **"Try 1 week" pilot offer** (You decide the terms first: price, what's included)
-- [ ] **Exit pop-up** offering the free checklist
+- [x] **Exit pop-up** offering the free checklist (2026-11-10: name + email → YVA OS lead → checklist opens; not on ad pages)
 - [ ] Check the booking form on phones (short, fast, clear "what happens next")
 
 ## 6. Getting mentioned on other websites (You; Claude drafts the text)
+
+**Ready-to-paste text (2026-11-10):** `docs/OFFSITE-TEXT.md` — Google Business Profile, Clutch/GoodFirms/UpCity, review-request email, LinkedIn About + 8 December posts.
 
 AI tools mostly repeat what *other* websites say about a company. This is the biggest lever for AI recommendations.
 - [ ] **Google Business Profile** (Claude drafts the description and services)
@@ -185,6 +188,7 @@ To build (Claude):
 ---
 
 ## Log
+- 2026-11-10: Fake-lead filter + lead panel (where it came from, Not-from-a-form warning, Mark as spam); exit pop-up with the checklist; home "At a glance"; 2 blog drafts; off-site text pack.
 - 2026-11-03: Plan written. Live check found internal files downloadable from the site (section 0).
 - 2026-11-07: 10 new pages (4 roles, 3 practice areas, 3 guides), llms.txt, IndexNow, WhatsApp button (needs a number), /admin → Service & Guide Pages.
 - 2026-11-05: Time Tracking "nobody tracking" fixed (server clock, YVALaw/YVALaw#19); internal files hidden from the live site (section 0).

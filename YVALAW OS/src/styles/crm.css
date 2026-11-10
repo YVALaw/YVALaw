@@ -76,6 +76,10 @@
 
 /* Lead drawer */
 .crm-utm { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.crm-origin { margin: 0; display: grid; gap: 4px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; font-size: 12.5px; }
+.crm-origin__row { display: grid; grid-template-columns: 110px 1fr; gap: 8px; }
+.crm-origin dt { color: var(--muted); }
+.crm-origin dd { margin: 0; overflow-wrap: anywhere; }
 .crm-convert { background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
 .crm-convert__title { font-size: 15px; font-weight: 600; }
 .crm-convert__sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
