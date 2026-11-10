@@ -2,6 +2,7 @@
  * lead-intake — public POST from the website booking forms (assets/js/lead-send.js).
  * Saves the lead in YVA OS → Leads (and notifies leads.manage holders through a database trigger).
  *   { name, email, phone, company, website, service, message, source, sms_consent, utm, hp }
+ *     (source + service must be ones our forms send — _lib/leadForms.cjs — or the lead is dropped; utm.ref = the page the visitor came from)
  *     → { id, token }        (hp = hidden honeypot field; bots fill it, people don't)
  *   { kind: 'calendly', id, token } → marks that lead "Calendly booked"
  * Same email again within 30 minutes updates the existing lead instead of creating another.
@@ -9,6 +10,7 @@
  */
 const crypto = require('node:crypto')
 const { rest, enc } = require('./_lib/supa.cjs')
+const { notFromForm } = require('./_lib/leadForms.cjs')
 
 const ALLOWED = [/^https:\/\/(www\.)?yvastaffing\.agency$/, /^https:\/\/[a-z0-9-]+--yvalaw\.netlify\.app$/, /^https:\/\/yvalaw\.netlify\.app$/, /^http:\/\/localhost(:\d+)?$/]
 const hits = new Map()   // ip → timestamps (per function instance)
@@ -44,6 +46,10 @@ exports.handler = async function handler(event) {
       return reply(200, { ok: true }, origin)
     }
     if (b.hp) return reply(200, { ok: true }, origin)                                 // honeypot: pretend success
+    // Only our booking forms: a source or service no form sends means a script posted here directly. Pretend success
+    // (no hint for the bot); a real visitor's lead still reaches YVA by email from the page itself.
+    const bad = notFromForm({ source: b.source, service: b.service })
+    if (bad) { console.warn(`lead-intake: dropped, ${bad}`); return reply(200, { ok: true }, origin) }
     const ip = String(h['x-nf-client-connection-ip'] || h['x-forwarded-for'] || '').split(',')[0].trim()
     const now = Date.now(), recent = (hits.get(ip) || []).filter(t => now - t < 10 * 60_000)
     if (ip && recent.length >= 6) return reply(429, { error: 'Too many requests' }, origin)
@@ -63,7 +69,7 @@ exports.handler = async function handler(event) {
       name, email, phone: phone === 'Not provided' ? null : phone,
       company: clip(b.company || b.firm_name, 200), website: clip(b.website, 300), service: clip(b.service, 120),
       message: clip(b.message, 5000), source: clip(b.source, 120) || 'Website', sms_consent: /^(yes|true|on|1)$/i.test(String(b.sms_consent || '')),
-      utm: Object.fromEntries(Object.entries(b.utm && typeof b.utm === 'object' ? b.utm : {}).filter(([k]) => /^utm_[a-z]+$|^gclid$|^fbclid$/.test(k)).slice(0, 8).map(([k, v]) => [k, String(v).slice(0, 200)])),
+      utm: Object.fromEntries(Object.entries(b.utm && typeof b.utm === 'object' ? b.utm : {}).filter(([k]) => /^utm_[a-z]+$|^gclid$|^fbclid$|^ref$/.test(k)).slice(0, 9).map(([k, v]) => [k, String(v).slice(0, 200)])),
     }
     // Same person within 30 minutes (e.g. EmailJS + backup form): update instead of a duplicate
     if (email) {

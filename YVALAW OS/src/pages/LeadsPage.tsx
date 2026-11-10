@@ -8,6 +8,7 @@ import { Banner, Chips, Drawer, Field, PageHeader, Pill, SearchInput, Segmented,
 import { Ic, P } from '../components/Icon'
 import { dateShort, usdShort } from '../utils/format'
 import { useToast } from '../context/ToastContext'
+import { leadFormWarning } from '../utils/leadForms'
 
 const SERVICES = ['Legal Intake', 'Legal Assistants', 'Demand Writing', 'Case Managers', 'Other']
 const KIND_LABEL: Record<LeadActivity['kind'], string> = { note: 'Note', call: 'Call', email: 'Email', meeting: 'Meeting', whatsapp: 'WhatsApp', follow_up: 'Follow-up', system: 'YVA OS' }
@@ -31,6 +32,19 @@ function emailInitials(email?: string) {
   const local = (email || '').split('@')[0]
   const parts = local.split(/[._-]+/).filter(Boolean)
   return (parts.length > 1 ? parts[0][0] + parts[1][0] : local.slice(0, 2)).toUpperCase() || '—'
+}
+
+/** Where a website lead came from, in plain words: the form's page, the page/site before it, the ad */
+function leadOrigin(l: Lead): { label: string; value: string }[] {
+  const u = l.utm || {}
+  const out: { label: string; value: string }[] = []
+  if (l.source) out.push({ label: 'Form on', value: l.source })
+  if (u.ref) out.push({ label: 'Came from', value: u.ref.startsWith('/') ? `our page ${u.ref}` : u.ref.replace(/\/$/, '') })
+  const ad = [u.utm_source, u.utm_medium, u.utm_campaign].filter(Boolean).join(' / ')
+  if (ad) out.push({ label: 'Ad / campaign', value: ad + (u.utm_term ? ` · keyword "${u.utm_term}"` : '') + (u.utm_content ? ` · ${u.utm_content}` : '') })
+  if (u.gclid) out.push({ label: 'Click', value: 'Google Ads click' })
+  if (u.fbclid) out.push({ label: 'Click', value: 'Facebook / Instagram ad click' })
+  return out
 }
 
 /** CRM → Leads: pipeline with an owner per lead, follow-ups, won → client + project (Step 9; redesign 2026-11) */
@@ -160,6 +174,11 @@ export default function LeadsPage() {
     if (!open?.id || !window.confirm('Delete this lead?')) return
     try { await deleteLead(open.id); setOpen(null); await load() } catch (e) { toast.error((e as Error).message) }
   }
+  /** Fake lead: deleted (the deletion is kept in the change history with everything the lead said) */
+  async function markSpam() {
+    if (!open?.id || !window.confirm(`Mark "${open.name}" as spam? The lead is deleted; the change history keeps a copy.`)) return
+    try { await deleteLead(open.id); setOpen(null); await load(); toast.success('Marked as spam and removed.') } catch (e) { toast.error((e as Error).message) }
+  }
 
   const followUp = (l: Lead): { text: string; tone: Tone } | null => {
     if (!l.next_follow_up || closed(l.stage)) return null
@@ -179,6 +198,7 @@ export default function LeadsPage() {
           <span className="crm-lead__age">{age(l.created_at)}</span>
           {l.calendly_booked && <span className="crm-tag crm-tag--info">Call booked</span>}
           {fu && <span className={`crm-tag crm-tag--${fu.tone}`}>{fu.text}</span>}
+          {leadFormWarning(l) && <span className="crm-tag crm-tag--danger" title={leadFormWarning(l) || ''}>Not from a form</span>}
         </span>
       </button>
     )
@@ -255,6 +275,7 @@ export default function LeadsPage() {
         sub={existing && openLead ? `${[openLead.company, `added ${age(openLead.created_at) === 'now' ? 'just now' : `${age(openLead.created_at)} ago`}`, openLead.source && `via ${openLead.source}`].filter(Boolean).join(' · ')}` : 'Website leads are added automatically'}
         footer={open && <>
           {existing && canManage && <button type="button" className="btn btn--ghost btn--danger" onClick={() => void remove()}>Delete</button>}
+          {existing && canManage && !mobile && !(openLead && leadFormWarning(openLead)) && <button type="button" className="btn btn--ghost" onClick={() => void markSpam()}>Mark as spam</button>}
           <span className="spacer" />
           {existing && openLead?.client_id && <button type="button" className="btn" onClick={() => navigate(`/clients/${openLead.client_id}`)}>Open client</button>}
           {existing && open.stage !== 'won' && !convert && <button type="button" className="btn" onClick={() => startConvert(open)}>Mark won…</button>}
@@ -262,6 +283,11 @@ export default function LeadsPage() {
         </>}
       >
         {open && <>
+          {existing && openLead && leadFormWarning(openLead) && (
+            <Banner tone="danger" action={canManage ? <button type="button" className="btn btn--sm" onClick={() => void markSpam()}>Mark as spam</button> : undefined}>
+              <strong>Not from a website form.</strong> {leadFormWarning(openLead)}. Bots send fake leads this way; check it before you reply.
+            </Banner>
+          )}
           {existing && open.email && (
             <div className="row row--wrap">
               <a className="btn" href={`mailto:${open.email}`}><Ic d={P.mail} size={15} />Email</a>
@@ -282,7 +308,11 @@ export default function LeadsPage() {
             <Field label="Source"><input aria-label="Source" className="input" value={open.source ?? ''} onChange={e => set({ source: e.target.value })} /></Field>
             <Field label="Message / notes" full><textarea aria-label="Message" className="textarea" rows={3} value={open.message ?? ''} onChange={e => set({ message: e.target.value })} /></Field>
           </div>
-          {existing && openLead?.utm && Object.keys(openLead.utm).length > 0 && <div className="crm-utm mono">Ad tracking: {Object.entries(openLead.utm).map(([k, v]) => `${k}=${v}`).join(' · ')}</div>}
+          {existing && openLead && leadOrigin(openLead).length > 0 && (
+            <dl className="crm-origin" aria-label="Where this lead came from">
+              {leadOrigin(openLead).map((r, i) => <div key={i} className="crm-origin__row"><dt>{r.label}</dt><dd>{r.value}</dd></div>)}
+            </dl>
+          )}
           {existing && openLead?.stage === 'lost' && openLead.lost_reason && <div className="crm-utm">Lost because: {openLead.lost_reason}</div>}
 
           {convert && existing && (

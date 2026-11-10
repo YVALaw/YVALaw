@@ -54,6 +54,8 @@
             var p = params || {};
             var utm = {};
             new URLSearchParams(location.search).forEach(function (v, k) { if (/^utm_|^gclid$|^fbclid$/.test(k)) utm[k] = v; });
+            // The page the visitor came from (another site, or one of our pages such as a service page → "Book a call")
+            try { if (document.referrer) { var r = new URL(document.referrer); utm.ref = (r.host === location.host ? '' : r.host) + r.pathname; } } catch (e) { /* ignore */ }
             fetch('/.netlify/functions/lead-intake', {
                 method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: p.name || [p.first_name, p.last_name].filter(Boolean).join(' '), email: p.email, phone: p.phone,
