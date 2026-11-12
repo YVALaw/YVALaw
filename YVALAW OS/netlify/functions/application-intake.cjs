@@ -2,11 +2,12 @@
  * application-intake — public POST from careers.html. Puts the application straight into
  * YVA OS → Candidates (stage "applied", source "Careers page") and notifies the hiring team
  * (CEO, Admin, Recruiter). Sent in the background after the EmailJS notification.
- *   { name, email, phone, country, languages, experience, linkedin, message, role, hp }
+ *   { name, email, phone, country, languages, experience, linkedin, message, role, hp, turnstile }
  */
 const crypto = require('node:crypto')
 const { rest, enc } = require('./_lib/supa.cjs')
 const { notify, dispatchPending } = require('./_lib/notify.cjs')
+const { verifyTurnstile } = require('./_lib/turnstile.cjs')
 
 const ALLOWED = [/^https:\/\/(www\.)?yvastaffing\.agency$/, /^https:\/\/[a-z0-9-]+--yvalaw\.netlify\.app$/, /^https:\/\/yvalaw\.netlify\.app$/, /^http:\/\/localhost(:\d+)?$/]
 const hits = new Map()
@@ -24,6 +25,9 @@ exports.handler = async function handler(event) {
   try { b = JSON.parse(event.body || '{}') } catch { return reply(400, { error: 'Invalid' }, origin) }
   if (b.hp) return reply(200, { ok: true }, origin)
   const ip = String(h['x-nf-client-connection-ip'] || h['x-forwarded-for'] || '').split(',')[0].trim()
+  // Cloudflare Turnstile ("are you a person?"), on once TURNSTILE_SECRET_KEY is set; the email route still delivers real applicants
+  const human = await verifyTurnstile(b.turnstile, ip)
+  if (!human.ok) { console.warn(`application-intake: dropped, bot check ${human.reason}`); return reply(200, { ok: true }, origin) }
   const now = Date.now(), recent = (hits.get(ip) || []).filter(t => now - t < 10 * 60_000)
   if (ip && recent.length >= 5) return reply(429, { error: 'Too many requests' }, origin)
   hits.set(ip, [...recent, now])

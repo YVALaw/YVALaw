@@ -79,6 +79,7 @@
         back.querySelector('.yxo-no').textContent = t.no;
         back.querySelector('.yxo-small').textContent = t.privacy;
         document.body.appendChild(back);
+        if (window.yvaBotCheck) window.yvaBotCheck.watch(go);   // Cloudflare check above the button (assets/js/bot-check.js)
         requestAnimationFrame(function () { back.classList.add('yxo-in'); });
         track('exit_offer_shown', reason);
         var before = document.activeElement;
@@ -100,12 +101,13 @@
             var body = JSON.stringify({ name: name, email: email, service: SERVICE, source: SOURCE, message: 'Downloaded the Legal Staffing Checklist (pop-up on ' + location.pathname + ')', utm: utm, hp: fHp.value });
             var went = false, done = function () { if (went) return; went = true; track('download_checklist', 'exit_popup'); location.href = '/checklist.html'; };
             try {
-                fetch('/.netlify/functions/lead-intake', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: body })
+                (window.yvaBotCheck ? window.yvaBotCheck.token(go) : Promise.resolve(null))
+                    .then(function (turnstile) { var b = JSON.parse(body); b.turnstile = turnstile; return fetch('/.netlify/functions/lead-intake', { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b) }); })
                     .then(function (r) { return r.ok ? r.json() : null; })
                     .then(function (d) { if (d && d.id) set('yva_lead', JSON.stringify({ id: d.id, token: d.token }), sessionStorage); })
                     .catch(function () {}).then(done);
             } catch (x) { done(); }
-            setTimeout(done, 2500);   // never leave the visitor waiting
+            setTimeout(done, 9000);   // never leave the visitor waiting (the person check can take a few seconds)
         };
         box.addEventListener('click', function (e) { e.stopPropagation(); });
     }
