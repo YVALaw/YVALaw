@@ -861,8 +861,9 @@
             try {
                 const ctrl = new AbortController();
                 const timer = setTimeout(() => ctrl.abort(), 10000);
+                const turnstile = window.yvaBotCheck ? await window.yvaBotCheck.token('apply-submit') : null;   // Cloudflare person check
                 const res = await fetch('/.netlify/functions/application-intake', { method: 'POST', signal: ctrl.signal,
-                    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(fields) });
+                    headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...fields, turnstile }) });
                 clearTimeout(timer);
                 savedToOs = res.ok;
             } catch (e) { /* try the email routes */ }
@@ -903,5 +904,6 @@
         loadJobs();
     </script>
 
+    <script src="/assets/js/bot-check.js" defer></script>
 </body>
 </html>

@@ -56,12 +56,14 @@
             new URLSearchParams(location.search).forEach(function (v, k) { if (/^utm_|^gclid$|^fbclid$/.test(k)) utm[k] = v; });
             // The page the visitor came from (another site, or one of our pages such as a service page → "Book a call")
             try { if (document.referrer) { var r = new URL(document.referrer); utm.ref = (r.host === location.host ? '' : r.host) + r.pathname; } } catch (e) { /* ignore */ }
-            fetch('/.netlify/functions/lead-intake', {
+            // The Cloudflare "are you a person?" token (assets/js/bot-check.js); the server checks it
+            var human = window.yvaBotCheck ? window.yvaBotCheck.token() : Promise.resolve(null);
+            human.then(function (turnstile) { return fetch('/.netlify/functions/lead-intake', {
                 method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name: p.name || [p.first_name, p.last_name].filter(Boolean).join(' '), email: p.email, phone: p.phone,
                     company: p.company || p.firm_name, website: p.website, service: p.service, message: p.message, sms_consent: p.sms_consent,
-                    source: source || p.source || location.pathname, utm: utm, hp: p.hp || '' })
-            }).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+                    source: source || p.source || location.pathname, utm: utm, hp: p.hp || '', turnstile: turnstile })
+            }); }).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
                 if (d && d.id) { try { sessionStorage.setItem('yva_lead', JSON.stringify({ id: d.id, token: d.token })); } catch (e) { /* private mode */ } }
             }).catch(function () { /* the email routes still deliver the lead */ });
         } catch (e) { /* never break the form */ }

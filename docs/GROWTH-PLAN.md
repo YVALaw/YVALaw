@@ -32,10 +32,10 @@ On 2026-11-04 a fake lead arrived ("Joseph", service "contract review", Source "
 service, and real forms always send the page name. A bot posted straight to `/.netlify/functions/lead-intake`
 with a made-up `Origin` header, which the current check can't tell apart from the real site.
 
-- [ ] **You:** free Cloudflare account → **Turnstile** → add a widget for `yvastaffing.agency` (mode "Managed" /
+- [x] **You:** free Cloudflare account → **Turnstile** → add a widget for `yvastaffing.agency` (mode "Managed" /
       invisible). Send Claude the **site key**; it's public, so it's OK in chat. Put the **secret key** only in
       Netlify → Environment variables as `TURNSTILE_SECRET_KEY`. Never paste it in chat.
-- [ ] **Claude:** add Turnstile to every booking form (home + 7 landing pages), the checklist form and the careers
+- [x] **Claude:** (2026-11-12, needs `TURNSTILE_SECRET_KEY` on Netlify to switch the server check on) add Turnstile to every booking form (home + 7 landing pages), the checklist form and the careers
       application form. `lead-intake` / `application-intake` must verify the token on the server and refuse
       without it. Keep the honeypot and rate limits. If Turnstile itself is down, the EmailJS / Netlify Forms
       backup still delivers, so no real lead is lost.
@@ -188,6 +188,7 @@ To build (Claude):
 ---
 
 ## Log
+- 2026-11-12: Cloudflare Turnstile on every website form + exit pop-up + careers (server check on once TURNSTILE_SECRET_KEY is on Netlify).
 - 2026-11-10: Fake-lead filter + lead panel (where it came from, Not-from-a-form warning, Mark as spam); exit pop-up with the checklist; home "At a glance"; 2 blog drafts; off-site text pack.
 - 2026-11-03: Plan written. Live check found internal files downloadable from the site (section 0).
 - 2026-11-07: 10 new pages (4 roles, 3 practice areas, 3 guides), llms.txt, IndexNow, WhatsApp button (needs a number), /admin → Service & Guide Pages.

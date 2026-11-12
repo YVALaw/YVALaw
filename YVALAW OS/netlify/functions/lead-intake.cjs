@@ -2,6 +2,7 @@
  * lead-intake — public POST from the website booking forms (assets/js/lead-send.js).
  * Saves the lead in YVA OS → Leads (and notifies leads.manage holders through a database trigger).
  *   { name, email, phone, company, website, service, message, source, sms_consent, utm, hp }
+ *     + turnstile (Cloudflare token, checked once TURNSTILE_SECRET_KEY is set)
  *     (source + service must be ones our forms send — _lib/leadForms.cjs — or the lead is dropped; utm.ref = the page the visitor came from)
  *     → { id, token }        (hp = hidden honeypot field; bots fill it, people don't)
  *   { kind: 'calendly', id, token } → marks that lead "Calendly booked"
@@ -11,6 +12,7 @@
 const crypto = require('node:crypto')
 const { rest, enc } = require('./_lib/supa.cjs')
 const { notFromForm } = require('./_lib/leadForms.cjs')
+const { verifyTurnstile } = require('./_lib/turnstile.cjs')
 
 const ALLOWED = [/^https:\/\/(www\.)?yvastaffing\.agency$/, /^https:\/\/[a-z0-9-]+--yvalaw\.netlify\.app$/, /^https:\/\/yvalaw\.netlify\.app$/, /^http:\/\/localhost(:\d+)?$/]
 const hits = new Map()   // ip → timestamps (per function instance)
@@ -51,6 +53,9 @@ exports.handler = async function handler(event) {
     const bad = notFromForm({ source: b.source, service: b.service })
     if (bad) { console.warn(`lead-intake: dropped, ${bad}`); return reply(200, { ok: true }, origin) }
     const ip = String(h['x-nf-client-connection-ip'] || h['x-forwarded-for'] || '').split(',')[0].trim()
+    // Cloudflare Turnstile ("are you a person?"), on once TURNSTILE_SECRET_KEY is set on Netlify
+    const human = await verifyTurnstile(b.turnstile, ip)
+    if (!human.ok) { console.warn(`lead-intake: dropped, bot check ${human.reason}`); return reply(200, { ok: true }, origin) }
     const now = Date.now(), recent = (hits.get(ip) || []).filter(t => now - t < 10 * 60_000)
     if (ip && recent.length >= 6) return reply(429, { error: 'Too many requests' }, origin)
     hits.set(ip, [...recent, now])
