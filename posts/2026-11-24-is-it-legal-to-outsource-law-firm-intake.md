@@ -1,10 +1,12 @@
 ---
-title: "Is It Legal (and Safe) to Outsource Intake and Client Communication for a Law Firm?"
-date: "2026-11-24T09:00:00.000Z"
-description: "Can a law firm outsource intake and client communication? What ABA Model Rules 5.3 and 1.6 say, and the safeguards that keep it ethical and safe."
-image: "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&q=80&w=1200"
-image_alt: "Person reviewing and signing a document at a desk"
-draft: true
+title: Is It Legal (and Safe) to Outsource Intake and Client Communication for a
+  Law Firm?
+draft: false
+date: 2026-11-24T09:00:00.000Z
+description: Can a law firm outsource intake and client communication? What ABA
+  Model Rules 5.3 and 1.6 say, and the safeguards that keep it ethical and safe.
+image: https://images.unsplash.com/photo-1450101499163-c8848c66ca85?auto=format&fit=crop&q=80&w=1200
+image_alt: Person reviewing and signing a document at a desk
 ---
 
 In most U.S. jurisdictions, yes: a law firm can generally use outside or remote nonlawyer staff for intake and client communication, as long as the attorneys supervise the work and protect client confidentiality. The ABA Model Rules address this mainly in Rule 5.3 (responsibilities regarding nonlawyer assistance) and Rule 1.6 (confidentiality of information), and most states have adopted similar rules, sometimes with their own ethics opinions on outsourcing. Whether it is safe depends on how you set it up: confidentiality terms, controlled access to your systems, written scripts, clear limits on legal advice and real supervision. This article is general information, not legal advice; check your state bar's rules and guidance before you decide.
