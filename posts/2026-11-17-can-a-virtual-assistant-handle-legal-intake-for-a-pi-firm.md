@@ -1,10 +1,12 @@
 ---
-title: "Can a Virtual Assistant Handle Legal Intake for a Personal Injury Firm?"
-date: "2026-11-17T09:00:00.000Z"
-description: "Yes, a trained virtual intake specialist can run PI intake: calls in English and Spanish, screening, CRM entry and consult booking, with attorneys in charge."
-image: "https://images.unsplash.com/photo-1423666639041-f56000c27a9a?auto=format&fit=crop&q=80&w=1200"
-image_alt: "Notebook, laptop and phone on a desk, ready for a client call"
-draft: true
+title: Can a Virtual Assistant Handle Legal Intake for a Personal Injury Firm?
+draft: false
+date: 2026-11-17T09:00:00.000Z
+description: "Yes, a trained virtual intake specialist can run PI intake: calls
+  in English and Spanish, screening, CRM entry and consult booking, with
+  attorneys in charge."
+image: https://images.unsplash.com/photo-1423666639041-f56000c27a9a?auto=format&fit=crop&q=80&w=1200
+image_alt: Notebook, laptop and phone on a desk, ready for a client call
 ---
 
 Yes. A trained virtual intake specialist can handle most of a personal injury firm's intake: answering calls and emails in English and Spanish, screening callers against the firm's criteria, collecting the accident facts, entering everything into the CRM, booking consultations and following up on leads that go quiet. What stays with the attorney is the legal judgment: evaluating the claim, deciding whether to accept the case and answering any legal question. The difference between intake that works and intake that loses cases is less about where the person sits and more about whether they are trained for legal intake, follow your script and are supervised.
