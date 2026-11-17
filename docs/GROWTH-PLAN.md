@@ -102,7 +102,7 @@ don't compete with the ads.
 - [x] One page per **practice area**: Personal Injury, Employment Law, Workers' Comp
 - [x] **Pricing guide:** "How much does a virtual legal assistant cost?" (in-house vs. freelancer vs. YVA, real numbers)
 - [x] **Comparison pages:** "Virtual legal assistant vs. hiring in-house" and "How to choose a virtual legal staffing company"
-- [x] **Company facts** for AI: `llms.txt` done (2026-11-07); "At a glance" box on every new page and on the home page About section (2026-11-10, EN/ES).
+- [x] **Company facts** for AI: `llms.txt` done (2026-11-07); "At a glance" box on every new page. The home page box (added 2026-11-10) was removed on 2026-11-17 at the owner's request; its facts are in the home JSON-LD (founder, no long-term contract, free replacement via `termsOfService`) and `llms.txt` (founder, 24/7 coverage).
 - [x] Add the new pages to the sitemap, the menu/footer and the site's built-in business info (structured data)
 - [ ] **Spanish versions** of the key pages (being bilingual is the main selling point)
 - [x] Automatic "new page" notice to Bing on every deploy (IndexNow)
@@ -188,6 +188,7 @@ To build (Claude):
 ---
 
 ## Log
+- 2026-11-17: Home "At a glance" box removed; founder + 24/7 coverage added to llms.txt; no-contract + free-replacement terms added to the home Organization/Service JSON-LD.
 - 2026-11-12: Cloudflare Turnstile on every website form + exit pop-up + careers (server check on once TURNSTILE_SECRET_KEY is on Netlify).
 - 2026-11-10: Fake-lead filter + lead panel (where it came from, Not-from-a-form warning, Mark as spam); exit pop-up with the checklist; home "At a glance"; 2 blog drafts; off-site text pack.
 - 2026-11-03: Plan written. Live check found internal files downloadable from the site (section 0).

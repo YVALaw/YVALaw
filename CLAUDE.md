@@ -65,7 +65,7 @@ Practice area landing pages: Hero → Problem → Services (role cards) → Cost
 | Pricing | `#pricing` | 4 cards + comparison table |
 | How It Works | `#how-it-works` | 3 steps |
 | Testimonials | `#testimonials` | 4-slide carousel, auto-advances |
-| About | `#about` | Story, stats grid, **At a glance** facts box (`#at-a-glance`, EN/ES keys `glance*`, prices via CMS markers), founders toggle |
+| About | `#about` | Story, stats grid, founders toggle (the "At a glance" box was removed 2026-11-17; its facts live in the Organization/Service JSON-LD and `llms.txt`) |
 | Footer | — | Quick links, services list, contact |
 
 ---
